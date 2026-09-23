@@ -7,8 +7,8 @@ export function totpKey(base64Key: string): Buffer {
 }
 
 /** userId в AAD: зашифрованный секрет нельзя перенести в строку другого пользователя. */
-export function sealTotpSecret(key: Buffer, userId: string, secret: string): Buffer {
-  return seal(key, secret, `totp:${userId}`);
+export function sealTotpSecret(key: Buffer, userId: string, secret: string): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(seal(key, secret, `totp:${userId}`));
 }
 
 export function openTotpSecret(key: Buffer, userId: string, sealed: Uint8Array): string {

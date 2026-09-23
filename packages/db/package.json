@@ -30,10 +30,9 @@
     "@sde/contracts": "workspace:*"
   },
   "devDependencies": {
-    "argon2": "0.45.1",
-    "otplib": "12.0.1",
     "prisma": "6.19.3",
     "tsx": "4.23.15",
-    "vitest": "3.2.7"
+    "vitest": "3.2.7",
+    "@sde/server-kit": "workspace:*"
   }
 }

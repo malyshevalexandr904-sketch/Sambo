@@ -14,8 +14,9 @@ export function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString('base64url');
 }
 
-export function sha256(value: string | Buffer): Buffer {
-  return createHash('sha256').update(value).digest();
+/** SHA-256 в виде Uint8Array (формат колонок bytea в Prisma). */
+export function sha256(value: string | Buffer): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(createHash('sha256').update(value).digest());
 }
 
 export function sha256Hex(value: string | Buffer): string {
