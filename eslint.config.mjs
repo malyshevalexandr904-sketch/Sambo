@@ -3,6 +3,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 import globals from 'globals';
+import reactHooks from 'eslint-plugin-react-hooks';
 
 export default tseslint.config(
   {
@@ -72,7 +73,13 @@ export default tseslint.config(
   {
     files: ['**/*.tsx'],
     languageOptions: { globals: { ...globals.browser } },
-    rules: { 'max-lines-per-function': ['warn', { max: 150, skipBlankLines: true, skipComments: true }] },
+    plugins: { 'react-hooks': reactHooks },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      'max-lines-per-function': ['warn', { max: 200, skipBlankLines: true, skipComments: true }],
+      // Асинхронные обработчики событий React допустимы: ошибки обрабатываются внутри.
+      '@typescript-eslint/no-misused-promises': ['error', { checksVoidReturn: { attributes: false } }],
+    },
   },
   prettier,
 );
