@@ -26,29 +26,33 @@ import { OutboxModule } from './modules/outbox';
 import { SettingsModule } from './modules/settings';
 import { UsersModule } from './modules/users';
 
-const logLevel = process.env.LOG_LEVEL ?? 'info';
-
 @Module({
   imports: [
     ConfigModule,
-    LoggerModule.forRoot({
-      pinoHttp: {
-        ...loggerOptions(logLevel, 'api'),
-        // traceId = X-Request-Id прокси или новый UUID; RequestContextMiddleware берёт тот же req.id.
-        genReqId: (req: IncomingMessage) => {
-          const incoming = req.headers['x-request-id'];
-          return typeof incoming === 'string' && TRACE_ID_RE.test(incoming) ? incoming : randomUUID();
+    LoggerModule.forRootAsync({
+      // Фабрика: уровень логирования читается при создании приложения, а не при импорте модуля.
+      useFactory: () => ({
+        pinoHttp: {
+          ...loggerOptions(process.env.LOG_LEVEL ?? 'info', 'api'),
+          // traceId = X-Request-Id прокси или новый UUID; RequestContextMiddleware берёт тот же req.id.
+          genReqId: (req: IncomingMessage) => {
+            const incoming = req.headers['x-request-id'];
+            return typeof incoming === 'string' && TRACE_ID_RE.test(incoming) ? incoming : randomUUID();
+          },
+          customProps: () => {
+            const ctx = RequestContextStore.get();
+            return { traceId: ctx?.traceId, userId: ctx?.user?.id };
+          },
+          autoLogging: { ignore: (req: IncomingMessage) => req.url === '/health' || req.url === '/ready' },
+          serializers: {
+            req: (req: { method: string; url: string }) => ({
+              method: req.method,
+              url: req.url.split('?')[0],
+            }),
+            res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
+          },
         },
-        customProps: () => {
-          const ctx = RequestContextStore.get();
-          return { traceId: ctx?.traceId, userId: ctx?.user?.id };
-        },
-        autoLogging: { ignore: (req: IncomingMessage) => req.url === '/health' || req.url === '/ready' },
-        serializers: {
-          req: (req: { method: string; url: string }) => ({ method: req.method, url: req.url.split('?')[0] }),
-          res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
-        },
-      },
+      }),
     }),
     PrismaModule,
     RedisModule,
