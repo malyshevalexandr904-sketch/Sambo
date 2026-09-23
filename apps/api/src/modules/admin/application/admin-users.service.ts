@@ -29,7 +29,12 @@ const USER_INCLUDE = {
   platformRoles: { where: { revokedAt: null }, select: { role: { select: { code: true } } } },
   organizationMemberships: {
     where: { status: { in: ['INVITED', 'ACTIVE', 'SUSPENDED'] } },
-    select: { organizationId: true, status: true, role: { select: { code: true } }, organization: { select: { name: true } } },
+    select: {
+      organizationId: true,
+      status: true,
+      role: { select: { code: true } },
+      organization: { select: { name: true } },
+    },
   },
 } satisfies Prisma.UserInclude;
 
@@ -48,7 +53,12 @@ function toAdminUser(u: UserRow): AdminUser {
     platformRoles: u.platformRoles.map((p) => p.role.code).filter(isRoleCode),
     organizations: u.organizationMemberships
       .filter((m) => isRoleCode(m.role.code))
-      .map((m) => ({ organizationId: m.organizationId, organizationName: m.organization.name, role: m.role.code as RoleCode, status: m.status })),
+      .map((m) => ({
+        organizationId: m.organizationId,
+        organizationName: m.organization.name,
+        role: m.role.code as RoleCode,
+        status: m.status,
+      })),
     createdAt: u.createdAt.toISOString(),
   };
 }
@@ -66,7 +76,13 @@ export class AdminUsersService {
     const cursor = decodeCursor(q.cursor);
     const and: Prisma.UserWhereInput[] = [{ deletedAt: null }];
     if (q.status) and.push({ status: q.status });
-    if (q.q) and.push({ OR: [{ email: { contains: q.q, mode: 'insensitive' } }, { displayName: { contains: q.q, mode: 'insensitive' } }] });
+    if (q.q)
+      and.push({
+        OR: [
+          { email: { contains: q.q, mode: 'insensitive' } },
+          { displayName: { contains: q.q, mode: 'insensitive' } },
+        ],
+      });
     if (q.role) {
       and.push({
         OR: [
@@ -76,7 +92,13 @@ export class AdminUsersService {
         ],
       });
     }
-    if (cursor) and.push({ OR: [{ createdAt: { lt: new Date(cursor.k) } }, { createdAt: new Date(cursor.k), id: { lt: cursor.id } }] });
+    if (cursor)
+      and.push({
+        OR: [
+          { createdAt: { lt: new Date(cursor.k) } },
+          { createdAt: new Date(cursor.k), id: { lt: cursor.id } },
+        ],
+      });
     const rows = await this.db.user.findMany({
       where: { AND: and },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -94,15 +116,31 @@ export class AdminUsersService {
 
   /** Блокировка отзывает все сессии пользователя сразу (API.md, 3.3; SECURITY.md, 3.1). */
   async block(actor: AuthUser, id: string, reason: string): Promise<AdminUser> {
-    if (actor.id === id) throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed: ['cannot_block_self'] });
+    if (actor.id === id)
+      throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed: ['cannot_block_self'] });
     const revoked = await this.db.tx(async (tx) => {
       const user = await tx.user.findFirst({ where: { id, deletedAt: null } });
       if (!user) throw new DomainError('NOT_FOUND', { resource: 'user' });
-      if (user.status === 'BLOCKED') throw new DomainError('INVALID_TRANSITION', { from: 'BLOCKED', to: 'BLOCKED', allowed: ['ACTIVE'] });
-      await tx.user.update({ where: { id }, data: { status: 'BLOCKED', permissionsVersion: { increment: 1 } } });
+      if (user.status === 'BLOCKED')
+        throw new DomainError('INVALID_TRANSITION', { from: 'BLOCKED', to: 'BLOCKED', allowed: ['ACTIVE'] });
+      await tx.user.update({
+        where: { id },
+        data: { status: 'BLOCKED', permissionsVersion: { increment: 1 } },
+      });
       const families = await this.sessions.revokeAll(tx, id, 'account_blocked');
-      await this.audit.record(tx, { action: 'user.blocked', entityType: 'User', entityId: id, before: { status: user.status }, after: { status: 'BLOCKED' }, reason });
-      await this.outbox.enqueue(tx, { type: 'user.blocked', aggregate: { type: 'User', id }, payload: { userId: id } });
+      await this.audit.record(tx, {
+        action: 'user.blocked',
+        entityType: 'User',
+        entityId: id,
+        before: { status: user.status },
+        after: { status: 'BLOCKED' },
+        reason,
+      });
+      await this.outbox.enqueue(tx, {
+        type: 'user.blocked',
+        aggregate: { type: 'User', id },
+        payload: { userId: id },
+      });
       return families;
     });
     await this.sessions.blockSessions(revoked);
@@ -113,10 +151,18 @@ export class AdminUsersService {
     await this.db.tx(async (tx) => {
       const user = await tx.user.findFirst({ where: { id, deletedAt: null } });
       if (!user) throw new DomainError('NOT_FOUND', { resource: 'user' });
-      if (user.status !== 'BLOCKED') throw new DomainError('INVALID_TRANSITION', { from: user.status, to: 'ACTIVE', allowed: [] });
+      if (user.status !== 'BLOCKED')
+        throw new DomainError('INVALID_TRANSITION', { from: user.status, to: 'ACTIVE', allowed: [] });
       const next = user.emailVerifiedAt ? 'ACTIVE' : 'PENDING_VERIFICATION';
       await tx.user.update({ where: { id }, data: { status: next, permissionsVersion: { increment: 1 } } });
-      await this.audit.record(tx, { action: 'user.unblocked', entityType: 'User', entityId: id, before: { status: 'BLOCKED' }, after: { status: next }, reason });
+      await this.audit.record(tx, {
+        action: 'user.unblocked',
+        entityType: 'User',
+        entityId: id,
+        before: { status: 'BLOCKED' },
+        after: { status: next },
+        reason,
+      });
     });
     return this.get(id);
   }
@@ -128,30 +174,55 @@ export class AdminUsersService {
       if (!user) throw new DomainError('NOT_FOUND', { resource: 'user' });
       if (!user.totpEnabledAt) throw new DomainError('TOTP_REQUIRED', { reason: 'recipient_without_totp' });
       const role = await tx.role.findUniqueOrThrow({ where: { code: req.roleCode } });
-      const existing = await tx.platformRoleAssignment.findFirst({ where: { userId: id, roleId: role.id, revokedAt: null } });
+      const existing = await tx.platformRoleAssignment.findFirst({
+        where: { userId: id, roleId: role.id, revokedAt: null },
+      });
       if (existing) throw new DomainError('ALREADY_EXISTS', { resource: 'platform_role' });
-      await tx.platformRoleAssignment.create({ data: { id: uuidv7(), userId: id, roleId: role.id, grantedById: actor.id } });
+      await tx.platformRoleAssignment.create({
+        data: { id: uuidv7(), userId: id, roleId: role.id, grantedById: actor.id },
+      });
       await tx.user.update({ where: { id }, data: { permissionsVersion: { increment: 1 } } });
-      await this.audit.record(tx, { action: 'user.platform_role_granted', entityType: 'User', entityId: id, after: { roleCode: req.roleCode }, reason: req.reason });
+      await this.audit.record(tx, {
+        action: 'user.platform_role_granted',
+        entityType: 'User',
+        entityId: id,
+        after: { roleCode: req.roleCode },
+        reason: req.reason,
+      });
     });
     return this.get(id);
   }
 
   /** Нельзя снять последнего SUPER_ADMIN — иначе платформой некому управлять. */
   async revokePlatformRole(id: string, roleCode: string, reason: string): Promise<void> {
-    if (!isRoleCode(roleCode) || ROLES[roleCode].scope !== 'PLATFORM') throw new DomainError('NOT_FOUND', { resource: 'platform_role' });
+    if (!isRoleCode(roleCode) || ROLES[roleCode].scope !== 'PLATFORM')
+      throw new DomainError('NOT_FOUND', { resource: 'platform_role' });
     await this.db.tx(async (tx) => {
       const role = await tx.role.findUniqueOrThrow({ where: { code: roleCode } });
-      const assignment = await tx.platformRoleAssignment.findFirst({ where: { userId: id, roleId: role.id, revokedAt: null } });
+      const assignment = await tx.platformRoleAssignment.findFirst({
+        where: { userId: id, roleId: role.id, revokedAt: null },
+      });
       if (!assignment) throw new DomainError('NOT_FOUND', { resource: 'platform_role' });
       if (roleCode === 'SUPER_ADMIN') {
         await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext('platform-role:SUPER_ADMIN'))`;
-        const remaining = await tx.platformRoleAssignment.count({ where: { roleId: role.id, revokedAt: null, user: { status: 'ACTIVE' } } });
-        if (remaining <= 1) throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed: ['last_super_admin'] });
+        const remaining = await tx.platformRoleAssignment.count({
+          where: { roleId: role.id, revokedAt: null, user: { status: 'ACTIVE' } },
+        });
+        if (remaining <= 1)
+          throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed: ['last_super_admin'] });
       }
-      await tx.platformRoleAssignment.update({ where: { id: assignment.id }, data: { revokedAt: new Date() } });
+      await tx.platformRoleAssignment.update({
+        where: { id: assignment.id },
+        data: { revokedAt: new Date() },
+      });
       await tx.user.update({ where: { id }, data: { permissionsVersion: { increment: 1 } } });
-      await this.audit.record(tx, { action: 'user.platform_role_revoked', entityType: 'User', entityId: id, before: { roleCode }, reason });
+      await this.audit.record(tx, {
+        action: 'user.platform_role_revoked',
+        entityType: 'User',
+        entityId: id,
+        before: { roleCode },
+        reason,
+      });
     });
   }
 
@@ -161,7 +232,9 @@ export class AdminUsersService {
       scope: ROLES[code].scope,
       isSystem: true,
       nameKey: ROLES[code].nameKey,
-      permissions: (Object.entries(ROLE_PERMISSIONS[code]) as [PermissionCode, RoleDto['permissions'][number]['mode']][]).map(([p, mode]) => ({
+      permissions: (
+        Object.entries(ROLE_PERMISSIONS[code]) as [PermissionCode, RoleDto['permissions'][number]['mode']][]
+      ).map(([p, mode]) => ({
         code: p,
         mode,
       })),

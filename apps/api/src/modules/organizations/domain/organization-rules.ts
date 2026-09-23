@@ -25,10 +25,13 @@ export const MEMBERSHIP_TRANSITIONS: Transition<MembershipStatus>[] = [
 ];
 
 export type TransitionCheck<S extends string> =
-  | { ok: true; reasonRequired: boolean }
-  | { ok: false; allowed: S[] };
+  { ok: true; reasonRequired: boolean } | { ok: false; allowed: S[] };
 
-export function checkTransition<S extends string>(table: Transition<S>[], from: S, to: S): TransitionCheck<S> {
+export function checkTransition<S extends string>(
+  table: Transition<S>[],
+  from: S,
+  to: S,
+): TransitionCheck<S> {
   const found = table.find((t) => t.from === from && t.to === to);
   if (found) return { ok: true, reasonRequired: found.reasonRequired };
   return { ok: false, allowed: table.filter((t) => t.from === from).map((t) => t.to) };
@@ -50,9 +53,40 @@ export function creatorRole(type: OrganizationType): RoleCode {
 }
 
 const TRANSLIT: Record<string, string> = {
-  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm',
-  н: 'n', о: 'o', п: 'p', р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'shch',
-  ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya', '№': '',
+  а: 'a',
+  б: 'b',
+  в: 'v',
+  г: 'g',
+  д: 'd',
+  е: 'e',
+  ё: 'e',
+  ж: 'zh',
+  з: 'z',
+  и: 'i',
+  й: 'y',
+  к: 'k',
+  л: 'l',
+  м: 'm',
+  н: 'n',
+  о: 'o',
+  п: 'p',
+  р: 'r',
+  с: 's',
+  т: 't',
+  у: 'u',
+  ф: 'f',
+  х: 'kh',
+  ц: 'ts',
+  ч: 'ch',
+  ш: 'sh',
+  щ: 'shch',
+  ъ: '',
+  ы: 'y',
+  ь: '',
+  э: 'e',
+  ю: 'yu',
+  я: 'ya',
+  '№': '',
 };
 
 /** Slug из названия: транслитерация, латиница, цифры и дефисы, 3–80 символов. */

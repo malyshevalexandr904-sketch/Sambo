@@ -1,6 +1,6 @@
 // Администрирование пользователей, ролей, справочников и настроек (API.md, 3.3, 3.7).
 import { z } from 'zod';
-import { CountryCode, LocalizedText, PageQuery, Reason } from './common.js';
+import { CountryCode, type LocalizedText, PageQuery, Reason } from './common.js';
 import { USER_STATUSES, type UserStatus } from './auth.js';
 import { ROLE_CODES, type GrantMode, type RoleCode } from './roles.js';
 import type { PermissionCode, PermissionScope } from './permissions.js';
@@ -72,14 +72,22 @@ export const DictionaryInputs = {
   countries: z.object({ nameRu: Name, nameEn: Name }),
   regions: z.object({ countryCode: CountryCode, nameRu: Name, nameEn: Name }),
   'sport-ranks': z.object({ nameRu: Name, nameEn: Name, rankOrder: z.number().int().min(1).max(1000) }),
-  'referee-categories': z.object({ nameRu: Name, nameEn: Name, rankOrder: z.number().int().min(1).max(1000) }),
+  'referee-categories': z.object({
+    nameRu: Name,
+    nameEn: Name,
+    rankOrder: z.number().int().min(1).max(1000),
+  }),
   disciplines: z.object({ nameRu: Name, nameEn: Name }),
   'document-types': z.object({
     nameRu: Name,
     nameEn: Name,
     sensitivity: z.enum(DOCUMENT_SENSITIVITIES),
     allowedMime: z.array(z.enum(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])).min(1),
-    maxSizeBytes: z.number().int().min(1024).max(50 * 1024 * 1024),
+    maxSizeBytes: z
+      .number()
+      .int()
+      .min(1024)
+      .max(50 * 1024 * 1024),
     retentionDays: z.number().int().min(1).max(3650),
   }),
 } as const satisfies Record<DictionaryName, z.ZodType>;
@@ -119,9 +127,7 @@ export interface DocumentTypeDto {
 export const SYSTEM_SETTINGS = {
   'registration.selfSignupEnabled': z.boolean(),
   'support.contactEmail': z.email().nullable(),
-  'ui.maintenanceBanner': z
-    .object({ ru: z.string().max(500), en: z.string().max(500) })
-    .nullable(),
+  'ui.maintenanceBanner': z.object({ ru: z.string().max(500), en: z.string().max(500) }).nullable(),
   'auth.leakedPasswordCheckEnabled': z.boolean(),
 } as const;
 

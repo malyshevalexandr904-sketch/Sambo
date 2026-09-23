@@ -17,7 +17,8 @@ export class DomainError extends Error {
 
 export const notFound = (resource: string): DomainError => new DomainError('NOT_FOUND', { resource });
 
-export const forbidden = (details?: Record<string, unknown>): DomainError => new DomainError('FORBIDDEN', details);
+export const forbidden = (details?: Record<string, unknown>): DomainError =>
+  new DomainError('FORBIDDEN', details);
 
 export const invalidTransition = (from: string, to: string, allowed: readonly string[]): DomainError =>
   new DomainError('INVALID_TRANSITION', { from, to, allowed });

@@ -74,9 +74,16 @@ export class OutboxDispatcher {
             const queue = this.queues.get(queueName);
             if (!queue) throw new Error(`Queue ${queueName} is not configured`);
             // jobId = eventId: повторная постановка того же события не создаёт дубль задачи.
-            await queue.add(row.type, { eventId: row.id, type: row.type, traceId: row.trace_id }, { jobId: `${queueName}-${row.id}` });
+            await queue.add(
+              row.type,
+              { eventId: row.id, type: row.type, traceId: row.trace_id },
+              { jobId: `${queueName}-${row.id}` },
+            );
           }
-          await tx.outboxEvent.update({ where: { id: row.id }, data: { status: 'DISPATCHED', dispatchedAt: new Date(), attempts: { increment: 1 } } });
+          await tx.outboxEvent.update({
+            where: { id: row.id },
+            data: { status: 'DISPATCHED', dispatchedAt: new Date(), attempts: { increment: 1 } },
+          });
         } catch (e) {
           const attempts = row.attempts + 1;
           const backoffMs = Math.min(2 ** attempts * 1_000, 5 * 60_000);
@@ -89,7 +96,10 @@ export class OutboxDispatcher {
               availableAt: new Date(Date.now() + backoffMs),
             },
           });
-          this.logger.warn({ eventId: row.id, type: row.type, attempts, traceId: row.trace_id }, 'Outbox event dispatch failed');
+          this.logger.warn(
+            { eventId: row.id, type: row.type, attempts, traceId: row.trace_id },
+            'Outbox event dispatch failed',
+          );
         }
       }
       return rows.length;

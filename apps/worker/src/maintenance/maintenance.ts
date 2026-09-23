@@ -38,7 +38,9 @@ export class Maintenance {
   /** Партиции AuditLog и DataAccessLog на 3 месяца вперёд. Функция SECURITY DEFINER, DDL у роли приложения нет. */
   private async ensurePartitions(): Promise<void> {
     for (const table of ['audit_log', 'data_access_log']) {
-      const rows = await this.db.$queryRaw<{ created: number }[]>`SELECT ensure_monthly_partitions(${table}, current_date, 3) AS created`;
+      const rows = await this.db.$queryRaw<
+        { created: number }[]
+      >`SELECT ensure_monthly_partitions(${table}, current_date, 3) AS created`;
       this.logger.info({ table, created: rows[0]?.created ?? 0 }, 'Partitions ensured');
     }
   }
@@ -47,7 +49,10 @@ export class Maintenance {
   private async cleanupTokens(): Promise<void> {
     const before = new Date(Date.now() - 30 * DAY);
     // Сначала разрываем цепочки ротации, чтобы удалить токены без нарушения FK.
-    await this.db.refreshToken.updateMany({ where: { expiresAt: { lt: before }, replacedById: { not: null } }, data: { replacedById: null } });
+    await this.db.refreshToken.updateMany({
+      where: { expiresAt: { lt: before }, replacedById: { not: null } },
+      data: { replacedById: null },
+    });
     const refresh = await this.db.refreshToken.deleteMany({ where: { expiresAt: { lt: before } } });
     const verification = await this.db.verificationToken.deleteMany({ where: { expiresAt: { lt: before } } });
     this.logger.info({ refresh: refresh.count, verification: verification.count }, 'Expired tokens removed');
@@ -56,7 +61,9 @@ export class Maintenance {
   /** OutboxEvent и ProcessedEvent — 30 дней после обработки. */
   private async cleanupOutbox(): Promise<void> {
     const before = new Date(Date.now() - 30 * DAY);
-    const outbox = await this.db.outboxEvent.deleteMany({ where: { status: 'DISPATCHED', dispatchedAt: { lt: before } } });
+    const outbox = await this.db.outboxEvent.deleteMany({
+      where: { status: 'DISPATCHED', dispatchedAt: { lt: before } },
+    });
     const processed = await this.db.processedEvent.deleteMany({ where: { processedAt: { lt: before } } });
     this.logger.info({ outbox: outbox.count, processed: processed.count }, 'Old outbox records removed');
   }
@@ -75,7 +82,10 @@ export class Maintenance {
         this.logger.warn({ err: e, fileId: file.id }, 'Failed to delete stale upload object');
         continue;
       }
-      await this.db.storedFile.update({ where: { id: file.id }, data: { status: 'DELETED', deletedAt: new Date() } });
+      await this.db.storedFile.update({
+        where: { id: file.id },
+        data: { status: 'DELETED', deletedAt: new Date() },
+      });
     }
     if (stale.length > 0) this.logger.info({ count: stale.length }, 'Stale uploads removed');
   }

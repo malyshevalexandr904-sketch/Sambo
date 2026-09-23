@@ -93,7 +93,12 @@ export class S3StorageService extends StorageService {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.buckets[bucket], Key: key }));
   }
 
-  async presignGet(bucket: FileBucket, key: string, expiresSeconds: number, downloadName: string): Promise<string> {
+  async presignGet(
+    bucket: FileBucket,
+    key: string,
+    expiresSeconds: number,
+    downloadName: string,
+  ): Promise<string> {
     const safeName = encodeURIComponent(downloadName.replace(/["\\\r\n]/g, '_'));
     return getSignedUrl(
       this.signer,

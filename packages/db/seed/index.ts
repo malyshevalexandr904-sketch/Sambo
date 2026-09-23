@@ -43,12 +43,29 @@ async function seedOrganizations(db: PrismaClient): Promise<void> {
   }
 }
 
-async function seedUsers(db: PrismaClient, password: string, adminTotpSecret: string, key: Buffer): Promise<void> {
+async function seedUsers(
+  db: PrismaClient,
+  password: string,
+  adminTotpSecret: string,
+  key: Buffer,
+): Promise<void> {
   const secretHash = await hashPassword(password);
-  const roles = new Map((await db.role.findMany()).map((r) => [r.code, r as { id: string; scope: RoleScope }]));
+  const roles = new Map(
+    (await db.role.findMany()).map((r) => [r.code, r as { id: string; scope: RoleScope }]),
+  );
   for (const u of SEED_USERS) {
-    const personData = { lastName: u.person.lastName, firstName: u.person.firstName, birthDate: new Date(u.person.birthDate), gender: u.person.gender, countryCode: 'RU' };
-    await db.person.upsert({ where: { id: u.personId }, create: { id: u.personId, ...personData }, update: personData });
+    const personData = {
+      lastName: u.person.lastName,
+      firstName: u.person.firstName,
+      birthDate: new Date(u.person.birthDate),
+      gender: u.person.gender,
+      countryCode: 'RU',
+    };
+    await db.person.upsert({
+      where: { id: u.personId },
+      create: { id: u.personId, ...personData },
+      update: personData,
+    });
     const userData = {
       email: u.email,
       displayName: u.displayName,
@@ -67,20 +84,36 @@ async function seedUsers(db: PrismaClient, password: string, adminTotpSecret: st
     });
     await db.authIdentity.upsert({
       where: { provider_providerSubject: { provider: 'EMAIL_PASSWORD', providerSubject: u.email } },
-      create: { id: u.identityId, userId: u.id, provider: 'EMAIL_PASSWORD', providerSubject: u.email, secretHash },
+      create: {
+        id: u.identityId,
+        userId: u.id,
+        provider: 'EMAIL_PASSWORD',
+        providerSubject: u.email,
+        secretHash,
+      },
       update: { secretHash },
     });
     for (const grant of u.grants) {
       const role = roles.get(grant.role);
       if (!role) throw new Error(`Seed: role ${grant.role} not found — apply migrations first`);
       if (!grant.organizationId) {
-        const existing = await db.platformRoleAssignment.findFirst({ where: { userId: u.id, roleId: role.id, revokedAt: null } });
-        if (!existing) await db.platformRoleAssignment.create({ data: { id: grant.id, userId: u.id, roleId: role.id } });
+        const existing = await db.platformRoleAssignment.findFirst({
+          where: { userId: u.id, roleId: role.id, revokedAt: null },
+        });
+        if (!existing)
+          await db.platformRoleAssignment.create({ data: { id: grant.id, userId: u.id, roleId: role.id } });
         continue;
       }
       await db.organizationMembership.upsert({
         where: { id: grant.id },
-        create: { id: grant.id, organizationId: grant.organizationId, userId: u.id, roleId: role.id, status: 'ACTIVE', validFrom: today },
+        create: {
+          id: grant.id,
+          organizationId: grant.organizationId,
+          userId: u.id,
+          roleId: role.id,
+          status: 'ACTIVE',
+          validFrom: today,
+        },
         update: { status: 'ACTIVE', validTo: null },
       });
     }
@@ -96,7 +129,10 @@ async function main(): Promise<void> {
     process.stdout.write(
       [
         'Seed completed. Fictional accounts (password from SEED_PASSWORD):',
-        ...SEED_USERS.map((u) => `  ${u.email.padEnd(28)} ${u.grants.map((g) => g.role).join(', ') || '—'}${u.totp ? '  [TOTP: SEED_ADMIN_TOTP_SECRET]' : ''}`),
+        ...SEED_USERS.map(
+          (u) =>
+            `  ${u.email.padEnd(28)} ${u.grants.map((g) => g.role).join(', ') || '—'}${u.totp ? '  [TOTP: SEED_ADMIN_TOTP_SECRET]' : ''}`,
+        ),
         '',
       ].join('\n'),
     );

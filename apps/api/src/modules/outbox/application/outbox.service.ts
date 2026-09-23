@@ -1,6 +1,12 @@
 // Transactional outbox (ADR-08; ARCHITECTURE.md, 12): событие пишется в той же транзакции, что и изменение.
 import { Inject, Injectable } from '@nestjs/common';
-import { type EmailTemplate, EVENT_SCHEMAS, type EventPayload, type EventType, type Locale } from '@sde/contracts';
+import {
+  type EmailTemplate,
+  EVENT_SCHEMAS,
+  type EventPayload,
+  type EventType,
+  type Locale,
+} from '@sde/contracts';
 import { type Prisma, type Tx, uuidv7 } from '@sde/db';
 import { deriveKey, type Env, KEY_PURPOSES, sealJson } from '@sde/server-kit';
 import { RequestContextStore } from '../../../common/context/request-context';

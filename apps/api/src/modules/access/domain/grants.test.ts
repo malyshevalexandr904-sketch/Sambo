@@ -8,7 +8,13 @@ import {
   type ResourceScope,
 } from './grants';
 
-const base: EffectiveGrants = { userId: 'u', permissionsVersion: 1, platform: [], organizations: [], competitions: [] };
+const base: EffectiveGrants = {
+  userId: 'u',
+  permissionsVersion: 1,
+  platform: [],
+  organizations: [],
+  competitions: [],
+};
 
 const FED = 'fed';
 const CLUB = 'club';
@@ -46,7 +52,12 @@ describe('decide — platform roles', () => {
   });
 
   it('organization roles never grant platform-scoped permissions', () => {
-    const g = { ...base, organizations: [{ organizationId: FED, organizationStatus: 'ACTIVE' as const, roles: ['FEDERATION_ADMIN' as const] }] };
+    const g = {
+      ...base,
+      organizations: [
+        { organizationId: FED, organizationStatus: 'ACTIVE' as const, roles: ['FEDERATION_ADMIN' as const] },
+      ],
+    };
     expect(decide(g, 'organization.approve', { kind: 'PLATFORM' }).allowed).toBe(false);
     expect(decide(g, 'user.view', orgScope(FED, [])).allowed).toBe(false);
   });
@@ -89,7 +100,9 @@ describe('decide — organization hierarchy (ORG_DESCENDANT)', () => {
   it('pending organization members may only fix their own organization', () => {
     const pending: EffectiveGrants = {
       ...base,
-      organizations: [{ organizationId: FED, organizationStatus: 'PENDING_REVIEW', roles: ['FEDERATION_ADMIN'] }],
+      organizations: [
+        { organizationId: FED, organizationStatus: 'PENDING_REVIEW', roles: ['FEDERATION_ADMIN'] },
+      ],
     };
     expect(decide(pending, 'organization.update', orgScope(FED, [])).allowed).toBe(true);
     expect(decide(pending, 'organization.approve', orgScope(FED, [])).allowed).toBe(false);

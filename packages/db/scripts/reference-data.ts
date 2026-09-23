@@ -140,12 +140,52 @@ const MB = 1024 * 1024;
 const DOC_MIME = 'application/pdf,image/jpeg,image/png';
 
 // Сроки хранения предварительные (DATABASE.md, 9), утверждаются с юристом.
-export const DOCUMENT_TYPES: [code: string, ru: string, en: string, sensitivity: string, mime: string, max: number, days: number][] = [
-  ['MEDICAL_CERTIFICATE', 'Медицинская справка о допуске', 'Medical clearance certificate', 'HEALTH', DOC_MIME, 10 * MB, 400],
-  ['INSURANCE_POLICY', 'Полис страхования от несчастных случаев', 'Accident insurance policy', 'GENERAL', DOC_MIME, 10 * MB, 400],
+export const DOCUMENT_TYPES: [
+  code: string,
+  ru: string,
+  en: string,
+  sensitivity: string,
+  mime: string,
+  max: number,
+  days: number,
+][] = [
+  [
+    'MEDICAL_CERTIFICATE',
+    'Медицинская справка о допуске',
+    'Medical clearance certificate',
+    'HEALTH',
+    DOC_MIME,
+    10 * MB,
+    400,
+  ],
+  [
+    'INSURANCE_POLICY',
+    'Полис страхования от несчастных случаев',
+    'Accident insurance policy',
+    'GENERAL',
+    DOC_MIME,
+    10 * MB,
+    400,
+  ],
   ['BIRTH_CERTIFICATE', 'Свидетельство о рождении', 'Birth certificate', 'IDENTITY', DOC_MIME, 10 * MB, 365],
   ['PASSPORT', 'Паспорт', 'Passport', 'IDENTITY', DOC_MIME, 10 * MB, 365],
-  ['SPORT_RANK_ORDER', 'Приказ о присвоении разряда', 'Sports rank assignment order', 'GENERAL', DOC_MIME, 10 * MB, 730],
-  ['CONSENT_SCAN', 'Скан согласия законного представителя', 'Guardian consent scan', 'GENERAL', DOC_MIME, 10 * MB, 1825],
+  [
+    'SPORT_RANK_ORDER',
+    'Приказ о присвоении разряда',
+    'Sports rank assignment order',
+    'GENERAL',
+    DOC_MIME,
+    10 * MB,
+    730,
+  ],
+  [
+    'CONSENT_SCAN',
+    'Скан согласия законного представителя',
+    'Guardian consent scan',
+    'GENERAL',
+    DOC_MIME,
+    10 * MB,
+    1825,
+  ],
   ['OTHER', 'Иной документ', 'Other document', 'GENERAL', DOC_MIME, 10 * MB, 365],
 ];

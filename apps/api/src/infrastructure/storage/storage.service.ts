@@ -24,11 +24,20 @@ export abstract class StorageService {
   /** Содержимое объекта целиком (файлы ограничены 20 МБ политиками загрузки). */
   abstract read(bucket: FileBucket, key: string): Promise<Buffer>;
 
-  abstract copy(from: { bucket: FileBucket; key: string }, to: { bucket: FileBucket; key: string }, contentType: string): Promise<void>;
+  abstract copy(
+    from: { bucket: FileBucket; key: string },
+    to: { bucket: FileBucket; key: string },
+    contentType: string,
+  ): Promise<void>;
 
   abstract delete(bucket: FileBucket, key: string): Promise<void>;
 
-  abstract presignGet(bucket: FileBucket, key: string, expiresSeconds: number, downloadName: string): Promise<string>;
+  abstract presignGet(
+    bucket: FileBucket,
+    key: string,
+    expiresSeconds: number,
+    downloadName: string,
+  ): Promise<string>;
 
   abstract publicUrl(key: string): string;
 

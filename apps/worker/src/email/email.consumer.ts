@@ -23,7 +23,9 @@ export class EmailConsumer {
 
   async handle(job: Job<OutboxJob>): Promise<void> {
     const { eventId, traceId } = job.data;
-    const done = await this.db.processedEvent.findUnique({ where: { consumer_eventId: { consumer: EMAIL_CONSUMER, eventId } } });
+    const done = await this.db.processedEvent.findUnique({
+      where: { consumer_eventId: { consumer: EMAIL_CONSUMER, eventId } },
+    });
     if (done) return;
     const event = await this.db.outboxEvent.findUnique({ where: { id: eventId } });
     if (!event) {
@@ -31,10 +33,17 @@ export class EmailConsumer {
       return;
     }
     const payload = EVENT_SCHEMAS['email.requested'].parse(event.payload);
-    const secret = openJson<{ to: string; params: Record<string, string> }>(this.key, payload.sealedParams, `email:${payload.template}`);
+    const secret = openJson<{ to: string; params: Record<string, string> }>(
+      this.key,
+      payload.sealedParams,
+      `email:${payload.template}`,
+    );
     const rendered = renderEmail(payload.template, payload.locale, secret.params);
     const result = await this.mailer.send(secret.to, rendered);
     await this.db.processedEvent.create({ data: { consumer: EMAIL_CONSUMER, eventId } });
-    this.logger.info({ eventId, traceId, template: payload.template, messageId: result.messageId }, 'Email sent');
+    this.logger.info(
+      { eventId, traceId, template: payload.template, messageId: result.messageId },
+      'Email sent',
+    );
   }
 }

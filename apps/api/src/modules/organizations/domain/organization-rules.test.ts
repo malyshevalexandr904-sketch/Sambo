@@ -1,14 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { checkTransition, creatorRole, MEMBERSHIP_TRANSITIONS, ORGANIZATION_TRANSITIONS, slugify } from './organization-rules';
+import {
+  checkTransition,
+  creatorRole,
+  MEMBERSHIP_TRANSITIONS,
+  ORGANIZATION_TRANSITIONS,
+  slugify,
+} from './organization-rules';
 
 describe('organization transitions', () => {
   it('allows approval and requires a reason for suspension', () => {
-    expect(checkTransition(ORGANIZATION_TRANSITIONS, 'PENDING_REVIEW', 'ACTIVE')).toEqual({ ok: true, reasonRequired: false });
-    expect(checkTransition(ORGANIZATION_TRANSITIONS, 'ACTIVE', 'SUSPENDED')).toEqual({ ok: true, reasonRequired: true });
+    expect(checkTransition(ORGANIZATION_TRANSITIONS, 'PENDING_REVIEW', 'ACTIVE')).toEqual({
+      ok: true,
+      reasonRequired: false,
+    });
+    expect(checkTransition(ORGANIZATION_TRANSITIONS, 'ACTIVE', 'SUSPENDED')).toEqual({
+      ok: true,
+      reasonRequired: true,
+    });
   });
 
   it('lists allowed targets for an invalid transition', () => {
-    expect(checkTransition(ORGANIZATION_TRANSITIONS, 'ARCHIVED', 'ACTIVE')).toEqual({ ok: false, allowed: [] });
+    expect(checkTransition(ORGANIZATION_TRANSITIONS, 'ARCHIVED', 'ACTIVE')).toEqual({
+      ok: false,
+      allowed: [],
+    });
     expect(checkTransition(ORGANIZATION_TRANSITIONS, 'PENDING_REVIEW', 'SUSPENDED')).toEqual({
       ok: false,
       allowed: ['ACTIVE', 'ARCHIVED'],

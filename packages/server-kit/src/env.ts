@@ -1,9 +1,7 @@
 // Схема окружения (раздел 49 ТЗ; SECURITY.md, 8). Приложение не стартует с неверной конфигурацией.
 import { z } from 'zod';
 
-const bool = z
-  .enum(['true', 'false', '1', '0'])
-  .transform((v) => v === 'true' || v === '1');
+const bool = z.enum(['true', 'false', '1', '0']).transform((v) => v === 'true' || v === '1');
 
 const secret = (min: number) => z.string().min(min, { error: `must be at least ${min} characters` });
 
@@ -72,19 +70,32 @@ export const EnvSchema = z
       ctx.addIssue({ code: 'custom', path: ['SMTP_HOST'], message: 'required when EMAIL_PROVIDER=smtp' });
     }
     if (env.DEPLOYMENT_MODE === 'venue-node' && !env.NODE_ID) {
-      ctx.addIssue({ code: 'custom', path: ['NODE_ID'], message: 'required when DEPLOYMENT_MODE=venue-node' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['NODE_ID'],
+        message: 'required when DEPLOYMENT_MODE=venue-node',
+      });
     }
     if (env.NODE_ENV === 'production') {
-      if (!env.COOKIE_SECURE) ctx.addIssue({ code: 'custom', path: ['COOKIE_SECURE'], message: 'must be true in production' });
+      if (!env.COOKIE_SECURE)
+        ctx.addIssue({ code: 'custom', path: ['COOKIE_SECURE'], message: 'must be true in production' });
       if (env.EMAIL_PROVIDER === 'log') {
-        ctx.addIssue({ code: 'custom', path: ['EMAIL_PROVIDER'], message: 'log provider is not allowed in production' });
+        ctx.addIssue({
+          code: 'custom',
+          path: ['EMAIL_PROVIDER'],
+          message: 'log provider is not allowed in production',
+        });
       }
       if (env.JWT_SECRET === env.AUTH_SECRET) {
         ctx.addIssue({ code: 'custom', path: ['AUTH_SECRET'], message: 'must differ from JWT_SECRET' });
       }
     }
     if (Boolean(env.JWT_PREVIOUS_SECRET) !== Boolean(env.JWT_PREVIOUS_KID)) {
-      ctx.addIssue({ code: 'custom', path: ['JWT_PREVIOUS_KID'], message: 'set together with JWT_PREVIOUS_SECRET' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['JWT_PREVIOUS_KID'],
+        message: 'set together with JWT_PREVIOUS_SECRET',
+      });
     }
   });
 

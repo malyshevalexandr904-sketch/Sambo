@@ -7,8 +7,16 @@ export const REFRESH_COOKIE_PATH = '/api/v1/auth';
 
 export function setSessionCookies(res: Response, session: IssuedSession, secure: boolean): void {
   const base: CookieOptions = { httpOnly: true, secure, sameSite: 'lax' };
-  res.cookie(COOKIE_ACCESS, session.accessToken, { ...base, path: '/', expires: session.accessTokenExpiresAt });
-  res.cookie(COOKIE_REFRESH, session.refreshToken, { ...base, path: REFRESH_COOKIE_PATH, expires: session.refreshTokenExpiresAt });
+  res.cookie(COOKIE_ACCESS, session.accessToken, {
+    ...base,
+    path: '/',
+    expires: session.accessTokenExpiresAt,
+  });
+  res.cookie(COOKIE_REFRESH, session.refreshToken, {
+    ...base,
+    path: REFRESH_COOKIE_PATH,
+    expires: session.refreshTokenExpiresAt,
+  });
 }
 
 export function clearSessionCookies(res: Response, secure: boolean): void {

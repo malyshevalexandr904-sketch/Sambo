@@ -108,7 +108,14 @@ describe('log redaction (SECURITY.md, 7)', () => {
       'request',
     );
     const out = lines.join('');
-    for (const leaked of ['Bearer abc', 'sde_at=xyz', 'kid@example.ru', 'Иванов', '2012-01-01', 'raw-token']) {
+    for (const leaked of [
+      'Bearer abc',
+      'sde_at=xyz',
+      'kid@example.ru',
+      'Иванов',
+      '2012-01-01',
+      'raw-token',
+    ]) {
       expect(out).not.toContain(leaked);
     }
     expect(out).toContain('[REDACTED]');

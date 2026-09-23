@@ -24,7 +24,8 @@ export class JwtService {
     const enc = new TextEncoder();
     this.current = { kid: env.JWT_KID, key: enc.encode(env.JWT_SECRET) };
     this.keys = new Map([[env.JWT_KID, this.current.key]]);
-    if (env.JWT_PREVIOUS_SECRET && env.JWT_PREVIOUS_KID) this.keys.set(env.JWT_PREVIOUS_KID, enc.encode(env.JWT_PREVIOUS_SECRET));
+    if (env.JWT_PREVIOUS_SECRET && env.JWT_PREVIOUS_KID)
+      this.keys.set(env.JWT_PREVIOUS_KID, enc.encode(env.JWT_PREVIOUS_SECRET));
   }
 
   async sign(claims: AccessClaims, now = new Date()): Promise<{ token: string; expiresAt: Date }> {
@@ -52,7 +53,11 @@ export class JwtService {
         },
         { issuer: ISSUER, audience: AUDIENCE, algorithms: ['HS256'] },
       );
-      if (typeof payload.sub !== 'string' || typeof payload.sid !== 'string' || typeof payload.pv !== 'number') {
+      if (
+        typeof payload.sub !== 'string' ||
+        typeof payload.sid !== 'string' ||
+        typeof payload.pv !== 'number'
+      ) {
         throw new DomainError('UNAUTHENTICATED');
       }
       return { sub: payload.sub, sid: payload.sid, pv: payload.pv };

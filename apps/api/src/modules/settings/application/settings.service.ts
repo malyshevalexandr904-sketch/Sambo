@@ -54,7 +54,10 @@ export class SettingsService {
     const parsed = SYSTEM_SETTINGS[key].safeParse(value);
     if (!parsed.success) {
       throw new DomainError('VALIDATION_FAILED', {
-        fields: parsed.error.issues.map((i) => ({ path: ['value', ...i.path.map(String)].join('.'), code: i.message })),
+        fields: parsed.error.issues.map((i) => ({
+          path: ['value', ...i.path.map(String)].join('.'),
+          code: i.message,
+        })),
       });
     }
     const json = z.json().parse(parsed.data) as Prisma.InputJsonValue;
@@ -74,7 +77,13 @@ export class SettingsService {
       return saved;
     });
     this.cache = null;
-    return { key, value: row.value, isDefault: false, updatedAt: row.updatedAt.toISOString(), updatedById: row.updatedById };
+    return {
+      key,
+      value: row.value,
+      isDefault: false,
+      updatedAt: row.updatedAt.toISOString(),
+      updatedById: row.updatedById,
+    };
   }
 
   private async load(): Promise<Map<string, unknown>> {

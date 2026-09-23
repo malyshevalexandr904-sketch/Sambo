@@ -33,7 +33,12 @@ async function main(): Promise<void> {
 
   const emailQueue = new Queue<OutboxJob>('email', {
     connection,
-    defaultJobOptions: { attempts: 5, backoff: { type: 'exponential', delay: 10_000 }, removeOnComplete: 1000, removeOnFail: 5000 },
+    defaultJobOptions: {
+      attempts: 5,
+      backoff: { type: 'exponential', delay: 10_000 },
+      removeOnComplete: 1000,
+      removeOnFail: 5000,
+    },
   });
   const maintenanceQueue = new Queue<{ job: MaintenanceJob }>('maintenance', { connection });
 
@@ -41,15 +46,27 @@ async function main(): Promise<void> {
   const maintenance = new Maintenance(db, s3, env, logger);
 
   const workers = [
-    new Worker<OutboxJob>('email', (job: Job<OutboxJob>) => emailConsumer.handle(job), { connection, concurrency: 5 }),
-    new Worker<{ job: MaintenanceJob }>('maintenance', (job) => maintenance.run(job.data.job), { connection, concurrency: 1 }),
+    new Worker<OutboxJob>('email', (job: Job<OutboxJob>) => emailConsumer.handle(job), {
+      connection,
+      concurrency: 5,
+    }),
+    new Worker<{ job: MaintenanceJob }>('maintenance', (job) => maintenance.run(job.data.job), {
+      connection,
+      concurrency: 1,
+    }),
   ];
   for (const w of workers) {
-    w.on('failed', (job, err) => logger.error({ err, queue: w.name, jobId: job?.id, attempts: job?.attemptsMade }, 'Job failed'));
+    w.on('failed', (job, err) =>
+      logger.error({ err, queue: w.name, jobId: job?.id, attempts: job?.attemptsMade }, 'Job failed'),
+    );
   }
 
   for (const [name, schedule] of Object.entries(MAINTENANCE_JOBS)) {
-    await maintenanceQueue.upsertJobScheduler(name, { every: schedule.every }, { name, data: { job: name as MaintenanceJob } });
+    await maintenanceQueue.upsertJobScheduler(
+      name,
+      { every: schedule.every },
+      { name, data: { job: name as MaintenanceJob } },
+    );
   }
 
   const dispatcher = new OutboxDispatcher(db, new Map([['email', emailQueue]]), logger);

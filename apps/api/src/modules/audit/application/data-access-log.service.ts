@@ -11,7 +11,12 @@ export class DataAccessLogService {
   constructor(private readonly db: PrismaService) {}
 
   /** Пишется отдельно от транзакции: отказ в доступе тоже фиксируется, хотя команда откатывается. */
-  async record(action: AccessAction, resourceType: string, resourceId: string, competitionId: string | null = null): Promise<void> {
+  async record(
+    action: AccessAction,
+    resourceType: string,
+    resourceId: string,
+    competitionId: string | null = null,
+  ): Promise<void> {
     const ctx = RequestContextStore.current();
     await this.db.dataAccessLog.create({
       data: {

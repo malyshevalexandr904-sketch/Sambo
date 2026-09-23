@@ -30,8 +30,16 @@ export interface UploadPolicy {
  * SVG и HTML не принимаются никогда (XSS).
  */
 export const UPLOAD_POLICIES: Record<UploadPurpose, UploadPolicy> = {
-  ORGANIZATION_LOGO: { bucket: 'PUBLIC_MEDIA', mimeTypes: ['image/png', 'image/jpeg', 'image/webp'], maxSizeBytes: 2 * MB },
-  COMPETITION_LOGO: { bucket: 'PUBLIC_MEDIA', mimeTypes: ['image/png', 'image/jpeg', 'image/webp'], maxSizeBytes: 2 * MB },
+  ORGANIZATION_LOGO: {
+    bucket: 'PUBLIC_MEDIA',
+    mimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
+    maxSizeBytes: 2 * MB,
+  },
+  COMPETITION_LOGO: {
+    bucket: 'PUBLIC_MEDIA',
+    mimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
+    maxSizeBytes: 2 * MB,
+  },
   REGULATION: { bucket: 'PUBLIC_MEDIA', mimeTypes: ['application/pdf'], maxSizeBytes: 20 * MB },
   DOCUMENT: {
     bucket: 'PRIVATE_DOCUMENTS',

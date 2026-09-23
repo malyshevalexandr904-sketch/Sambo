@@ -1,5 +1,9 @@
 import type { FileBucket } from '@sde/contracts';
-import { type PresignedPost, StorageService, type StoredObjectInfo } from '../../src/infrastructure/storage/storage.service';
+import {
+  type PresignedPost,
+  StorageService,
+  type StoredObjectInfo,
+} from '../../src/infrastructure/storage/storage.service';
 
 /** Хранилище в памяти вместо S3: проверяется логика API, а не провайдер. S3 проверяется в CI (MinIO). */
 export class MemoryStorage extends StorageService {
@@ -28,7 +32,11 @@ export class MemoryStorage extends StorageService {
     return o.body;
   }
 
-  async copy(from: { bucket: FileBucket; key: string }, to: { bucket: FileBucket; key: string }, contentType: string): Promise<void> {
+  async copy(
+    from: { bucket: FileBucket; key: string },
+    to: { bucket: FileBucket; key: string },
+    contentType: string,
+  ): Promise<void> {
     const o = await this.read(from.bucket, from.key);
     this.put(to.bucket, to.key, o, contentType);
   }

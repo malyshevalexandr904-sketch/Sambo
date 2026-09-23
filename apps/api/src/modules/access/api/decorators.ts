@@ -18,7 +18,8 @@ export type RouteAccess =
   | { kind: 'permission'; permission: PermissionCode; scope: ScopeRef };
 
 /** Открытый маршрут. Аутентификация, если есть, всё равно разбирается. */
-export const Public = (): MethodDecorator & ClassDecorator => SetMetadata(ROUTE_ACCESS, { kind: 'public' } satisfies RouteAccess);
+export const Public = (): MethodDecorator & ClassDecorator =>
+  SetMetadata(ROUTE_ACCESS, { kind: 'public' } satisfies RouteAccess);
 
 /** Любой вошедший пользователь; дальнейшие проверки — в use case (политики «своё»). */
 export const Authenticated = (): MethodDecorator & ClassDecorator =>

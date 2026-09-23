@@ -45,7 +45,10 @@ export class TotpService {
     const user = await this.db.user.findUniqueOrThrow({ where: { id: userId } });
     if (user.totpEnabledAt) throw new DomainError('ALREADY_EXISTS', { resource: 'totp' });
     const secret = authenticator.generateSecret(20);
-    await this.db.user.update({ where: { id: userId }, data: { totpSecretEnc: sealTotpSecret(this.key, userId, secret) } });
+    await this.db.user.update({
+      where: { id: userId },
+      data: { totpSecretEnc: sealTotpSecret(this.key, userId, secret) },
+    });
     return { otpauthUri: authenticator.keyuri(user.email ?? user.displayName, ISSUER, secret) };
   }
 
@@ -57,7 +60,11 @@ export class TotpService {
       const { codes, hashes } = generateRecoveryCodes();
       await tx.user.update({
         where: { id: userId },
-        data: { totpEnabledAt: new Date(), totpRecoveryCodeHashes: hashes, permissionsVersion: { increment: 1 } },
+        data: {
+          totpEnabledAt: new Date(),
+          totpRecoveryCodeHashes: hashes,
+          permissionsVersion: { increment: 1 },
+        },
       });
       await this.audit.record(tx, { action: 'auth.totp_enabled', entityType: 'User', entityId: userId });
       return { recoveryCodes: codes };
@@ -69,12 +76,18 @@ export class TotpService {
       const platformRoles = await tx.platformRoleAssignment.count({
         where: { userId, revokedAt: null, role: { code: { in: [...PLATFORM_ROLE_CODES] } } },
       });
-      if (platformRoles > 0) throw new DomainError('FORBIDDEN', { reason: 'totp_required_for_platform_roles' });
+      if (platformRoles > 0)
+        throw new DomainError('FORBIDDEN', { reason: 'totp_required_for_platform_roles' });
       const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
       if (!user.totpEnabledAt || !(await this.verify(tx, user, code))) throw new DomainError('TOTP_INVALID');
       await tx.user.update({
         where: { id: userId },
-        data: { totpEnabledAt: null, totpSecretEnc: null, totpRecoveryCodeHashes: [], permissionsVersion: { increment: 1 } },
+        data: {
+          totpEnabledAt: null,
+          totpSecretEnc: null,
+          totpRecoveryCodeHashes: [],
+          permissionsVersion: { increment: 1 },
+        },
       });
       await this.audit.record(tx, { action: 'auth.totp_disabled', entityType: 'User', entityId: userId });
     });

@@ -16,7 +16,11 @@ export default async function setup(): Promise<void> {
   const dbPackage = path.resolve(__dirname, '..', '..', '..', 'packages', 'db');
   execFileSync('pnpm', ['exec', 'prisma', 'migrate', 'deploy'], {
     cwd: dbPackage,
-    env: { ...process.env, DATABASE_URL: TEST_ENV.DATABASE_URL, DATABASE_ADMIN_URL: TEST_ENV.DATABASE_ADMIN_URL },
+    env: {
+      ...process.env,
+      DATABASE_URL: TEST_ENV.DATABASE_URL,
+      DATABASE_ADMIN_URL: TEST_ENV.DATABASE_ADMIN_URL,
+    },
     stdio: 'pipe',
   });
   const redis = new Redis(TEST_ENV.REDIS_URL);

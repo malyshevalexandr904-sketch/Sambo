@@ -10,9 +10,7 @@ export interface Mailer {
 class SmtpMailer implements Mailer {
   private readonly transport: nodemailer.Transporter;
 
-  constructor(
-    private readonly env: Env,
-  ) {
+  constructor(private readonly env: Env) {
     this.transport = nodemailer.createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
@@ -22,7 +20,9 @@ class SmtpMailer implements Mailer {
   }
 
   async send(to: string, email: RenderedEmail): Promise<{ messageId: string | null }> {
-    const info = (await this.transport.sendMail({ from: this.env.EMAIL_FROM, to, ...email })) as { messageId?: string };
+    const info = (await this.transport.sendMail({ from: this.env.EMAIL_FROM, to, ...email })) as {
+      messageId?: string;
+    };
     return { messageId: info.messageId ?? null };
   }
 }

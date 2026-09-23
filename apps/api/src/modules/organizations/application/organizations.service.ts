@@ -19,7 +19,12 @@ import { PolicyService, type ResourceScope } from '../../access';
 import { AuditService } from '../../audit';
 import { FilesService } from '../../files';
 import { OutboxService } from '../../outbox';
-import { checkTransition, creatorRole, ORGANIZATION_TRANSITIONS, slugify } from '../domain/organization-rules';
+import {
+  checkTransition,
+  creatorRole,
+  ORGANIZATION_TRANSITIONS,
+  slugify,
+} from '../domain/organization-rules';
 import { ClosureRepository } from '../infrastructure/closure.repository';
 import { ORGANIZATION_INCLUDE, type OrganizationRow, toDetail, toSummary } from './organization-mapper';
 import { OrganizationScopeService } from './organization-scope.service';
@@ -96,13 +101,22 @@ export class OrganizationsService {
       take: q.limit + 1,
       include: ORGANIZATION_INCLUDE,
     });
-    return toPage(rows, q.limit, (r) => ({ k: r.name, id: r.id }), (r) => toSummary(r, this.publicUrl));
+    return toPage(
+      rows,
+      q.limit,
+      (r) => ({ k: r.name, id: r.id }),
+      (r) => toSummary(r, this.publicUrl),
+    );
   }
 
   async get(user: AuthUser, id: string): Promise<OrganizationDto> {
     const scope = await this.scopes.scopeOf(id);
-    if (!(await this.policy.isVisible(user, scope))) throw new DomainError('NOT_FOUND', { resource: 'organization' });
-    const row = await this.db.organization.findUniqueOrThrow({ where: { id }, include: { ...ORGANIZATION_INCLUDE, legalDetails: true } });
+    if (!(await this.policy.isVisible(user, scope)))
+      throw new DomainError('NOT_FOUND', { resource: 'organization' });
+    const row = await this.db.organization.findUniqueOrThrow({
+      where: { id },
+      include: { ...ORGANIZATION_INCLUDE, legalDetails: true },
+    });
     return this.detail(user, row, scope);
   }
 
@@ -111,14 +125,26 @@ export class OrganizationsService {
     const approveScope = await this.scopes.parentScopeOf(row.id);
     if (await this.policy.can(user, 'organization.approve', approveScope)) {
       actions.push('organization.approve');
-      for (const t of ORGANIZATION_TRANSITIONS.filter((x) => x.from === row.status)) actions.push(`transition:${t.to}`);
+      for (const t of ORGANIZATION_TRANSITIONS.filter((x) => x.from === row.status))
+        actions.push(`transition:${t.to}`);
     }
-    return toDetail(row, this.publicUrl, { includeLegal: actions.includes('organization.update'), allowedActions: actions });
+    return toDetail(row, this.publicUrl, {
+      includeLegal: actions.includes('organization.update'),
+      allowedActions: actions,
+    });
   }
 
-  private async uniqueSlug(tx: Tx, requested: string | undefined, name: string, excludeId?: string): Promise<string> {
+  private async uniqueSlug(
+    tx: Tx,
+    requested: string | undefined,
+    name: string,
+    excludeId?: string,
+  ): Promise<string> {
     const taken = async (slug: string): Promise<boolean> =>
-      (await tx.organization.findFirst({ where: { slug, id: excludeId ? { not: excludeId } : undefined }, select: { id: true } })) !== null;
+      (await tx.organization.findFirst({
+        where: { slug, id: excludeId ? { not: excludeId } : undefined },
+        select: { id: true },
+      })) !== null;
     if (requested) {
       if (await taken(requested)) throw new DomainError('SLUG_TAKEN');
       return requested;
@@ -131,7 +157,11 @@ export class OrganizationsService {
     return `${base.slice(0, 60)}-${uuidv7().slice(-8)}`;
   }
 
-  private async assertRegion(tx: Tx, regionId: string | null | undefined, countryCode: string): Promise<void> {
+  private async assertRegion(
+    tx: Tx,
+    regionId: string | null | undefined,
+    countryCode: string,
+  ): Promise<void> {
     if (!regionId) return;
     const region = await tx.region.findUnique({ where: { id: regionId } });
     if (!region || region.countryCode !== countryCode) {
@@ -141,19 +171,26 @@ export class OrganizationsService {
 
   private async assertCountry(tx: Tx, countryCode: string): Promise<void> {
     if (!(await tx.country.findUnique({ where: { code: countryCode } }))) {
-      throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'countryCode', code: 'invalid_country' }] });
+      throw new DomainError('VALIDATION_FAILED', {
+        fields: [{ path: 'countryCode', code: 'invalid_country' }],
+      });
     }
   }
 
   /** Родитель должен существовать, быть виден и активен. Возвращает, можно ли сразу активировать дочернюю. */
-  private async resolveParent(user: AuthUser, parentId: string | null | undefined): Promise<{ canActivate: boolean }> {
-    if (!parentId) return { canActivate: await this.policy.can(user, 'organization.approve', { kind: 'PLATFORM' }) };
+  private async resolveParent(
+    user: AuthUser,
+    parentId: string | null | undefined,
+  ): Promise<{ canActivate: boolean }> {
+    if (!parentId)
+      return { canActivate: await this.policy.can(user, 'organization.approve', { kind: 'PLATFORM' }) };
     const parent = await this.db.organization.findFirst({ where: { id: parentId, deletedAt: null } });
     const scope = parent ? await this.scopes.scopeOf(parent.id) : null;
     if (!parent || !scope || !(await this.policy.isVisible(user, scope))) {
       throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'parentId', code: 'not_found' }] });
     }
-    if (parent.status !== 'ACTIVE') throw new DomainError('ORGANIZATION_NOT_ACTIVE', { organizationId: parent.id });
+    if (parent.status !== 'ACTIVE')
+      throw new DomainError('ORGANIZATION_NOT_ACTIVE', { organizationId: parent.id });
     return { canActivate: await this.policy.can(user, 'organization.create_child', scope) };
   }
 
@@ -162,7 +199,8 @@ export class OrganizationsService {
     const id = await this.db.tx(async (tx) => {
       await this.assertCountry(tx, input.countryCode);
       await this.assertRegion(tx, input.regionId, input.countryCode);
-      if (input.logoFileId) await this.files.assertAttachable(tx, input.logoFileId, user.id, 'ORGANIZATION_LOGO', 'logoFileId');
+      if (input.logoFileId)
+        await this.files.assertAttachable(tx, input.logoFileId, user.id, 'ORGANIZATION_LOGO', 'logoFileId');
       const orgId = uuidv7();
       const slug = await this.uniqueSlug(tx, input.slug, input.shortName || input.name);
       const status = canActivate ? 'ACTIVE' : 'PENDING_REVIEW';
@@ -191,7 +229,15 @@ export class OrganizationsService {
       await this.closure.insertNode(tx, orgId, input.parentId ?? null);
       const role = await tx.role.findUniqueOrThrow({ where: { code: creatorRole(input.type) } });
       await tx.organizationMembership.create({
-        data: { id: uuidv7(), organizationId: orgId, userId: user.id, roleId: role.id, status: 'ACTIVE', validFrom: today(), invitedById: user.id },
+        data: {
+          id: uuidv7(),
+          organizationId: orgId,
+          userId: user.id,
+          roleId: role.id,
+          status: 'ACTIVE',
+          validFrom: today(),
+          invitedById: user.id,
+        },
       });
       await tx.user.update({ where: { id: user.id }, data: { permissionsVersion: { increment: 1 } } });
       await this.audit.record(tx, {
@@ -201,17 +247,33 @@ export class OrganizationsService {
         organizationId: orgId,
         after: auditView(created),
       });
-      await this.outbox.enqueue(tx, { type: 'organization.created', aggregate: { type: 'Organization', id: orgId }, payload: { organizationId: orgId } });
+      await this.outbox.enqueue(tx, {
+        type: 'organization.created',
+        aggregate: { type: 'Organization', id: orgId },
+        payload: { organizationId: orgId },
+      });
       return orgId;
     });
     const fresh = { ...user, permissionsVersion: user.permissionsVersion + 1 };
     return this.get(fresh, id);
   }
 
-  async update(user: AuthUser, id: string, version: number, patch: OrganizationPatch): Promise<OrganizationDto> {
-    const current = await this.db.organization.findFirst({ where: { id, deletedAt: null }, include: { ...ORGANIZATION_INCLUDE, legalDetails: true } });
+  async update(
+    user: AuthUser,
+    id: string,
+    version: number,
+    patch: OrganizationPatch,
+  ): Promise<OrganizationDto> {
+    const current = await this.db.organization.findFirst({
+      where: { id, deletedAt: null },
+      include: { ...ORGANIZATION_INCLUDE, legalDetails: true },
+    });
     if (!current) throw new DomainError('NOT_FOUND', { resource: 'organization' });
-    if (patch.type !== undefined && patch.type !== current.type && !(await this.policy.can(user, 'organization.approve', { kind: 'PLATFORM' }))) {
+    if (
+      patch.type !== undefined &&
+      patch.type !== current.type &&
+      !(await this.policy.can(user, 'organization.approve', { kind: 'PLATFORM' }))
+    ) {
       throw new DomainError('FORBIDDEN', { field: 'type' });
     }
     const parentChanged = patch.parentId !== undefined && (patch.parentId ?? null) !== current.parentId;
@@ -222,14 +284,22 @@ export class OrganizationsService {
     await this.db.tx(async (tx) => {
       const countryCode = patch.countryCode ?? current.countryCode;
       if (patch.countryCode) await this.assertCountry(tx, patch.countryCode);
-      if (patch.regionId !== undefined || patch.countryCode) await this.assertRegion(tx, patch.regionId ?? current.regionId, countryCode);
+      if (patch.regionId !== undefined || patch.countryCode)
+        await this.assertRegion(tx, patch.regionId ?? current.regionId, countryCode);
       if (patch.logoFileId && patch.logoFileId !== current.logoFileId) {
         await this.files.assertAttachable(tx, patch.logoFileId, user.id, 'ORGANIZATION_LOGO', 'logoFileId');
       }
-      if (parentChanged && patch.parentId && (patch.parentId === id || (await this.closure.isDescendant(tx, patch.parentId, id)))) {
+      if (
+        parentChanged &&
+        patch.parentId &&
+        (patch.parentId === id || (await this.closure.isDescendant(tx, patch.parentId, id)))
+      ) {
         throw new DomainError('ORGANIZATION_HIERARCHY_CYCLE');
       }
-      const slug = patch.slug && patch.slug !== current.slug ? await this.uniqueSlug(tx, patch.slug, current.name, id) : undefined;
+      const slug =
+        patch.slug && patch.slug !== current.slug
+          ? await this.uniqueSlug(tx, patch.slug, current.name, id)
+          : undefined;
       const { count } = await tx.organization.updateMany({
         where: { id, version },
         data: {
@@ -250,7 +320,8 @@ export class OrganizationsService {
         },
       });
       if (count === 0) throw versionConflict(current.version);
-      if (patch.legalDetails === null) await tx.organizationLegalDetails.deleteMany({ where: { organizationId: id } });
+      if (patch.legalDetails === null)
+        await tx.organizationLegalDetails.deleteMany({ where: { organizationId: id } });
       if (patch.legalDetails) {
         await tx.organizationLegalDetails.upsert({
           where: { organizationId: id },
@@ -259,7 +330,10 @@ export class OrganizationsService {
         });
       }
       if (parentChanged) await this.closure.move(tx, id, patch.parentId ?? null);
-      const after = await tx.organization.findUniqueOrThrow({ where: { id }, include: { ...ORGANIZATION_INCLUDE, legalDetails: true } });
+      const after = await tx.organization.findUniqueOrThrow({
+        where: { id },
+        include: { ...ORGANIZATION_INCLUDE, legalDetails: true },
+      });
       await this.audit.record(tx, {
         action: 'organization.updated',
         entityType: 'Organization',
@@ -272,17 +346,30 @@ export class OrganizationsService {
     return this.get(user, id);
   }
 
-  async transition(user: AuthUser, id: string, version: number, req: OrganizationTransitionRequest): Promise<OrganizationDto> {
+  async transition(
+    user: AuthUser,
+    id: string,
+    version: number,
+    req: OrganizationTransitionRequest,
+  ): Promise<OrganizationDto> {
     await this.db.tx(async (tx) => {
       const org = await tx.organization.findFirst({ where: { id, deletedAt: null } });
       if (!org) throw new DomainError('NOT_FOUND', { resource: 'organization' });
       const check = checkTransition(ORGANIZATION_TRANSITIONS, org.status, req.to);
-      if (!check.ok) throw new DomainError('INVALID_TRANSITION', { from: org.status, to: req.to, allowed: check.allowed });
+      if (!check.ok)
+        throw new DomainError('INVALID_TRANSITION', { from: org.status, to: req.to, allowed: check.allowed });
       if (check.reasonRequired && !req.reason) throw new DomainError('REASON_REQUIRED');
-      const { count } = await tx.organization.updateMany({ where: { id, version }, data: { status: req.to, version: { increment: 1 } } });
+      const { count } = await tx.organization.updateMany({
+        where: { id, version },
+        data: { status: req.to, version: { increment: 1 } },
+      });
       if (count === 0) throw versionConflict(org.version);
       const members = await this.closure.memberUserIds(tx, [id]);
-      if (members.length > 0) await tx.user.updateMany({ where: { id: { in: members } }, data: { permissionsVersion: { increment: 1 } } });
+      if (members.length > 0)
+        await tx.user.updateMany({
+          where: { id: { in: members } },
+          data: { permissionsVersion: { increment: 1 } },
+        });
       await this.audit.record(tx, {
         action: 'organization.status_changed',
         entityType: 'Organization',

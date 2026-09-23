@@ -8,7 +8,12 @@ import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { RedisService } from '../../../infrastructure/redis/redis.module';
 import { AuditService } from '../../audit';
-import { ACCESS_TOKEN_TTL_SECONDS, classifyRefresh, nextRefreshExpiry, sessionExhausted } from '../domain/session-policy';
+import {
+  ACCESS_TOKEN_TTL_SECONDS,
+  classifyRefresh,
+  nextRefreshExpiry,
+  sessionExhausted,
+} from '../domain/session-policy';
 import { JwtService } from '../infrastructure/jwt.service';
 
 export interface IssuedSession {
@@ -73,10 +78,14 @@ export class SessionService {
 
   /** Ротация refresh token. Повторное предъявление отзывает всю сессию (REFRESH_TOKEN_REUSED). */
   async rotate(rawRefreshToken: string): Promise<IssuedSession> {
-    type Outcome = { kind: 'ok'; session: IssuedSession } | { kind: 'revoked'; error: 'REFRESH_TOKEN_REUSED' | 'ACCOUNT_BLOCKED'; familyId: string };
+    type Outcome =
+      | { kind: 'ok'; session: IssuedSession }
+      | { kind: 'revoked'; error: 'REFRESH_TOKEN_REUSED' | 'ACCOUNT_BLOCKED'; familyId: string };
     const outcome = await this.db.tx(async (tx): Promise<Outcome> => {
       const hash = sha256(rawRefreshToken);
-      const rows = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM refresh_token WHERE token_hash = ${hash} FOR UPDATE`;
+      const rows = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM refresh_token WHERE token_hash = ${hash} FOR UPDATE`;
       const row = rows[0];
       if (!row) throw new DomainError('REFRESH_TOKEN_INVALID');
       const token = await tx.refreshToken.findUniqueOrThrow({
@@ -107,7 +116,13 @@ export class SessionService {
       });
       const startedAt = first?.createdAt ?? token.createdAt;
       if (sessionExhausted(now, startedAt)) throw new DomainError('REFRESH_TOKEN_INVALID');
-      const session = await this.issue(tx, token.user, token.familyId, nextRefreshExpiry(now, startedAt), token.id);
+      const session = await this.issue(
+        tx,
+        token.user,
+        token.familyId,
+        nextRefreshExpiry(now, startedAt),
+        token.id,
+      );
       return { kind: 'ok', session };
     });
     if (outcome.kind === 'revoked') {
@@ -197,7 +212,10 @@ export class SessionService {
   }
 
   async belongsTo(sessionId: string, userId: string): Promise<boolean> {
-    const t = await this.db.refreshToken.findFirst({ where: { familyId: sessionId, userId }, select: { id: true } });
+    const t = await this.db.refreshToken.findFirst({
+      where: { familyId: sessionId, userId },
+      select: { id: true },
+    });
     return t !== null;
   }
 }

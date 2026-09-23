@@ -25,7 +25,10 @@ export class MeController {
 
   @Patch()
   @Authenticated()
-  async update(@CurrentUser() user: AuthUser, @ValidBody(UpdateMeRequest) body: UpdateMeRequest): Promise<DataEnvelope<Me>> {
+  async update(
+    @CurrentUser() user: AuthUser,
+    @ValidBody(UpdateMeRequest) body: UpdateMeRequest,
+  ): Promise<DataEnvelope<Me>> {
     return ok(await this.me.update(user.id, body));
   }
 

@@ -18,7 +18,10 @@ export class SettingsController {
 
   @Put(':key')
   @RequirePermission('platform.settings.manage', PLATFORM_SCOPE)
-  async put(@Param('key') key: string, @ValidBody(PutSettingRequest) body: { value: unknown }): Promise<DataEnvelope<SystemSettingDto>> {
+  async put(
+    @Param('key') key: string,
+    @ValidBody(PutSettingRequest) body: { value: unknown },
+  ): Promise<DataEnvelope<SystemSettingDto>> {
     const user = RequestContextStore.current().user;
     return ok(await this.settings.put(key, body.value, user?.id ?? ''));
   }

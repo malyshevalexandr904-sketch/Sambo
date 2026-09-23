@@ -3,11 +3,21 @@ import { Injectable } from '@nestjs/common';
 import type { PermissionCode } from '@sde/contracts';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
-import { canSee, decide, type EffectiveGrants, permissionsInScope, type ResourceScope } from '../domain/grants';
+import {
+  canSee,
+  decide,
+  type EffectiveGrants,
+  permissionsInScope,
+  type ResourceScope,
+} from '../domain/grants';
 import { GrantsService } from './grants.service';
 
 /** Политика отношений (◐): «свой спортсмен», «назначен на ковёр» и т. п. Регистрирует модуль-владелец. */
-export type RelationshipPolicy = (user: AuthUser, scope: ResourceScope, resource: unknown) => Promise<boolean>;
+export type RelationshipPolicy = (
+  user: AuthUser,
+  scope: ResourceScope,
+  resource: unknown,
+) => Promise<boolean>;
 
 export interface AccessResult {
   viaPlatform: boolean;
@@ -30,7 +40,12 @@ export class PolicyService {
   }
 
   /** Бросает FORBIDDEN (403) или NOT_FOUND (404), если ресурс пользователю не виден вовсе. */
-  async assert(user: AuthUser, permission: PermissionCode, scope: ResourceScope, resource?: unknown): Promise<AccessResult> {
+  async assert(
+    user: AuthUser,
+    permission: PermissionCode,
+    scope: ResourceScope,
+    resource?: unknown,
+  ): Promise<AccessResult> {
     const grants = await this.grants(user);
     const decision = decide(grants, permission, scope);
     if (decision.allowed && decision.mode !== 'POLICY') return { viaPlatform: decision.viaPlatform, grants };
@@ -42,7 +57,12 @@ export class PolicyService {
     throw new DomainError('FORBIDDEN', { permission });
   }
 
-  async can(user: AuthUser, permission: PermissionCode, scope: ResourceScope, resource?: unknown): Promise<boolean> {
+  async can(
+    user: AuthUser,
+    permission: PermissionCode,
+    scope: ResourceScope,
+    resource?: unknown,
+  ): Promise<boolean> {
     try {
       await this.assert(user, permission, scope, resource);
       return true;
@@ -57,7 +77,11 @@ export class PolicyService {
   }
 
   /** Доступные действия над ресурсом: права (без политик) ∩ переданный список кандидатов. */
-  async allowedActions(user: AuthUser, scope: ResourceScope, candidates: readonly PermissionCode[]): Promise<PermissionCode[]> {
+  async allowedActions(
+    user: AuthUser,
+    scope: ResourceScope,
+    candidates: readonly PermissionCode[],
+  ): Promise<PermissionCode[]> {
     const perms = permissionsInScope(await this.grants(user), scope);
     return candidates.filter((c) => perms.has(c));
   }

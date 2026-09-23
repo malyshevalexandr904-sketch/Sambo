@@ -37,11 +37,20 @@ describe('registration and email verification', () => {
     await s.agent
       .post('/api/v1/auth/register')
       .set('x-csrf-token', s.csrf)
-      .send({ email: 'Coach@Test.local', password: PASSWORD, displayName: 'Тренер', locale: 'ru', acceptTerms: true })
+      .send({
+        email: 'Coach@Test.local',
+        password: PASSWORD,
+        displayName: 'Тренер',
+        locale: 'ru',
+        acceptTerms: true,
+      })
       .expect(202, { data: { status: 'VERIFICATION_SENT' } });
 
     // До подтверждения войти нельзя.
-    const early = await s.agent.post('/api/v1/auth/login').set('x-csrf-token', s.csrf).send({ email: 'coach@test.local', password: PASSWORD });
+    const early = await s.agent
+      .post('/api/v1/auth/login')
+      .set('x-csrf-token', s.csrf)
+      .send({ email: 'coach@test.local', password: PASSWORD });
     expect(early.status).toBe(403);
     expect(early.body.error.code).toBe('EMAIL_NOT_VERIFIED');
 
@@ -64,7 +73,10 @@ describe('registration and email verification', () => {
     expect(after.status).toBe(401);
 
     // Токен подтверждения одноразовый.
-    const again = await s.agent.post('/api/v1/auth/verify-email').set('x-csrf-token', csrf).send({ token: tokenFromUrl(mail?.params.verifyUrl) });
+    const again = await s.agent
+      .post('/api/v1/auth/verify-email')
+      .set('x-csrf-token', csrf)
+      .send({ token: tokenFromUrl(mail?.params.verifyUrl) });
     expect(again.body.error.code).toBe('TOKEN_EXPIRED');
   });
 
@@ -74,7 +86,13 @@ describe('registration and email verification', () => {
     await s.agent
       .post('/api/v1/auth/register')
       .set('x-csrf-token', s.csrf)
-      .send({ email: 'taken@test.local', password: PASSWORD, displayName: 'X', locale: 'ru', acceptTerms: true })
+      .send({
+        email: 'taken@test.local',
+        password: PASSWORD,
+        displayName: 'X',
+        locale: 'ru',
+        acceptTerms: true,
+      })
       .expect(202, { data: { status: 'VERIFICATION_SENT' } });
     const mails = await sentEmails(t);
     expect(mails.map((m) => m.to)).toEqual(['taken@test.local']);
@@ -86,15 +104,26 @@ describe('registration and email verification', () => {
     const leaked = await s.agent
       .post('/api/v1/auth/register')
       .set('x-csrf-token', s.csrf)
-      .send({ email: 'a@test.local', password: 'qwerty123456', displayName: 'X', locale: 'ru', acceptTerms: true });
+      .send({
+        email: 'a@test.local',
+        password: 'qwerty123456',
+        displayName: 'X',
+        locale: 'ru',
+        acceptTerms: true,
+      });
     expect(leaked.status).toBe(400);
     expect(leaked.body.error.details.fields).toEqual([{ path: 'password', code: 'password_leaked' }]);
 
-    const invalid = await s.agent.post('/api/v1/auth/register').set('x-csrf-token', s.csrf).send({ email: 'nope', password: 'short', locale: 'xx' });
+    const invalid = await s.agent
+      .post('/api/v1/auth/register')
+      .set('x-csrf-token', s.csrf)
+      .send({ email: 'nope', password: 'short', locale: 'xx' });
     expect(invalid.status).toBe(400);
     expect(invalid.body.error.code).toBe('VALIDATION_FAILED');
     const paths = (invalid.body.error.details.fields as { path: string }[]).map((f) => f.path);
-    expect(paths).toEqual(expect.arrayContaining(['email', 'password', 'displayName', 'locale', 'acceptTerms']));
+    expect(paths).toEqual(
+      expect.arrayContaining(['email', 'password', 'displayName', 'locale', 'acceptTerms']),
+    );
     expect(invalid.body.error.traceId).toBeTruthy();
   });
 });
@@ -103,8 +132,14 @@ describe('login', () => {
   it('answers the same for a wrong password and an unknown email', async () => {
     await createUser(t, { email: 'known@test.local' });
     const s = await csrfAgent(t);
-    const wrong = await s.agent.post('/api/v1/auth/login').set('x-csrf-token', s.csrf).send({ email: 'known@test.local', password: 'wrong-password-1' });
-    const unknown = await s.agent.post('/api/v1/auth/login').set('x-csrf-token', s.csrf).send({ email: 'ghost@test.local', password: 'wrong-password-1' });
+    const wrong = await s.agent
+      .post('/api/v1/auth/login')
+      .set('x-csrf-token', s.csrf)
+      .send({ email: 'known@test.local', password: 'wrong-password-1' });
+    const unknown = await s.agent
+      .post('/api/v1/auth/login')
+      .set('x-csrf-token', s.csrf)
+      .send({ email: 'ghost@test.local', password: 'wrong-password-1' });
     expect(wrong.status).toBe(401);
     expect(unknown.status).toBe(401);
     expect(wrong.body.error.code).toBe('INVALID_CREDENTIALS');
@@ -115,20 +150,33 @@ describe('login', () => {
   it('blocked accounts cannot sign in', async () => {
     await createUser(t, { email: 'blocked@test.local', status: 'BLOCKED' });
     const s = await csrfAgent(t);
-    const res = await s.agent.post('/api/v1/auth/login').set('x-csrf-token', s.csrf).send({ email: 'blocked@test.local', password: PASSWORD });
+    const res = await s.agent
+      .post('/api/v1/auth/login')
+      .set('x-csrf-token', s.csrf)
+      .send({ email: 'blocked@test.local', password: PASSWORD });
     expect(res.body.error.code).toBe('ACCOUNT_BLOCKED');
   });
 
   it('requires TOTP for users who enabled it and rejects replay of the same code', async () => {
     await createUser(t, { email: 'admin@test.local', platform: ['SUPER_ADMIN'] });
     const s = await csrfAgent(t);
-    const noCode = await s.agent.post('/api/v1/auth/login').set('x-csrf-token', s.csrf).send({ email: 'admin@test.local', password: PASSWORD });
+    const noCode = await s.agent
+      .post('/api/v1/auth/login')
+      .set('x-csrf-token', s.csrf)
+      .send({ email: 'admin@test.local', password: PASSWORD });
     expect(noCode.body.error.code).toBe('TOTP_REQUIRED');
     const code = totpNow();
-    await s.agent.post('/api/v1/auth/login').set('x-csrf-token', s.csrf).send({ email: 'admin@test.local', password: PASSWORD, totpCode: code }).expect(200);
+    await s.agent
+      .post('/api/v1/auth/login')
+      .set('x-csrf-token', s.csrf)
+      .send({ email: 'admin@test.local', password: PASSWORD, totpCode: code })
+      .expect(200);
     // Вход выдаёт новый CSRF-токен, поэтому повтор — из нового клиента.
     const other = await csrfAgent(t);
-    const replay = await other.agent.post('/api/v1/auth/login').set('x-csrf-token', other.csrf).send({ email: 'admin@test.local', password: PASSWORD, totpCode: code });
+    const replay = await other.agent
+      .post('/api/v1/auth/login')
+      .set('x-csrf-token', other.csrf)
+      .send({ email: 'admin@test.local', password: PASSWORD, totpCode: code });
     expect(replay.body.error.code).toBe('TOTP_INVALID');
   });
 
@@ -138,9 +186,16 @@ describe('login', () => {
     const res = await s.agent.patch('/api/v1/me').send({ displayName: 'Новое имя' });
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('CSRF_TOKEN_INVALID');
-    const forged = await s.agent.patch('/api/v1/me').set('x-csrf-token', 'forged.value').send({ displayName: 'Новое имя' });
+    const forged = await s.agent
+      .patch('/api/v1/me')
+      .set('x-csrf-token', 'forged.value')
+      .send({ displayName: 'Новое имя' });
     expect(forged.body.error.code).toBe('CSRF_TOKEN_INVALID');
-    await s.agent.patch('/api/v1/me').set('x-csrf-token', s.csrf).send({ displayName: 'Новое имя' }).expect(200);
+    await s.agent
+      .patch('/api/v1/me')
+      .set('x-csrf-token', s.csrf)
+      .send({ displayName: 'Новое имя' })
+      .expect(200);
   });
 });
 
@@ -156,20 +211,32 @@ describe('refresh token rotation', () => {
     const first = loginRes.body.data.tokens as { accessToken: string; refreshToken: string };
     await http.get('/api/v1/me').set('authorization', `Bearer ${first.accessToken}`).expect(200);
 
-    const rotated = await http.post('/api/v1/auth/refresh').set('x-auth-mode', 'bearer').send({ refreshToken: first.refreshToken }).expect(200);
+    const rotated = await http
+      .post('/api/v1/auth/refresh')
+      .set('x-auth-mode', 'bearer')
+      .send({ refreshToken: first.refreshToken })
+      .expect(200);
     const second = rotated.body.data as { accessToken: string; refreshToken: string };
     expect(second.refreshToken).not.toBe(first.refreshToken);
 
-    const reuse = await http.post('/api/v1/auth/refresh').set('x-auth-mode', 'bearer').send({ refreshToken: first.refreshToken });
+    const reuse = await http
+      .post('/api/v1/auth/refresh')
+      .set('x-auth-mode', 'bearer')
+      .send({ refreshToken: first.refreshToken });
     expect(reuse.status).toBe(401);
     expect(reuse.body.error.code).toBe('REFRESH_TOKEN_REUSED');
 
     // Всё семейство отозвано: и новый refresh, и выданный access token.
-    const afterReuse = await http.post('/api/v1/auth/refresh').set('x-auth-mode', 'bearer').send({ refreshToken: second.refreshToken });
+    const afterReuse = await http
+      .post('/api/v1/auth/refresh')
+      .set('x-auth-mode', 'bearer')
+      .send({ refreshToken: second.refreshToken });
     expect(afterReuse.body.error.code).toBe('REFRESH_TOKEN_REUSED');
     const me = await http.get('/api/v1/me').set('authorization', `Bearer ${second.accessToken}`);
     expect(me.status).toBe(401);
-    const audit = await t.admin.auditLog.count({ where: { action: 'auth.refresh_reuse_detected', entityId: u.id } });
+    const audit = await t.admin.auditLog.count({
+      where: { action: 'auth.refresh_reuse_detected', entityId: u.id },
+    });
     expect(audit).toBeGreaterThanOrEqual(1);
   });
 
@@ -187,8 +254,16 @@ describe('password recovery and sessions', () => {
     const u = await createUser(t, { email: 'reset@test.local' });
     const s = await login(t, u.email);
     const anon = await csrfAgent(t);
-    await anon.agent.post('/api/v1/auth/password/forgot').set('x-csrf-token', anon.csrf).send({ email: 'reset@test.local' }).expect(202);
-    await anon.agent.post('/api/v1/auth/password/forgot').set('x-csrf-token', anon.csrf).send({ email: 'ghost@test.local' }).expect(202);
+    await anon.agent
+      .post('/api/v1/auth/password/forgot')
+      .set('x-csrf-token', anon.csrf)
+      .send({ email: 'reset@test.local' })
+      .expect(202);
+    await anon.agent
+      .post('/api/v1/auth/password/forgot')
+      .set('x-csrf-token', anon.csrf)
+      .send({ email: 'ghost@test.local' })
+      .expect(202);
     const mails = await sentEmails(t, 'auth.password_reset');
     expect(mails).toHaveLength(1);
     const newPassword = 'Another-Strong-Pass-7';
@@ -198,9 +273,16 @@ describe('password recovery and sessions', () => {
       .send({ token: tokenFromUrl(mails[0]?.params.resetUrl), newPassword })
       .expect(204);
     expect((await s.agent.get('/api/v1/me')).status).toBe(401);
-    const old = await anon.agent.post('/api/v1/auth/login').set('x-csrf-token', anon.csrf).send({ email: u.email, password: PASSWORD });
+    const old = await anon.agent
+      .post('/api/v1/auth/login')
+      .set('x-csrf-token', anon.csrf)
+      .send({ email: u.email, password: PASSWORD });
     expect(old.body.error.code).toBe('INVALID_CREDENTIALS');
-    await anon.agent.post('/api/v1/auth/login').set('x-csrf-token', anon.csrf).send({ email: u.email, password: newPassword }).expect(200);
+    await anon.agent
+      .post('/api/v1/auth/login')
+      .set('x-csrf-token', anon.csrf)
+      .send({ email: u.email, password: newPassword })
+      .expect(200);
     expect(await sentEmails(t, 'auth.password_changed')).toHaveLength(1);
   });
 
@@ -219,7 +301,9 @@ describe('password recovery and sessions', () => {
 
     const stranger = await createUser(t);
     const c = await login(t, stranger.email);
-    const foreign = await c.agent.delete(`/api/v1/auth/sessions/${sessions.find((x) => x.current)?.id}`).set('x-csrf-token', c.csrf);
+    const foreign = await c.agent
+      .delete(`/api/v1/auth/sessions/${sessions.find((x) => x.current)?.id}`)
+      .set('x-csrf-token', c.csrf);
     expect(foreign.status).toBe(404);
   });
 
@@ -245,21 +329,35 @@ describe('TOTP management', () => {
     const uri = setup.body.data.otpauthUri as string;
     const secret = new URL(uri).searchParams.get('secret') ?? '';
     const { authenticator } = await import('otplib');
-    const enabled = await s.agent.post('/api/v1/auth/totp/enable').set('x-csrf-token', s.csrf).send({ code: authenticator.generate(secret) }).expect(200);
+    const enabled = await s.agent
+      .post('/api/v1/auth/totp/enable')
+      .set('x-csrf-token', s.csrf)
+      .send({ code: authenticator.generate(secret) })
+      .expect(200);
     const codes = enabled.body.data.recoveryCodes as string[];
     expect(codes).toHaveLength(10);
 
     const anon = await csrfAgent(t);
-    await anon.agent.post('/api/v1/auth/login').set('x-csrf-token', anon.csrf).send({ email: u.email, password: PASSWORD, totpCode: codes[0] }).expect(200);
+    await anon.agent
+      .post('/api/v1/auth/login')
+      .set('x-csrf-token', anon.csrf)
+      .send({ email: u.email, password: PASSWORD, totpCode: codes[0] })
+      .expect(200);
     const other = await csrfAgent(t);
-    const reuse = await other.agent.post('/api/v1/auth/login').set('x-csrf-token', other.csrf).send({ email: u.email, password: PASSWORD, totpCode: codes[0] });
+    const reuse = await other.agent
+      .post('/api/v1/auth/login')
+      .set('x-csrf-token', other.csrf)
+      .send({ email: u.email, password: PASSWORD, totpCode: codes[0] });
     expect(reuse.body.error.code).toBe('TOTP_INVALID');
   });
 
   it('platform administrators cannot disable TOTP', async () => {
     const u = await createUser(t, { platform: ['PLATFORM_ADMIN'] });
     const s = await login(t, u.email, { totp: true });
-    const res = await s.agent.post('/api/v1/auth/totp/disable').set('x-csrf-token', s.csrf).send({ code: '000000' });
+    const res = await s.agent
+      .post('/api/v1/auth/totp/disable')
+      .set('x-csrf-token', s.csrf)
+      .send({ code: '000000' });
     expect(res.status).toBe(403);
   });
 });

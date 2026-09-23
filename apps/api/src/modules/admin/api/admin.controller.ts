@@ -36,14 +36,21 @@ export class AdminController {
   @Post('users/:id/block')
   @RequirePermission('user.manage', PLATFORM_SCOPE)
   @HttpCode(200)
-  async block(@CurrentUser() actor: AuthUser, @UuidParam('id') id: string, @ValidBody(ReasonRequest) body: ReasonRequest): Promise<DataEnvelope<AdminUser>> {
+  async block(
+    @CurrentUser() actor: AuthUser,
+    @UuidParam('id') id: string,
+    @ValidBody(ReasonRequest) body: ReasonRequest,
+  ): Promise<DataEnvelope<AdminUser>> {
     return ok(await this.users.block(actor, id, body.reason));
   }
 
   @Post('users/:id/unblock')
   @RequirePermission('user.manage', PLATFORM_SCOPE)
   @HttpCode(200)
-  async unblock(@UuidParam('id') id: string, @ValidBody(ReasonRequest) body: ReasonRequest): Promise<DataEnvelope<AdminUser>> {
+  async unblock(
+    @UuidParam('id') id: string,
+    @ValidBody(ReasonRequest) body: ReasonRequest,
+  ): Promise<DataEnvelope<AdminUser>> {
     return ok(await this.users.unblock(id, body.reason));
   }
 

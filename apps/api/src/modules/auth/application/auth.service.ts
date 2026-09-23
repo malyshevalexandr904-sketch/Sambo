@@ -61,39 +61,73 @@ export class AuthService {
   /** Ответ всегда одинаковый: занятость email не раскрывается (API.md, 3.1). */
   async register(input: RegisterRequest): Promise<void> {
     await this.limiter.hit('authEmail', `register:${input.email}`);
-    if (!(await this.settings.get('registration.selfSignupEnabled'))) throw new DomainError('FORBIDDEN', { reason: 'signup_disabled' });
+    if (!(await this.settings.get('registration.selfSignupEnabled')))
+      throw new DomainError('FORBIDDEN', { reason: 'signup_disabled' });
     await this.assertPasswordAcceptable(input.password, 'password');
     const secretHash = await hashPassword(input.password);
     try {
       await this.db.tx(async (tx) => {
-        const existing = await tx.user.findUnique({ where: { email: input.email }, select: { id: true, locale: true } });
+        const existing = await tx.user.findUnique({
+          where: { email: input.email },
+          select: { id: true, locale: true },
+        });
         if (existing) {
           await this.emails.request(tx, {
             template: 'auth.account_exists',
             to: input.email,
             userId: existing.id,
             locale: existing.locale === 'en' ? 'en' : 'ru',
-            params: { loginUrl: `${this.env.APP_URL}/${input.locale}/login`, resetUrl: `${this.env.APP_URL}/${input.locale}/forgot-password` },
+            params: {
+              loginUrl: `${this.env.APP_URL}/${input.locale}/login`,
+              resetUrl: `${this.env.APP_URL}/${input.locale}/forgot-password`,
+            },
           });
           return;
         }
         const userId = uuidv7();
         await tx.user.create({
-          data: { id: userId, email: input.email, displayName: input.displayName, locale: input.locale, status: 'PENDING_VERIFICATION' },
+          data: {
+            id: userId,
+            email: input.email,
+            displayName: input.displayName,
+            locale: input.locale,
+            status: 'PENDING_VERIFICATION',
+          },
         });
         await tx.authIdentity.create({
-          data: { id: uuidv7(), userId, provider: 'EMAIL_PASSWORD', providerSubject: input.email, secretHash },
+          data: {
+            id: uuidv7(),
+            userId,
+            provider: 'EMAIL_PASSWORD',
+            providerSubject: input.email,
+            secretHash,
+          },
         });
-        const token = await this.tokens.issue(tx, 'EMAIL_VERIFY', { userId, ttlSeconds: EMAIL_VERIFY_TTL_SECONDS });
+        const token = await this.tokens.issue(tx, 'EMAIL_VERIFY', {
+          userId,
+          ttlSeconds: EMAIL_VERIFY_TTL_SECONDS,
+        });
         await this.emails.request(tx, {
           template: 'auth.verify_email',
           to: input.email,
           userId,
           locale: input.locale,
-          params: { verifyUrl: this.link(input.locale, '/verify-email', token), displayName: input.displayName },
+          params: {
+            verifyUrl: this.link(input.locale, '/verify-email', token),
+            displayName: input.displayName,
+          },
         });
-        await this.audit.record(tx, { action: 'user.registered', entityType: 'User', entityId: userId, actorUserId: userId });
-        await this.outbox.enqueue(tx, { type: 'user.registered', aggregate: { type: 'User', id: userId }, payload: { userId } });
+        await this.audit.record(tx, {
+          action: 'user.registered',
+          entityType: 'User',
+          entityId: userId,
+          actorUserId: userId,
+        });
+        await this.outbox.enqueue(tx, {
+          type: 'user.registered',
+          aggregate: { type: 'User', id: userId },
+          payload: { userId },
+        });
       });
     } catch (e) {
       // Гонка двух регистраций одного email: для клиента ответ тот же.
@@ -110,9 +144,18 @@ export class AuthService {
       if (user.status === 'BLOCKED') throw new DomainError('ACCOUNT_BLOCKED');
       const updated = await tx.user.update({
         where: { id: user.id },
-        data: { emailVerifiedAt: user.emailVerifiedAt ?? new Date(), status: 'ACTIVE', lastLoginAt: new Date() },
+        data: {
+          emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+          status: 'ACTIVE',
+          lastLoginAt: new Date(),
+        },
       });
-      await this.audit.record(tx, { action: 'user.email_verified', entityType: 'User', entityId: user.id, actorUserId: user.id });
+      await this.audit.record(tx, {
+        action: 'user.email_verified',
+        entityType: 'User',
+        entityId: user.id,
+        actorUserId: user.id,
+      });
       return { userId: user.id, session: await this.sessions.create(tx, updated) };
     });
     return { me: await this.me.get(userId), session };
@@ -128,7 +171,8 @@ export class AuthService {
       await burnPasswordCheck(input.password);
       throw new DomainError('INVALID_CREDENTIALS');
     }
-    if (!(await verifyPassword(identity.secretHash, input.password))) throw new DomainError('INVALID_CREDENTIALS');
+    if (!(await verifyPassword(identity.secretHash, input.password)))
+      throw new DomainError('INVALID_CREDENTIALS');
     const user = identity.user;
     if (user.status === 'BLOCKED') throw new DomainError('ACCOUNT_BLOCKED');
     if (user.status === 'PENDING_VERIFICATION') throw new DomainError('EMAIL_NOT_VERIFIED');
@@ -139,13 +183,23 @@ export class AuthService {
         if (!(await this.totp.verify(tx, user, input.totpCode))) throw new DomainError('TOTP_INVALID');
       }
       if (passwordNeedsRehash(identity.secretHash ?? '')) {
-        await tx.authIdentity.update({ where: { id: identity.id }, data: { secretHash: await hashPassword(input.password) } });
+        await tx.authIdentity.update({
+          where: { id: identity.id },
+          data: { secretHash: await hashPassword(input.password) },
+        });
       }
       await tx.authIdentity.update({ where: { id: identity.id }, data: { lastUsedAt: new Date() } });
       await tx.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-      const platformRoles = await tx.platformRoleAssignment.count({ where: { userId: user.id, revokedAt: null } });
+      const platformRoles = await tx.platformRoleAssignment.count({
+        where: { userId: user.id, revokedAt: null },
+      });
       if (platformRoles > 0) {
-        await this.audit.record(tx, { action: 'auth.login', entityType: 'User', entityId: user.id, actorUserId: user.id });
+        await this.audit.record(tx, {
+          action: 'auth.login',
+          entityType: 'User',
+          entityId: user.id,
+          actorUserId: user.id,
+        });
       }
       return this.sessions.create(tx, user);
     });
@@ -168,7 +222,10 @@ export class AuthService {
       if (!identity || identity.user.status === 'BLOCKED') return;
       const userLocale: Locale = identity.user.locale === 'en' ? 'en' : locale;
       await this.tokens.invalidateAll(tx, identity.user.id, 'PASSWORD_RESET');
-      const token = await this.tokens.issue(tx, 'PASSWORD_RESET', { userId: identity.user.id, ttlSeconds: PASSWORD_RESET_TTL_SECONDS });
+      const token = await this.tokens.issue(tx, 'PASSWORD_RESET', {
+        userId: identity.user.id,
+        ttlSeconds: PASSWORD_RESET_TTL_SECONDS,
+      });
       await this.emails.request(tx, {
         template: 'auth.password_reset',
         to: email,
@@ -188,12 +245,23 @@ export class AuthService {
       if (!consumed.userId) throw new DomainError('TOKEN_EXPIRED');
       const user = await tx.user.findUniqueOrThrow({ where: { id: consumed.userId } });
       if (user.status === 'BLOCKED') throw new DomainError('ACCOUNT_BLOCKED');
-      await tx.authIdentity.updateMany({ where: { userId: user.id, provider: 'EMAIL_PASSWORD' }, data: { secretHash } });
+      await tx.authIdentity.updateMany({
+        where: { userId: user.id, provider: 'EMAIL_PASSWORD' },
+        data: { secretHash },
+      });
       if (user.status === 'PENDING_VERIFICATION') {
-        await tx.user.update({ where: { id: user.id }, data: { status: 'ACTIVE', emailVerifiedAt: new Date() } });
+        await tx.user.update({
+          where: { id: user.id },
+          data: { status: 'ACTIVE', emailVerifiedAt: new Date() },
+        });
       }
       const families = await this.sessions.revokeAll(tx, user.id, 'password_reset');
-      await this.audit.record(tx, { action: 'auth.password_reset', entityType: 'User', entityId: user.id, actorUserId: user.id });
+      await this.audit.record(tx, {
+        action: 'auth.password_reset',
+        entityType: 'User',
+        entityId: user.id,
+        actorUserId: user.id,
+      });
       await this.notifyPasswordChanged(tx, user);
       return families;
     });
@@ -202,7 +270,8 @@ export class AuthService {
 
   async changePassword(userId: string, sessionId: string, current: string, next: string): Promise<void> {
     const identity = await this.db.authIdentity.findFirst({ where: { userId, provider: 'EMAIL_PASSWORD' } });
-    if (!identity?.secretHash || !(await verifyPassword(identity.secretHash, current))) throw new DomainError('INVALID_CREDENTIALS');
+    if (!identity?.secretHash || !(await verifyPassword(identity.secretHash, current)))
+      throw new DomainError('INVALID_CREDENTIALS');
     await this.assertPasswordAcceptable(next, 'newPassword');
     const secretHash = await hashPassword(next);
     const revoked = await this.db.tx(async (tx) => {
@@ -215,7 +284,10 @@ export class AuthService {
     await this.sessions.blockSessions(revoked);
   }
 
-  private async notifyPasswordChanged(tx: Tx, user: { id: string; email: string | null; locale: string }): Promise<void> {
+  private async notifyPasswordChanged(
+    tx: Tx,
+    user: { id: string; email: string | null; locale: string },
+  ): Promise<void> {
     if (!user.email) return;
     const locale: Locale = user.locale === 'en' ? 'en' : 'ru';
     await this.emails.request(tx, {

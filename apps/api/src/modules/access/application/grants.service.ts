@@ -33,7 +33,10 @@ export class GrantsService {
     const today = new Date(new Date().toISOString().slice(0, 10));
     const [user, platform, orgMemberships, compMemberships] = await Promise.all([
       this.db.user.findUnique({ where: { id: userId }, select: { totpEnabledAt: true, status: true } }),
-      this.db.platformRoleAssignment.findMany({ where: { userId, revokedAt: null }, select: { role: { select: { code: true } } } }),
+      this.db.platformRoleAssignment.findMany({
+        where: { userId, revokedAt: null },
+        select: { role: { select: { code: true } } },
+      }),
       this.db.organizationMembership.findMany({
         where: {
           userId,
@@ -41,20 +44,32 @@ export class GrantsService {
           OR: [{ validTo: null }, { validTo: { gte: today } }],
           organization: { deletedAt: null },
         },
-        select: { organizationId: true, role: { select: { code: true } }, organization: { select: { status: true } } },
+        select: {
+          organizationId: true,
+          role: { select: { code: true } },
+          organization: { select: { status: true } },
+        },
       }),
       this.db.competitionMembership.findMany({
         where: { userId, status: 'ACTIVE' },
         select: { competitionId: true, role: { select: { code: true } } },
       }),
     ]);
-    const empty: EffectiveGrants = { userId, permissionsVersion, platform: [], organizations: [], competitions: [] };
+    const empty: EffectiveGrants = {
+      userId,
+      permissionsVersion,
+      platform: [],
+      organizations: [],
+      competitions: [],
+    };
     if (!user || user.status !== 'ACTIVE') return empty;
 
     const platformRoles = platform
       .map((p) => p.role.code)
       .filter(isRoleCode)
-      .filter((r) => ROLES[r].scope === 'PLATFORM' && (!ROLES[r].requiresTotp || user.totpEnabledAt !== null));
+      .filter(
+        (r) => ROLES[r].scope === 'PLATFORM' && (!ROLES[r].requiresTotp || user.totpEnabledAt !== null),
+      );
 
     const orgs = new Map<string, { organizationStatus: OrganizationStatus; roles: RoleCode[] }>();
     for (const m of orgMemberships) {

@@ -10,7 +10,9 @@ export type ScopeResolverFn = (id: string | undefined, req: Request) => Promise<
  */
 @Injectable()
 export class ScopeResolverRegistry {
-  private readonly resolvers = new Map<string, ScopeResolverFn>([['platform', () => Promise.resolve({ kind: 'PLATFORM' })]]);
+  private readonly resolvers = new Map<string, ScopeResolverFn>([
+    ['platform', () => Promise.resolve({ kind: 'PLATFORM' })],
+  ]);
 
   register(name: string, fn: ScopeResolverFn): void {
     if (this.resolvers.has(name)) throw new Error(`Scope resolver "${name}" is already registered`);

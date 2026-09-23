@@ -36,7 +36,10 @@ export class OrganizationsController {
 
   @Get()
   @Authenticated()
-  list(@CurrentUser() user: AuthUser, @ValidQuery(OrganizationsQuery) q: OrganizationsQuery): Promise<Page<OrganizationSummary>> {
+  list(
+    @CurrentUser() user: AuthUser,
+    @ValidQuery(OrganizationsQuery) q: OrganizationsQuery,
+  ): Promise<Page<OrganizationSummary>> {
     return this.organizations.list(user, q);
   }
 
@@ -55,7 +58,11 @@ export class OrganizationsController {
 
   @Get(':id')
   @Authenticated()
-  async get(@CurrentUser() user: AuthUser, @UuidParam('id') id: string, @Res({ passthrough: true }) res: Response): Promise<DataEnvelope<Organization>> {
+  async get(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<DataEnvelope<Organization>> {
     const org = await this.organizations.get(user, id);
     res.setHeader('ETag', etag(org.version));
     return ok(org);
@@ -92,7 +99,10 @@ export class OrganizationsController {
 
   @Get(':id/members')
   @RequirePermission('organization.members.view', ORG)
-  listMembers(@UuidParam('id') id: string, @ValidQuery(MembersQuery) q: MembersQuery): Promise<Page<Membership>> {
+  listMembers(
+    @UuidParam('id') id: string,
+    @ValidQuery(MembersQuery) q: MembersQuery,
+  ): Promise<Page<Membership>> {
     return this.members.list(id, q);
   }
 
@@ -126,7 +136,10 @@ export class InvitesController {
   @Post('accept')
   @Authenticated()
   @HttpCode(200)
-  async accept(@CurrentUser() user: AuthUser, @ValidBody(AcceptInviteRequest) body: z.infer<typeof AcceptInviteRequest>): Promise<DataEnvelope<Membership>> {
+  async accept(
+    @CurrentUser() user: AuthUser,
+    @ValidBody(AcceptInviteRequest) body: z.infer<typeof AcceptInviteRequest>,
+  ): Promise<DataEnvelope<Membership>> {
     return ok(await this.members.accept(user, body.token));
   }
 }

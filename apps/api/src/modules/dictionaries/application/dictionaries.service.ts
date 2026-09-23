@@ -9,7 +9,7 @@ import {
   type RankedDictionaryDto,
   type RegionDto,
 } from '@sde/contracts';
-import { uuidv7 } from '@sde/db';
+import { type Tx, uuidv7 } from '@sde/db';
 import { sha256Hex } from '@sde/server-kit';
 import type { z } from 'zod';
 import { DomainError } from '../../../common/errors/domain-error';
@@ -49,13 +49,17 @@ export class DictionariesService {
   }
 
   private async invalidate(name: DictionaryName): Promise<void> {
-    const keys = name === 'regions' ? await this.redis.keys('dict:regions:*').catch(() => []) : [`dict:${name}`];
+    const keys =
+      name === 'regions' ? await this.redis.keys('dict:regions:*').catch(() => []) : [`dict:${name}`];
     if (keys.length > 0) await this.redis.del(...keys).catch(() => undefined);
   }
 
   countries(): Promise<CachedDictionary<CountryDto>> {
     return this.cached('countries', async () =>
-      (await this.db.country.findMany({ orderBy: { nameRu: 'asc' } })).map((c) => ({ code: c.code, name: { ru: c.nameRu, en: c.nameEn } })),
+      (await this.db.country.findMany({ orderBy: { nameRu: 'asc' } })).map((c) => ({
+        code: c.code,
+        name: { ru: c.nameRu, en: c.nameEn },
+      })),
     );
   }
 
@@ -92,7 +96,10 @@ export class DictionariesService {
 
   disciplines(): Promise<CachedDictionary<DisciplineDto>> {
     return this.cached('disciplines', async () =>
-      (await this.db.discipline.findMany({ orderBy: { code: 'asc' } })).map((d) => ({ code: d.code, name: { ru: d.nameRu, en: d.nameEn } })),
+      (await this.db.discipline.findMany({ orderBy: { code: 'asc' } })).map((d) => ({
+        code: d.code,
+        name: { ru: d.nameRu, en: d.nameEn },
+      })),
     );
   }
 
@@ -118,50 +125,7 @@ export class DictionariesService {
       });
     }
     await this.db.tx(async (tx) => {
-      let before: unknown = null;
-      switch (name) {
-        case 'countries': {
-          const input = parsed.data as z.infer<(typeof DictionaryInputs)['countries']>;
-          if (!/^[A-Z]{2}$/.test(code)) throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'code', code: 'invalid_country' }] });
-          before = await tx.country.findUnique({ where: { code } });
-          await tx.country.upsert({ where: { code }, create: { code, ...input }, update: input });
-          break;
-        }
-        case 'regions': {
-          const input = parsed.data as z.infer<(typeof DictionaryInputs)['regions']>;
-          if (!(await tx.country.findUnique({ where: { code: input.countryCode } }))) {
-            throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'countryCode', code: 'invalid_country' }] });
-          }
-          before = await tx.region.findUnique({ where: { code } });
-          await tx.region.upsert({ where: { code }, create: { id: uuidv7(), code, ...input }, update: input });
-          break;
-        }
-        case 'sport-ranks': {
-          const input = parsed.data as z.infer<(typeof DictionaryInputs)['sport-ranks']>;
-          before = await tx.sportRank.findUnique({ where: { code } });
-          await tx.sportRank.upsert({ where: { code }, create: { code, ...input }, update: input });
-          break;
-        }
-        case 'referee-categories': {
-          const input = parsed.data as z.infer<(typeof DictionaryInputs)['referee-categories']>;
-          before = await tx.refereeCategory.findUnique({ where: { code } });
-          await tx.refereeCategory.upsert({ where: { code }, create: { code, ...input }, update: input });
-          break;
-        }
-        case 'disciplines': {
-          const input = parsed.data as z.infer<(typeof DictionaryInputs)['disciplines']>;
-          before = await tx.discipline.findUnique({ where: { code } });
-          await tx.discipline.upsert({ where: { code }, create: { code, ...input }, update: input });
-          break;
-        }
-        case 'document-types': {
-          const input = parsed.data as z.infer<(typeof DictionaryInputs)['document-types']>;
-          const data = { ...input, allowedMime: input.allowedMime.join(',') };
-          before = await tx.documentType.findUnique({ where: { code } });
-          await tx.documentType.upsert({ where: { code }, create: { code, ...data }, update: data });
-          break;
-        }
-      }
+      const before = await this.write(tx, name, code, parsed.data);
       await this.audit.record(tx, {
         action: 'dictionary.upserted',
         entityType: `Dictionary:${name}`,
@@ -170,5 +134,55 @@ export class DictionariesService {
       });
     });
     await this.invalidate(name);
+  }
+
+  /** Запись одной строки справочника; возвращает прежнее состояние для аудита. */
+  private async write(tx: Tx, name: DictionaryName, code: string, data: unknown): Promise<unknown> {
+    switch (name) {
+      case 'countries': {
+        const input = data as z.infer<(typeof DictionaryInputs)['countries']>;
+        if (!/^[A-Z]{2}$/.test(code))
+          throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'code', code: 'invalid_country' }] });
+        const before = await tx.country.findUnique({ where: { code } });
+        await tx.country.upsert({ where: { code }, create: { code, ...input }, update: input });
+        return before;
+      }
+      case 'regions': {
+        const input = data as z.infer<(typeof DictionaryInputs)['regions']>;
+        if (!(await tx.country.findUnique({ where: { code: input.countryCode } }))) {
+          throw new DomainError('VALIDATION_FAILED', {
+            fields: [{ path: 'countryCode', code: 'invalid_country' }],
+          });
+        }
+        const before = await tx.region.findUnique({ where: { code } });
+        await tx.region.upsert({ where: { code }, create: { id: uuidv7(), code, ...input }, update: input });
+        return before;
+      }
+      case 'sport-ranks': {
+        const input = data as z.infer<(typeof DictionaryInputs)['sport-ranks']>;
+        const before = await tx.sportRank.findUnique({ where: { code } });
+        await tx.sportRank.upsert({ where: { code }, create: { code, ...input }, update: input });
+        return before;
+      }
+      case 'referee-categories': {
+        const input = data as z.infer<(typeof DictionaryInputs)['referee-categories']>;
+        const before = await tx.refereeCategory.findUnique({ where: { code } });
+        await tx.refereeCategory.upsert({ where: { code }, create: { code, ...input }, update: input });
+        return before;
+      }
+      case 'disciplines': {
+        const input = data as z.infer<(typeof DictionaryInputs)['disciplines']>;
+        const before = await tx.discipline.findUnique({ where: { code } });
+        await tx.discipline.upsert({ where: { code }, create: { code, ...input }, update: input });
+        return before;
+      }
+      case 'document-types': {
+        const input = data as z.infer<(typeof DictionaryInputs)['document-types']>;
+        const row = { ...input, allowedMime: input.allowedMime.join(',') };
+        const before = await tx.documentType.findUnique({ where: { code } });
+        await tx.documentType.upsert({ where: { code }, create: { code, ...row }, update: row });
+        return before;
+      }
+    }
   }
 }

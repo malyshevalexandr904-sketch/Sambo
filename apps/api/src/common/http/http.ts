@@ -56,7 +56,8 @@ export function toPage<Row, Dto>(
 export function parseIfMatch(header: string | undefined): number {
   if (!header) throw new DomainError('VERSION_REQUIRED');
   const match = /^(?:W\/)?"v(\d{1,9})"$/.exec(header.trim());
-  if (!match?.[1]) throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'If-Match', code: 'invalid_etag' }] });
+  if (!match?.[1])
+    throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'If-Match', code: 'invalid_etag' }] });
   return Number(match[1]);
 }
 

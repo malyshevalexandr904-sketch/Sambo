@@ -39,7 +39,16 @@ export class AuthGuard implements CanActivate {
       if (!(await this.sessions.isActive(claims.sid))) throw new DomainError('UNAUTHENTICATED');
       const user = await this.db.user.findUnique({
         where: { id: claims.sub },
-        select: { id: true, status: true, permissionsVersion: true, totpEnabledAt: true, personId: true, email: true, emailVerifiedAt: true, locale: true },
+        select: {
+          id: true,
+          status: true,
+          permissionsVersion: true,
+          totpEnabledAt: true,
+          personId: true,
+          email: true,
+          emailVerifiedAt: true,
+          locale: true,
+        },
       });
       if (!user || user.status === 'PENDING_VERIFICATION') throw new DomainError('UNAUTHENTICATED');
       if (user.status === 'BLOCKED') throw new DomainError('ACCOUNT_BLOCKED');

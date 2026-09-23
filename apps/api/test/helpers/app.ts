@@ -45,7 +45,7 @@ export async function createTestApp(env: Record<string, string> = {}): Promise<T
     app,
     http: () => request.agent(app.getHttpServer()),
     admin,
-    storage: app.get(StorageService) as MemoryStorage,
+    storage: app.get<StorageService, MemoryStorage>(StorageService),
     redis,
     close: async () => {
       await app.close();
@@ -95,7 +95,13 @@ export async function createUser(
     },
   });
   await t.admin.authIdentity.create({
-    data: { id: uuidv7(), userId: id, provider: 'EMAIL_PASSWORD', providerSubject: email, secretHash: await hashPassword(PASSWORD) },
+    data: {
+      id: uuidv7(),
+      userId: id,
+      provider: 'EMAIL_PASSWORD',
+      providerSubject: email,
+      secretHash: await hashPassword(PASSWORD),
+    },
   });
   for (const code of opts.platform ?? []) {
     const role = await t.admin.role.findUniqueOrThrow({ where: { code } });
@@ -104,7 +110,14 @@ export async function createUser(
   for (const m of opts.orgs ?? []) {
     const role = await t.admin.role.findUniqueOrThrow({ where: { code: m.role } });
     await t.admin.organizationMembership.create({
-      data: { id: uuidv7(), organizationId: m.organizationId, userId: id, roleId: role.id, status: 'ACTIVE', validFrom: new Date() },
+      data: {
+        id: uuidv7(),
+        organizationId: m.organizationId,
+        userId: id,
+        roleId: role.id,
+        status: 'ACTIVE',
+        validFrom: new Date(),
+      },
     });
   }
   return { id, email };
@@ -112,7 +125,11 @@ export async function createUser(
 
 export async function createOrg(
   t: TestApp,
-  opts: { type?: 'CLUB' | 'REGIONAL_FEDERATION' | 'ORGANIZER' | 'SPORTS_SCHOOL'; parentId?: string | null; status?: 'ACTIVE' | 'PENDING_REVIEW' | 'SUSPENDED' } = {},
+  opts: {
+    type?: 'CLUB' | 'REGIONAL_FEDERATION' | 'ORGANIZER' | 'SPORTS_SCHOOL';
+    parentId?: string | null;
+    status?: 'ACTIVE' | 'PENDING_REVIEW' | 'SUSPENDED';
+  } = {},
 ): Promise<string> {
   const id = uuidv7();
   await t.admin.organization.create({
@@ -127,7 +144,8 @@ export async function createOrg(
       status: opts.status ?? 'ACTIVE',
     },
   });
-  await t.admin.$executeRaw`INSERT INTO organization_closure (ancestor_id, descendant_id, depth) VALUES (${id}::uuid, ${id}::uuid, 0)`;
+  await t.admin
+    .$executeRaw`INSERT INTO organization_closure (ancestor_id, descendant_id, depth) VALUES (${id}::uuid, ${id}::uuid, 0)`;
   if (opts.parentId) {
     await t.admin.$executeRaw`
       INSERT INTO organization_closure (ancestor_id, descendant_id, depth)
@@ -164,13 +182,21 @@ export async function login(t: TestApp, email: string, opts: { totp?: boolean } 
 }
 
 /** Письма из outbox: расшифровка запечатанных параметров, как это делает worker. */
-export async function sentEmails(t: TestApp, template?: EmailTemplate): Promise<{ to: string; params: Record<string, string> }[]> {
+export async function sentEmails(
+  t: TestApp,
+  template?: EmailTemplate,
+): Promise<{ to: string; params: Record<string, string> }[]> {
   const key = deriveKey(TEST_ENV.AUTH_SECRET, KEY_PURPOSES.outboxSecrets);
-  const events = await t.admin.outboxEvent.findMany({ where: { type: 'email.requested' }, orderBy: { occurredAt: 'asc' } });
+  const events = await t.admin.outboxEvent.findMany({
+    where: { type: 'email.requested' },
+    orderBy: { occurredAt: 'asc' },
+  });
   return events
     .map((e) => e.payload as { template: EmailTemplate; sealedParams: string })
     .filter((p) => !template || p.template === template)
-    .map((p) => openJson<{ to: string; params: Record<string, string> }>(key, p.sealedParams, `email:${p.template}`));
+    .map((p) =>
+      openJson<{ to: string; params: Record<string, string> }>(key, p.sealedParams, `email:${p.template}`),
+    );
 }
 
 export function tokenFromUrl(url: string | undefined): string {

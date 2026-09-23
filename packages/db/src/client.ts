@@ -9,6 +9,9 @@ export interface CreatePrismaClientOptions {
   log?: Prisma.LogLevel[];
 }
 
-export function createPrismaClient({ url, log = ['warn', 'error'] }: CreatePrismaClientOptions): PrismaClient {
+export function createPrismaClient({
+  url,
+  log = ['warn', 'error'],
+}: CreatePrismaClientOptions): PrismaClient {
   return new PrismaClient({ datasourceUrl: url, log });
 }

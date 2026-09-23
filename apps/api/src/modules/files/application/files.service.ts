@@ -63,7 +63,10 @@ export class FilesService {
       sha256: file.sha256,
       status: file.status,
       createdAt: file.createdAt.toISOString(),
-      publicUrl: file.bucket === 'PUBLIC_MEDIA' && file.status === 'AVAILABLE' ? this.storage.publicUrl(file.storageKey) : null,
+      publicUrl:
+        file.bucket === 'PUBLIC_MEDIA' && file.status === 'AVAILABLE'
+          ? this.storage.publicUrl(file.storageKey)
+          : null,
     };
   }
 
@@ -78,7 +81,8 @@ export class FilesService {
     if (!policy.mimeTypes.includes(req.mimeType)) {
       throw new DomainError('UNSUPPORTED_FILE_TYPE', { allowed: policy.mimeTypes });
     }
-    if (req.sizeBytes > policy.maxSizeBytes) throw new DomainError('FILE_TOO_LARGE', { maxSizeBytes: policy.maxSizeBytes });
+    if (req.sizeBytes > policy.maxSizeBytes)
+      throw new DomainError('FILE_TOO_LARGE', { maxSizeBytes: policy.maxSizeBytes });
 
     const id = uuidv7();
     const now = new Date();
@@ -103,11 +107,19 @@ export class FilesService {
       maxSizeBytes: req.sizeBytes,
       expiresSeconds: UPLOAD_TTL_SECONDS,
     });
-    return { fileId: id, uploadUrl: post.url, fields: post.fields, expiresAt: new Date(Date.now() + UPLOAD_TTL_SECONDS * 1000).toISOString() };
+    return {
+      fileId: id,
+      uploadUrl: post.url,
+      fields: post.fields,
+      expiresAt: new Date(Date.now() + UPLOAD_TTL_SECONDS * 1000).toISOString(),
+    };
   }
 
   /** Публичные медиа загружаются в приватное хранилище и публикуются только после проверки. */
-  private uploadTarget(file: { id: string; bucket: FileBucket; storageKey: string }): { bucket: FileBucket; key: string } {
+  private uploadTarget(file: { id: string; bucket: FileBucket; storageKey: string }): {
+    bucket: FileBucket;
+    key: string;
+  } {
     return file.bucket === 'PUBLIC_MEDIA'
       ? { bucket: 'PRIVATE_DOCUMENTS', key: stagingKey(file.id) }
       : { bucket: file.bucket, key: file.storageKey };
@@ -118,7 +130,8 @@ export class FilesService {
     const file = await this.db.storedFile.findUnique({ where: { id: fileId } });
     if (!file || file.uploadedById !== user.id) throw new DomainError('NOT_FOUND', { resource: 'file' });
     if (file.status === 'AVAILABLE') return this.toDto(file);
-    if (file.status !== 'PENDING_UPLOAD') throw new DomainError('INVALID_TRANSITION', { from: file.status, to: 'AVAILABLE', allowed: [] });
+    if (file.status !== 'PENDING_UPLOAD')
+      throw new DomainError('INVALID_TRANSITION', { from: file.status, to: 'AVAILABLE', allowed: [] });
 
     const target = this.uploadTarget(file);
     const info = await this.storage.head(target.bucket, target.key);
@@ -138,7 +151,10 @@ export class FilesService {
       await this.storage.delete(target.bucket, target.key);
     }
     const updated = await this.db.tx(async (tx) => {
-      const saved = await tx.storedFile.update({ where: { id: file.id }, data: { status: 'AVAILABLE', verifiedAt: new Date() } });
+      const saved = await tx.storedFile.update({
+        where: { id: file.id },
+        data: { status: 'AVAILABLE', verifiedAt: new Date() },
+      });
       await this.audit.record(tx, {
         action: 'file.uploaded',
         entityType: 'StoredFile',
@@ -152,9 +168,13 @@ export class FilesService {
 
   async downloadUrl(user: AuthUser, fileId: string): Promise<DownloadUrl> {
     const file = await this.db.storedFile.findUnique({ where: { id: fileId } });
-    if (!file || file.status !== 'AVAILABLE' || file.deletedAt) throw new DomainError('NOT_FOUND', { resource: 'file' });
+    if (!file || file.status !== 'AVAILABLE' || file.deletedAt)
+      throw new DomainError('NOT_FOUND', { resource: 'file' });
     if (file.bucket === 'PUBLIC_MEDIA') {
-      return { url: this.storage.publicUrl(file.storageKey), expiresAt: new Date(Date.now() + 3600_000).toISOString() };
+      return {
+        url: this.storage.publicUrl(file.storageKey),
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+      };
     }
     const policy = this.accessPolicies.get(file.purpose as UploadPurpose);
     const allowed = policy ? await policy(user, file) : file.uploadedById === user.id;
@@ -162,7 +182,12 @@ export class FilesService {
       await this.accessLog.record('DENIED', 'StoredFile', file.id);
       throw new DomainError('NOT_FOUND', { resource: 'file' });
     }
-    const url = await this.storage.presignGet(file.bucket, file.storageKey, DOWNLOAD_TTL_SECONDS, file.originalName);
+    const url = await this.storage.presignGet(
+      file.bucket,
+      file.storageKey,
+      DOWNLOAD_TTL_SECONDS,
+      file.originalName,
+    );
     await this.accessLog.record('DOWNLOAD', 'StoredFile', file.id);
     return { url, expiresAt: new Date(Date.now() + DOWNLOAD_TTL_SECONDS * 1000).toISOString() };
   }
@@ -171,7 +196,13 @@ export class FilesService {
    * Файл можно привязать к сущности, только если его загрузил этот же пользователь, он проверен
    * и загружен с нужной целью (API.md, 3.4: logoFileId).
    */
-  async assertAttachable(tx: Tx, fileId: string, userId: string, purpose: UploadPurpose, field: string): Promise<void> {
+  async assertAttachable(
+    tx: Tx,
+    fileId: string,
+    userId: string,
+    purpose: UploadPurpose,
+    field: string,
+  ): Promise<void> {
     const file = await tx.storedFile.findUnique({ where: { id: fileId } });
     if (!file || file.uploadedById !== userId || file.status !== 'AVAILABLE' || file.purpose !== purpose) {
       throw new DomainError('VALIDATION_FAILED', { fields: [{ path: field, code: 'invalid_file' }] });

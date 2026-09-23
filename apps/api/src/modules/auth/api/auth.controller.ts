@@ -67,7 +67,9 @@ export class AuthController {
   @Public()
   @RateLimit('auth')
   @HttpCode(202)
-  async register(@ValidBody(RegisterRequest) body: RegisterRequest): Promise<DataEnvelope<{ status: 'VERIFICATION_SENT' }>> {
+  async register(
+    @ValidBody(RegisterRequest) body: RegisterRequest,
+  ): Promise<DataEnvelope<{ status: 'VERIFICATION_SENT' }>> {
     await this.auth.register(body);
     return ok({ status: 'VERIFICATION_SENT' });
   }
@@ -147,7 +149,10 @@ export class AuthController {
   @Authenticated()
   @RateLimit('auth')
   @HttpCode(204)
-  async change(@CurrentUser() user: AuthUser, @ValidBody(ChangePasswordRequest) body: z.infer<typeof ChangePasswordRequest>): Promise<void> {
+  async change(
+    @CurrentUser() user: AuthUser,
+    @ValidBody(ChangePasswordRequest) body: z.infer<typeof ChangePasswordRequest>,
+  ): Promise<void> {
     await this.auth.changePassword(user.id, user.sessionId, body.currentPassword, body.newPassword);
   }
 
@@ -161,7 +166,8 @@ export class AuthController {
   @Authenticated()
   @HttpCode(204)
   async revokeSession(@CurrentUser() user: AuthUser, @UuidParam('id') id: string): Promise<void> {
-    if (!(await this.sessions.belongsTo(id, user.id))) throw new DomainError('NOT_FOUND', { resource: 'session' });
+    if (!(await this.sessions.belongsTo(id, user.id)))
+      throw new DomainError('NOT_FOUND', { resource: 'session' });
     await this.db.tx((tx) => this.sessions.revoke(tx, id, 'user_revoked'));
     await this.sessions.blockSessions([id]);
   }
@@ -188,7 +194,10 @@ export class AuthController {
   @Authenticated()
   @RateLimit('auth')
   @HttpCode(204)
-  async totpDisable(@CurrentUser() user: AuthUser, @ValidBody(TotpCodeRequest) body: z.infer<typeof TotpCodeRequest>): Promise<void> {
+  async totpDisable(
+    @CurrentUser() user: AuthUser,
+    @ValidBody(TotpCodeRequest) body: z.infer<typeof TotpCodeRequest>,
+  ): Promise<void> {
     await this.totp.disable(user.id, body.code);
   }
 }

@@ -30,7 +30,8 @@ export const ValidBody = (schema: z.ZodType): ParameterDecorator => Body(new Zod
 export const ValidQuery = (schema: z.ZodType): ParameterDecorator => Query(new ZodValidationPipe(schema));
 
 /** UUID из пути. Неверный формат → 404: для клиента это просто несуществующий ресурс. */
-export const UuidParam = (name: string): ParameterDecorator => Param(name, new ZodValidationPipe(Uuid, name, true));
+export const UuidParam = (name: string): ParameterDecorator =>
+  Param(name, new ZodValidationPipe(Uuid, name, true));
 
 export const ValidParam = (name: string, schema: z.ZodType): ParameterDecorator =>
   Param(name, new ZodValidationPipe(schema, name, true));

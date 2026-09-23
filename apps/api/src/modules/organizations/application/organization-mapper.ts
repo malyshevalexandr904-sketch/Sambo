@@ -22,7 +22,10 @@ export function toSummary(row: OrganizationRow, publicUrl: (key: string) => stri
     countryCode: row.countryCode,
     regionId: row.regionId,
     city: row.city,
-    logoUrl: row.logo && row.logo.status === 'AVAILABLE' && row.logo.bucket === 'PUBLIC_MEDIA' ? publicUrl(row.logo.storageKey) : null,
+    logoUrl:
+      row.logo && row.logo.status === 'AVAILABLE' && row.logo.bucket === 'PUBLIC_MEDIA'
+        ? publicUrl(row.logo.storageKey)
+        : null,
   };
 }
 

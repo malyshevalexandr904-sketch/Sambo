@@ -5,7 +5,16 @@ import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { ModulesContainer } from '@nestjs/core';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ROUTE_ACCESS, type RouteAccess } from '../src/modules/access';
-import { createOrg, createTestApp, createUser, csrfAgent, login, resetData, type Session, type TestApp } from './helpers/app';
+import {
+  createOrg,
+  createTestApp,
+  createUser,
+  csrfAgent,
+  login,
+  resetData,
+  type Session,
+  type TestApp,
+} from './helpers/app';
 
 interface Route {
   method: string;
@@ -58,10 +67,16 @@ const PARAMS: Record<string, () => string> = {
 };
 
 function concrete(path: string): string {
-  return path.replace(/:(\w+)/g, (_, p: string) => (PARAMS[p] ?? (() => '01920000-0000-7000-8000-00000000eeee'))());
+  return path.replace(/:(\w+)/g, (_, p: string) =>
+    (PARAMS[p] ?? (() => '01920000-0000-7000-8000-00000000eeee'))(),
+  );
 }
 
-function send(s: Session, method: string, path: string): Promise<{ status: number; body: { error?: { code: string } } }> {
+function send(
+  s: Session,
+  method: string,
+  path: string,
+): Promise<{ status: number; body: { error?: { code: string } } }> {
   const agent = s.agent;
   const url = concrete(path);
   switch (method) {
@@ -107,7 +122,8 @@ describe('route security autotest', () => {
     const failures: string[] = [];
     for (const r of routes.filter((x) => x.access?.kind !== 'public')) {
       const res = await send(anon, r.method, r.path);
-      if (res.status !== 401) failures.push(`${r.method} ${r.path} → ${res.status} ${res.body.error?.code ?? ''}`);
+      if (res.status !== 401)
+        failures.push(`${r.method} ${r.path} → ${res.status} ${res.body.error?.code ?? ''}`);
     }
     expect(failures).toEqual([]);
   });
@@ -116,7 +132,8 @@ describe('route security autotest', () => {
     const failures: string[] = [];
     for (const r of routes.filter((x) => x.access?.kind === 'permission')) {
       const res = await send(noRights, r.method, r.path);
-      if (res.status !== 403 && res.status !== 404) failures.push(`${r.method} ${r.path} → ${res.status} ${res.body.error?.code ?? ''}`);
+      if (res.status !== 403 && res.status !== 404)
+        failures.push(`${r.method} ${r.path} → ${res.status} ${res.body.error?.code ?? ''}`);
     }
     expect(failures).toEqual([]);
   });

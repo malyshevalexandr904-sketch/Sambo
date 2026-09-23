@@ -3,7 +3,12 @@ import argon2 from 'argon2';
 import { COMMON_PASSWORDS } from './common-passwords.js';
 
 /** OWASP Password Storage Cheat Sheet: m = 19 MiB, t = 2, p = 1. */
-export const ARGON2_PARAMS = { type: argon2.argon2id, memoryCost: 19_456, timeCost: 2, parallelism: 1 } as const;
+export const ARGON2_PARAMS = {
+  type: argon2.argon2id,
+  memoryCost: 19_456,
+  timeCost: 2,
+  parallelism: 1,
+} as const;
 
 export function hashPassword(password: string): Promise<string> {
   return argon2.hash(password, ARGON2_PARAMS);
@@ -46,6 +51,9 @@ export class LocalLeakedPasswordChecker implements LeakedPasswordChecker {
     if (COMMON_PASSWORDS.has(normalized)) return true;
     // Очевидные шаблоны: один символ или простая последовательность.
     if (/^(.)\1+$/.test(normalized)) return true;
-    return '0123456789012345678901234567890'.includes(normalized) || 'qwertyuiopasdfghjklzxcvbnm'.includes(normalized);
+    return (
+      '0123456789012345678901234567890'.includes(normalized) ||
+      'qwertyuiopasdfghjklzxcvbnm'.includes(normalized)
+    );
   }
 }

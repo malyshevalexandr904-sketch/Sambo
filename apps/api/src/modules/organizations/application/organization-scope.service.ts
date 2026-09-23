@@ -22,7 +22,10 @@ export class OrganizationScopeService implements OnModuleInit {
 
   async scopeOf(id: string | undefined): Promise<OrganizationScope> {
     if (!id) throw new DomainError('NOT_FOUND', { resource: 'organization' });
-    const org = await this.db.organization.findFirst({ where: { id, deletedAt: null }, select: { id: true, status: true } });
+    const org = await this.db.organization.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true, status: true },
+    });
     if (!org) throw new DomainError('NOT_FOUND', { resource: 'organization' });
     return {
       kind: 'ORGANIZATION',
@@ -35,7 +38,10 @@ export class OrganizationScopeService implements OnModuleInit {
   /** Активация и приостановка решаются на уровне родителя (федерации) или платформы (API.md, 3.4). */
   async parentScopeOf(id: string | undefined): Promise<ResourceScope> {
     if (!id) throw new DomainError('NOT_FOUND', { resource: 'organization' });
-    const org = await this.db.organization.findFirst({ where: { id, deletedAt: null }, select: { parentId: true } });
+    const org = await this.db.organization.findFirst({
+      where: { id, deletedAt: null },
+      select: { parentId: true },
+    });
     if (!org) throw new DomainError('NOT_FOUND', { resource: 'organization' });
     return org.parentId ? this.scopeOf(org.parentId) : { kind: 'PLATFORM' };
   }

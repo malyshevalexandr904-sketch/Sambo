@@ -16,7 +16,10 @@ async function main(): Promise<void> {
     }
     throw e;
   }
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true, bodyParser: false });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+    bodyParser: false,
+  });
   configureApp(app, { useLogger: true });
   const env = app.get<Env>(ENV);
   await app.listen(env.API_PORT, '0.0.0.0');

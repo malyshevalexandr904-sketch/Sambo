@@ -16,7 +16,10 @@ export class AuditQueryService {
       actorUserId: query.actorUserId,
       action: query.action,
       competitionId: fixedCompetitionId ?? query.competitionId,
-      occurredAt: { gte: query.from ? new Date(query.from) : undefined, lte: query.to ? new Date(query.to) : undefined },
+      occurredAt: {
+        gte: query.from ? new Date(query.from) : undefined,
+        lte: query.to ? new Date(query.to) : undefined,
+      },
     };
     if (cursor) {
       const at = new Date(cursor.k);
@@ -35,7 +38,12 @@ export class AuditQueryService {
       (r): AuditEntry => ({
         id: r.id,
         occurredAt: r.occurredAt.toISOString(),
-        actor: { type: r.actorType, userId: r.actorUserId, displayName: r.actorUser?.displayName ?? null, nodeId: r.nodeId },
+        actor: {
+          type: r.actorType,
+          userId: r.actorUserId,
+          displayName: r.actorUser?.displayName ?? null,
+          nodeId: r.nodeId,
+        },
         action: r.action,
         entityType: r.entityType,
         entityId: r.entityId,

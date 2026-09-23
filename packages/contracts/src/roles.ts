@@ -28,17 +28,67 @@ export interface RoleDef {
 }
 
 export const ROLES: Record<RoleCode, RoleDef> = {
-  SUPER_ADMIN: { scope: 'PLATFORM', inheritsToDescendants: false, requiresTotp: true, nameKey: 'roles.SUPER_ADMIN' },
-  PLATFORM_ADMIN: { scope: 'PLATFORM', inheritsToDescendants: false, requiresTotp: true, nameKey: 'roles.PLATFORM_ADMIN' },
-  FEDERATION_ADMIN: { scope: 'ORGANIZATION', inheritsToDescendants: true, requiresTotp: false, nameKey: 'roles.FEDERATION_ADMIN' },
-  ORGANIZER: { scope: 'ORGANIZATION', inheritsToDescendants: false, requiresTotp: false, nameKey: 'roles.ORGANIZER' },
-  TOURNAMENT_MANAGER: { scope: 'COMPETITION', inheritsToDescendants: false, requiresTotp: false, nameKey: 'roles.TOURNAMENT_MANAGER' },
-  SECRETARY: { scope: 'COMPETITION', inheritsToDescendants: false, requiresTotp: false, nameKey: 'roles.SECRETARY' },
-  CHIEF_REFEREE: { scope: 'COMPETITION', inheritsToDescendants: false, requiresTotp: false, nameKey: 'roles.CHIEF_REFEREE' },
-  REFEREE: { scope: 'COMPETITION', inheritsToDescendants: false, requiresTotp: false, nameKey: 'roles.REFEREE' },
-  MEDICAL_STAFF: { scope: 'COMPETITION', inheritsToDescendants: false, requiresTotp: false, nameKey: 'roles.MEDICAL_STAFF' },
+  SUPER_ADMIN: {
+    scope: 'PLATFORM',
+    inheritsToDescendants: false,
+    requiresTotp: true,
+    nameKey: 'roles.SUPER_ADMIN',
+  },
+  PLATFORM_ADMIN: {
+    scope: 'PLATFORM',
+    inheritsToDescendants: false,
+    requiresTotp: true,
+    nameKey: 'roles.PLATFORM_ADMIN',
+  },
+  FEDERATION_ADMIN: {
+    scope: 'ORGANIZATION',
+    inheritsToDescendants: true,
+    requiresTotp: false,
+    nameKey: 'roles.FEDERATION_ADMIN',
+  },
+  ORGANIZER: {
+    scope: 'ORGANIZATION',
+    inheritsToDescendants: false,
+    requiresTotp: false,
+    nameKey: 'roles.ORGANIZER',
+  },
+  TOURNAMENT_MANAGER: {
+    scope: 'COMPETITION',
+    inheritsToDescendants: false,
+    requiresTotp: false,
+    nameKey: 'roles.TOURNAMENT_MANAGER',
+  },
+  SECRETARY: {
+    scope: 'COMPETITION',
+    inheritsToDescendants: false,
+    requiresTotp: false,
+    nameKey: 'roles.SECRETARY',
+  },
+  CHIEF_REFEREE: {
+    scope: 'COMPETITION',
+    inheritsToDescendants: false,
+    requiresTotp: false,
+    nameKey: 'roles.CHIEF_REFEREE',
+  },
+  REFEREE: {
+    scope: 'COMPETITION',
+    inheritsToDescendants: false,
+    requiresTotp: false,
+    nameKey: 'roles.REFEREE',
+  },
+  MEDICAL_STAFF: {
+    scope: 'COMPETITION',
+    inheritsToDescendants: false,
+    requiresTotp: false,
+    nameKey: 'roles.MEDICAL_STAFF',
+  },
   COACH: { scope: 'ORGANIZATION', inheritsToDescendants: false, requiresTotp: false, nameKey: 'roles.COACH' },
-  CLUB_MANAGER: { scope: 'ORGANIZATION', inheritsToDescendants: false, requiresTotp: false, nameKey: 'roles.CLUB_MANAGER' },
+  CLUB_MANAGER: {
+    scope: 'ORGANIZATION',
+    inheritsToDescendants: false,
+    requiresTotp: false,
+    nameKey: 'roles.CLUB_MANAGER',
+  },
 };
 
 export const PLATFORM_ROLE_CODES = ROLE_CODES.filter((r) => ROLES[r].scope === 'PLATFORM');
@@ -54,7 +104,13 @@ export const COMPETITION_ROLE_CODES = ROLE_CODES.filter((r) => ROLES[r].scope ==
  */
 export type GrantMode = 'DIRECT' | 'POLICY' | 'INHERITED' | 'LIMITED';
 
-const MARKS: Record<string, GrantMode | null> = { x: 'DIRECT', p: 'POLICY', i: 'INHERITED', r: 'LIMITED', '.': null };
+const MARKS: Record<string, GrantMode | null> = {
+  x: 'DIRECT',
+  p: 'POLICY',
+  i: 'INHERITED',
+  r: 'LIMITED',
+  '.': null,
+};
 
 // Столбцы: SA PA FA ORG TM SEC CR REF MED COA CM
 const COLUMNS: readonly RoleCode[] = [

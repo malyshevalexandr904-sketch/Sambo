@@ -6,9 +6,23 @@
 // Каталог прав меняется в коде (contracts) → генерируется новая миграция → ревью SQL.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { PERMISSION_CODES, PERMISSIONS, ROLE_CODES, ROLE_PERMISSIONS, ROLES, permissionModule } from '@sde/contracts';
+import {
+  PERMISSION_CODES,
+  PERMISSIONS,
+  ROLE_CODES,
+  ROLE_PERMISSIONS,
+  ROLES,
+  permissionModule,
+} from '@sde/contracts';
 import { uuidv7 } from '../src/uuid';
-import { COUNTRIES, DISCIPLINES, DOCUMENT_TYPES, REFEREE_CATEGORIES, RU_REGIONS, SPORT_RANKS } from './reference-data';
+import {
+  COUNTRIES,
+  DISCIPLINES,
+  DOCUMENT_TYPES,
+  REFEREE_CATEGORIES,
+  RU_REGIONS,
+  SPORT_RANKS,
+} from './reference-data';
 
 const q = (v: string): string => `'${v.replace(/'/g, "''")}'`;
 
@@ -19,7 +33,8 @@ function accessSql(): string {
     return `  (${q(code)}, ${q(permissionModule(code))}, ${q(def.description)}, ${scopes})`;
   });
   const roles = ROLE_CODES.map(
-    (code) => `  (${q(uuidv7())}::uuid, ${q(code)}, ${q(ROLES[code].scope)}::"RoleScope", true, ${q(ROLES[code].nameKey)})`,
+    (code) =>
+      `  (${q(uuidv7())}::uuid, ${q(code)}, ${q(ROLES[code].scope)}::"RoleScope", true, ${q(ROLES[code].nameKey)})`,
   );
   const grants = ROLE_CODES.flatMap((role) =>
     Object.entries(ROLE_PERMISSIONS[role]).map(([perm, mode]) => `  (${q(role)}, ${q(perm)}, ${q(mode)})`),
@@ -53,7 +68,9 @@ UPDATE "user" SET "permissions_version" = "permissions_version" + 1;
 
 function referenceSql(): string {
   const countries = COUNTRIES.map(([c, ru, en]) => `  (${q(c)}, ${q(ru)}, ${q(en)})`);
-  const regions = RU_REGIONS.map(([c, ru, en]) => `  (${q(uuidv7())}::uuid, 'RU', ${q(c)}, ${q(ru)}, ${q(en)})`);
+  const regions = RU_REGIONS.map(
+    ([c, ru, en]) => `  (${q(uuidv7())}::uuid, 'RU', ${q(c)}, ${q(ru)}, ${q(en)})`,
+  );
   const ranks = SPORT_RANKS.map(([c, ru, en, o]) => `  (${q(c)}, ${q(ru)}, ${q(en)}, ${o})`);
   const refs = REFEREE_CATEGORIES.map(([c, ru, en, o]) => `  (${q(c)}, ${q(ru)}, ${q(en)}, ${o})`);
   const disciplines = DISCIPLINES.map(([c, ru, en]) => `  (${q(c)}, ${q(ru)}, ${q(en)})`);
@@ -96,5 +113,8 @@ const accessOnly = process.argv.includes('--access-only');
 const dir = path.join(__dirname, '..', 'prisma', 'migrations', name);
 mkdirSync(dir, { recursive: true });
 const header = `-- Миграция данных, сгенерирована scripts/generate-data-migration.ts. Идемпотентна. Не править вручную.\n\n`;
-writeFileSync(path.join(dir, 'migration.sql'), header + accessSql() + (accessOnly ? '' : '\n' + referenceSql()));
+writeFileSync(
+  path.join(dir, 'migration.sql'),
+  header + accessSql() + (accessOnly ? '' : '\n' + referenceSql()),
+);
 process.stdout.write(`Written ${path.join(dir, 'migration.sql')}\n`);

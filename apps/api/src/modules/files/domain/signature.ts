@@ -10,7 +10,8 @@ const CHECKS: Record<string, (buf: Buffer) => boolean> = {
   'image/jpeg': (b) => startsWith(b, [0xff, 0xd8, 0xff]),
   'image/webp': (b) => startsWith(b, ascii('RIFF')) && startsWith(b, ascii('WEBP'), 8),
   'application/pdf': (b) => startsWith(b, ascii('%PDF-')),
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': (b) => startsWith(b, [0x50, 0x4b, 0x03, 0x04]),
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': (b) =>
+    startsWith(b, [0x50, 0x4b, 0x03, 0x04]),
   // CSV: текст UTF-8 без нулевых байтов и без HTML/скриптов в начале.
   'text/csv': (b) => {
     if (b.includes(0)) return false;
@@ -47,6 +48,10 @@ export function extensionFor(mimeType: string): string {
 /** Имя файла только для отображения: без путей, управляющих символов и лишней длины. */
 export function sanitizeFileName(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? 'file';
-  const cleaned = base.replace(/[\u0000-\u001f\u007f<>:"|?*]/g, '_').replace(/^\.+/, '').trim();
+  const cleaned = base
+    // eslint-disable-next-line no-control-regex -- удаляем именно управляющие символы из имени файла
+    .replace(/[\u0000-\u001f\u007f<>:"|?*]/g, '_')
+    .replace(/^\.+/, '')
+    .trim();
   return (cleaned || 'file').slice(0, 200);
 }

@@ -33,7 +33,9 @@ describe('refresh token rotation', () => {
 
   it('never extends a session beyond 90 days from its start', () => {
     const started = new Date(now.getTime() - (SESSION_MAX_AGE_SECONDS - 3600) * 1000);
-    expect(nextRefreshExpiry(now, started).getTime()).toBe(started.getTime() + SESSION_MAX_AGE_SECONDS * 1000);
+    expect(nextRefreshExpiry(now, started).getTime()).toBe(
+      started.getTime() + SESSION_MAX_AGE_SECONDS * 1000,
+    );
     expect(sessionExhausted(now, started)).toBe(false);
     expect(sessionExhausted(new Date(now.getTime() + 3600_000), started)).toBe(true);
   });

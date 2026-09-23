@@ -1,5 +1,11 @@
 import { Controller, Get, HttpCode, Post } from '@nestjs/common';
-import { type DataEnvelope, type DownloadUrl, type StoredFileDto, UploadRequest, type UploadTicket } from '@sde/contracts';
+import {
+  type DataEnvelope,
+  type DownloadUrl,
+  type StoredFileDto,
+  UploadRequest,
+  type UploadTicket,
+} from '@sde/contracts';
 import { CurrentUser } from '../../../common/context/current-user';
 import type { AuthUser } from '../../../common/context/request-context';
 import { ok } from '../../../common/http/http';
@@ -16,7 +22,10 @@ export class FilesController {
   @Post('uploads')
   @Authenticated()
   @RateLimit('upload')
-  async createUpload(@CurrentUser() user: AuthUser, @ValidBody(UploadRequest) body: UploadRequest): Promise<DataEnvelope<UploadTicket>> {
+  async createUpload(
+    @CurrentUser() user: AuthUser,
+    @ValidBody(UploadRequest) body: UploadRequest,
+  ): Promise<DataEnvelope<UploadTicket>> {
     return ok(await this.files.createUpload(user, body));
   }
 
@@ -24,13 +33,19 @@ export class FilesController {
   @Authenticated()
   @RateLimit('upload')
   @HttpCode(200)
-  async complete(@CurrentUser() user: AuthUser, @UuidParam('id') id: string): Promise<DataEnvelope<StoredFileDto>> {
+  async complete(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+  ): Promise<DataEnvelope<StoredFileDto>> {
     return ok(await this.files.complete(user, id));
   }
 
   @Get(':id/download-url')
   @Authenticated()
-  async downloadUrl(@CurrentUser() user: AuthUser, @UuidParam('id') id: string): Promise<DataEnvelope<DownloadUrl>> {
+  async downloadUrl(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+  ): Promise<DataEnvelope<DownloadUrl>> {
     return ok(await this.files.downloadUrl(user, id));
   }
 }

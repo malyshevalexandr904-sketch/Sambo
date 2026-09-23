@@ -63,7 +63,11 @@ export interface GrantDecision {
  */
 const RESTRICTED_ORG_PERMISSIONS: Record<OrganizationStatus, ReadonlySet<PermissionCode>> = {
   ACTIVE: new Set(),
-  PENDING_REVIEW: new Set(['organization.update', 'organization.members.view', 'organization.members.manage']),
+  PENDING_REVIEW: new Set([
+    'organization.update',
+    'organization.members.view',
+    'organization.members.manage',
+  ]),
   SUSPENDED: new Set(['organization.members.view']),
   ARCHIVED: new Set(['organization.members.view']),
 };
@@ -80,16 +84,33 @@ function permissionHasScope(permission: PermissionCode, scope: PermissionScope):
   return (PERMISSIONS[permission].scopes as readonly PermissionScope[]).includes(scope);
 }
 
-function orgGrantApplies(grant: OrganizationGrant, role: RoleCode, targetOrgId: string, targetAncestors: string[]): boolean {
+function orgGrantApplies(
+  grant: OrganizationGrant,
+  role: RoleCode,
+  targetOrgId: string,
+  targetAncestors: string[],
+): boolean {
   if (grant.organizationId === targetOrgId) return true;
-  return ROLES[role].inheritsToDescendants && grant.organizationStatus === 'ACTIVE' && targetAncestors.includes(grant.organizationId);
+  return (
+    ROLES[role].inheritsToDescendants &&
+    grant.organizationStatus === 'ACTIVE' &&
+    targetAncestors.includes(grant.organizationId)
+  );
 }
 
-function modeFromOrganizations(grants: EffectiveGrants, permission: PermissionCode, orgId: string, ancestors: string[]): GrantMode | null {
+function modeFromOrganizations(
+  grants: EffectiveGrants,
+  permission: PermissionCode,
+  orgId: string,
+  ancestors: string[],
+): GrantMode | null {
   let mode: GrantMode | null = null;
   for (const g of grants.organizations) {
     const restricted = g.organizationStatus !== 'ACTIVE';
-    if (restricted && (g.organizationId !== orgId || !RESTRICTED_ORG_PERMISSIONS[g.organizationStatus].has(permission))) {
+    if (
+      restricted &&
+      (g.organizationId !== orgId || !RESTRICTED_ORG_PERMISSIONS[g.organizationStatus].has(permission))
+    ) {
       continue;
     }
     for (const role of g.roles) {
@@ -116,13 +137,18 @@ function modeFromCompetition(
     if (g.organizationStatus !== 'ACTIVE') continue;
     for (const role of g.roles) {
       const m = ROLE_PERMISSIONS[role][permission];
-      if (m && orgGrantApplies(g, role, scope.organizerOrganizationId, scope.organizerAncestorIds)) mode = better(mode, m);
+      if (m && orgGrantApplies(g, role, scope.organizerOrganizationId, scope.organizerAncestorIds))
+        mode = better(mode, m);
     }
   }
   return mode;
 }
 
-export function decide(grants: EffectiveGrants, permission: PermissionCode, scope: ResourceScope): GrantDecision {
+export function decide(
+  grants: EffectiveGrants,
+  permission: PermissionCode,
+  scope: ResourceScope,
+): GrantDecision {
   for (const role of grants.platform) {
     const m = ROLE_PERMISSIONS[role][permission];
     if (m) return { allowed: true, mode: m, viaPlatform: true };
@@ -152,7 +178,9 @@ export function canSee(grants: EffectiveGrants, scope: ResourceScope): boolean {
   if (scope.visibleToAll || grants.platform.length > 0) return true;
   const ancestors = scope.kind === 'ORGANIZATION' ? scope.ancestorIds : scope.organizerAncestorIds;
   if (grants.organizations.some((g) => ancestors.includes(g.organizationId))) return true;
-  return scope.kind === 'COMPETITION' && grants.competitions.some((g) => g.competitionId === scope.competitionId);
+  return (
+    scope.kind === 'COMPETITION' && grants.competitions.some((g) => g.competitionId === scope.competitionId)
+  );
 }
 
 /** Роль можно выдать, только если у выдающего есть все её права в этой области (API.md, 3.4). */
@@ -164,7 +192,10 @@ export function missingPermissionsForRole(granted: Set<PermissionCode>, role: Ro
  * Права, которые пользователь может передать ролью организации: права в самой организации
  * и права на её турниры (для ролей вроде ORGANIZER и FEDERATION_ADMIN, у которых есть турнирные права).
  */
-export function grantablePermissions(grants: EffectiveGrants, scope: Extract<ResourceScope, { kind: 'ORGANIZATION' }>): Set<PermissionCode> {
+export function grantablePermissions(
+  grants: EffectiveGrants,
+  scope: Extract<ResourceScope, { kind: 'ORGANIZATION' }>,
+): Set<PermissionCode> {
   const inOrg = permissionsInScope(grants, scope);
   const onCompetitions = permissionsInScope(grants, {
     kind: 'COMPETITION',

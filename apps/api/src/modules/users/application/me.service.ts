@@ -59,7 +59,9 @@ export class MeService {
       for (const r of rows) if (isRoleCode(r.code)) map.set(r.id, [...(map.get(r.id) ?? []), r.code]);
       return map;
     };
-    const orgs = group(user.organizationMemberships.map((m) => ({ id: m.organizationId, code: m.role.code })));
+    const orgs = group(
+      user.organizationMemberships.map((m) => ({ id: m.organizationId, code: m.role.code })),
+    );
     const comps = group(user.competitionMemberships.map((m) => ({ id: m.competitionId, code: m.role.code })));
     const grants: Grants = {
       platform: user.platformRoles.map((p) => p.role.code).filter(isRoleCode),
@@ -137,7 +139,7 @@ export class MeService {
         action: 'person.upserted',
         entityType: 'Person',
         entityId: person.id,
-        before: user.person ? personDto(user.person) as unknown as Record<string, unknown> : null,
+        before: user.person ? (personDto(user.person) as unknown as Record<string, unknown>) : null,
         after: personDto(person) as unknown as Record<string, unknown>,
       });
       return personDto(person);

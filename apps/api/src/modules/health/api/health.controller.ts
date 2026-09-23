@@ -24,10 +24,15 @@ export class HealthController {
   }
 
   @Get('ready')
-  async ready(@Res({ passthrough: true }) res: Response): Promise<{ status: Check; checks: Record<string, Check> }> {
+  async ready(
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ status: Check; checks: Record<string, Check> }> {
     const probe = async (fn: () => Promise<unknown>): Promise<Check> => {
       try {
-        await Promise.race([fn(), new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2_000))]);
+        await Promise.race([
+          fn(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 2_000)),
+        ]);
         return 'ok';
       } catch {
         return 'fail';

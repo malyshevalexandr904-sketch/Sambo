@@ -25,7 +25,15 @@ export function configureApp(app: NestExpressApplication, opts: { useLogger: boo
   app.enableCors({
     origin: env.CORS_ORIGINS.length > 0 ? env.CORS_ORIGINS : false,
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'If-Match', 'Idempotency-Key', 'X-Request-Id', CSRF_HEADER, AUTH_MODE_HEADER],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'If-Match',
+      'Idempotency-Key',
+      'X-Request-Id',
+      CSRF_HEADER,
+      AUTH_MODE_HEADER,
+    ],
     exposedHeaders: ['ETag', 'X-Request-Id', 'Retry-After'],
   });
   app.setGlobalPrefix('api/v1', { exclude: ['health', 'ready'] });

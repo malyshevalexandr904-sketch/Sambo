@@ -32,7 +32,8 @@ export type RateLimitGroup = keyof typeof RATE_LIMITS;
 const RATE_LIMIT_GROUP = 'sde:rate-limit-group';
 
 /** Группа лимита маршрута; по умолчанию — `api`. */
-export const RateLimit = (group: RateLimitGroup): MethodDecorator & ClassDecorator => SetMetadata(RATE_LIMIT_GROUP, group);
+export const RateLimit = (group: RateLimitGroup): MethodDecorator & ClassDecorator =>
+  SetMetadata(RATE_LIMIT_GROUP, group);
 
 @Injectable()
 export class RateLimitService {
@@ -51,7 +52,11 @@ export class RateLimitService {
     const redisKey = `rl:${group}:${sha256Hex(key).slice(0, 32)}:${window}`;
     let count: number;
     try {
-      const res = await this.redis.multi().incr(redisKey).expire(redisKey, windowSeconds + 1).exec();
+      const res = await this.redis
+        .multi()
+        .incr(redisKey)
+        .expire(redisKey, windowSeconds + 1)
+        .exec();
       count = Number(res?.[0]?.[1] ?? 0);
     } catch (e) {
       this.logger.warn({ err: e, group }, 'Rate limiter unavailable');
@@ -73,8 +78,10 @@ export class RateLimitGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const group =
-      this.reflector.getAllAndOverride<RateLimitGroup | undefined>(RATE_LIMIT_GROUP, [context.getHandler(), context.getClass()]) ??
-      'api';
+      this.reflector.getAllAndOverride<RateLimitGroup | undefined>(RATE_LIMIT_GROUP, [
+        context.getHandler(),
+        context.getClass(),
+      ]) ?? 'api';
     const req = context.switchToHttp().getRequest<Request>();
     const user = RequestContextStore.current().user;
     const subject = group === 'auth' || !user ? `ip:${req.ip ?? 'unknown'}` : `user:${user.id}`;

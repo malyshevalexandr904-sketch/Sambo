@@ -33,7 +33,9 @@ export type Locale = z.infer<typeof Locale>;
 
 const IANA_ZONES: ReadonlySet<string> | null = (() => {
   const intl = Intl as unknown as { supportedValuesOf?: (key: string) => string[] };
-  return typeof intl.supportedValuesOf === 'function' ? new Set([...intl.supportedValuesOf('timeZone'), 'UTC']) : null;
+  return typeof intl.supportedValuesOf === 'function'
+    ? new Set([...intl.supportedValuesOf('timeZone'), 'UTC'])
+    : null;
 })();
 
 export const Timezone = z.string().refine((tz) => (IANA_ZONES ? IANA_ZONES.has(tz) : tz.length > 0), {

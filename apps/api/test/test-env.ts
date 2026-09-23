@@ -5,7 +5,8 @@ export const TEST_ENV = {
   LOG_LEVEL: 'silent',
   APP_URL: 'http://localhost:3000',
   DATABASE_URL: process.env.TEST_DATABASE_URL ?? 'postgresql://sde_app:sde_dev_app@localhost:5432/sde_test',
-  DATABASE_ADMIN_URL: process.env.TEST_DATABASE_ADMIN_URL ?? 'postgresql://sde:sde_dev_owner@localhost:5432/sde_test',
+  DATABASE_ADMIN_URL:
+    process.env.TEST_DATABASE_ADMIN_URL ?? 'postgresql://sde:sde_dev_owner@localhost:5432/sde_test',
   REDIS_URL: process.env.TEST_REDIS_URL ?? 'redis://localhost:6379/15',
   JWT_SECRET: 'test-jwt-secret-0123456789abcdefghijklmnop',
   JWT_KID: 't1',

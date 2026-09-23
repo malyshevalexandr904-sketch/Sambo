@@ -54,7 +54,11 @@ export function loggerOptions(level: string, service: string): LoggerOptions {
   };
 }
 
-export function createLogger(level: string, service: string, destination?: pino.DestinationStream): pino.Logger {
+export function createLogger(
+  level: string,
+  service: string,
+  destination?: pino.DestinationStream,
+): pino.Logger {
   return destination ? pino(loggerOptions(level, service), destination) : pino(loggerOptions(level, service));
 }
 

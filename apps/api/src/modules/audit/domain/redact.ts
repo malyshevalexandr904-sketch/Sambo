@@ -35,7 +35,9 @@ function normalize(value: unknown): unknown {
   if (Buffer.isBuffer(value) || value instanceof Uint8Array) return REDACTED;
   if (Array.isArray(value)) return value.map(normalize);
   if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.entries(value as Plain).map(([k, v]) => [k, REDACTED_FIELDS.has(k) ? REDACTED : normalize(v)]));
+    return Object.fromEntries(
+      Object.entries(value as Plain).map(([k, v]) => [k, REDACTED_FIELDS.has(k) ? REDACTED : normalize(v)]),
+    );
   }
   return value;
 }
@@ -48,11 +50,20 @@ function same(a: unknown, b: unknown): boolean {
  * Разница двух состояний. Для создания передаётся before = null, для удаления after = null.
  * Служебные поля (updatedAt, version) не включаются: они меняются всегда.
  */
-export function auditDiff(before: Plain | null, after: Plain | null): { before: Plain | null; after: Plain | null } {
+export function auditDiff(
+  before: Plain | null,
+  after: Plain | null,
+): { before: Plain | null; after: Plain | null } {
   const skip = new Set(['updatedAt', 'createdAt', 'version']);
   if (!before || !after) {
     const pick = (o: Plain | null): Plain | null =>
-      o ? Object.fromEntries(Object.entries(o).filter(([k]) => !skip.has(k)).map(([k, v]) => [k, REDACTED_FIELDS.has(k) ? REDACTED : normalize(v)])) : null;
+      o
+        ? Object.fromEntries(
+            Object.entries(o)
+              .filter(([k]) => !skip.has(k))
+              .map(([k, v]) => [k, REDACTED_FIELDS.has(k) ? REDACTED : normalize(v)]),
+          )
+        : null;
     return { before: pick(before), after: pick(after) };
   }
   const b: Plain = {};

@@ -3,10 +3,15 @@ import { renderEmail, TemplateParamsError } from './templates';
 
 describe('email templates', () => {
   it('renders ru and en with the action link', () => {
-    const ru = renderEmail('auth.verify_email', 'ru', { verifyUrl: 'https://sambo.local/ru/verify-email?token=abc', displayName: 'Иван' });
+    const ru = renderEmail('auth.verify_email', 'ru', {
+      verifyUrl: 'https://sambo.local/ru/verify-email?token=abc',
+      displayName: 'Иван',
+    });
     expect(ru.subject).toContain('Подтвердите email');
     expect(ru.text).toContain('https://sambo.local/ru/verify-email?token=abc');
-    const en = renderEmail('auth.password_reset', 'en', { resetUrl: 'https://sambo.local/en/reset-password?token=x' });
+    const en = renderEmail('auth.password_reset', 'en', {
+      resetUrl: 'https://sambo.local/en/reset-password?token=x',
+    });
     expect(en.subject).toContain('Password reset');
   });
 
@@ -23,6 +28,8 @@ describe('email templates', () => {
 
   it('rejects missing params and non-http links', () => {
     expect(() => renderEmail('auth.password_reset', 'ru', {})).toThrow(TemplateParamsError);
-    expect(() => renderEmail('auth.password_reset', 'ru', { resetUrl: 'javascript:alert(1)' })).toThrow(TemplateParamsError);
+    expect(() => renderEmail('auth.password_reset', 'ru', { resetUrl: 'javascript:alert(1)' })).toThrow(
+      TemplateParamsError,
+    );
   });
 });
