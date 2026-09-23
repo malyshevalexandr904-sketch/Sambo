@@ -1,4 +1,4 @@
-import { type Prisma, PrismaClient } from '@prisma/client';
+import { type Prisma, PrismaClient } from '../generated/client/index.js';
 
 export type DbClient = PrismaClient;
 /** Клиент внутри интерактивной транзакции. */

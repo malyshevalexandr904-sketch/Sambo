@@ -53,7 +53,7 @@ module.exports = {
   ],
   options: {
     doNotFollow: { path: 'node_modules' },
-    exclude: { path: '(dist|\\.next|generated|coverage|node_modules)/' },
+    exclude: { path: '(^|/)(dist|\\.next|generated|coverage)/' },
     tsPreCompilationDeps: true,
     combinedDependencies: true,
     tsConfig: { fileName: 'tsconfig.depcruise.json' },

@@ -43,10 +43,26 @@ export default tseslint.config(
       'max-lines-per-function': ['warn', { max: 60, skipBlankLines: true, skipComments: true }],
       'no-restricted-properties': [
         'error',
-        { object: 'prisma', property: '$queryRawUnsafe', message: 'Только tagged template $queryRaw (SECURITY.md, 5).' },
-        { object: 'prisma', property: '$executeRawUnsafe', message: 'Только tagged template $executeRaw (SECURITY.md, 5).' },
-        { object: 'tx', property: '$queryRawUnsafe', message: 'Только tagged template $queryRaw (SECURITY.md, 5).' },
-        { object: 'tx', property: '$executeRawUnsafe', message: 'Только tagged template $executeRaw (SECURITY.md, 5).' },
+        {
+          object: 'prisma',
+          property: '$queryRawUnsafe',
+          message: 'Только tagged template $queryRaw (SECURITY.md, 5).',
+        },
+        {
+          object: 'prisma',
+          property: '$executeRawUnsafe',
+          message: 'Только tagged template $executeRaw (SECURITY.md, 5).',
+        },
+        {
+          object: 'tx',
+          property: '$queryRawUnsafe',
+          message: 'Только tagged template $queryRaw (SECURITY.md, 5).',
+        },
+        {
+          object: 'tx',
+          property: '$executeRawUnsafe',
+          message: 'Только tagged template $executeRaw (SECURITY.md, 5).',
+        },
       ],
       'no-restricted-syntax': [
         'error',

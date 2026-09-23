@@ -34,5 +34,14 @@
     "tsx": "4.23.15",
     "vitest": "3.2.7",
     "@sde/server-kit": "workspace:*"
-  }
+  },
+  "files": [
+    "dist",
+    "generated",
+    "prisma",
+    "prisma.config.ts",
+    "seed",
+    "scripts",
+    "tsconfig.json"
+  ]
 }

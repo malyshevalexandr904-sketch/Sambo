@@ -26,7 +26,7 @@ describe('i18n dictionaries', () => {
   });
 
   it('translate every error code, role, organization type and status', () => {
-    const all = new Set(keys(ru as Tree));
+    const all = new Set(keys(ru));
     const required = [
       ...Object.keys(ERROR_CODES).map((c) => `errors.${c}`),
       ...ROLE_CODES.map((r) => `roles.${r}`),

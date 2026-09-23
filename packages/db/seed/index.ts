@@ -3,7 +3,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { hashPassword, sealTotpSecret, totpKey } from '@sde/server-kit';
-import { type OrganizationType, PrismaClient, type RoleScope } from '@prisma/client';
+import { type OrganizationType, PrismaClient, type RoleScope } from '../generated/client';
 import { SEED_ORGANIZATIONS, SEED_USERS } from './data';
 
 const envFile = path.resolve(__dirname, '..', '..', '..', '.env');

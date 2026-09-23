@@ -5,8 +5,10 @@
 
 generator client {
   provider        = "prisma-client-js"
+  // Клиент генерируется внутрь пакета: так его забирает `pnpm deploy` в Docker-образы.
+  output          = "../generated/client"
   previewFeatures = ["relationJoins", "postgresqlExtensions"]
-  binaryTargets   = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {

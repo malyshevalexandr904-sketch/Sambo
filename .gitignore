@@ -14,3 +14,4 @@ next-env.d.ts
 .vscode/*
 !.vscode/extensions.json
 packages/db/generated/
+.local-ca.crt

@@ -1,0 +1,42 @@
+# Образ backend: api, worker и задачи миграций (раздел 50 ТЗ; ARCHITECTURE.md, 3).
+# Сборка: docker build -f infra/docker/Dockerfile.api --target api .
+#         docker build -f infra/docker/Dockerfile.api --target worker .
+#         docker build -f infra/docker/Dockerfile.api --target migrate .
+# Базовый образ фиксируется по digest в Phase 12 (SECURITY.md, 3.9).
+FROM node:22-bookworm-slim AS base
+ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH CI=true
+RUN corepack enable \
+ && apt-get update && apt-get install -y --no-install-recommends openssl ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /repo
+
+FROM base AS build
+COPY . .
+RUN pnpm install --frozen-lockfile
+RUN pnpm turbo run build --filter=@sde/api... --filter=@sde/worker...
+RUN pnpm --filter=@sde/api deploy --prod --legacy /out/api \
+ && pnpm --filter=@sde/worker deploy --prod --legacy /out/worker
+
+# Миграции и seed: нужен Prisma CLI (devDependency), поэтому полный набор зависимостей.
+FROM build AS migrate
+WORKDIR /repo/packages/db
+USER node
+CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
+
+FROM base AS api
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build --chown=node:node /out/api ./
+USER node
+EXPOSE 4000
+HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD node -e "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "dist/main.js"]
+
+FROM base AS worker
+ENV NODE_ENV=production
+WORKDIR /app
+COPY --from=build --chown=node:node /out/worker ./
+USER node
+EXPOSE 4100
+HEALTHCHECK --interval=15s --timeout=3s --retries=5 CMD node -e "fetch('http://127.0.0.1:4100/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "dist/main.js"]

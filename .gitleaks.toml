@@ -1,0 +1,14 @@
+# gitleaks (SECURITY.md, 3.9). Значения в .env.example и тестах — заведомо учебные, не секреты.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Учебные значения для локальной разработки и тестов"
+paths = [
+  '''\.env\.example$''',
+  '''apps/api/test/.*''',
+  '''packages/server-kit/src/.*\.test\.ts$''',
+  '''docker-compose\.yml$''',
+  '''\.github/workflows/ci\.yml$''',
+  '''pnpm-lock\.yaml$''',
+]

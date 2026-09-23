@@ -1,0 +1,112 @@
+# Гейты качества (IMPLEMENTATION_PLAN, 0.3): lint → typecheck → unit → integration → build,
+# границы модулей (dependency-cruiser), поиск секретов (gitleaks), сборка Docker-образов.
+# Упавшая проверка чинится, а не отключается.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  secrets:
+    name: Secrets scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_CONFIG: .gitleaks.toml
+
+  quality:
+    name: Lint, typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Format
+        run: pnpm format:check
+      - name: Build packages
+        run: pnpm turbo run build --filter=./packages/*
+      - name: Lint
+        run: pnpm lint
+      - name: Module boundaries
+        run: pnpm lint:deps
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit tests
+        run: pnpm test:unit
+      - name: Build
+        run: pnpm build
+      - name: Dependency audit
+        run: pnpm audit --prod --audit-level high
+
+  integration:
+    name: Integration tests (PostgreSQL, Redis)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sde
+          POSTGRES_PASSWORD: sde_dev_owner
+          POSTGRES_DB: sde_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U sde" --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql://sde_app:sde_dev_app@localhost:5432/sde_test
+      TEST_DATABASE_ADMIN_URL: postgresql://sde:sde_dev_owner@localhost:5432/sde_test
+      TEST_REDIS_URL: redis://localhost:6379/15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Application role
+        run: psql postgresql://sde:sde_dev_owner@localhost:5432/sde_test -c "CREATE ROLE sde_app LOGIN PASSWORD 'sde_dev_app'"
+      - name: Build packages
+        run: pnpm turbo run build --filter=./packages/*
+      # Глобальная подготовка тестов пересоздаёт схему и применяет все миграции с нуля.
+      - name: Integration tests
+        run: pnpm test:integration
+
+  docker:
+    name: Docker images
+    runs-on: ubuntu-latest
+    needs: [quality]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: api
+        run: docker build -f infra/docker/Dockerfile.api --target api -t sde-api:ci .
+      - name: worker
+        run: docker build -f infra/docker/Dockerfile.api --target worker -t sde-worker:ci .
+      - name: migrate
+        run: docker build -f infra/docker/Dockerfile.api --target migrate -t sde-migrate:ci .
+      - name: web
+        run: docker build -f infra/docker/Dockerfile.web --target web -t sde-web:ci .
+      - name: compose config
+        run: cp .env.example .env && docker compose config -q

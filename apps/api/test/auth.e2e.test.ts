@@ -101,16 +101,13 @@ describe('registration and email verification', () => {
 
   it('rejects leaked passwords and invalid bodies with field errors', async () => {
     const s = await csrfAgent(t);
-    const leaked = await s.agent
-      .post('/api/v1/auth/register')
-      .set('x-csrf-token', s.csrf)
-      .send({
-        email: 'a@test.local',
-        password: 'qwerty123456',
-        displayName: 'X',
-        locale: 'ru',
-        acceptTerms: true,
-      });
+    const leaked = await s.agent.post('/api/v1/auth/register').set('x-csrf-token', s.csrf).send({
+      email: 'a@test.local',
+      password: 'qwerty123456',
+      displayName: 'X',
+      locale: 'ru',
+      acceptTerms: true,
+    });
     expect(leaked.status).toBe(400);
     expect(leaked.body.error.details.fields).toEqual([{ path: 'password', code: 'password_leaked' }]);
 

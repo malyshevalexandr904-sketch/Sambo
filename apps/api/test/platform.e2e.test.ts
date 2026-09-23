@@ -408,16 +408,13 @@ describe('dictionaries and settings', () => {
     const fresh = await createTestApp();
     try {
       const anon = await csrfAgent(fresh);
-      const res = await anon.agent
-        .post('/api/v1/auth/register')
-        .set('x-csrf-token', anon.csrf)
-        .send({
-          email: 'late@test.local',
-          password: PASSWORD,
-          displayName: 'X',
-          locale: 'ru',
-          acceptTerms: true,
-        });
+      const res = await anon.agent.post('/api/v1/auth/register').set('x-csrf-token', anon.csrf).send({
+        email: 'late@test.local',
+        password: PASSWORD,
+        displayName: 'X',
+        locale: 'ru',
+        acceptTerms: true,
+      });
       expect(res.status).toBe(403);
     } finally {
       await fresh.close();
