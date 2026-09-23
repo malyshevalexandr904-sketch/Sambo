@@ -309,6 +309,13 @@
     "INTERNAL_ERROR": "Server error. Reference code: {traceId}",
     "DEPENDENCY_UNAVAILABLE": "Service temporarily unavailable. Try again later.",
     "NETWORK": "No connection to the server. Check your network.",
-    "UNKNOWN": "The action could not be completed."
+    "UNKNOWN": "The action could not be completed.",
+    "IDEMPOTENCY_KEY_REQUIRED": "Retry the action: the request has no idempotency key.",
+    "MESSENGER_DATA_INVALID": "Messenger data could not be verified.",
+    "NODE_CREDENTIALS_INVALID": "The venue node is not authorized.",
+    "IDEMPOTENCY_KEY_REUSED": "This request was already made with different data.",
+    "EXPECTED_SEQ_MISMATCH": "Data is outdated. Refresh the page.",
+    "WRITE_AUTHORITY_ELSEWHERE": "The tournament is currently run on the venue node: changes in the cloud are unavailable.",
+    "STALE_EPOCH": "Venue node data is outdated."
   }
 }
