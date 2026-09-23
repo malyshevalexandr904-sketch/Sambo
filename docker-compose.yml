@@ -45,8 +45,9 @@ services:
       interval: 5s
       retries: 20
 
+  # Образы MinIO берутся с quay.io: публикация community-образов в Docker Hub прекращена.
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address :9001
     environment:
       MINIO_ROOT_USER: sde-dev
@@ -60,7 +61,7 @@ services:
 
   # Buckets: публичные медиа читаются анонимно, документы — только по presigned URL (ARCHITECTURE.md, 18).
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:1754467928
     depends_on:
       minio: { condition: service_healthy }
     entrypoint: >
