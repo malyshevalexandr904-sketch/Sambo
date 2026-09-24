@@ -6,6 +6,10 @@ const plugins = [swc.vite({ module: { type: 'es6' } })];
 
 export default defineConfig({
   test: {
+    // Файлы выполняются по одному: интеграционные тесты делят одну базу и очищают её через TRUNCATE,
+    // параллельный запуск даёт deadlock и чужие данные. Опция действует только на корневом уровне —
+    // в конфигурации проекта vitest её игнорирует (и файлы идут параллельно, если ядер больше двух).
+    fileParallelism: false,
     projects: [
       { plugins, test: { name: 'unit', include: ['src/**/*.test.ts'], environment: 'node' } },
       {
@@ -15,7 +19,6 @@ export default defineConfig({
           include: ['test/**/*.e2e.test.ts'],
           environment: 'node',
           globalSetup: ['test/global-setup.ts'],
-          fileParallelism: false,
           testTimeout: 30_000,
           hookTimeout: 60_000,
         },
