@@ -8,7 +8,7 @@ import { useState } from 'react';
 import { QueryState } from '@/components/common';
 import { api } from '@/lib/api';
 import { useErrorMessage } from '@/lib/errors';
-import { formatDateTime } from '@/lib/format';
+import { describeUserAgent, formatDateTime } from '@/lib/format';
 import { qk, useMe } from '@/lib/queries';
 
 type Notice = { tone: 'success' | 'danger'; text: string } | null;
@@ -138,7 +138,9 @@ function SessionsCard() {
                 className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="text-sm">
-                  <p className="font-medium">{s.userAgent ?? '—'}</p>
+                  <p className="font-medium" title={s.userAgent ?? undefined}>
+                    {describeUserAgent(s.userAgent)}
+                  </p>
                   <p className="text-slate-600">
                     {s.ipMasked ?? '—'} · {t('lastUsed')}: {formatDateTime(s.lastUsedAt, locale)}
                   </p>
