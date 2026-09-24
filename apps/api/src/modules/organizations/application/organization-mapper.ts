@@ -1,13 +1,21 @@
-import type { Organization as OrganizationDto, OrganizationSummary } from '@sde/contracts';
+import type { Organization as OrganizationDto, OrganizationRef, OrganizationSummary } from '@sde/contracts';
 import type { Organization, OrganizationLegalDetails, StoredFile } from '@sde/db';
 
 export type OrganizationRow = Organization & {
   logo: Pick<StoredFile, 'storageKey' | 'status' | 'bucket'> | null;
   legalDetails?: OrganizationLegalDetails | null;
+  parent?: OrganizationRef | null;
 };
 
 export const ORGANIZATION_INCLUDE = {
   logo: { select: { storageKey: true, status: true, bucket: true } },
+} as const;
+
+/** Карточка: + реквизиты и вышестоящая организация (списки обходятся без этих join). */
+export const ORGANIZATION_DETAIL_INCLUDE = {
+  ...ORGANIZATION_INCLUDE,
+  legalDetails: true,
+  parent: { select: { id: true, name: true, shortName: true } },
 } as const;
 
 export function toSummary(row: OrganizationRow, publicUrl: (key: string) => string): OrganizationSummary {
@@ -38,6 +46,7 @@ export function toDetail(
   const legal = opts.includeLegal && row.legalDetails ? row.legalDetails : null;
   return {
     ...toSummary(row, publicUrl),
+    parent: row.parent ?? null,
     address: row.address,
     contactEmail: row.contactEmail,
     contactPhone: row.contactPhone,

@@ -9,7 +9,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { api, ApiError } from '@/lib/api';
 import { applyFieldErrors, useErrorMessage, useFieldMessage } from '@/lib/errors';
-import { qk, useCountries, useRegions } from '@/lib/queries';
+import { canCreateWithAuthority, qk, useCountries, useMe, useRegions } from '@/lib/queries';
 import { LogoUpload } from './logo-upload';
 
 export interface OrganizationFormValues {
@@ -32,6 +32,7 @@ export interface OrganizationFormValues {
   kpp: string;
   ogrn: string;
   legalAddress: string;
+  managerEmail: string;
 }
 
 const FIELDS = [
@@ -48,6 +49,7 @@ const FIELDS = [
   'contactPhone',
   'website',
   'logoFileId',
+  'managerEmail',
 ] as const;
 const LEGAL = ['legalName', 'inn', 'kpp', 'ogrn', 'legalAddress'] as const;
 
@@ -72,6 +74,7 @@ export function toFormValues(org?: Organization): OrganizationFormValues {
     kpp: org?.legalDetails?.kpp ?? '',
     ogrn: org?.legalDetails?.ogrn ?? '',
     legalAddress: org?.legalDetails?.legalAddress ?? '',
+    managerEmail: '',
   };
 }
 
@@ -103,6 +106,7 @@ function toPayload(v: OrganizationFormValues, mode: 'create' | 'edit'): Record<s
   };
   if (v.slug.trim()) payload.slug = v.slug.trim();
   if (mode === 'create' && payload.parentId === null) delete payload.parentId;
+  if (mode === 'create' && v.managerEmail.trim()) payload.managerEmail = v.managerEmail.trim();
   return payload;
 }
 
@@ -126,6 +130,9 @@ export function OrganizationForm({
   const form = useForm<OrganizationFormValues>({ defaultValues: toFormValues(initial) });
   const countryCode = form.watch('countryCode');
   const withLegal = form.watch('withLegal');
+  const me = useMe();
+  // Создатель с полномочиями регистрирует организацию от имени руководителя и сам в неё не входит.
+  const withManager = mode === 'create' && canCreateWithAuthority(me.data);
   const countries = useCountries();
   const regions = useRegions(countryCode);
   const parents = useQuery({
@@ -232,6 +239,19 @@ export function OrganizationForm({
           </Field>
         </div>
       </Card>
+      {withManager ? (
+        <Card>
+          <CardTitle>{t('manager')}</CardTitle>
+          <Field
+            id="managerEmail"
+            label={t('managerEmail')}
+            hint={t('managerEmailHint')}
+            error={err('managerEmail')}
+          >
+            <Input id="managerEmail" type="email" autoComplete="off" {...form.register('managerEmail')} />
+          </Field>
+        </Card>
+      ) : null}
       <Card>
         <CardTitle>{t('logo')}</CardTitle>
         <LogoUpload

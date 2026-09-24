@@ -11,7 +11,7 @@ import {
   ROLES,
   type RoleCode,
 } from '@sde/contracts';
-import { type OrganizationMembership, type Prisma, type Role, uuidv7 } from '@sde/db';
+import { type OrganizationMembership, type Prisma, type Role, type Tx, uuidv7 } from '@sde/db';
 import type { Env } from '@sde/server-kit';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
@@ -111,53 +111,84 @@ export class MembersService {
       const org = await tx.organization.findUniqueOrThrow({ where: { id: organizationId } });
       if (org.status === 'ARCHIVED' || org.status === 'SUSPENDED')
         throw new DomainError('ORGANIZATION_NOT_ACTIVE', { organizationId });
-      const role = await tx.role.findUniqueOrThrow({ where: { code: req.roleCode } });
-      const existing = await tx.organizationMembership.findFirst({
-        where: {
-          organizationId,
-          roleId: role.id,
-          status: { in: ['INVITED', 'ACTIVE'] },
-          OR: [{ invitedEmail: req.email }, { user: { email: req.email } }],
-        },
-      });
-      if (existing) throw new DomainError('ALREADY_EXISTS', { resource: 'membership' });
-      const membership = await tx.organizationMembership.create({
-        data: {
-          id: uuidv7(),
-          organizationId,
-          invitedEmail: req.email,
-          roleId: role.id,
-          status: 'INVITED',
-          invitedById: user.id,
-        },
-        include: MEMBER_INCLUDE,
-      });
-      const token = await this.tokens.issue(tx, 'INVITE', {
-        userId: null,
-        ttlSeconds: INVITE_TTL_SECONDS,
-        payload: { membershipId: membership.id },
-      });
-      await this.emails.request(tx, {
-        template: 'organization.invite',
-        to: req.email,
-        userId: null,
-        locale,
-        params: {
-          organizationName: org.name,
-          roleCode: req.roleCode,
-          acceptUrl: `${this.env.APP_URL.replace(/\/$/, '')}/${locale}/invites/accept?token=${encodeURIComponent(token)}`,
-        },
-      });
-      await this.audit.record(tx, {
-        action: 'organization.member_invited',
-        entityType: 'OrganizationMembership',
-        entityId: membership.id,
-        organizationId,
-        after: { roleCode: req.roleCode, status: 'INVITED', invitedEmail: req.email },
-      });
-      return membership;
+      return this.inviteInTx(tx, user, org, req, locale, { initialManager: false });
     });
     return toDto(created);
+  }
+
+  /**
+   * Приглашение первого руководителя при создании организации создателем с полномочиями
+   * (платформа или вышестоящая федерация). Проверку «роль не шире своей» не проходит: создатель
+   * регистрирует организацию от имени её руководителя, как при одобрении самостоятельной регистрации.
+   */
+  async inviteInitialManager(
+    tx: Tx,
+    user: AuthUser,
+    org: { id: string; name: string },
+    req: InviteMemberRequest,
+    locale: Locale,
+  ): Promise<void> {
+    await this.inviteInTx(tx, user, org, req, locale, { initialManager: true });
+  }
+
+  private async inviteInTx(
+    tx: Tx,
+    user: AuthUser,
+    org: { id: string; name: string },
+    req: InviteMemberRequest,
+    locale: Locale,
+    opts: { initialManager: boolean },
+  ): Promise<MembershipRow> {
+    const role = await tx.role.findUniqueOrThrow({ where: { code: req.roleCode } });
+    const existing = await tx.organizationMembership.findFirst({
+      where: {
+        organizationId: org.id,
+        roleId: role.id,
+        status: { in: ['INVITED', 'ACTIVE'] },
+        OR: [{ invitedEmail: req.email }, { user: { email: req.email } }],
+      },
+    });
+    if (existing) throw new DomainError('ALREADY_EXISTS', { resource: 'membership' });
+    const membership = await tx.organizationMembership.create({
+      data: {
+        id: uuidv7(),
+        organizationId: org.id,
+        invitedEmail: req.email,
+        roleId: role.id,
+        status: 'INVITED',
+        invitedById: user.id,
+      },
+      include: MEMBER_INCLUDE,
+    });
+    const token = await this.tokens.issue(tx, 'INVITE', {
+      userId: null,
+      ttlSeconds: INVITE_TTL_SECONDS,
+      payload: { membershipId: membership.id },
+    });
+    await this.emails.request(tx, {
+      template: 'organization.invite',
+      to: req.email,
+      userId: null,
+      locale,
+      params: {
+        organizationName: org.name,
+        roleCode: req.roleCode,
+        acceptUrl: `${this.env.APP_URL.replace(/\/$/, '')}/${locale}/invites/accept?token=${encodeURIComponent(token)}`,
+      },
+    });
+    await this.audit.record(tx, {
+      action: 'organization.member_invited',
+      entityType: 'OrganizationMembership',
+      entityId: membership.id,
+      organizationId: org.id,
+      after: {
+        roleCode: req.roleCode,
+        status: 'INVITED',
+        invitedEmail: req.email,
+        ...(opts.initialManager ? { initialManager: true } : {}),
+      },
+    });
+    return membership;
   }
 
   /** Принять приглашение может только владелец приглашённого email, подтвердивший его. */

@@ -1,5 +1,11 @@
 'use client';
-import type { DataEnvelope, Me, RegionDto, CountryDto } from '@sde/contracts';
+import {
+  type CountryDto,
+  type DataEnvelope,
+  type Me,
+  type RegionDto,
+  ROLE_PERMISSIONS,
+} from '@sde/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
 
@@ -44,3 +50,10 @@ export function useRegions(countryCode: string) {
 }
 
 export const isPlatformUser = (me: Me | undefined): boolean => (me?.grants.platform.length ?? 0) > 0;
+
+/** Может создать организацию с полномочиями: платформенная роль или право создавать дочерние (федерация). */
+export const canCreateWithAuthority = (me: Me | undefined): boolean =>
+  isPlatformUser(me) ||
+  (me?.grants.organizations ?? []).some((g) =>
+    g.roles.some((r) => ROLE_PERMISSIONS[r]['organization.create_child'] !== undefined),
+  );

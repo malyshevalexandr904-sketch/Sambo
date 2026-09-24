@@ -131,6 +131,74 @@ describe('create and approve', () => {
     expect(asFa.body.data.allowedActions).toEqual(
       expect.arrayContaining(['organization.update', 'organization.approve', 'transition:SUSPENDED']),
     );
+    // Карточка показывает вышестоящую организацию.
+    const fedRow = await t.admin.organization.findUniqueOrThrow({ where: { id: fed } });
+    expect(asFa.body.data.parent).toEqual({ id: fed, name: fedRow.name, shortName: fedRow.shortName });
+    // Федерация управляет дочерним клубом по наследованию, но не становится его руководителем.
+    expect(await t.admin.organizationMembership.count({ where: { organizationId: id } })).toBe(0);
+  });
+
+  it('a creator with authority does not join; the first manager is invited by managerEmail', async () => {
+    const sa = await login(t, (await createUser(t, { platform: ['SUPER_ADMIN'] })).email, { totp: true });
+    const created = await post(sa, '/api/v1/organizations', {
+      ...clubInput(),
+      managerEmail: 'Head.Coach@Club.test',
+    });
+    expect(created.status).toBe(201);
+    const club = created.body.data as { id: string; status: string; parent: unknown };
+    expect(club.status).toBe('ACTIVE');
+    expect(club.parent).toBeNull();
+
+    const members = await t.admin.organizationMembership.findMany({
+      where: { organizationId: club.id },
+      include: { role: true },
+    });
+    expect(members).toHaveLength(1);
+    expect(members[0]).toMatchObject({
+      userId: null,
+      invitedEmail: 'head.coach@club.test',
+      status: 'INVITED',
+    });
+    expect(members[0]?.role.code).toBe('CLUB_MANAGER');
+    const [mail] = await sentEmails(t, 'organization.invite');
+    expect(mail).toMatchObject({ to: 'head.coach@club.test', params: { roleCode: 'CLUB_MANAGER' } });
+    const invited = await t.admin.auditLog.findFirstOrThrow({
+      where: { action: 'organization.member_invited' },
+    });
+    expect(invited.after).toMatchObject({ roleCode: 'CLUB_MANAGER', initialManager: true });
+
+    // Приглашённый принимает приглашение и получает права руководителя.
+    const head = await createUser(t, { email: 'head.coach@club.test' });
+    const h = await login(t, head.email);
+    const accepted = await post(h, '/api/v1/invites/accept', { token: tokenFromUrl(mail?.params.acceptUrl) });
+    expect(accepted.status).toBe(200);
+    const me = await h.agent.get('/api/v1/me').expect(200);
+    expect(me.body.data.grants.organizations).toEqual([{ organizationId: club.id, roles: ['CLUB_MANAGER'] }]);
+  });
+
+  it('managerEmail is refused for self-registration and for the creator own address', async () => {
+    const applicant = await login(t, (await createUser(t)).email);
+    const selfReg = await post(applicant, '/api/v1/organizations', {
+      ...clubInput(),
+      managerEmail: 'x@club.test',
+    });
+    expect(selfReg.status).toBe(400);
+    expect(selfReg.body.error.details.fields).toEqual([{ path: 'managerEmail', code: 'not_allowed' }]);
+
+    const paUser = await createUser(t, { platform: ['PLATFORM_ADMIN'] });
+    const pa = await login(t, paUser.email, { totp: true });
+    const self = await post(pa, '/api/v1/organizations', { ...clubInput(), managerEmail: paUser.email });
+    expect(self.status).toBe(400);
+    expect(self.body.error.details.fields).toEqual([{ path: 'managerEmail', code: 'manager_is_creator' }]);
+
+    // Без managerEmail администратор платформы создаёт организацию и не получает прав руководителя.
+    const created = await post(pa, '/api/v1/organizations', clubInput());
+    expect(created.status).toBe(201);
+    expect(
+      await t.admin.organizationMembership.count({ where: { organizationId: created.body.data.id } }),
+    ).toBe(0);
+    const me = await pa.agent.get('/api/v1/me').expect(200);
+    expect(me.body.data.grants.organizations).toEqual([]);
   });
 
   it('forbids hierarchy cycles and duplicate slugs', async () => {
