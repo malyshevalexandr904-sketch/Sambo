@@ -138,11 +138,31 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
 
 export class TemplateParamsError extends Error {}
 
-function fill(text: string, params: Params, escape: boolean): string {
-  return text.replace(/\{(\w+)\}/g, (_, key: string) => {
-    const value = params[key] ?? '';
-    return escape ? escapeHtml(value) : value;
-  });
+/**
+ * Русская типографика: кавычки внутри «ёлочек» — „лапки“. Названия организаций сами содержат
+ * кавычки («Спортивный клуб «Буревестник»»), поэтому вложенность выравнивается после подстановки.
+ */
+export function nestQuotes(text: string): string {
+  let depth = 0;
+  let out = '';
+  for (const ch of text) {
+    if (ch === '«') {
+      depth += 1;
+      out += depth > 1 ? '„' : ch;
+    } else if (ch === '»' && depth > 0) {
+      out += depth > 1 ? '“' : ch;
+      depth -= 1;
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+function fill(text: string, params: Params, escape: boolean, locale: Locale): string {
+  const filled = text.replace(/\{(\w+)\}/g, (_, key: string) => params[key] ?? '');
+  const typographed = locale === 'ru' ? nestQuotes(filled) : filled;
+  return escape ? escapeHtml(typographed) : typographed;
 }
 
 export function renderEmail(template: EmailTemplate, locale: Locale, input: Params): RenderedEmail {
@@ -156,8 +176,8 @@ export function renderEmail(template: EmailTemplate, locale: Locale, input: Para
   };
   const url = def.action ? params[def.action.param] : undefined;
   if (url && !/^https?:\/\//.test(url)) throw new TemplateParamsError(`Unsafe link in ${template}`);
-  const textLines = def.lines.map((l) => fill(l, params, false));
-  const htmlLines = def.lines.map((l) => `<p>${fill(l, params, true)}</p>`);
+  const textLines = def.lines.map((l) => fill(l, params, false, locale));
+  const htmlLines = def.lines.map((l) => `<p>${fill(l, params, true, locale)}</p>`);
   if (def.action && url) {
     textLines.push('', `${def.action.label}: ${url}`);
     htmlLines.push(
@@ -171,7 +191,7 @@ export function renderEmail(template: EmailTemplate, locale: Locale, input: Para
   textLines.push('', '—', footer);
   htmlLines.push(`<hr><p style="color:#6b7280;font-size:12px">${escapeHtml(footer)}</p>`);
   return {
-    subject: fill(def.subject, params, false),
+    subject: fill(def.subject, params, false, locale),
     text: textLines.join('\n'),
     html: `<!doctype html><html lang="${locale}"><body style="font-family:system-ui,sans-serif;line-height:1.5">${htmlLines.join('')}</body></html>`,
   };
