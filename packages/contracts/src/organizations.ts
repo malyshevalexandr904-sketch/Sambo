@@ -57,7 +57,14 @@ const OrganizationFields = {
   legalDetails: LegalDetailsInput.nullable().optional(),
 };
 
-export const OrganizationInput = z.object(OrganizationFields);
+export const OrganizationInput = z.object({
+  ...OrganizationFields,
+  /**
+   * Email первого руководителя. Только для создателя с полномочиями (платформа или вышестоящая федерация):
+   * такой создатель сам в организацию не входит, руководитель получает приглашение.
+   */
+  managerEmail: Email.optional(),
+});
 export type OrganizationInput = z.infer<typeof OrganizationInput>;
 
 export const OrganizationPatch = z.object(OrganizationFields).partial();
@@ -92,7 +99,14 @@ export interface OrganizationSummary {
   logoUrl: string | null;
 }
 
+export interface OrganizationRef {
+  id: string;
+  name: string;
+  shortName: string;
+}
+
 export interface Organization extends OrganizationSummary {
+  parent: OrganizationRef | null;
   address: string | null;
   contactEmail: string | null;
   contactPhone: string | null;

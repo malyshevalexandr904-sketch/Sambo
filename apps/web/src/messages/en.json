@@ -167,7 +167,10 @@
     "transitionTo": "Move to “{status}”",
     "edit": "Edit",
     "details": "Organization details",
-    "pendingNotice": "The organization is under review. It becomes visible to everyone once the parent organization or a platform administrator activates it."
+    "pendingNotice": "The organization is under review. It becomes visible to everyone once the parent organization or a platform administrator activates it.",
+    "manager": "Organization manager",
+    "managerEmail": "Manager email",
+    "managerEmailHint": "The manager will receive an invitation at this address. You register the organization on their behalf and do not join it yourself. You can leave it empty and invite later."
   },
   "audit": {
     "title": "Audit log",
@@ -191,9 +194,13 @@
     "keys": {
       "registration_selfSignupEnabled": "Self sign-up",
       "support_contactEmail": "Support email",
-      "ui_maintenanceBanner": "Maintenance banner (JSON with ru and en fields, or null)",
+      "ui_maintenanceBanner": "Maintenance banner",
       "auth_leakedPasswordCheckEnabled": "Leaked password check"
-    }
+    },
+    "bannerRu": "Text in Russian",
+    "bannerEn": "Text in English",
+    "bannerHint": "Leave both fields empty to remove the banner.",
+    "emptyMeansNone": "Leave empty if there is no address."
   },
   "account": {
     "title": "My profile",
@@ -273,7 +280,9 @@
     "reason_too_short": "Reason must be at least 5 characters",
     "too_long": "Value is too long",
     "not_found": "Not found",
-    "invalid": "Invalid value"
+    "invalid": "Invalid value",
+    "not_allowed": "This field is available only when creating an organization with platform or parent-organization authority",
+    "manager_is_creator": "Enter the manager address, not your own"
   },
   "errors": {
     "VALIDATION_FAILED": "Please check the form fields.",

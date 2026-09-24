@@ -43,7 +43,10 @@ export class OrganizationsController {
     return this.organizations.list(user, q);
   }
 
-  /** Любой вошедший может подать организацию на проверку; с правом на родителя — сразу ACTIVE. */
+  /**
+   * Любой вошедший может подать организацию на проверку и становится её руководителем.
+   * С правом на родителя или платформенным правом — сразу ACTIVE, руководитель — по приглашению.
+   */
   @Post()
   @Authenticated()
   async create(
@@ -51,7 +54,7 @@ export class OrganizationsController {
     @ValidBody(OrganizationInput) body: OrganizationInput,
     @Res({ passthrough: true }) res: Response,
   ): Promise<DataEnvelope<Organization>> {
-    const org = await this.organizations.create(user, body);
+    const org = await this.organizations.create(user, body, RequestContextStore.current().locale);
     res.setHeader('ETag', etag(org.version));
     return ok(org);
   }

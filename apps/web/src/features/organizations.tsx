@@ -22,12 +22,12 @@ import {
   Th,
 } from '@sde/ui';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useLocale, useTranslations } from 'next-intl';
+import { type ReactNode, useState } from 'react';
 import { QueryState, ReasonAction, StatusBadge } from '@/components/common';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
-import { qk } from '@/lib/queries';
+import { qk, useCountries, useRegions } from '@/lib/queries';
 import { MembersPanel } from './members';
 import { OrganizationForm } from './organization-form';
 
@@ -214,6 +214,51 @@ function Transitions({ org, onChanged }: { org: Organization; onChanged: () => P
   );
 }
 
+/** Данные организации: вышестоящая организация, страна и регион — по справочникам на языке интерфейса. */
+function OrganizationFacts({ o, canEdit }: { o: Organization; canEdit: boolean }) {
+  const t = useTranslations();
+  const locale = useLocale();
+  const countries = useCountries();
+  const regions = useRegions(o.countryCode);
+  const pick = (name: { ru: string; en: string }): string => (locale === 'en' ? name.en : name.ru);
+  const country = countries.data?.find((c) => c.code === o.countryCode);
+  const region = o.regionId ? regions.data?.find((r) => r.id === o.regionId) : undefined;
+  const rows: [string, ReactNode][] = [
+    [t('organizations.shortName'), o.shortName],
+    [
+      t('organizations.parent'),
+      o.parent ? (
+        <Link href={`/admin/organizations/${o.parent.id}`} className="text-blue-700 hover:underline">
+          {o.parent.name}
+        </Link>
+      ) : (
+        t('organizations.noParent')
+      ),
+    ],
+    [t('organizations.country'), country ? pick(country.name) : o.countryCode],
+    [t('organizations.region'), region ? pick(region.name) : '—'],
+    [t('organizations.city'), o.city ?? '—'],
+    [t('organizations.address'), o.address ?? '—'],
+    [t('organizations.contactEmail'), <span className="break-all">{o.contactEmail ?? '—'}</span>],
+    [t('organizations.contactPhone'), o.contactPhone ?? '—'],
+    [t('organizations.website'), <span className="break-all">{o.website ?? '—'}</span>],
+    [t('organizations.inn'), o.legalDetails?.inn ?? (canEdit ? '—' : t('organizations.legalHidden'))],
+  ];
+  return (
+    <Card>
+      <CardTitle>{t('organizations.details')}</CardTitle>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+        {rows.map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-slate-500">{label}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
+  );
+}
+
 export function OrganizationDetail({ id }: { id: string }) {
   const t = useTranslations();
   const queryClient = useQueryClient();
@@ -272,23 +317,7 @@ export function OrganizationDetail({ id }: { id: string }) {
               />
             ) : (
               <div className="grid gap-6 xl:grid-cols-2">
-                <Card>
-                  <CardTitle>{t('organizations.details')}</CardTitle>
-                  <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                    <dt className="text-slate-500">{t('organizations.shortName')}</dt>
-                    <dd>{o.shortName}</dd>
-                    <dt className="text-slate-500">{t('organizations.city')}</dt>
-                    <dd>{o.city ?? '—'}</dd>
-                    <dt className="text-slate-500">{t('organizations.contactEmail')}</dt>
-                    <dd className="break-all">{o.contactEmail ?? '—'}</dd>
-                    <dt className="text-slate-500">{t('organizations.contactPhone')}</dt>
-                    <dd>{o.contactPhone ?? '—'}</dd>
-                    <dt className="text-slate-500">{t('organizations.website')}</dt>
-                    <dd className="break-all">{o.website ?? '—'}</dd>
-                    <dt className="text-slate-500">{t('organizations.inn')}</dt>
-                    <dd>{o.legalDetails?.inn ?? (canEdit ? '—' : t('organizations.legalHidden'))}</dd>
-                  </dl>
-                </Card>
+                <OrganizationFacts o={o} canEdit={canEdit} />
                 <Transitions org={o} onChanged={refresh} />
                 {o.allowedActions.includes('organization.members.view') ? (
                   <MembersPanel

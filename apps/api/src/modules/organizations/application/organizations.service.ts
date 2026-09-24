@@ -6,6 +6,7 @@ import {
   type OrganizationPatch,
   type OrganizationsQuery,
   type OrganizationSummary,
+  type Locale,
   type OrganizationTransitionRequest,
   type Page,
   type PermissionCode,
@@ -26,7 +27,14 @@ import {
   slugify,
 } from '../domain/organization-rules';
 import { ClosureRepository } from '../infrastructure/closure.repository';
-import { ORGANIZATION_INCLUDE, type OrganizationRow, toDetail, toSummary } from './organization-mapper';
+import {
+  ORGANIZATION_DETAIL_INCLUDE,
+  ORGANIZATION_INCLUDE,
+  type OrganizationRow,
+  toDetail,
+  toSummary,
+} from './organization-mapper';
+import { MembersService } from './members.service';
 import { OrganizationScopeService } from './organization-scope.service';
 
 const ACTION_CANDIDATES: PermissionCode[] = [
@@ -66,6 +74,7 @@ export class OrganizationsService {
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
     private readonly files: FilesService,
+    private readonly members: MembersService,
   ) {}
 
   private publicUrl = (key: string): string => this.files.publicUrl(key);
@@ -115,7 +124,7 @@ export class OrganizationsService {
       throw new DomainError('NOT_FOUND', { resource: 'organization' });
     const row = await this.db.organization.findUniqueOrThrow({
       where: { id },
-      include: { ...ORGANIZATION_INCLUDE, legalDetails: true },
+      include: ORGANIZATION_DETAIL_INCLUDE,
     });
     return this.detail(user, row, scope);
   }
@@ -194,8 +203,24 @@ export class OrganizationsService {
     return { canActivate: await this.policy.can(user, 'organization.create_child', scope) };
   }
 
-  async create(user: AuthUser, input: OrganizationInput): Promise<OrganizationDto> {
+  /**
+   * Создатель с полномочиями (платформа или право на родителя) регистрирует организацию от имени
+   * её руководителя и сам в неё не входит: иначе он получил бы права роли руководителя
+   * (спортсмены, документы, заявки), которых нет в его собственной роли. Руководитель — по приглашению
+   * `managerEmail`. Без полномочий организация уходит на проверку, создатель становится руководителем.
+   */
+  async create(user: AuthUser, input: OrganizationInput, locale: Locale): Promise<OrganizationDto> {
     const { canActivate } = await this.resolveParent(user, input.parentId);
+    const hasAuthority =
+      canActivate || (await this.policy.can(user, 'organization.approve', { kind: 'PLATFORM' }));
+    if (input.managerEmail) {
+      const code = !hasAuthority
+        ? 'not_allowed'
+        : user.email && input.managerEmail.toLowerCase() === user.email.toLowerCase()
+          ? 'manager_is_creator'
+          : null;
+      if (code) throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'managerEmail', code }] });
+    }
     const id = await this.db.tx(async (tx) => {
       await this.assertCountry(tx, input.countryCode);
       await this.assertRegion(tx, input.regionId, input.countryCode);
@@ -224,22 +249,9 @@ export class OrganizationsService {
           createdById: user.id,
           legalDetails: input.legalDetails ? { create: { ...input.legalDetails } } : undefined,
         },
-        include: { ...ORGANIZATION_INCLUDE, legalDetails: true },
+        include: ORGANIZATION_DETAIL_INCLUDE,
       });
       await this.closure.insertNode(tx, orgId, input.parentId ?? null);
-      const role = await tx.role.findUniqueOrThrow({ where: { code: creatorRole(input.type) } });
-      await tx.organizationMembership.create({
-        data: {
-          id: uuidv7(),
-          organizationId: orgId,
-          userId: user.id,
-          roleId: role.id,
-          status: 'ACTIVE',
-          validFrom: today(),
-          invitedById: user.id,
-        },
-      });
-      await tx.user.update({ where: { id: user.id }, data: { permissionsVersion: { increment: 1 } } });
       await this.audit.record(tx, {
         action: 'organization.created',
         entityType: 'Organization',
@@ -247,6 +259,29 @@ export class OrganizationsService {
         organizationId: orgId,
         after: auditView(created),
       });
+      if (!hasAuthority) {
+        const role = await tx.role.findUniqueOrThrow({ where: { code: creatorRole(input.type) } });
+        await tx.organizationMembership.create({
+          data: {
+            id: uuidv7(),
+            organizationId: orgId,
+            userId: user.id,
+            roleId: role.id,
+            status: 'ACTIVE',
+            validFrom: today(),
+            invitedById: user.id,
+          },
+        });
+        await tx.user.update({ where: { id: user.id }, data: { permissionsVersion: { increment: 1 } } });
+      } else if (input.managerEmail) {
+        await this.members.inviteInitialManager(
+          tx,
+          user,
+          { id: orgId, name: input.name },
+          { email: input.managerEmail, roleCode: creatorRole(input.type) },
+          locale,
+        );
+      }
       await this.outbox.enqueue(tx, {
         type: 'organization.created',
         aggregate: { type: 'Organization', id: orgId },
@@ -254,7 +289,7 @@ export class OrganizationsService {
       });
       return orgId;
     });
-    const fresh = { ...user, permissionsVersion: user.permissionsVersion + 1 };
+    const fresh = hasAuthority ? user : { ...user, permissionsVersion: user.permissionsVersion + 1 };
     return this.get(fresh, id);
   }
 
@@ -266,7 +301,7 @@ export class OrganizationsService {
   ): Promise<OrganizationDto> {
     const current = await this.db.organization.findFirst({
       where: { id, deletedAt: null },
-      include: { ...ORGANIZATION_INCLUDE, legalDetails: true },
+      include: ORGANIZATION_DETAIL_INCLUDE,
     });
     if (!current) throw new DomainError('NOT_FOUND', { resource: 'organization' });
     if (
@@ -332,7 +367,7 @@ export class OrganizationsService {
       if (parentChanged) await this.closure.move(tx, id, patch.parentId ?? null);
       const after = await tx.organization.findUniqueOrThrow({
         where: { id },
-        include: { ...ORGANIZATION_INCLUDE, legalDetails: true },
+        include: ORGANIZATION_DETAIL_INCLUDE,
       });
       await this.audit.record(tx, {
         action: 'organization.updated',
