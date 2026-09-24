@@ -1,0 +1,56 @@
+{
+  "name": "sambo-digital-ecosystem",
+  "private": true,
+  "version": "0.2.0",
+  "description": "SAMBO DIGITAL ECOSYSTEM — цифровая экосистема детско-юношеских турниров по самбо",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint && pnpm run lint:deps",
+    "lint:deps": "depcruise apps packages --config .dependency-cruiser.cjs",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:unit": "turbo run test:unit",
+    "test:integration": "turbo run test:integration --concurrency=1",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @sde/db run generate",
+    "db:migrate": "pnpm --filter @sde/db run migrate:deploy",
+    "db:migrate:dev": "pnpm --filter @sde/db run migrate:dev",
+    "db:seed": "pnpm --filter @sde/db run seed",
+    "db:reset": "pnpm --filter @sde/db run reset"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "22.20.4",
+    "dependency-cruiser": "17.4.3",
+    "eslint": "9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.4.0",
+    "prettier": "3.9.9",
+    "turbo": "2.11.3",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "eslint-plugin-react-hooks": "5.2.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "@swc/core",
+      "argon2",
+      "esbuild",
+      "prisma",
+      "sharp",
+      "unrs-resolver"
+    ],
+    "overrides": {
+      "postcss@<8.5.18": ">=8.5.18",
+      "deepmerge-ts@<8.0.0": "^8.0.0"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "name": "@sde/db",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Схема Prisma, миграции, клиент БД и seed",
+  "type": "commonjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "lint": "eslint src seed scripts",
+    "typecheck": "prisma generate && tsc --noEmit",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
+    "migrate:status": "prisma migrate status",
+    "seed": "tsx seed/index.ts",
+    "reset": "prisma migrate reset --force --skip-seed && tsx seed/index.ts",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@prisma/client": "6.19.3",
+    "@sde/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "prisma": "6.19.3",
+    "tsx": "4.23.15",
+    "vitest": "3.2.7",
+    "@sde/server-kit": "workspace:*"
+  },
+  "files": [
+    "dist",
+    "generated",
+    "prisma",
+    "prisma.config.ts",
+    "seed",
+    "scripts",
+    "tsconfig.json"
+  ]
+}

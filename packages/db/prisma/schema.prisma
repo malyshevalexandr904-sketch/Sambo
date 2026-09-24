@@ -1,0 +1,607 @@
+// SAMBO DIGITAL ECOSYSTEM — схема БД (DATABASE.md).
+// Phase 2: Identity & Access (3.1), Organizations (3.2), Platform (3.9), справочники Phase 2 (API.md, 3.7).
+// Конструкции, которые Prisma не выражает (partial unique, CHECK, генерируемые колонки, партиции,
+// REVOKE), пишутся SQL-шагами в миграциях (DATABASE.md, 10). Миграции пишутся и ревьюятся вручную.
+
+generator client {
+  provider        = "prisma-client-js"
+  // Клиент генерируется внутрь пакета: так его забирает `pnpm deploy` в Docker-образы.
+  output          = "../generated/client"
+  previewFeatures = ["relationJoins", "postgresqlExtensions"]
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DATABASE_ADMIN_URL")
+  extensions = [citext, pg_trgm]
+}
+
+// ============================================================
+// Identity & Access (DATABASE.md, 3.1)
+// ============================================================
+
+enum UserStatus {
+  PENDING_VERIFICATION
+  ACTIVE
+  BLOCKED
+}
+
+enum AuthProvider {
+  EMAIL_PASSWORD
+  TELEGRAM
+  MAX
+}
+
+enum TokenPurpose {
+  EMAIL_VERIFY
+  PASSWORD_RESET
+  INVITE
+  MESSENGER_LINK
+}
+
+enum RoleScope {
+  PLATFORM
+  ORGANIZATION
+  COMPETITION
+}
+
+enum GrantMode {
+  DIRECT
+  POLICY
+  INHERITED
+  LIMITED
+}
+
+enum MembershipStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  ENDED
+}
+
+model User {
+  id                     String    @id @default(uuid(7)) @db.Uuid
+  email                  String?   @unique @db.Citext
+  emailVerifiedAt        DateTime? @map("email_verified_at") @db.Timestamptz(3)
+  displayName            String    @map("display_name")
+  status                 UserStatus @default(PENDING_VERIFICATION)
+  locale                 String    @default("ru")
+  timezone               String?
+  personId               String?   @unique @map("person_id") @db.Uuid
+  totpSecretEnc          Bytes?    @map("totp_secret_enc")
+  totpEnabledAt          DateTime? @map("totp_enabled_at") @db.Timestamptz(3)
+  totpRecoveryCodeHashes String[]  @default([]) @map("totp_recovery_code_hashes")
+  permissionsVersion     Int       @default(1) @map("permissions_version")
+  lastLoginAt            DateTime? @map("last_login_at") @db.Timestamptz(3)
+  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  person                   Person?                  @relation("UserPerson", fields: [personId], references: [id], onDelete: Restrict)
+  identities               AuthIdentity[]
+  refreshTokens            RefreshToken[]
+  verificationTokens       VerificationToken[]
+  platformRoles            PlatformRoleAssignment[] @relation("PlatformRoleUser")
+  grantedPlatformRoles     PlatformRoleAssignment[] @relation("PlatformRoleGrantor")
+  organizationMemberships  OrganizationMembership[] @relation("MembershipUser")
+  invitedMemberships       OrganizationMembership[] @relation("MembershipInviter")
+  competitionMemberships   CompetitionMembership[]  @relation("CompetitionMembershipUser")
+  invitedCompetitionStaff  CompetitionMembership[]  @relation("CompetitionMembershipInviter")
+  createdOrganizations     Organization[]           @relation("OrganizationCreator")
+  createdPersons           Person[]                 @relation("PersonCreator")
+  uploadedFiles            StoredFile[]
+  auditEntries             AuditLog[]
+  dataAccessEntries        DataAccessLog[]
+  updatedSettings          SystemSetting[]
+
+  @@index([status, createdAt])
+  @@map("user")
+}
+
+model AuthIdentity {
+  id              String       @id @default(uuid(7)) @db.Uuid
+  userId          String       @map("user_id") @db.Uuid
+  provider        AuthProvider
+  providerSubject String       @map("provider_subject")
+  secretHash      String?      @map("secret_hash")
+  metadata        Json?
+  lastUsedAt      DateTime?    @map("last_used_at") @db.Timestamptz(3)
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, providerSubject])
+  @@index([userId])
+  @@map("auth_identity")
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  familyId     String    @map("family_id") @db.Uuid
+  tokenHash    Bytes     @unique @map("token_hash")
+  replacedById String?   @unique @map("replaced_by_id") @db.Uuid
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(3)
+  revokeReason String?   @map("revoke_reason")
+  ip           String?   @db.Inet
+  userAgent    String?   @map("user_agent")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user       User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  replacedBy RefreshToken? @relation("RefreshRotation", fields: [replacedById], references: [id], onDelete: Restrict)
+  replaces   RefreshToken? @relation("RefreshRotation")
+
+  @@index([familyId])
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("refresh_token")
+}
+
+model VerificationToken {
+  id         String       @id @default(uuid(7)) @db.Uuid
+  userId     String?      @map("user_id") @db.Uuid
+  purpose    TokenPurpose
+  tokenHash  Bytes        @unique @map("token_hash")
+  payload    Json?
+  expiresAt  DateTime     @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime?    @map("consumed_at") @db.Timestamptz(3)
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([expiresAt])
+  @@index([userId, purpose])
+  @@map("verification_token")
+}
+
+model Role {
+  id       String    @id @default(uuid(7)) @db.Uuid
+  code     String    @unique
+  scope    RoleScope
+  isSystem Boolean   @default(true) @map("is_system")
+  nameKey  String    @map("name_key")
+
+  permissions             RolePermission[]
+  platformAssignments     PlatformRoleAssignment[]
+  organizationMemberships OrganizationMembership[]
+  competitionMemberships  CompetitionMembership[]
+
+  @@map("role")
+}
+
+model Permission {
+  code        String @id
+  module      String
+  description String
+  scopes      RoleScope[]
+
+  roles RolePermission[]
+
+  @@map("permission")
+}
+
+model RolePermission {
+  roleId         String    @map("role_id") @db.Uuid
+  permissionCode String    @map("permission_code")
+  mode           GrantMode @default(DIRECT)
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionCode], references: [code], onDelete: Cascade)
+
+  @@id([roleId, permissionCode])
+  @@map("role_permission")
+}
+
+model PlatformRoleAssignment {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  roleId      String    @map("role_id") @db.Uuid
+  grantedById String?   @map("granted_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(3)
+
+  user      User  @relation("PlatformRoleUser", fields: [userId], references: [id], onDelete: Restrict)
+  role      Role  @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  grantedBy User? @relation("PlatformRoleGrantor", fields: [grantedById], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@map("platform_role_assignment")
+}
+
+model OrganizationMembership {
+  id             String           @id @default(uuid(7)) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String?          @map("user_id") @db.Uuid
+  invitedEmail   String?          @map("invited_email") @db.Citext
+  roleId         String           @map("role_id") @db.Uuid
+  status         MembershipStatus @default(INVITED)
+  validFrom      DateTime?        @map("valid_from") @db.Date
+  validTo        DateTime?        @map("valid_to") @db.Date
+  invitedById    String?          @map("invited_by_id") @db.Uuid
+  version        Int              @default(1)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User?        @relation("MembershipUser", fields: [userId], references: [id], onDelete: Restrict)
+  role         Role         @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  invitedBy    User?        @relation("MembershipInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@index([userId, status])
+  @@index([organizationId, status])
+  @@map("organization_membership")
+}
+
+/// Персонал турнира. Таблица создана в Phase 2, используется с Phase 4;
+/// внешний ключ на `competition` добавляется миграцией Phase 4 вместе с таблицей турнира.
+model CompetitionMembership {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  competitionId String           @map("competition_id") @db.Uuid
+  userId        String           @map("user_id") @db.Uuid
+  roleId        String           @map("role_id") @db.Uuid
+  status        MembershipStatus @default(INVITED)
+  invitedById   String?          @map("invited_by_id") @db.Uuid
+  version       Int              @default(1)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user      User  @relation("CompetitionMembershipUser", fields: [userId], references: [id], onDelete: Restrict)
+  role      Role  @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  invitedBy User? @relation("CompetitionMembershipInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@index([userId, status])
+  @@index([competitionId, roleId])
+  @@map("competition_membership")
+}
+
+// ============================================================
+// People — минимальный Person (Phase 2); профили — Phase 3 (DATABASE.md, 3.3)
+// ============================================================
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+model Person {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  lastName      String    @map("last_name")
+  firstName     String    @map("first_name")
+  middleName    String?   @map("middle_name")
+  birthDate     DateTime  @map("birth_date") @db.Date
+  gender        Gender
+  countryCode   String?   @map("country_code") @db.Char(2)
+  regionId      String?   @map("region_id") @db.Uuid
+  city          String?
+  photoFileId   String?   @map("photo_file_id") @db.Uuid
+  lastNameNorm  Unsupported("text")? @map("last_name_norm")
+  firstNameNorm Unsupported("text")? @map("first_name_norm")
+  mergedIntoId  String?   @map("merged_into_id") @db.Uuid
+  createdById   String?   @map("created_by_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  user       User?       @relation("UserPerson")
+  country    Country?    @relation(fields: [countryCode], references: [code], onDelete: Restrict)
+  region     Region?     @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  photo      StoredFile? @relation("PersonPhoto", fields: [photoFileId], references: [id], onDelete: Restrict)
+  mergedInto Person?     @relation("PersonMerge", fields: [mergedIntoId], references: [id], onDelete: Restrict)
+  mergedFrom Person[]    @relation("PersonMerge")
+  createdBy  User?       @relation("PersonCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@map("person")
+}
+
+// ============================================================
+// Organizations (DATABASE.md, 3.2)
+// ============================================================
+
+enum OrganizationType {
+  NATIONAL_FEDERATION
+  REGIONAL_FEDERATION
+  CLUB
+  SPORTS_SCHOOL
+  ORGANIZER
+  OTHER
+}
+
+enum OrganizationStatus {
+  PENDING_REVIEW
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+model Country {
+  code   String @id @db.Char(2)
+  nameRu String @map("name_ru")
+  nameEn String @map("name_en")
+
+  regions       Region[]
+  organizations Organization[]
+  persons       Person[]
+
+  @@map("country")
+}
+
+model Region {
+  id          String @id @default(uuid(7)) @db.Uuid
+  countryCode String @map("country_code") @db.Char(2)
+  code        String
+  nameRu      String @map("name_ru")
+  nameEn      String @map("name_en")
+
+  country       Country        @relation(fields: [countryCode], references: [code], onDelete: Restrict)
+  organizations Organization[]
+  persons       Person[]
+
+  @@unique([countryCode, code])
+  @@unique([code])
+  @@map("region")
+}
+
+model Organization {
+  id           String             @id @default(uuid(7)) @db.Uuid
+  type         OrganizationType
+  parentId     String?            @map("parent_id") @db.Uuid
+  name         String
+  shortName    String             @map("short_name")
+  slug         String             @unique
+  logoFileId   String?            @map("logo_file_id") @db.Uuid
+  countryCode  String             @map("country_code") @db.Char(2)
+  regionId     String?            @map("region_id") @db.Uuid
+  city         String?
+  address      String?
+  contactEmail String?            @map("contact_email") @db.Citext
+  contactPhone String?            @map("contact_phone")
+  website      String?
+  status       OrganizationStatus @default(PENDING_REVIEW)
+  nameNorm     Unsupported("text")? @map("name_norm")
+  version      Int                @default(1)
+  createdById  String?            @map("created_by_id") @db.Uuid
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime?          @map("deleted_at") @db.Timestamptz(3)
+
+  parent       Organization?             @relation("OrganizationHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children     Organization[]            @relation("OrganizationHierarchy")
+  logo         StoredFile?               @relation("OrganizationLogo", fields: [logoFileId], references: [id], onDelete: Restrict)
+  country      Country                   @relation(fields: [countryCode], references: [code], onDelete: Restrict)
+  region       Region?                   @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  createdBy    User?                     @relation("OrganizationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  legalDetails OrganizationLegalDetails?
+  ancestors    OrganizationClosure[]     @relation("ClosureDescendant")
+  descendants  OrganizationClosure[]     @relation("ClosureAncestor")
+  memberships  OrganizationMembership[]
+
+  @@index([parentId])
+  @@index([regionId, type, status])
+  @@map("organization")
+}
+
+model OrganizationLegalDetails {
+  organizationId String   @id @map("organization_id") @db.Uuid
+  legalName      String   @map("legal_name")
+  inn            String
+  kpp            String?
+  ogrn           String?
+  legalAddress   String   @map("legal_address")
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@map("organization_legal_details")
+}
+
+model OrganizationClosure {
+  ancestorId   String @map("ancestor_id") @db.Uuid
+  descendantId String @map("descendant_id") @db.Uuid
+  depth        Int
+
+  ancestor   Organization @relation("ClosureAncestor", fields: [ancestorId], references: [id], onDelete: Restrict)
+  descendant Organization @relation("ClosureDescendant", fields: [descendantId], references: [id], onDelete: Restrict)
+
+  @@id([ancestorId, descendantId])
+  @@index([descendantId])
+  @@map("organization_closure")
+}
+
+// ============================================================
+// Справочники Phase 2 (API.md, 3.7; DATABASE.md, 3.3–3.5)
+// ============================================================
+
+enum Sensitivity {
+  HEALTH
+  IDENTITY
+  GENERAL
+}
+
+model SportRank {
+  code      String @id
+  nameRu    String @map("name_ru")
+  nameEn    String @map("name_en")
+  rankOrder Int    @unique @map("rank_order")
+
+  @@map("sport_rank")
+}
+
+model RefereeCategory {
+  code      String @id
+  nameRu    String @map("name_ru")
+  nameEn    String @map("name_en")
+  rankOrder Int    @unique @map("rank_order")
+
+  @@map("referee_category")
+}
+
+model Discipline {
+  code   String @id
+  nameRu String @map("name_ru")
+  nameEn String @map("name_en")
+
+  @@map("discipline")
+}
+
+model DocumentType {
+  code          String      @id
+  nameRu        String      @map("name_ru")
+  nameEn        String      @map("name_en")
+  sensitivity   Sensitivity
+  allowedMime   String      @map("allowed_mime")
+  maxSizeBytes  Int         @map("max_size_bytes")
+  retentionDays Int         @map("retention_days")
+
+  @@map("document_type")
+}
+
+// ============================================================
+// Platform (DATABASE.md, 3.9)
+// ============================================================
+
+enum FileBucket {
+  PUBLIC_MEDIA
+  PRIVATE_DOCUMENTS
+  GENERATED
+}
+
+enum FileStatus {
+  PENDING_UPLOAD
+  AVAILABLE
+  REJECTED
+  DELETED
+}
+
+enum ActorType {
+  USER
+  SYSTEM
+  NODE
+}
+
+enum AccessAction {
+  VIEW
+  DOWNLOAD
+  DENIED
+}
+
+enum OutboxStatus {
+  PENDING
+  DISPATCHED
+  FAILED
+}
+
+model StoredFile {
+  id           String     @id @default(uuid(7)) @db.Uuid
+  bucket       FileBucket
+  purpose      String
+  storageKey   String     @unique @map("storage_key")
+  originalName String     @map("original_name")
+  mimeType     String     @map("mime_type")
+  sizeBytes    BigInt     @map("size_bytes")
+  sha256       String
+  status       FileStatus @default(PENDING_UPLOAD)
+  uploadedById String?    @map("uploaded_by_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  verifiedAt   DateTime?  @map("verified_at") @db.Timestamptz(3)
+  deletedAt    DateTime?  @map("deleted_at") @db.Timestamptz(3)
+
+  uploadedBy        User?          @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  organizationLogos Organization[] @relation("OrganizationLogo")
+  personPhotos      Person[]       @relation("PersonPhoto")
+
+  @@index([status, createdAt])
+  @@map("stored_file")
+}
+
+/// Партиционирована по месяцам (occurred_at). У роли приложения нет UPDATE/DELETE.
+model AuditLog {
+  id                   String    @default(uuid(7)) @db.Uuid
+  occurredAt           DateTime  @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  actorType            ActorType @map("actor_type")
+  actorUserId          String?   @map("actor_user_id") @db.Uuid
+  nodeId               String?   @map("node_id") @db.Uuid
+  action               String
+  entityType           String    @map("entity_type")
+  entityId             String?   @map("entity_id") @db.Uuid
+  competitionId        String?   @map("competition_id") @db.Uuid
+  organizationId       String?   @map("organization_id") @db.Uuid
+  before               Json?
+  after                Json?
+  reason               String?
+  platformIntervention Boolean   @default(false) @map("platform_intervention")
+  ip                   String?   @db.Inet
+  userAgent            String?   @map("user_agent")
+  traceId              String?   @map("trace_id")
+
+  actorUser User? @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@id([id, occurredAt])
+  @@index([entityType, entityId, occurredAt])
+  @@index([competitionId, occurredAt])
+  @@index([actorUserId, occurredAt])
+  @@index([occurredAt])
+  @@map("audit_log")
+}
+
+/// Партиционирована по месяцам (occurred_at). Append-only.
+model DataAccessLog {
+  id            String       @default(uuid(7)) @db.Uuid
+  occurredAt    DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  userId        String?      @map("user_id") @db.Uuid
+  action        AccessAction
+  resourceType  String       @map("resource_type")
+  resourceId    String       @map("resource_id") @db.Uuid
+  competitionId String?      @map("competition_id") @db.Uuid
+  ip            String?      @db.Inet
+  userAgent     String?      @map("user_agent")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([id, occurredAt])
+  @@index([resourceType, resourceId, occurredAt])
+  @@index([userId, occurredAt])
+  @@map("data_access_log")
+}
+
+model OutboxEvent {
+  id            String       @id @default(uuid(7)) @db.Uuid
+  occurredAt    DateTime     @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  type          String
+  schemaVersion Int          @default(1) @map("schema_version")
+  aggregateType String       @map("aggregate_type")
+  aggregateId   String       @map("aggregate_id") @db.Uuid
+  competitionId String?      @map("competition_id") @db.Uuid
+  traceId       String?      @map("trace_id")
+  payload       Json
+  status        OutboxStatus @default(PENDING)
+  attempts      Int          @default(0)
+  lastError     String?      @map("last_error")
+  availableAt   DateTime     @default(now()) @map("available_at") @db.Timestamptz(3)
+  dispatchedAt  DateTime?    @map("dispatched_at") @db.Timestamptz(3)
+
+  @@map("outbox_event")
+}
+
+model ProcessedEvent {
+  consumer    String
+  eventId     String   @map("event_id") @db.Uuid
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz(3)
+
+  @@id([consumer, eventId])
+  @@index([processedAt])
+  @@map("processed_event")
+}
+
+model SystemSetting {
+  key         String   @id
+  value       Json
+  updatedById String?  @map("updated_by_id") @db.Uuid
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@map("system_setting")
+}
