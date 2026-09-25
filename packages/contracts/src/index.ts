@@ -9,3 +9,8 @@ export * from './organizations.js';
 export * from './files.js';
 export * from './audit.js';
 export * from './events.js';
+export * from './athletes.js';
+export * from './rulesets.js';
+export * from './categories.js';
+export * from './documents.js';
+export * from './imports.js';

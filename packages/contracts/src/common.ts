@@ -55,6 +55,9 @@ export const CountryCode = z
 
 export const Cursor = z.string().min(1).max(500);
 
+/** Заголовок идемпотентности (API.md, 1.5): UUID, ответ хранится 24 часа по (userId, ключ). */
+export const IDEMPOTENCY_HEADER = 'idempotency-key';
+
 export const PageQuery = z.object({
   cursor: Cursor.optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
