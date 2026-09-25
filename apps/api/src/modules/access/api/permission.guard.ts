@@ -5,7 +5,7 @@ import type { Request } from 'express';
 import { RequestContextStore } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PolicyService } from '../application/policy.service';
-import { ScopeResolverRegistry } from '../application/scope-resolvers';
+import { asResolution, ScopeResolverRegistry } from '../application/scope-resolvers';
 import type { ResourceScope } from '../domain/grants';
 import { ROUTE_ACCESS, type RouteAccess } from './decorators';
 
@@ -39,9 +39,14 @@ export class PermissionGuard implements CanActivate {
 
     const param = access.scope.param ? req.params[access.scope.param] : undefined;
     const id = typeof param === 'string' ? param : undefined;
-    const scope = await this.scopes.get(access.scope.resolver)(id, req);
-    const result = await this.policy.assert(user, access.permission, scope);
-    req.accessScope = scope;
+    const resolution = asResolution(await this.scopes.get(access.scope.resolver)(id, req));
+    const result = await this.policy.assertAny(
+      user,
+      access.permission,
+      resolution.scopes,
+      resolution.resource,
+    );
+    req.accessScope = result.scope;
     req.accessViaPlatform = result.viaPlatform;
     return true;
   }

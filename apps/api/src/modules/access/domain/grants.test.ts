@@ -4,7 +4,10 @@ import {
   decide,
   type EffectiveGrants,
   grantablePermissions,
+  holdsAnywhere,
   missingPermissionsForRole,
+  NOWHERE_SCOPE,
+  organizationReach,
   type ResourceScope,
 } from './grants';
 
@@ -174,5 +177,60 @@ describe('visibility and role granting', () => {
     };
     const clubScope = orgScope(CLUB, []) as Extract<ResourceScope, { kind: 'ORGANIZATION' }>;
     expect(missingPermissionsForRole(grantablePermissions(org, clubScope), 'ORGANIZER')).toEqual([]);
+  });
+});
+
+describe('organization reach for list filters (PERMISSIONS.md, 6)', () => {
+  it('lists organizations with the grant mode and inheritance to descendants', () => {
+    const g: EffectiveGrants = {
+      ...base,
+      organizations: [
+        { organizationId: CLUB, organizationStatus: 'ACTIVE', roles: ['COACH'] },
+        { organizationId: FED, organizationStatus: 'ACTIVE', roles: ['FEDERATION_ADMIN'] },
+        { organizationId: OTHER_CLUB, organizationStatus: 'SUSPENDED', roles: ['CLUB_MANAGER'] },
+      ],
+    };
+    expect(organizationReach(g, 'athlete.view')).toEqual({
+      platform: false,
+      organizations: [
+        { organizationId: CLUB, mode: 'DIRECT', withDescendants: false },
+        { organizationId: FED, mode: 'DIRECT', withDescendants: true },
+      ],
+    });
+    expect(organizationReach(g, 'athlete.update').organizations).toEqual([
+      { organizationId: CLUB, mode: 'POLICY', withDescendants: false },
+    ]);
+    // ▲ у организатора — только на турнирах, в организациях списка нет.
+    const org: EffectiveGrants = {
+      ...base,
+      organizations: [{ organizationId: CLUB, organizationStatus: 'ACTIVE', roles: ['ORGANIZER'] }],
+    };
+    expect(organizationReach(org, 'document.view').organizations).toEqual([]);
+  });
+
+  it('holds a permission anywhere: organization, competition or platform', () => {
+    const fa: EffectiveGrants = {
+      ...base,
+      organizations: [{ organizationId: FED, organizationStatus: 'ACTIVE', roles: ['FEDERATION_ADMIN'] }],
+    };
+    expect(holdsAnywhere(fa, 'referee.manage')).toBe(true);
+    expect(holdsAnywhere(base, 'referee.manage')).toBe(false);
+    const secretary: EffectiveGrants = {
+      ...base,
+      competitions: [{ competitionId: 'c1', roles: ['SECRETARY'] }],
+    };
+    expect(holdsAnywhere(secretary, 'document.verify')).toBe(true);
+    const pa: EffectiveGrants = { ...base, platform: ['PLATFORM_ADMIN'] };
+    expect(organizationReach(pa, 'athlete.view').platform).toBe(true);
+  });
+
+  it('a resource without organizations is visible only to the platform', () => {
+    const coach: EffectiveGrants = {
+      ...base,
+      organizations: [{ organizationId: CLUB, organizationStatus: 'ACTIVE', roles: ['COACH'] }],
+    };
+    expect(canSee(coach, NOWHERE_SCOPE)).toBe(false);
+    expect(decide(coach, 'athlete.view', NOWHERE_SCOPE).allowed).toBe(false);
+    expect(decide({ ...base, platform: ['SUPER_ADMIN'] }, 'athlete.view', NOWHERE_SCOPE).allowed).toBe(true);
   });
 });

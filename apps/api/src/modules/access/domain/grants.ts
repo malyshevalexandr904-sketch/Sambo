@@ -49,6 +49,17 @@ export type ResourceScope =
       visibleToAll: boolean;
     };
 
+/**
+ * Область «нигде»: ресурс без организации (например, спортсмен, покинувший все клубы).
+ * Доступен только через платформенные роли, остальным — 404.
+ */
+export const NOWHERE_SCOPE: ResourceScope = {
+  kind: 'ORGANIZATION',
+  organizationId: '00000000-0000-0000-0000-000000000000',
+  ancestorIds: [],
+  visibleToAll: false,
+};
+
 export interface GrantDecision {
   allowed: boolean;
   mode: GrantMode | null;
@@ -170,6 +181,42 @@ export function permissionsInScope(grants: EffectiveGrants, scope: ResourceScope
     if (decide(grants, code, scope).allowed) result.add(code);
   }
   return result;
+}
+
+/**
+ * Где действует право в организациях — для фильтра списков в SQL тем же набором областей (PERMISSIONS.md, 6).
+ * `withDescendants` — право наследуется на дочерние организации (ORG_DESCENDANT).
+ */
+export interface OrganizationReach {
+  platform: boolean;
+  organizations: { organizationId: string; mode: GrantMode; withDescendants: boolean }[];
+}
+
+export function organizationReach(grants: EffectiveGrants, permission: PermissionCode): OrganizationReach {
+  const platform = grants.platform.some((role) => ROLE_PERMISSIONS[role][permission] !== undefined);
+  const byOrg = new Map<string, { mode: GrantMode; withDescendants: boolean }>();
+  for (const g of grants.organizations) {
+    const restricted = g.organizationStatus !== 'ACTIVE';
+    if (restricted && !RESTRICTED_ORG_PERMISSIONS[g.organizationStatus].has(permission)) continue;
+    for (const role of g.roles) {
+      const m = ROLE_PERMISSIONS[role][permission];
+      if (!m || m === 'INHERITED' || m === 'LIMITED') continue;
+      const prev = byOrg.get(g.organizationId);
+      byOrg.set(g.organizationId, {
+        mode: better(prev?.mode ?? null, m) ?? m,
+        withDescendants:
+          (prev?.withDescendants ?? false) || (!restricted && ROLES[role].inheritsToDescendants),
+      });
+    }
+  }
+  return { platform, organizations: [...byOrg].map(([organizationId, v]) => ({ organizationId, ...v })) };
+}
+
+/** Право есть хотя бы в одной области: платформа, организация или турнир. */
+export function holdsAnywhere(grants: EffectiveGrants, permission: PermissionCode): boolean {
+  const reach = organizationReach(grants, permission);
+  if (reach.platform || reach.organizations.length > 0) return true;
+  return grants.competitions.some((g) => g.roles.some((r) => ROLE_PERMISSIONS[r][permission] !== undefined));
 }
 
 /** Видит ли пользователь ресурс вообще (иначе — 404, а не 403). */
