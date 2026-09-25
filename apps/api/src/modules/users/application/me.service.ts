@@ -9,33 +9,17 @@ import {
   type UpsertMyPersonRequest,
   isRoleCode,
 } from '@sde/contracts';
-import { type Person, uuidv7 } from '@sde/db';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { AuditService } from '../../audit';
-
-const toDate = (d: string): Date => new Date(`${d}T00:00:00.000Z`);
-const normalizeName = (v: string): string => v.trim().toLowerCase().replaceAll('ё', 'е');
-
-export function personDto(p: Person): PersonDto {
-  return {
-    id: p.id,
-    lastName: p.lastName,
-    firstName: p.firstName,
-    middleName: p.middleName,
-    birthDate: p.birthDate.toISOString().slice(0, 10),
-    gender: p.gender,
-    countryCode: p.countryCode,
-    regionId: p.regionId,
-    city: p.city,
-  };
-}
+import { PeopleService, personAudit, personDto } from '../../people';
 
 @Injectable()
 export class MeService {
   constructor(
     private readonly db: PrismaService,
     private readonly audit: AuditService,
+    private readonly people: PeopleService,
   ) {}
 
   async get(userId: string): Promise<Me> {
@@ -107,40 +91,41 @@ export class MeService {
   /**
    * Создаёт или обновляет Person пользователя. Если в справочнике уже есть похожий человек
    * (то же ФИО и дата рождения) — POSSIBLE_DUPLICATE, пока пользователь не подтвердит, что это не он.
-   * Привязка к существующей записи (например, созданной тренером) — с проверкой, Phase 3.
+   * Привязка к записи, которую внёс тренер (законный представитель), — по приглашению (Phase 3).
    */
   async upsertPerson(userId: string, input: UpsertMyPersonRequest): Promise<PersonDto> {
     return this.db.tx(async (tx) => {
       const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, include: { person: true } });
       if (!input.confirmNotDuplicate) {
-        const dupes = await tx.$queryRaw<{ id: string }[]>`
-          SELECT id FROM person
-          WHERE last_name_norm = ${normalizeName(input.lastName)} AND first_name_norm = ${normalizeName(input.firstName)}
-            AND birth_date = ${toDate(input.birthDate)}::date AND deleted_at IS NULL AND merged_into_id IS NULL
-            AND id IS DISTINCT FROM ${user.personId}::uuid
-          LIMIT 5`;
+        const dupes = await this.people.exactMatches(tx, input, { excludePersonId: user.personId });
         if (dupes.length > 0) throw new DomainError('POSSIBLE_DUPLICATE', { count: dupes.length });
       }
-      const data = {
-        lastName: input.lastName,
-        firstName: input.firstName,
-        middleName: input.middleName ?? null,
-        birthDate: toDate(input.birthDate),
-        gender: input.gender,
-        countryCode: input.countryCode ?? null,
-        regionId: input.regionId ?? null,
-        city: input.city ?? null,
-      };
-      const person = user.person
-        ? await tx.person.update({ where: { id: user.person.id }, data })
-        : await tx.person.create({ data: { id: uuidv7(), ...data, createdById: userId } });
-      if (!user.person) await tx.user.update({ where: { id: userId }, data: { personId: person.id } });
+      let person;
+      if (user.person) {
+        person = (
+          await this.people.update(
+            tx,
+            user.person.id,
+            {
+              ...input,
+              middleName: input.middleName ?? null,
+              countryCode: input.countryCode ?? null,
+              regionId: input.regionId ?? null,
+              city: input.city ?? null,
+            },
+            '',
+          )
+        ).after;
+      } else {
+        person = await this.people.create(tx, input, userId, '');
+        await tx.user.update({ where: { id: userId }, data: { personId: person.id } });
+      }
       await this.audit.record(tx, {
         action: 'person.upserted',
         entityType: 'Person',
         entityId: person.id,
-        before: user.person ? (personDto(user.person) as unknown as Record<string, unknown>) : null,
-        after: personDto(person) as unknown as Record<string, unknown>,
+        before: user.person ? personAudit(user.person) : null,
+        after: personAudit(person),
       });
       return personDto(person);
     });
