@@ -14,6 +14,7 @@ export interface OutboxJob {
 /** Потребители событий: событие → очереди. События без потребителей просто помечаются отправленными. */
 export const CONSUMERS: Partial<Record<EventType, readonly string[]>> = {
   'email.requested': ['email'],
+  'athlete.import_requested': ['imports'],
 };
 
 const MAX_ATTEMPTS = 10;

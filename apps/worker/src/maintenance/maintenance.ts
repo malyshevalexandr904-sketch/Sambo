@@ -1,6 +1,6 @@
 // Обслуживание БД и хранилища (DATABASE.md, 5, 8, 9): партиции журналов, сроки хранения служебных данных.
 import { DeleteObjectCommand, type S3Client } from '@aws-sdk/client-s3';
-import type { PrismaClient } from '@sde/db';
+import { type PrismaClient, uuidv7 } from '@sde/db';
 import type { Env, Logger } from '@sde/server-kit';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -10,6 +10,7 @@ export const MAINTENANCE_JOBS = {
   cleanupTokens: { every: DAY },
   cleanupOutbox: { every: DAY },
   cleanupPendingUploads: { every: 60 * 60 * 1000 },
+  expireDocuments: { every: 60 * 60 * 1000 },
 } as const;
 
 export type MaintenanceJob = keyof typeof MAINTENANCE_JOBS;
@@ -32,6 +33,9 @@ export class Maintenance {
         return this.cleanupOutbox();
       case 'cleanupPendingUploads':
         return this.cleanupPendingUploads();
+      case 'expireDocuments':
+        await this.expireDocuments();
+        return;
     }
   }
 
@@ -88,5 +92,43 @@ export class Maintenance {
       });
     }
     if (stale.length > 0) this.logger.info({ count: stale.length }, 'Stale uploads removed');
+  }
+
+  /**
+   * Проверенный документ с истёкшим сроком действия → EXPIRED (ARCHITECTURE.md, 16.4). В сам день окончания
+   * документ ещё действует. Переход пишется в аудит от имени системы.
+   */
+  async expireDocuments(today: Date = new Date(new Date().toISOString().slice(0, 10))): Promise<number> {
+    const due = await this.db.document.findMany({
+      where: { status: 'VERIFIED', deletedAt: null, expirationDate: { lt: today } },
+      select: { id: true, competitionId: true },
+      take: 1000,
+    });
+    let expired = 0;
+    for (const doc of due) {
+      await this.db.$transaction(async (tx) => {
+        const { count } = await tx.document.updateMany({
+          where: { id: doc.id, status: 'VERIFIED' },
+          data: { status: 'EXPIRED', version: { increment: 1 } },
+        });
+        if (count === 0) return;
+        expired += 1;
+        await tx.auditLog.create({
+          data: {
+            id: uuidv7(),
+            actorType: 'SYSTEM',
+            action: 'document.expired',
+            entityType: 'Document',
+            entityId: doc.id,
+            competitionId: doc.competitionId,
+            before: { status: 'VERIFIED' },
+            after: { status: 'EXPIRED' },
+            traceId: 'maintenance:expireDocuments',
+          },
+        });
+      });
+    }
+    if (expired > 0) this.logger.info({ count: expired }, 'Documents expired');
+    return expired;
   }
 }
