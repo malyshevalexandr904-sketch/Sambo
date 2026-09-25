@@ -1,2 +1,2 @@
 export { UsersModule } from './users.module';
-export { MeService, personDto } from './application/me.service';
+export { MeService } from './application/me.service';

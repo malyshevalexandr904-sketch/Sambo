@@ -6,6 +6,8 @@ export const SEED_IDS = {
   clubSambo: '01920000-0000-7000-8000-000000000002',
   clubVityaz: '01920000-0000-7000-8000-000000000003',
   organizer: '01920000-0000-7000-8000-000000000004',
+  /** Учебный турнир «Кубок Юности»: до Phase 4 существует через свой персонал (секретарь). */
+  competition: '01920000-0000-7000-8015-000000000001',
 } as const;
 
 export interface SeedOrganization {
@@ -75,7 +77,8 @@ export interface SeedUser {
   displayName: string;
   totp: boolean;
   person: { lastName: string; firstName: string; birthDate: string; gender: 'MALE' | 'FEMALE' };
-  grants: { id: string; role: string; organizationId: string | null }[];
+  /** Роль на платформе (organizationId и competitionId пусты), в организации или в турнире. */
+  grants: { id: string; role: string; organizationId: string | null; competitionId?: string }[];
 }
 
 const u = (n: number): string => `01920000-0000-7000-8001-${String(n).padStart(12, '0')}`;
@@ -173,5 +176,25 @@ export const SEED_USERS: SeedUser[] = [
     totp: false,
     person: { lastName: 'Арбитрова', firstName: 'Ольга', birthDate: '1986-12-03', gender: 'FEMALE' },
     grants: [],
+  },
+  {
+    id: u(10),
+    identityId: i(10),
+    personId: p(10),
+    email: 'parent1@sambo.local',
+    displayName: 'Родитель спортсмена',
+    totp: false,
+    person: { lastName: 'Орлова', firstName: 'Светлана', birthDate: '1986-08-17', gender: 'FEMALE' },
+    grants: [],
+  },
+  {
+    id: u(11),
+    identityId: i(11),
+    personId: p(11),
+    email: 'secretary@sambo.local',
+    displayName: 'Секретарь «Кубка Юности»',
+    totp: false,
+    person: { lastName: 'Протоколова', firstName: 'Вера', birthDate: '1991-01-22', gender: 'FEMALE' },
+    grants: [{ id: g(11), role: 'SECRETARY', organizationId: null, competitionId: SEED_IDS.competition }],
   },
 ];

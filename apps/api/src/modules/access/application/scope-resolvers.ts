@@ -2,7 +2,23 @@ import { Injectable } from '@nestjs/common';
 import type { Request } from 'express';
 import type { ResourceScope } from '../domain/grants';
 
-export type ScopeResolverFn = (id: string | undefined, req: Request) => Promise<ResourceScope>;
+/**
+ * Ресурс с несколькими областями (спортсмен в клубе и в спортшколе): право достаточно иметь в любой из них.
+ * `resource` передаётся политикам отношений (◐), например `{ athleteId }` для COACH_OWN.
+ */
+export interface ScopeResolution {
+  scopes: ResourceScope[];
+  resource?: unknown;
+}
+
+export type ScopeResolverFn = (
+  id: string | undefined,
+  req: Request,
+) => Promise<ResourceScope | ScopeResolution>;
+
+export function asResolution(value: ResourceScope | ScopeResolution): ScopeResolution {
+  return 'scopes' in value ? value : { scopes: [value] };
+}
 
 /**
  * Реестр резолверов области. Модуль-владелец данных регистрирует резолвер для своих ресурсов

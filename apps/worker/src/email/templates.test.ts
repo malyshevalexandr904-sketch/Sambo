@@ -45,4 +45,21 @@ describe('email templates', () => {
       TemplateParamsError,
     );
   });
+
+  it('renders the guardian invitation without the child data and the rejection with the reason', () => {
+    const invite = renderEmail('guardian.invite', 'ru', {
+      acceptUrl: 'https://sambo.local/ru/invites/guardian?token=t',
+      organizationName: 'Клуб «Витязь»',
+    });
+    expect(invite.text).toContain('«Клуб „Витязь“» указал(а) вас законным представителем');
+    const rejected = renderEmail('document.rejected', 'en', {
+      documentType: 'Medical certificate',
+      reason: 'Stamp is not readable',
+      documentsUrl: 'https://sambo.local/en/documents',
+    });
+    expect(rejected.text).toContain('Reason: Stamp is not readable');
+    expect(() =>
+      renderEmail('document.rejected', 'ru', { documentType: 'x', documentsUrl: 'https://a' }),
+    ).toThrow(TemplateParamsError);
+  });
 });

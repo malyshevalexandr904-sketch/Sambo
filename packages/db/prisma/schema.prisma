@@ -1,5 +1,6 @@
 // SAMBO DIGITAL ECOSYSTEM — схема БД (DATABASE.md).
 // Phase 2: Identity & Access (3.1), Organizations (3.2), Platform (3.9), справочники Phase 2 (API.md, 3.7).
+// Phase 3: People (3.3), Rules & Setup — правила и категории (3.4), документы (3.5), ImportJob (3.9).
 // Конструкции, которые Prisma не выражает (partial unique, CHECK, генерируемые колонки, партиции,
 // REVOKE), пишутся SQL-шагами в миграциях (DATABASE.md, 10). Миграции пишутся и ревьюятся вручную.
 
@@ -62,39 +63,61 @@ enum MembershipStatus {
 }
 
 model User {
-  id                     String    @id @default(uuid(7)) @db.Uuid
-  email                  String?   @unique @db.Citext
-  emailVerifiedAt        DateTime? @map("email_verified_at") @db.Timestamptz(3)
-  displayName            String    @map("display_name")
+  id                     String     @id @default(uuid(7)) @db.Uuid
+  email                  String?    @unique @db.Citext
+  emailVerifiedAt        DateTime?  @map("email_verified_at") @db.Timestamptz(3)
+  displayName            String     @map("display_name")
   status                 UserStatus @default(PENDING_VERIFICATION)
-  locale                 String    @default("ru")
+  locale                 String     @default("ru")
   timezone               String?
-  personId               String?   @unique @map("person_id") @db.Uuid
-  totpSecretEnc          Bytes?    @map("totp_secret_enc")
-  totpEnabledAt          DateTime? @map("totp_enabled_at") @db.Timestamptz(3)
-  totpRecoveryCodeHashes String[]  @default([]) @map("totp_recovery_code_hashes")
-  permissionsVersion     Int       @default(1) @map("permissions_version")
-  lastLoginAt            DateTime? @map("last_login_at") @db.Timestamptz(3)
-  createdAt              DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt              DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt              DateTime? @map("deleted_at") @db.Timestamptz(3)
+  personId               String?    @unique @map("person_id") @db.Uuid
+  totpSecretEnc          Bytes?     @map("totp_secret_enc")
+  totpEnabledAt          DateTime?  @map("totp_enabled_at") @db.Timestamptz(3)
+  totpRecoveryCodeHashes String[]   @default([]) @map("totp_recovery_code_hashes")
+  permissionsVersion     Int        @default(1) @map("permissions_version")
+  lastLoginAt            DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  createdAt              DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt              DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt              DateTime?  @map("deleted_at") @db.Timestamptz(3)
 
-  person                   Person?                  @relation("UserPerson", fields: [personId], references: [id], onDelete: Restrict)
-  identities               AuthIdentity[]
-  refreshTokens            RefreshToken[]
-  verificationTokens       VerificationToken[]
-  platformRoles            PlatformRoleAssignment[] @relation("PlatformRoleUser")
-  grantedPlatformRoles     PlatformRoleAssignment[] @relation("PlatformRoleGrantor")
-  organizationMemberships  OrganizationMembership[] @relation("MembershipUser")
-  invitedMemberships       OrganizationMembership[] @relation("MembershipInviter")
-  competitionMemberships   CompetitionMembership[]  @relation("CompetitionMembershipUser")
-  invitedCompetitionStaff  CompetitionMembership[]  @relation("CompetitionMembershipInviter")
-  createdOrganizations     Organization[]           @relation("OrganizationCreator")
-  createdPersons           Person[]                 @relation("PersonCreator")
-  uploadedFiles            StoredFile[]
-  auditEntries             AuditLog[]
-  dataAccessEntries        DataAccessLog[]
-  updatedSettings          SystemSetting[]
+  person                    Person?                  @relation("UserPerson", fields: [personId], references: [id], onDelete: Restrict)
+  identities                AuthIdentity[]
+  refreshTokens             RefreshToken[]
+  verificationTokens        VerificationToken[]
+  platformRoles             PlatformRoleAssignment[] @relation("PlatformRoleUser")
+  grantedPlatformRoles      PlatformRoleAssignment[] @relation("PlatformRoleGrantor")
+  organizationMemberships   OrganizationMembership[] @relation("MembershipUser")
+  invitedMemberships        OrganizationMembership[] @relation("MembershipInviter")
+  competitionMemberships    CompetitionMembership[]  @relation("CompetitionMembershipUser")
+  invitedCompetitionStaff   CompetitionMembership[]  @relation("CompetitionMembershipInviter")
+  createdOrganizations      Organization[]           @relation("OrganizationCreator")
+  createdPersons            Person[]                 @relation("PersonCreator")
+  uploadedFiles             StoredFile[]
+  auditEntries              AuditLog[]
+  dataAccessEntries         DataAccessLog[]
+  updatedSettings           SystemSetting[]
+  createdAthletes           AthleteProfile[]         @relation("AthleteCreator")
+  createdCoaches            CoachProfile[]           @relation("CoachCreator")
+  createdCoachMemberships   CoachMembership[]        @relation("CoachMembershipCreator")
+  createdReferees           RefereeProfile[]         @relation("RefereeCreator")
+  createdAthleteMemberships AthleteMembership[]      @relation("AthleteMembershipCreator")
+  createdAthleteCoaches     AthleteCoach[]           @relation("AthleteCoachCreator")
+  createdRanks              AthleteRankRecord[]      @relation("RankCreator")
+  revokedRanks              AthleteRankRecord[]      @relation("RankRevoker")
+  createdGuardians          Guardian[]               @relation("GuardianCreator")
+  verifiedGuardians         Guardian[]               @relation("GuardianVerifier")
+  endedGuardians            Guardian[]               @relation("GuardianEnder")
+  createdConsentTemplates   ConsentTemplate[]        @relation("ConsentTemplateCreator")
+  recordedConsents          Consent[]                @relation("ConsentRecorder")
+  revokedConsents           Consent[]                @relation("ConsentRevoker")
+  createdRuleSets           RuleSet[]                @relation("RuleSetCreator")
+  createdRuleSetVersions    RuleSetVersion[]         @relation("RuleSetVersionCreator")
+  publishedRuleSetVersions  RuleSetVersion[]         @relation("RuleSetPublisher")
+  createdAgeGroups          AgeGroup[]               @relation("AgeGroupCreator")
+  createdCategoryTemplates  CategoryTemplate[]       @relation("CategoryTemplateCreator")
+  uploadedDocuments         Document[]               @relation("DocumentUploader")
+  reviewedDocuments         Document[]               @relation("DocumentReviewer")
+  importJobs                ImportJob[]              @relation("ImportCreator")
 
   @@index([status, createdAt])
   @@map("user")
@@ -173,7 +196,7 @@ model Role {
 }
 
 model Permission {
-  code        String @id
+  code        String      @id
   module      String
   description String
   scopes      RoleScope[]
@@ -267,23 +290,23 @@ enum Gender {
 }
 
 model Person {
-  id            String    @id @default(uuid(7)) @db.Uuid
-  lastName      String    @map("last_name")
-  firstName     String    @map("first_name")
-  middleName    String?   @map("middle_name")
-  birthDate     DateTime  @map("birth_date") @db.Date
+  id            String               @id @default(uuid(7)) @db.Uuid
+  lastName      String               @map("last_name")
+  firstName     String               @map("first_name")
+  middleName    String?              @map("middle_name")
+  birthDate     DateTime             @map("birth_date") @db.Date
   gender        Gender
-  countryCode   String?   @map("country_code") @db.Char(2)
-  regionId      String?   @map("region_id") @db.Uuid
+  countryCode   String?              @map("country_code") @db.Char(2)
+  regionId      String?              @map("region_id") @db.Uuid
   city          String?
-  photoFileId   String?   @map("photo_file_id") @db.Uuid
+  photoFileId   String?              @map("photo_file_id") @db.Uuid
   lastNameNorm  Unsupported("text")? @map("last_name_norm")
   firstNameNorm Unsupported("text")? @map("first_name_norm")
-  mergedIntoId  String?   @map("merged_into_id") @db.Uuid
-  createdById   String?   @map("created_by_id") @db.Uuid
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(3)
+  mergedIntoId  String?              @map("merged_into_id") @db.Uuid
+  createdById   String?              @map("created_by_id") @db.Uuid
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt     DateTime?            @map("deleted_at") @db.Timestamptz(3)
 
   user       User?       @relation("UserPerson")
   country    Country?    @relation(fields: [countryCode], references: [code], onDelete: Restrict)
@@ -292,6 +315,13 @@ model Person {
   mergedInto Person?     @relation("PersonMerge", fields: [mergedIntoId], references: [id], onDelete: Restrict)
   mergedFrom Person[]    @relation("PersonMerge")
   createdBy  User?       @relation("PersonCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  athleteProfile    AthleteProfile?
+  coachProfile      CoachProfile?
+  refereeProfile    RefereeProfile?
+  guardianOf        Guardian[]      @relation("GuardianPerson")
+  consentsAsSubject Consent[]       @relation("ConsentSubject")
+  consentsGiven     Consent[]       @relation("ConsentGiver")
 
   @@map("person")
 }
@@ -345,27 +375,27 @@ model Region {
 }
 
 model Organization {
-  id           String             @id @default(uuid(7)) @db.Uuid
+  id           String               @id @default(uuid(7)) @db.Uuid
   type         OrganizationType
-  parentId     String?            @map("parent_id") @db.Uuid
+  parentId     String?              @map("parent_id") @db.Uuid
   name         String
-  shortName    String             @map("short_name")
-  slug         String             @unique
-  logoFileId   String?            @map("logo_file_id") @db.Uuid
-  countryCode  String             @map("country_code") @db.Char(2)
-  regionId     String?            @map("region_id") @db.Uuid
+  shortName    String               @map("short_name")
+  slug         String               @unique
+  logoFileId   String?              @map("logo_file_id") @db.Uuid
+  countryCode  String               @map("country_code") @db.Char(2)
+  regionId     String?              @map("region_id") @db.Uuid
   city         String?
   address      String?
-  contactEmail String?            @map("contact_email") @db.Citext
-  contactPhone String?            @map("contact_phone")
+  contactEmail String?              @map("contact_email") @db.Citext
+  contactPhone String?              @map("contact_phone")
   website      String?
-  status       OrganizationStatus @default(PENDING_REVIEW)
+  status       OrganizationStatus   @default(PENDING_REVIEW)
   nameNorm     Unsupported("text")? @map("name_norm")
-  version      Int                @default(1)
-  createdById  String?            @map("created_by_id") @db.Uuid
-  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt    DateTime?          @map("deleted_at") @db.Timestamptz(3)
+  version      Int                  @default(1)
+  createdById  String?              @map("created_by_id") @db.Uuid
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt    DateTime?            @map("deleted_at") @db.Timestamptz(3)
 
   parent       Organization?             @relation("OrganizationHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
   children     Organization[]            @relation("OrganizationHierarchy")
@@ -377,6 +407,14 @@ model Organization {
   ancestors    OrganizationClosure[]     @relation("ClosureDescendant")
   descendants  OrganizationClosure[]     @relation("ClosureAncestor")
   memberships  OrganizationMembership[]
+
+  athleteMemberships AthleteMembership[]
+  coachMemberships   CoachMembership[]
+  ruleSets           RuleSet[]           @relation("RuleSetOwner")
+  ageGroups          AgeGroup[]          @relation("AgeGroupOwner")
+  categoryTemplates  CategoryTemplate[]  @relation("CategoryTemplateOwner")
+  documents          Document[]          @relation("OrganizationDocument")
+  importJobs         ImportJob[]         @relation("ImportOrganization")
 
   @@index([parentId])
   @@index([regionId, type, status])
@@ -426,6 +464,8 @@ model SportRank {
   nameEn    String @map("name_en")
   rankOrder Int    @unique @map("rank_order")
 
+  rankRecords AthleteRankRecord[]
+
   @@map("sport_rank")
 }
 
@@ -435,6 +475,8 @@ model RefereeCategory {
   nameEn    String @map("name_en")
   rankOrder Int    @unique @map("rank_order")
 
+  referees RefereeProfile[]
+
   @@map("referee_category")
 }
 
@@ -442,6 +484,10 @@ model Discipline {
   code   String @id
   nameRu String @map("name_ru")
   nameEn String @map("name_en")
+
+  ruleSets          RuleSet[]
+  ageGroups         AgeGroup[]
+  categoryTemplates CategoryTemplate[]
 
   @@map("discipline")
 }
@@ -454,6 +500,8 @@ model DocumentType {
   allowedMime   String      @map("allowed_mime")
   maxSizeBytes  Int         @map("max_size_bytes")
   retentionDays Int         @map("retention_days")
+
+  documents Document[]
 
   @@map("document_type")
 }
@@ -511,6 +559,8 @@ model StoredFile {
   uploadedBy        User?          @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
   organizationLogos Organization[] @relation("OrganizationLogo")
   personPhotos      Person[]       @relation("PersonPhoto")
+  document          Document?      @relation("DocumentFile")
+  importJobs        ImportJob[]    @relation("ImportFile")
 
   @@index([status, createdAt])
   @@map("stored_file")
@@ -604,4 +654,472 @@ model SystemSetting {
   updatedBy User? @relation(fields: [updatedById], references: [id], onDelete: Restrict)
 
   @@map("system_setting")
+}
+
+// ============================================================
+// People — профили, членства, представители, согласия (DATABASE.md, 3.3; Phase 3)
+// Производные значения (текущий клуб, тренер, разряд, возраст) не хранятся.
+// ============================================================
+
+enum ProfileStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum GuardianRelation {
+  MOTHER
+  FATHER
+  LEGAL_GUARDIAN
+  OTHER
+}
+
+enum GuardianVerificationBasis {
+  DOCUMENT_SHOWN
+  PAPER_APPLICATION
+}
+
+enum ConsentKind {
+  PD_PROCESSING
+  PD_DISTRIBUTION
+  HEALTH_DATA
+}
+
+enum ConsentMethod {
+  ELECTRONIC
+  PAPER_SCAN
+}
+
+model AthleteProfile {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  personId    String        @unique @map("person_id") @db.Uuid
+  publicId    String        @unique @map("public_id")
+  status      ProfileStatus @default(ACTIVE)
+  version     Int           @default(1)
+  createdById String?       @map("created_by_id") @db.Uuid
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  person      Person              @relation(fields: [personId], references: [id], onDelete: Restrict)
+  createdBy   User?               @relation("AthleteCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  memberships AthleteMembership[]
+  coaches     AthleteCoach[]
+  ranks       AthleteRankRecord[]
+  guardians   Guardian[]
+  documents   Document[]
+
+  @@map("athlete_profile")
+}
+
+model CoachProfile {
+  id          String        @id @default(uuid(7)) @db.Uuid
+  personId    String        @unique @map("person_id") @db.Uuid
+  status      ProfileStatus @default(ACTIVE)
+  version     Int           @default(1)
+  createdById String?       @map("created_by_id") @db.Uuid
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  person      Person            @relation(fields: [personId], references: [id], onDelete: Restrict)
+  createdBy   User?             @relation("CoachCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  memberships CoachMembership[]
+  athletes    AthleteCoach[]
+
+  @@map("coach_profile")
+}
+
+/// Тренер в организации (клубе, спортшколе) с периодом. Не зависит от аккаунта: тренер без входа в систему
+/// тоже бывает. Права тренера-пользователя даёт OrganizationMembership с ролью COACH.
+model CoachMembership {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  coachId        String    @map("coach_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  validFrom      DateTime  @map("valid_from") @db.Date
+  validTo        DateTime? @map("valid_to") @db.Date
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  coach        CoachProfile @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy    User?        @relation("CoachMembershipCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, validTo])
+  @@index([coachId])
+  @@map("coach_membership")
+}
+
+model RefereeProfile {
+  id                  String        @id @default(uuid(7)) @db.Uuid
+  personId            String        @unique @map("person_id") @db.Uuid
+  refereeCategoryCode String        @map("referee_category_code")
+  categoryAssignedAt  DateTime?     @map("category_assigned_at") @db.Date
+  status              ProfileStatus @default(ACTIVE)
+  version             Int           @default(1)
+  createdById         String?       @map("created_by_id") @db.Uuid
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  person    Person          @relation(fields: [personId], references: [id], onDelete: Restrict)
+  category  RefereeCategory @relation(fields: [refereeCategoryCode], references: [code], onDelete: Restrict)
+  createdBy User?           @relation("RefereeCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([refereeCategoryCode])
+  @@map("referee_profile")
+}
+
+model AthleteMembership {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  athleteId      String    @map("athlete_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  isPrimary      Boolean   @map("is_primary")
+  validFrom      DateTime  @map("valid_from") @db.Date
+  validTo        DateTime? @map("valid_to") @db.Date
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  athlete      AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy    User?          @relation("AthleteMembershipCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, validTo])
+  @@index([athleteId])
+  @@map("athlete_membership")
+}
+
+model AthleteCoach {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  athleteId   String    @map("athlete_id") @db.Uuid
+  coachId     String    @map("coach_id") @db.Uuid
+  isPrimary   Boolean   @map("is_primary")
+  validFrom   DateTime  @map("valid_from") @db.Date
+  validTo     DateTime? @map("valid_to") @db.Date
+  createdById String?   @map("created_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  athlete   AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  coach     CoachProfile   @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  createdBy User?          @relation("AthleteCoachCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([coachId, validTo])
+  @@index([athleteId])
+  @@map("athlete_coach")
+}
+
+model AthleteRankRecord {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  athleteId     String    @map("athlete_id") @db.Uuid
+  sportRankCode String    @map("sport_rank_code")
+  assignedAt    DateTime  @map("assigned_at") @db.Date
+  orderRef      String?   @map("order_ref")
+  documentId    String?   @map("document_id") @db.Uuid
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(3)
+  revokedById   String?   @map("revoked_by_id") @db.Uuid
+  revokeReason  String?   @map("revoke_reason")
+  createdById   String?   @map("created_by_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  athlete   AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  sportRank SportRank      @relation(fields: [sportRankCode], references: [code], onDelete: Restrict)
+  document  Document?      @relation("RankDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  revokedBy User?          @relation("RankRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+  createdBy User?          @relation("RankCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@map("athlete_rank_record")
+}
+
+/// Законный представитель. Связь не удаляется: прекращается (`endedAt`) с причиной — история остаётся.
+model Guardian {
+  id                String                     @id @default(uuid(7)) @db.Uuid
+  athleteId         String                     @map("athlete_id") @db.Uuid
+  guardianPersonId  String                     @map("guardian_person_id") @db.Uuid
+  relation          GuardianRelation
+  verifiedAt        DateTime?                  @map("verified_at") @db.Timestamptz(3)
+  verifiedById      String?                    @map("verified_by_id") @db.Uuid
+  verificationBasis GuardianVerificationBasis? @map("verification_basis")
+  endedAt           DateTime?                  @map("ended_at") @db.Timestamptz(3)
+  endedById         String?                    @map("ended_by_id") @db.Uuid
+  endReason         String?                    @map("end_reason")
+  createdById       String?                    @map("created_by_id") @db.Uuid
+  createdAt         DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  athlete        AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  guardianPerson Person         @relation("GuardianPerson", fields: [guardianPersonId], references: [id], onDelete: Restrict)
+  verifiedBy     User?          @relation("GuardianVerifier", fields: [verifiedById], references: [id], onDelete: Restrict)
+  endedBy        User?          @relation("GuardianEnder", fields: [endedById], references: [id], onDelete: Restrict)
+  createdBy      User?          @relation("GuardianCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([guardianPersonId])
+  @@index([athleteId])
+  @@map("guardian")
+}
+
+/// Текст согласия. После публикации не меняется (триггер): доказуемо, на какой текст дано согласие.
+model ConsentTemplate {
+  id           String      @id @default(uuid(7)) @db.Uuid
+  kind         ConsentKind
+  version      Int
+  locale       String
+  operatorName String      @map("operator_name")
+  bodyMarkdown String      @map("body_markdown")
+  publishedAt  DateTime?   @map("published_at") @db.Timestamptz(3)
+  retiredAt    DateTime?   @map("retired_at") @db.Timestamptz(3)
+  createdById  String?     @map("created_by_id") @db.Uuid
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  createdBy User?     @relation("ConsentTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  consents  Consent[]
+
+  @@unique([kind, version, locale])
+  @@map("consent_template")
+}
+
+/// Согласие. `competitionId` — без FK до появления таблицы турнира (Phase 4).
+model Consent {
+  id              String        @id @default(uuid(7)) @db.Uuid
+  subjectPersonId String        @map("subject_person_id") @db.Uuid
+  givenByPersonId String        @map("given_by_person_id") @db.Uuid
+  templateId      String        @map("template_id") @db.Uuid
+  competitionId   String?       @map("competition_id") @db.Uuid
+  method          ConsentMethod
+  documentId      String?       @map("document_id") @db.Uuid
+  givenAt         DateTime      @map("given_at") @db.Timestamptz(3)
+  revokedAt       DateTime?     @map("revoked_at") @db.Timestamptz(3)
+  revokedById     String?       @map("revoked_by_id") @db.Uuid
+  revokeReason    String?       @map("revoke_reason")
+  recordedById    String?       @map("recorded_by_id") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  subject    Person          @relation("ConsentSubject", fields: [subjectPersonId], references: [id], onDelete: Restrict)
+  givenBy    Person          @relation("ConsentGiver", fields: [givenByPersonId], references: [id], onDelete: Restrict)
+  template   ConsentTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  document   Document?       @relation("ConsentDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  revokedBy  User?           @relation("ConsentRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+  recordedBy User?           @relation("ConsentRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+
+  @@index([givenByPersonId])
+  @@map("consent")
+}
+
+// ============================================================
+// Rules & Setup — правила, возрастные группы, весовые категории, шаблоны (DATABASE.md, 3.4; Phase 3)
+// ============================================================
+
+enum RuleSetVersionStatus {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+enum AgeCalculationPolicy {
+  BY_BIRTH_YEAR
+  EXACT_ON_DATE
+  BIRTH_YEAR_RANGE
+}
+
+enum WeightLimitKind {
+  UP_TO
+  ABOVE
+}
+
+model RuleSet {
+  id                  String        @id @default(uuid(7)) @db.Uuid
+  code                String        @unique
+  disciplineCode      String        @map("discipline_code")
+  ownerOrganizationId String?       @map("owner_organization_id") @db.Uuid
+  name                String
+  status              ProfileStatus @default(ACTIVE)
+  createdById         String?       @map("created_by_id") @db.Uuid
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  discipline        Discipline       @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
+  ownerOrganization Organization?    @relation("RuleSetOwner", fields: [ownerOrganizationId], references: [id], onDelete: Restrict)
+  createdBy         User?            @relation("RuleSetCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  versions          RuleSetVersion[]
+
+  @@index([ownerOrganizationId])
+  @@map("rule_set")
+}
+
+/// Версия правил. После публикации неизменяема (триггер forbid_update_published): турнир закрепляет версию (ADR-09).
+model RuleSetVersion {
+  id            String               @id @default(uuid(7)) @db.Uuid
+  ruleSetId     String               @map("rule_set_id") @db.Uuid
+  version       Int
+  schemaVersion Int                  @map("schema_version")
+  parameters    Json
+  checksum      String?
+  status        RuleSetVersionStatus @default(DRAFT)
+  publishedAt   DateTime?            @map("published_at") @db.Timestamptz(3)
+  publishedById String?              @map("published_by_id") @db.Uuid
+  createdById   String?              @map("created_by_id") @db.Uuid
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  ruleSet     RuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Restrict)
+  publishedBy User?   @relation("RuleSetPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
+  createdBy   User?   @relation("RuleSetVersionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@unique([ruleSetId, version])
+  @@map("rule_set_version")
+}
+
+model AgeGroup {
+  id                  String               @id @default(uuid(7)) @db.Uuid
+  disciplineCode      String               @map("discipline_code")
+  ownerOrganizationId String?              @map("owner_organization_id") @db.Uuid
+  code                String
+  nameRu              String               @map("name_ru")
+  nameEn              String               @map("name_en")
+  policy              AgeCalculationPolicy @default(BY_BIRTH_YEAR)
+  ageFrom             Int                  @map("age_from")
+  ageTo               Int                  @map("age_to")
+  createdById         String?              @map("created_by_id") @db.Uuid
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime?            @map("deleted_at") @db.Timestamptz(3)
+
+  discipline        Discipline             @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
+  ownerOrganization Organization?          @relation("AgeGroupOwner", fields: [ownerOrganizationId], references: [id], onDelete: Restrict)
+  createdBy         User?                  @relation("AgeGroupCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  weightCategories  WeightCategory[]
+  templateItems     CategoryTemplateItem[]
+
+  @@index([disciplineCode])
+  @@map("age_group")
+}
+
+model WeightCategory {
+  id         String          @id @default(uuid(7)) @db.Uuid
+  ageGroupId String          @map("age_group_id") @db.Uuid
+  gender     Gender
+  kind       WeightLimitKind
+  limitGrams Int             @map("limit_grams")
+  sortOrder  Int             @default(0) @map("sort_order")
+  createdAt  DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt  DateTime?       @map("deleted_at") @db.Timestamptz(3)
+
+  ageGroup      AgeGroup               @relation(fields: [ageGroupId], references: [id], onDelete: Restrict)
+  templateItems CategoryTemplateItem[]
+
+  @@index([ageGroupId])
+  @@map("weight_category")
+}
+
+model CategoryTemplate {
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  ownerOrganizationId String?   @map("owner_organization_id") @db.Uuid
+  disciplineCode      String    @map("discipline_code")
+  name                String
+  createdById         String?   @map("created_by_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  ownerOrganization Organization?          @relation("CategoryTemplateOwner", fields: [ownerOrganizationId], references: [id], onDelete: Restrict)
+  discipline        Discipline             @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
+  createdBy         User?                  @relation("CategoryTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  items             CategoryTemplateItem[]
+
+  @@map("category_template")
+}
+
+model CategoryTemplateItem {
+  id               String @id @default(uuid(7)) @db.Uuid
+  templateId       String @map("template_id") @db.Uuid
+  ageGroupId       String @map("age_group_id") @db.Uuid
+  gender           Gender
+  weightCategoryId String @map("weight_category_id") @db.Uuid
+
+  template       CategoryTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  ageGroup       AgeGroup         @relation(fields: [ageGroupId], references: [id], onDelete: Restrict)
+  weightCategory WeightCategory   @relation(fields: [weightCategoryId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, weightCategoryId])
+  @@map("category_template_item")
+}
+
+// ============================================================
+// Documents (DATABASE.md, 3.5; Phase 3). `applicationId`, `competitionId` — без FK до Phase 4.
+// ============================================================
+
+enum DocumentStatus {
+  UPLOADED
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+model Document {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  typeCode       String         @map("type_code")
+  athleteId      String?        @map("athlete_id") @db.Uuid
+  applicationId  String?        @map("application_id") @db.Uuid
+  organizationId String?        @map("organization_id") @db.Uuid
+  competitionId  String?        @map("competition_id") @db.Uuid
+  fileId         String         @unique @map("file_id") @db.Uuid
+  status         DocumentStatus @default(UPLOADED)
+  expirationDate DateTime?      @map("expiration_date") @db.Date
+  uploadedById   String?        @map("uploaded_by_id") @db.Uuid
+  uploadedAt     DateTime       @default(now()) @map("uploaded_at") @db.Timestamptz(3)
+  reviewedById   String?        @map("reviewed_by_id") @db.Uuid
+  reviewedAt     DateTime?      @map("reviewed_at") @db.Timestamptz(3)
+  rejectReason   String?        @map("reject_reason")
+  version        Int            @default(1)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?      @map("deleted_at") @db.Timestamptz(3)
+
+  type         DocumentType        @relation(fields: [typeCode], references: [code], onDelete: Restrict)
+  athlete      AthleteProfile?     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  organization Organization?       @relation("OrganizationDocument", fields: [organizationId], references: [id], onDelete: Restrict)
+  file         StoredFile          @relation("DocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
+  uploadedBy   User?               @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+  reviewedBy   User?               @relation("DocumentReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  rankRecords  AthleteRankRecord[] @relation("RankDocument")
+  consents     Consent[]           @relation("ConsentDocument")
+
+  @@index([athleteId, typeCode, status])
+  @@index([applicationId])
+  @@index([organizationId])
+  @@index([competitionId])
+  @@index([status, uploadedAt])
+  @@map("document")
+}
+
+// ============================================================
+// Фоновый импорт (DATABASE.md, 3.9; Phase 3)
+// ============================================================
+
+enum ImportKind {
+  ATHLETES
+}
+
+enum JobStatus {
+  PENDING
+  PARSED
+  COMMITTED
+  FAILED
+}
+
+model ImportJob {
+  id             String     @id @default(uuid(7)) @db.Uuid
+  kind           ImportKind @default(ATHLETES)
+  organizationId String     @map("organization_id") @db.Uuid
+  fileId         String     @map("file_id") @db.Uuid
+  status         JobStatus  @default(PENDING)
+  errorCode      String?    @map("error_code")
+  report         Json?
+  createdById    String     @map("created_by_id") @db.Uuid
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  parsedAt       DateTime?  @map("parsed_at") @db.Timestamptz(3)
+  completedAt    DateTime?  @map("completed_at") @db.Timestamptz(3)
+
+  organization Organization @relation("ImportOrganization", fields: [organizationId], references: [id], onDelete: Restrict)
+  file         StoredFile   @relation("ImportFile", fields: [fileId], references: [id], onDelete: Restrict)
+  createdBy    User         @relation("ImportCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([createdById, createdAt])
+  @@map("import_job")
 }

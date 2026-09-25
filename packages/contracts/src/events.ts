@@ -12,6 +12,8 @@ export const EMAIL_TEMPLATES = [
   'auth.password_reset',
   'auth.password_changed',
   'organization.invite',
+  'guardian.invite',
+  'document.rejected',
 ] as const;
 export type EmailTemplate = (typeof EMAIL_TEMPLATES)[number];
 
@@ -26,6 +28,10 @@ export const EVENT_SCHEMAS = {
   'user.blocked': z.object({ userId: Uuid }),
   'organization.created': z.object({ organizationId: Uuid }),
   'organization.status_changed': z.object({ organizationId: Uuid, from: z.string(), to: z.string() }),
+  'athlete.import_requested': z.object({ importJobId: Uuid }),
+  'athlete.merged': z.object({ sourceAthleteId: Uuid, targetAthleteId: Uuid }),
+  'consent.revoked': z.object({ consentId: Uuid, athleteId: Uuid, kind: z.string() }),
+  'document.rejected': z.object({ documentId: Uuid }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

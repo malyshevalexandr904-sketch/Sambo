@@ -64,6 +64,7 @@ export function ReasonAction({
   title,
   description,
   variant = 'secondary',
+  size = 'md',
   required = true,
   onConfirm,
 }: {
@@ -71,6 +72,8 @@ export function ReasonAction({
   title: string;
   description?: string;
   variant?: 'secondary' | 'danger' | 'primary';
+  /** Кнопка в строке списка — маленькая. */
+  size?: 'sm' | 'md';
   required?: boolean;
   onConfirm: (reason: string) => Promise<void>;
 }) {
@@ -83,7 +86,7 @@ export function ReasonAction({
   const id = `reason-${label.replace(/\W+/g, '-')}`;
   if (!open) {
     return (
-      <Button variant={variant} onClick={() => setOpen(true)}>
+      <Button variant={variant} size={size} onClick={() => setOpen(true)}>
         {label}
       </Button>
     );

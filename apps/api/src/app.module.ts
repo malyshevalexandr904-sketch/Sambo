@@ -1,5 +1,5 @@
 import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { loadEnv, loggerOptions } from '@sde/server-kit';
 import { randomUUID } from 'node:crypto';
@@ -7,6 +7,7 @@ import type { IncomingMessage } from 'node:http';
 import { RequestContextMiddleware, TRACE_ID_RE } from './common/context/request-context.middleware';
 import { RequestContextStore } from './common/context/request-context';
 import { AllExceptionsFilter } from './common/errors/exception.filter';
+import { IdempotencyInterceptor } from './common/http/idempotency';
 import { CsrfGuard } from './common/security/csrf';
 import { RateLimitGuard } from './common/security/rate-limit';
 import { SecurityModule } from './common/security/security.module';
@@ -16,13 +17,22 @@ import { RedisModule } from './infrastructure/redis/redis.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
 import { AccessModule, PermissionGuard } from './modules/access';
 import { AdminModule } from './modules/admin';
+import { AthletesModule } from './modules/athletes';
 import { AuditModule } from './modules/audit';
 import { AuthGuard, AuthModule } from './modules/auth';
+import { CategoriesModule } from './modules/categories';
+import { CoachesModule } from './modules/coaches';
+import { CompetitionsModule } from './modules/competitions';
+import { ConsentsModule } from './modules/consents';
 import { DictionariesModule } from './modules/dictionaries';
+import { DocumentsModule } from './modules/documents';
 import { FilesModule } from './modules/files';
 import { HealthModule } from './modules/health';
 import { OrganizationsModule } from './modules/organizations';
 import { OutboxModule } from './modules/outbox';
+import { PeopleModule } from './modules/people';
+import { RefereesModule } from './modules/referees';
+import { RuleSetsModule } from './modules/rulesets';
 import { SettingsModule } from './modules/settings';
 import { UsersModule } from './modules/users';
 
@@ -66,6 +76,15 @@ import { UsersModule } from './modules/users';
     AuthModule,
     FilesModule,
     OrganizationsModule,
+    PeopleModule,
+    CoachesModule,
+    RefereesModule,
+    AthletesModule,
+    CompetitionsModule,
+    DocumentsModule,
+    ConsentsModule,
+    RuleSetsModule,
+    CategoriesModule,
     AdminModule,
     DictionariesModule,
     HealthModule,
@@ -77,6 +96,8 @@ import { UsersModule } from './modules/users';
     { provide: APP_GUARD, useExisting: RateLimitGuard },
     { provide: APP_GUARD, useExisting: CsrfGuard },
     { provide: APP_GUARD, useExisting: PermissionGuard },
+    // После guards: ключ идемпотентности привязан к проверенному пользователю (API.md, 1.5).
+    { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],
 })
 export class AppModule implements NestModule {

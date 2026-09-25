@@ -7,6 +7,7 @@ import { type Job, Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import { EmailConsumer } from './email/email.consumer';
 import { createMailer } from './email/mailer';
+import { ImportConsumer } from './imports/import.consumer';
 import { MAINTENANCE_JOBS, Maintenance, type MaintenanceJob } from './maintenance/maintenance';
 import { OutboxDispatcher, type OutboxJob } from './outbox/dispatcher';
 
@@ -40,15 +41,29 @@ async function main(): Promise<void> {
       removeOnFail: 5000,
     },
   });
+  const importQueue = new Queue<OutboxJob>('imports', {
+    connection,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5_000 },
+      removeOnComplete: 1000,
+      removeOnFail: 5000,
+    },
+  });
   const maintenanceQueue = new Queue<{ job: MaintenanceJob }>('maintenance', { connection });
 
   const emailConsumer = new EmailConsumer(db, createMailer(env, logger), logger, env);
   const maintenance = new Maintenance(db, s3, env, logger);
+  const importConsumer = new ImportConsumer(db, s3, env, logger);
 
   const workers = [
     new Worker<OutboxJob>('email', (job: Job<OutboxJob>) => emailConsumer.handle(job), {
       connection,
       concurrency: 5,
+    }),
+    new Worker<OutboxJob>('imports', (job: Job<OutboxJob>) => importConsumer.handle(job), {
+      connection,
+      concurrency: 2,
     }),
     new Worker<{ job: MaintenanceJob }>('maintenance', (job) => maintenance.run(job.data.job), {
       connection,
@@ -69,7 +84,14 @@ async function main(): Promise<void> {
     );
   }
 
-  const dispatcher = new OutboxDispatcher(db, new Map([['email', emailQueue]]), logger);
+  const dispatcher = new OutboxDispatcher(
+    db,
+    new Map([
+      ['email', emailQueue],
+      ['imports', importQueue],
+    ]),
+    logger,
+  );
   dispatcher.start();
 
   const port = Number(process.env.WORKER_PORT ?? 4100);
@@ -86,7 +108,7 @@ async function main(): Promise<void> {
     health.close();
     await dispatcher.stop();
     await Promise.all(workers.map((w) => w.close()));
-    await Promise.all([emailQueue.close(), maintenanceQueue.close()]);
+    await Promise.all([emailQueue.close(), importQueue.close(), maintenanceQueue.close()]);
     await db.$disconnect();
     connection.disconnect();
     process.exit(0);

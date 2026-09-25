@@ -64,6 +64,7 @@ const PARAMS: Record<string, () => string> = {
   code: () => 'ZZ',
   roleCode: () => 'SUPER_ADMIN',
   key: () => 'registration.selfSignupEnabled',
+  version: () => '1',
 };
 
 function concrete(path: string): string {

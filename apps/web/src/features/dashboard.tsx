@@ -6,7 +6,8 @@ import { useTranslations } from 'next-intl';
 import { StatusBadge } from '@/components/common';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
-import { qk, useMe } from '@/lib/queries';
+import { hasAnywhere } from '@/lib/access';
+import { qk, useMe, useMyAthletes } from '@/lib/queries';
 
 function OrganizationRow({ id, roles }: { id: string; roles: string[] }) {
   const t = useTranslations();
@@ -24,6 +25,47 @@ function OrganizationRow({ id, roles }: { id: string; roles: string[] }) {
         {org.data ? <StatusBadge status={org.data.status} /> : null}
       </div>
     </li>
+  );
+}
+
+function WorkCard() {
+  const t = useTranslations();
+  const { data: me } = useMe();
+  const mine = useMyAthletes(!!me?.personId);
+  const links = [
+    { href: '/athletes', label: t('dashboard.links.athletes'), visible: hasAnywhere(me, 'athlete.view') },
+    {
+      href: '/athletes/new',
+      label: t('dashboard.links.newAthlete'),
+      visible: hasAnywhere(me, 'athlete.create'),
+    },
+    {
+      href: '/athletes/import',
+      label: t('dashboard.links.import'),
+      visible: hasAnywhere(me, 'athlete.import'),
+    },
+    { href: '/children', label: t('dashboard.links.children'), visible: (mine.data?.length ?? 0) > 0 },
+    {
+      href: '/documents',
+      label: t('dashboard.links.documents'),
+      visible: hasAnywhere(me, 'document.verify'),
+    },
+    { href: '/account', label: t('dashboard.links.person'), visible: !me?.personId },
+  ].filter((l) => l.visible);
+  if (links.length === 0) return null;
+  return (
+    <Card>
+      <CardTitle>{t('dashboard.work')}</CardTitle>
+      <ul className="space-y-2">
+        {links.map((l) => (
+          <li key={l.href}>
+            <Link href={l.href} className="font-medium text-blue-700 hover:underline">
+              {l.label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 
@@ -46,6 +88,7 @@ export function Dashboard() {
         </Alert>
       ) : null}
       <div className="grid gap-6 xl:grid-cols-2">
+        <WorkCard />
         <Card>
           <CardTitle>{t('dashboard.myOrganizations')}</CardTitle>
           {me.grants.organizations.length === 0 ? (

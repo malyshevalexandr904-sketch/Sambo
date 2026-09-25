@@ -1,10 +1,19 @@
 // Проверка словарей в CI (ARCHITECTURE.md, 19): ключи ru и en совпадают, у каждого кода ошибки,
-// роли, типа и статуса организации есть перевод.
+// роли, типа и статуса организации, статусов и видов из справочников Phase 3 есть перевод.
 import {
+  AGE_POLICIES,
+  CONSENT_KINDS,
+  DOCUMENT_STATUSES,
   ERROR_CODES,
+  GUARDIAN_RELATIONS,
+  GUARDIAN_VERIFICATION_BASES,
+  IMPORT_COLUMNS,
+  IMPORT_FILE_ERRORS,
   ORGANIZATION_STATUSES,
   ORGANIZATION_TYPES,
+  PROFILE_STATUSES,
   ROLE_CODES,
+  RULESET_VERSION_STATUSES,
   SYSTEM_SETTING_DEFAULTS,
   USER_STATUSES,
 } from '@sde/contracts';
@@ -33,6 +42,15 @@ describe('i18n dictionaries', () => {
       ...ORGANIZATION_TYPES.map((x) => `orgTypes.${x}`),
       ...[...ORGANIZATION_STATUSES, ...USER_STATUSES].map((s) => `statuses.${s}`),
       ...Object.keys(SYSTEM_SETTING_DEFAULTS).map((k) => `settings.keys.${k.replaceAll('.', '_')}`),
+      ...PROFILE_STATUSES.map((s) => `statuses.${s}`),
+      ...DOCUMENT_STATUSES.map((s) => `documents.statuses.${s}`),
+      ...CONSENT_KINDS.map((k) => `consents.kinds.${k}`),
+      ...GUARDIAN_RELATIONS.map((r) => `guardians.relations.${r}`),
+      ...GUARDIAN_VERIFICATION_BASES.map((b) => `guardians.bases.${b}`),
+      ...IMPORT_FILE_ERRORS.map((e) => `imports.fileErrors.${e}`),
+      ...IMPORT_COLUMNS.map((c) => `imports.columns.${c}`),
+      ...AGE_POLICIES.map((p) => `catalog.policies.${p}`),
+      ...RULESET_VERSION_STATUSES.map((s) => `rulesets.statuses.${s}`),
     ];
     expect(required.filter((k) => !all.has(k))).toEqual([]);
   });

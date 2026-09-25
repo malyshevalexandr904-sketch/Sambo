@@ -1,10 +1,11 @@
 // Seed для разработки (раздел 47 ТЗ; DATABASE.md, 11). Все данные вымышленные. Идемпотентен: повторный запуск
-// обновляет те же записи. Спортсмены, турнир, категории и заявки добавляются в seed с Phase 3–4.
+// обновляет те же записи. Phase 3: спортсмены, тренеры, судьи, представители, согласия, правила, категории.
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { hashPassword, sealTotpSecret, totpKey } from '@sde/server-kit';
 import { type OrganizationType, PrismaClient, type RoleScope } from '../generated/client';
 import { SEED_ORGANIZATIONS, SEED_USERS } from './data';
+import { seedPhase3 } from './phase3';
 
 const envFile = path.resolve(__dirname, '..', '..', '..', '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
@@ -96,28 +97,42 @@ async function seedUsers(
     for (const grant of u.grants) {
       const role = roles.get(grant.role);
       if (!role) throw new Error(`Seed: role ${grant.role} not found — apply migrations first`);
-      if (!grant.organizationId) {
-        const existing = await db.platformRoleAssignment.findFirst({
-          where: { userId: u.id, roleId: role.id, revokedAt: null },
-        });
-        if (!existing)
-          await db.platformRoleAssignment.create({ data: { id: grant.id, userId: u.id, roleId: role.id } });
-        continue;
-      }
-      await db.organizationMembership.upsert({
-        where: { id: grant.id },
-        create: {
-          id: grant.id,
-          organizationId: grant.organizationId,
-          userId: u.id,
-          roleId: role.id,
-          status: 'ACTIVE',
-          validFrom: today,
-        },
-        update: { status: 'ACTIVE', validTo: null },
-      });
+      await seedGrant(db, u.id, role.id, grant);
     }
   }
+}
+
+type SeedGrant = (typeof SEED_USERS)[number]['grants'][number];
+
+/** Роль в турнире, на платформе или в организации. */
+async function seedGrant(db: PrismaClient, userId: string, roleId: string, grant: SeedGrant): Promise<void> {
+  if (grant.competitionId) {
+    await db.competitionMembership.upsert({
+      where: { id: grant.id },
+      create: { id: grant.id, competitionId: grant.competitionId, userId, roleId, status: 'ACTIVE' },
+      update: { status: 'ACTIVE' },
+    });
+    return;
+  }
+  if (!grant.organizationId) {
+    const existing = await db.platformRoleAssignment.findFirst({
+      where: { userId, roleId, revokedAt: null },
+    });
+    if (!existing) await db.platformRoleAssignment.create({ data: { id: grant.id, userId, roleId } });
+    return;
+  }
+  await db.organizationMembership.upsert({
+    where: { id: grant.id },
+    create: {
+      id: grant.id,
+      organizationId: grant.organizationId,
+      userId,
+      roleId,
+      status: 'ACTIVE',
+      validFrom: today,
+    },
+    update: { status: 'ACTIVE', validTo: null },
+  });
 }
 
 async function main(): Promise<void> {
@@ -126,6 +141,7 @@ async function main(): Promise<void> {
     const key = totpKey(required('TOTP_ENCRYPTION_KEY'));
     await seedOrganizations(db);
     await seedUsers(db, required('SEED_PASSWORD'), required('SEED_ADMIN_TOTP_SECRET'), key);
+    const summary = await seedPhase3(db);
     process.stdout.write(
       [
         'Seed completed. Fictional accounts (password from SEED_PASSWORD):',
@@ -133,6 +149,8 @@ async function main(): Promise<void> {
           (u) =>
             `  ${u.email.padEnd(28)} ${u.grants.map((g) => g.role).join(', ') || '—'}${u.totp ? '  [TOTP: SEED_ADMIN_TOTP_SECRET]' : ''}`,
         ),
+        '',
+        ...summary,
         '',
       ].join('\n'),
     );

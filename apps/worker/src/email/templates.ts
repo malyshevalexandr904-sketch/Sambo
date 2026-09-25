@@ -86,6 +86,26 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       action: { label: 'Принять приглашение', param: 'acceptUrl' },
       required: ['acceptUrl', 'organizationName', 'roleCode'],
     },
+    'guardian.invite': {
+      subject: 'Приглашение законного представителя — SAMBO Digital',
+      lines: [
+        '«{organizationName}» указал(а) вас законным представителем спортсмена.',
+        'Войдите или зарегистрируйтесь с этим адресом email и примите приглашение: в личном кабинете вы увидите данные ребёнка, дадите согласия и загрузите документы. Ссылка действует 7 дней.',
+        'Если вы не знаете, о чём речь, просто проигнорируйте письмо.',
+      ],
+      action: { label: 'Принять приглашение', param: 'acceptUrl' },
+      required: ['acceptUrl', 'organizationName'],
+    },
+    'document.rejected': {
+      subject: 'Документ отклонён — SAMBO Digital',
+      lines: [
+        'Документ «{documentType}», который вы загрузили, отклонён при проверке.',
+        'Причина: {reason}',
+        'Загрузите исправленный документ в разделе «Документы».',
+      ],
+      action: { label: 'Открыть документы', param: 'documentsUrl' },
+      required: ['documentType', 'reason', 'documentsUrl'],
+    },
   },
   en: {
     'auth.verify_email': {
@@ -132,6 +152,26 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       ],
       action: { label: 'Accept invitation', param: 'acceptUrl' },
       required: ['acceptUrl', 'organizationName', 'roleCode'],
+    },
+    'guardian.invite': {
+      subject: 'Guardian invitation — SAMBO Digital',
+      lines: [
+        '“{organizationName}” listed you as a legal guardian of an athlete.',
+        'Sign in or sign up with this email address and accept the invitation to see the athlete, give consents and upload documents. The link is valid for 7 days.',
+        'If you do not know what this is about, ignore this email.',
+      ],
+      action: { label: 'Accept invitation', param: 'acceptUrl' },
+      required: ['acceptUrl', 'organizationName'],
+    },
+    'document.rejected': {
+      subject: 'Document rejected — SAMBO Digital',
+      lines: [
+        'The document “{documentType}” you uploaded was rejected during review.',
+        'Reason: {reason}',
+        'Please upload a corrected document in the Documents section.',
+      ],
+      action: { label: 'Open documents', param: 'documentsUrl' },
+      required: ['documentType', 'reason', 'documentsUrl'],
     },
   },
 };
