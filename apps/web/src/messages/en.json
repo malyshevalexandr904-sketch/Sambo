@@ -465,7 +465,10 @@
     "revoked": "Revoked",
     "revokeRank": "Revoke",
     "revokeRankTitle": "Revoke the rank record?",
-    "addRank": "Add rank"
+    "addRank": "Add rank",
+    "notFound": "Athlete not found",
+    "notFoundHint": "There is no such record or the athlete belongs to another club: other clubs’ data is not shown.",
+    "backToList": "Back to athletes"
   },
   "guardians": {
     "title": "Legal guardians",
@@ -493,7 +496,9 @@
     "invite": "Invite",
     "end": "Unlink",
     "endTitle": "Unlink the guardian?",
-    "invited": "Invitation sent."
+    "invited": "Invitation sent.",
+    "added": "Guardian added. Verify them once you see a document or an application.",
+    "addedInvited": "Guardian added; an invitation was sent to {email}. Verify them once you see a document or an application."
   },
   "consents": {
     "title": "Consents",
@@ -561,7 +566,8 @@
     "queueHint": "Athlete documents in your competitions.",
     "queueEmpty": "No documents match these filters.",
     "competition": "Competition (optional)",
-    "competitionHint": "ID of the competition the document is for: the competition secretary reviews it. Picking from a list arrives with competitions (Phase 4)."
+    "competitionHint": "ID of the competition the document is for: the competition secretary reviews it. Picking from a list arrives with competitions (Phase 4).",
+    "rejectedAt": "Rejected"
   },
   "imports": {
     "title": "Import athletes",

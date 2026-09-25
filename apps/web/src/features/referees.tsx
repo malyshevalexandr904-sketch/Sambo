@@ -157,7 +157,7 @@ function RefereeRow({ referee: r }: { referee: RefereeSummary }) {
           <Select
             aria-label={t('referees.category')}
             value={code}
-            className="min-w-48"
+            className="min-w-80"
             onChange={(e) => setCode(e.target.value)}
           >
             {(categories.data ?? []).map((c) => (

@@ -17,6 +17,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { ReasonAction } from '@/components/common';
 import { FilePicker } from '@/components/file-picker';
+import { MarkdownLite } from '@/components/markdown-lite';
 import { fieldErrors } from '@/components/person-fields';
 import { api, uploadFile } from '@/lib/api';
 import { useFieldMessage } from '@/lib/errors';
@@ -144,9 +145,10 @@ function GiveConsent({
       <p className="text-sm text-slate-600">{t('operator', { name: template.operatorName })}</p>
       <details className="mt-2">
         <summary className="cursor-pointer text-sm text-blue-700">{t('readText')}</summary>
-        <div className="mt-2 max-h-72 overflow-y-auto whitespace-pre-wrap rounded bg-slate-50 p-3 text-sm">
-          {template.bodyMarkdown}
-        </div>
+        <MarkdownLite
+          text={template.bodyMarkdown}
+          className="mt-2 max-h-72 overflow-y-auto rounded bg-slate-50 p-3 text-sm"
+        />
       </details>
       <label htmlFor={id} className="mt-3 flex items-start gap-2 text-sm">
         <input

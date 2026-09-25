@@ -62,7 +62,7 @@ export function AthletesList() {
         }
       />
       <form
-        className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(16rem,2fr)_8rem_repeat(3,minmax(0,1fr))_auto]"
+        className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6"
         onSubmit={(e) => {
           e.preventDefault();
           setFilters(draft);
@@ -73,6 +73,7 @@ export function AthletesList() {
         </label>
         <Input
           id="athlete-q"
+          className="sm:col-span-2 lg:col-span-3"
           placeholder={t('athletes.searchPlaceholder')}
           value={draft.q}
           onChange={(e) => setDraft({ ...draft, q: e.target.value })}
@@ -81,10 +82,12 @@ export function AthletesList() {
           aria-label={t('athletes.birthYear')}
           placeholder={t('athletes.birthYear')}
           inputMode="numeric"
+          className="lg:col-span-1"
           value={draft.birthYear}
           onChange={(e) => setDraft({ ...draft, birthYear: e.target.value.replace(/\D/g, '').slice(0, 4) })}
         />
         <Select
+          className="lg:col-span-2"
           aria-label={t('people.gender')}
           value={draft.gender}
           onChange={(e) => setDraft({ ...draft, gender: e.target.value })}
@@ -99,6 +102,7 @@ export function AthletesList() {
           ))}
         </Select>
         <Select
+          className="lg:col-span-2"
           aria-label={t('common.status')}
           value={draft.status}
           onChange={(e) => setDraft({ ...draft, status: e.target.value })}
@@ -112,6 +116,7 @@ export function AthletesList() {
         </Select>
         {isCoach ? (
           <Select
+            className="lg:col-span-2"
             aria-label={t('athletes.scope')}
             value={draft.mine}
             onChange={(e) => setDraft({ ...draft, mine: e.target.value })}
@@ -120,7 +125,9 @@ export function AthletesList() {
             <option value="">{t('athletes.allOfClub')}</option>
           </Select>
         ) : null}
-        <Button type="submit">{t('common.apply')}</Button>
+        <Button type="submit" className="justify-self-start">
+          {t('common.apply')}
+        </Button>
       </form>
       <QueryState isPending={query.isPending} error={query.error}>
         {() =>

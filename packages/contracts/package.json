@@ -1,6 +1,6 @@
 {
   "name": "@sde/contracts",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Единый источник схем API, каталога прав и кодов ошибок (Zod)",
   "type": "module",

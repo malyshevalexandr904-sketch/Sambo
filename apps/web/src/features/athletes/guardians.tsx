@@ -41,6 +41,7 @@ export function GuardiansPanel({ athlete, editable }: { athlete: Athlete; editab
   const [email, setEmail] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const add = useAction();
+  const [added, setAdded] = useState<string | null>(null);
   const minor = !isAdultOn(athlete.person.birthDate);
 
   return (
@@ -56,8 +57,19 @@ export function GuardiansPanel({ athlete, editable }: { athlete: Athlete; editab
           <GuardianRow key={g.id} athleteId={athlete.id} guardian={g} editable={editable} />
         ))}
       </ul>
+      {added ? (
+        <Alert tone="success" className="mb-4">
+          {added}
+        </Alert>
+      ) : null}
       {editable && !adding ? (
-        <Button variant="secondary" onClick={() => setAdding(true)}>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setAdded(null);
+            setAdding(true);
+          }}
+        >
           {t('guardians.add')}
         </Button>
       ) : null}
@@ -79,6 +91,9 @@ export function GuardiansPanel({ athlete, editable }: { athlete: Athlete; editab
                   },
                 });
                 setAdding(false);
+                setAdded(
+                  email.trim() ? t('guardians.addedInvited', { email: email.trim() }) : t('guardians.added'),
+                );
                 setPerson(emptyPerson());
                 setEmail('');
                 await refreshAthlete(queryClient, athlete.id);
