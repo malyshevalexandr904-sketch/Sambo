@@ -202,7 +202,12 @@ describe('consents', () => {
       method: 'ELECTRONIC',
     });
     expect(repeat.body.error.code).toBe('ALREADY_EXISTS');
-    const card = await coach.agent.get(`/api/v1/athletes/${athleteId}`).expect(200);
+    // Версия карточки не менялась, а статус согласий — да: условный GET не должен вернуть 304 из кэша.
+    const card = await coach.agent
+      .get(`/api/v1/athletes/${athleteId}`)
+      .set('if-none-match', '"v1"')
+      .expect(200);
+    expect(card.headers['cache-control']).toBe('no-store');
     expect(card.body.data.consentsStatus).toEqual({
       PD_PROCESSING: 'GIVEN',
       PD_DISTRIBUTION: 'GIVEN',
