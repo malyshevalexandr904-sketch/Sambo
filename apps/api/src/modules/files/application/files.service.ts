@@ -193,6 +193,35 @@ export class FilesService {
   }
 
   /**
+   * Ссылка на приватный файл после проверки прав модулем-владельцем (документ проверяет `document.view` сам).
+   * Скачивание пишется в журнал доступа от имени ресурса-владельца.
+   */
+  async grantedDownloadUrl(
+    fileId: string,
+    log: { resourceType: string; resourceId: string; competitionId?: string | null },
+  ): Promise<DownloadUrl> {
+    const file = await this.db.storedFile.findUnique({ where: { id: fileId } });
+    if (!file || file.status !== 'AVAILABLE' || file.deletedAt)
+      throw new DomainError('NOT_FOUND', { resource: 'file' });
+    const url = await this.storage.presignGet(
+      file.bucket,
+      file.storageKey,
+      DOWNLOAD_TTL_SECONDS,
+      file.originalName,
+    );
+    await this.accessLog.record('DOWNLOAD', log.resourceType, log.resourceId, log.competitionId ?? null);
+    return { url, expiresAt: new Date(Date.now() + DOWNLOAD_TTL_SECONDS * 1000).toISOString() };
+  }
+
+  /** Файл загружен пользователем, проверен и не привязан: для проверок, которым важна цель и тип файла. */
+  async attachableFile(tx: Tx, fileId: string, userId: string): Promise<StoredFile | null> {
+    const file = await tx.storedFile.findUnique({ where: { id: fileId } });
+    return file && file.uploadedById === userId && file.status === 'AVAILABLE' && !file.deletedAt
+      ? file
+      : null;
+  }
+
+  /**
    * Файл можно привязать к сущности, только если его загрузил этот же пользователь, он проверен
    * и загружен с нужной целью (API.md, 3.4: logoFileId).
    */
