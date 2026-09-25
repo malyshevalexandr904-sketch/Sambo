@@ -1,6 +1,17 @@
 // Клиент API (ARCHITECTURE.md, 23): тот же origin, cookie-сессия, CSRF double submit,
 // прозрачное обновление access token (одно на все параллельные запросы).
-import { type ApiErrorBody, COOKIE_CSRF, CSRF_HEADER, type ErrorCode, type FieldError } from '@sde/contracts';
+import {
+  type ApiErrorBody,
+  COOKIE_CSRF,
+  CSRF_HEADER,
+  type DataEnvelope,
+  type ErrorCode,
+  type FieldError,
+  IDEMPOTENCY_HEADER,
+  type StoredFileDto,
+  type UploadPurpose,
+  type UploadTicket,
+} from '@sde/contracts';
 
 export class ApiError extends Error {
   constructor(
@@ -71,6 +82,8 @@ export interface RequestOptions {
   version?: number;
   /** Не пытаться обновить сессию при 401 (сами запросы входа). */
   noRefresh?: boolean;
+  /** Ключ идемпотентности команды (API.md, 1.5): повтор с тем же ключом не выполняется дважды. */
+  idempotencyKey?: string;
 }
 
 function buildUrl(path: string, query?: RequestOptions['query']): string {
@@ -97,6 +110,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   if (!SAFE.has(method)) headers[CSRF_HEADER] = await ensureCsrf();
   if (opts.version !== undefined) headers['If-Match'] = `"v${opts.version}"`;
+  if (opts.idempotencyKey) headers[IDEMPOTENCY_HEADER] = opts.idempotencyKey;
   let res: Response;
   try {
     res = await fetch(buildUrl(path, opts.query), {
@@ -143,4 +157,23 @@ export async function uploadToStorage(
 export async function sha256Hex(file: File): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** Загрузка файла целиком: билет → хранилище → проверка на сервере. Возвращает проверенный файл. */
+export async function uploadFile(purpose: UploadPurpose, file: File): Promise<StoredFileDto> {
+  const ticket = await api<DataEnvelope<UploadTicket>>('/files/uploads', {
+    method: 'POST',
+    body: {
+      purpose,
+      fileName: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      sha256: await sha256Hex(file),
+    },
+  });
+  await uploadToStorage(ticket.data.uploadUrl, ticket.data.fields, file);
+  const done = await api<DataEnvelope<StoredFileDto>>(`/files/${ticket.data.fileId}/complete`, {
+    method: 'POST',
+  });
+  return done.data;
 }

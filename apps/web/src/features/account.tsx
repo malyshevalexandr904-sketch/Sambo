@@ -2,6 +2,7 @@
 // Профиль: имя и язык, смена пароля, сеансы, двухфакторная аутентификация (API.md, 3.1–3.2).
 import type { DataEnvelope, Me, SessionDto } from '@sde/contracts';
 import { Alert, Badge, Button, Card, CardTitle, Field, Input, PageHeader, Select } from '@sde/ui';
+import { MyPersonCard } from './my-person';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -280,6 +281,7 @@ export function Account() {
       <div className="grid gap-6 xl:grid-cols-2">
         <ProfileCard me={me.data} />
         <TotpCard me={me.data} />
+        <MyPersonCard />
         <PasswordCard />
         <SessionsCard />
       </div>

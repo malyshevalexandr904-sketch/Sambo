@@ -1,19 +1,19 @@
 'use client';
 // Адаптивный каркас кабинета и админ-панели (раздел 33 ТЗ; ARCHITECTURE.md, 23.3): боковое меню
 // на широких экранах, выдвижное — на телефоне. Пункты меню — по правам (скрытие — удобство, не защита).
-import { type Me, type PermissionCode, ROLE_PERMISSIONS } from '@sde/contracts';
+import type { Me, PermissionCode } from '@sde/contracts';
 import { Alert, Button, cn, Spinner } from '@sde/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
-import { useMe } from '@/lib/queries';
+import { hasAnywhere, platformHas } from '@/lib/access';
+import { useMe, useMyAthletes } from '@/lib/queries';
 import { LocaleSwitcher } from './locale-switcher';
 
 export function hasPlatformPermission(me: Me | undefined, permission: PermissionCode): boolean {
-  if (!me?.totpEnabled) return false;
-  return me.grants.platform.some((role) => ROLE_PERMISSIONS[role][permission] !== undefined);
+  return platformHas(me, permission);
 }
 
 interface NavItem {
@@ -25,6 +25,7 @@ interface NavItem {
 export function AppShell({ children }: { children: ReactNode }) {
   const t = useTranslations();
   const me = useMe();
+  const myAthletes = useMyAthletes(!!me.data?.personId);
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -60,7 +61,19 @@ export function AppShell({ children }: { children: ReactNode }) {
   const user = me.data;
   const nav: NavItem[] = [
     { href: '/admin', label: t('nav.dashboard'), visible: true },
+    { href: '/athletes', label: t('nav.athletes'), visible: hasAnywhere(user, 'athlete.view') },
+    { href: '/children', label: t('nav.children'), visible: (myAthletes.data?.length ?? 0) > 0 },
+    { href: '/coaches', label: t('nav.coaches'), visible: hasAnywhere(user, 'coach.manage') },
+    { href: '/documents', label: t('nav.documents'), visible: hasAnywhere(user, 'document.verify') },
     { href: '/admin/organizations', label: t('nav.organizations'), visible: true },
+    { href: '/admin/referees', label: t('nav.referees'), visible: hasAnywhere(user, 'referee.manage') },
+    { href: '/admin/categories', label: t('nav.categories'), visible: hasAnywhere(user, 'category.manage') },
+    { href: '/admin/rulesets', label: t('nav.rulesets'), visible: hasAnywhere(user, 'ruleset.manage') },
+    {
+      href: '/admin/consent-templates',
+      label: t('nav.consentTemplates'),
+      visible: hasPlatformPermission(user, 'consent_template.manage'),
+    },
     { href: '/admin/users', label: t('nav.users'), visible: hasPlatformPermission(user, 'user.view') },
     { href: '/admin/audit', label: t('nav.audit'), visible: hasPlatformPermission(user, 'audit.view') },
     {
