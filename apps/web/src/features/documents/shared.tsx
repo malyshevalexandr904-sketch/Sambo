@@ -92,7 +92,8 @@ export function DocumentItem({
       </p>
       {doc.reviewedAt ? (
         <p className="text-slate-600">
-          {t('documents.reviewed')} {formatDateTime(doc.reviewedAt, locale)}
+          {doc.status === 'REJECTED' ? t('documents.rejectedAt') : t('documents.reviewed')}{' '}
+          {formatDateTime(doc.reviewedAt, locale)}
           {doc.reviewedBy ? ` · ${doc.reviewedBy.displayName}` : ''}
           {doc.rejectReason ? ` · ${t('documents.rejectReason')}: ${doc.rejectReason}` : ''}
         </p>

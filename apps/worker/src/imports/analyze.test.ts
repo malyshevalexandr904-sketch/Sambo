@@ -72,6 +72,9 @@ describe('import preview', () => {
     expect(byRow.get(2)?.coach).toEqual({ id: 'c1', name: 'Тренеров С.' });
     expect(byRow.get(3)?.errors).toEqual([{ path: 'sportRankCode', code: 'invalid_code' }]);
     expect(byRow.get(4)?.errors).toEqual([{ path: 'coachEmail', code: 'coach_not_found' }]);
+    // Строка с ошибкой узнаваема по тому, как она записана в файле.
+    expect(byRow.get(4)?.source).toEqual({ lastName: 'Сидоров', firstName: 'Илья', birthDate: '2013-05-17' });
+    expect(byRow.get(7)?.source).toEqual({ lastName: '', firstName: 'Без', birthDate: 'вчера' });
     expect(byRow.get(5)?.duplicates.map((d) => d.athleteId)).toEqual(['a1']);
     expect(byRow.get(6)?.errors).toEqual([{ path: 'lastName', code: 'duplicate_in_file' }]);
     expect(

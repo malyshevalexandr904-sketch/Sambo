@@ -29,6 +29,10 @@ const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.s
 /** Выбор по строке: CREATE, SKIP или LINK:<athleteId>. */
 type Choice = string;
 
+/** Значения строки как в файле (строка с ошибкой не нормализована). */
+const sourceText = (...parts: (string | undefined)[]): string =>
+  parts.filter((p) => p && p.trim()).join(' ') || '—';
+
 function defaultChoice(r: ImportRowReport): Choice {
   if (!r.data) return 'SKIP';
   return r.duplicates.length > 0 ? 'SKIP' : 'CREATE';
@@ -254,8 +258,22 @@ function ImportPreview({ job, onRestart }: { job: ImportJobDto; onRestart: () =>
               }
             >
               <Td>{r.row}</Td>
-              <Td>{r.data ? `${r.data.lastName} ${r.data.firstName} ${r.data.middleName ?? ''}` : '—'}</Td>
-              <Td>{r.data ? formatDate(r.data.birthDate, locale) : '—'}</Td>
+              <Td>
+                {r.data ? (
+                  `${r.data.lastName} ${r.data.firstName} ${r.data.middleName ?? ''}`
+                ) : (
+                  <span className="text-slate-500">
+                    {sourceText(r.source?.lastName, r.source?.firstName)}
+                  </span>
+                )}
+              </Td>
+              <Td>
+                {r.data ? (
+                  formatDate(r.data.birthDate, locale)
+                ) : (
+                  <span className="text-slate-500">{sourceText(r.source?.birthDate)}</span>
+                )}
+              </Td>
               <Td>{r.data?.sportRankCode ? rankName(r.data.sportRankCode) : '—'}</Td>
               <Td>{r.coach?.name ?? r.data?.coachEmail ?? '—'}</Td>
               <Td>
@@ -298,6 +316,7 @@ function ImportPreview({ job, onRestart }: { job: ImportJobDto; onRestart: () =>
                   </span>
                 ) : (
                   <Select
+                    className="min-w-40"
                     aria-label={t('imports.actionFor', { row: r.row })}
                     disabled={committed || !r.data}
                     value={choices[r.row] ?? 'SKIP'}

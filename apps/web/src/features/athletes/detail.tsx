@@ -2,15 +2,15 @@
 // Карточка спортсмена (API.md, 4.1): данные, клуб и тренер, разряды, представители, согласия, документы.
 // Доступные действия приходят с сервера (allowedActions): интерфейс лишь скрывает недоступное.
 import { type Athlete, type DataEnvelope, fullName } from '@sde/contracts';
-import { Alert, Badge, Button, Card, CardTitle, Field, Input, PageHeader } from '@sde/ui';
+import { Alert, Badge, Button, Card, CardTitle, EmptyState, Field, Input, PageHeader } from '@sde/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { QueryState, ReasonAction, StatusBadge } from '@/components/common';
 import { fieldErrors, PersonFields, type PersonValues, withPrefix } from '@/components/person-fields';
 import { AthleteDocuments } from '@/features/documents/athlete-documents';
-import { useRouter } from '@/i18n/navigation';
-import { api } from '@/lib/api';
+import { Link, useRouter } from '@/i18n/navigation';
+import { api, ApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { pickName, qk } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
@@ -26,6 +26,17 @@ export function AthleteDetail({ id }: { id: string }) {
     queryKey: qk.athlete(id),
     queryFn: async () => (await api<DataEnvelope<Athlete>>(`/athletes/${id}`)).data,
   });
+  // Спортсмена нет или он в чужом клубе — сервер не различает эти случаи (404), интерфейс тоже.
+  if (query.error instanceof ApiError && query.error.code === 'NOT_FOUND') {
+    return (
+      <EmptyState title={t('athletes.notFound')}>
+        <p>{t('athletes.notFoundHint')}</p>
+        <Link href="/athletes" className="mt-3 inline-block font-medium text-blue-700 hover:underline">
+          {t('athletes.backToList')}
+        </Link>
+      </EmptyState>
+    );
+  }
   return (
     <QueryState isPending={query.isPending} error={query.error}>
       {() => {

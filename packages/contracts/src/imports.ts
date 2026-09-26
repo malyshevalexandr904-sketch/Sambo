@@ -210,6 +210,8 @@ export interface ImportRowResult {
 export interface ImportRowReport {
   /** Номер строки файла (заголовок — строка 1). */
   row: number;
+  /** Как строка записана в файле — чтобы узнать строку с ошибкой (в отчётах до 0.3.1 поля нет). */
+  source?: { lastName: string; firstName: string; birthDate: string };
   data: ImportRowData | null;
   errors: FieldError[];
   duplicates: DuplicateCandidate[];

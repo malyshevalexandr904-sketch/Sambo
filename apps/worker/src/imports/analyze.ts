@@ -47,6 +47,11 @@ export async function analyzeRows(rows: RawRow[], lookups: ImportLookups): Promi
     }
     report.push({
       row: raw.row,
+      source: {
+        lastName: raw.values.lastName?.trim() ?? '',
+        firstName: raw.values.firstName?.trim() ?? '',
+        birthDate: raw.values.birthDate?.trim() ?? '',
+      },
       data: errors.length === 0 ? data : null,
       errors,
       duplicates,
