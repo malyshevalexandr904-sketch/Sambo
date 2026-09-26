@@ -2,6 +2,7 @@ export { AthletesModule } from './athletes.module';
 export {
   type AthleteBasics,
   AthleteAccessService,
+  type AthleteRegistrationInfo,
   type RelationInfo,
 } from './application/athlete-access.service';
 export {

@@ -3,5 +3,10 @@ import { OrganizationsModule } from '../organizations';
 import { RuleSetsController } from './api/rulesets.controller';
 import { RuleSetsService } from './application/rulesets.service';
 
-@Module({ imports: [OrganizationsModule], controllers: [RuleSetsController], providers: [RuleSetsService] })
+@Module({
+  imports: [OrganizationsModule],
+  controllers: [RuleSetsController],
+  providers: [RuleSetsService],
+  exports: [RuleSetsService],
+})
 export class RuleSetsModule {}

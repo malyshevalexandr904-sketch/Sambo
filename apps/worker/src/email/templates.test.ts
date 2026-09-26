@@ -62,4 +62,20 @@ describe('email templates', () => {
       renderEmail('document.rejected', 'ru', { documentType: 'x', documentsUrl: 'https://a' }),
     ).toThrow(TemplateParamsError);
   });
+
+  it('renders the competition staff invitation with the role name', () => {
+    const r = renderEmail('competition.invite', 'ru', {
+      acceptUrl: 'https://sambo.local/ru/invites/competition?token=t',
+      competitionName: 'Первенство клуба «Витязь»',
+      roleCode: 'SECRETARY',
+    });
+    expect(r.subject).toBe('Приглашение в персонал турнира «Первенство клуба „Витязь“» — SAMBO Digital');
+    expect(r.text).toContain('с ролью «секретарь»');
+    const en = renderEmail('competition.invite', 'en', {
+      acceptUrl: 'https://sambo.local/en/invites/competition?token=t',
+      competitionName: 'Club cup',
+      roleCode: 'CHIEF_REFEREE',
+    });
+    expect(en.text).toContain('as chief referee');
+  });
 });

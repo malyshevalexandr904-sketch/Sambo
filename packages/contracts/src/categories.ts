@@ -164,6 +164,8 @@ export const ELIGIBILITY_REASONS = [
   'RANK_TOO_HIGH',
   'REGION_NOT_ALLOWED',
   'MAX_CATEGORIES_REACHED',
+  'CATEGORY_CLOSED',
+  'ALREADY_ENTERED',
 ] as const;
 export type EligibilityReason = (typeof ELIGIBILITY_REASONS)[number];
 

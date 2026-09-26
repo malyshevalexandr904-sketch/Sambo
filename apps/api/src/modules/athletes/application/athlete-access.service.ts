@@ -1,7 +1,8 @@
 // Доступ к спортсмену (PERMISSIONS.md, 5): области — организации текущих членств (CLUB_MEMBER, ORG_DESCENDANT),
 // политики отношений COACH_OWN (◐ у тренера), SELF и GUARDIAN (подтверждённый представитель).
 import { Injectable, type OnModuleInit } from '@nestjs/common';
-import type { AthleteRelation, PermissionCode } from '@sde/contracts';
+import { type AthleteRelation, fullName, type PermissionCode } from '@sde/contracts';
+import type { Tx } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -35,6 +36,29 @@ export interface AthleteBasics {
   athleteId: string;
   personId: string;
   birthDate: string;
+}
+
+/** Сведения спортсмена для заявки на турнир: снимок участия (ADR-10) и проверка принадлежности клубу. */
+export interface AthleteRegistrationInfo {
+  athleteId: string;
+  personId: string;
+  status: 'ACTIVE' | 'INACTIVE' | 'ARCHIVED';
+  lastName: string;
+  firstName: string;
+  middleName: string | null;
+  birthDate: string;
+  gender: 'MALE' | 'FEMALE';
+  personRegionId: string | null;
+  /** Текущие членства: основной клуб — первым. */
+  memberships: {
+    organizationId: string;
+    name: string;
+    shortName: string;
+    regionId: string | null;
+    isPrimary: boolean;
+  }[];
+  coachName: string | null;
+  rankCode: string | null;
 }
 
 export interface AthleteResourceRef {
@@ -119,6 +143,52 @@ export class AthleteAccessService implements OnModuleInit {
           birthDate: row.person.birthDate.toISOString().slice(0, 10),
         }
       : null;
+  }
+
+  async registrationInfo(athleteId: string, tx?: Tx): Promise<AthleteRegistrationInfo | null> {
+    const a = await (tx ?? this.db).athleteProfile.findUnique({
+      where: { id: athleteId },
+      include: {
+        person: true,
+        memberships: {
+          where: currentPeriod(),
+          orderBy: [{ isPrimary: 'desc' }, { validFrom: 'desc' }],
+          include: { organization: { select: { id: true, name: true, shortName: true, regionId: true } } },
+        },
+        coaches: {
+          where: currentPeriod(),
+          orderBy: [{ isPrimary: 'desc' }, { validFrom: 'desc' }],
+          include: { coach: { include: { person: true } } },
+        },
+        ranks: {
+          where: { revokedAt: null },
+          orderBy: [{ assignedAt: 'desc' }, { createdAt: 'desc' }],
+          take: 1,
+        },
+      },
+    });
+    if (!a) return null;
+    const coach = a.coaches[0]?.coach.person ?? null;
+    return {
+      athleteId: a.id,
+      personId: a.personId,
+      status: a.status,
+      lastName: a.person.lastName,
+      firstName: a.person.firstName,
+      middleName: a.person.middleName,
+      birthDate: a.person.birthDate.toISOString().slice(0, 10),
+      gender: a.person.gender,
+      personRegionId: a.person.regionId,
+      memberships: a.memberships.map((m) => ({
+        organizationId: m.organization.id,
+        name: m.organization.name,
+        shortName: m.organization.shortName,
+        regionId: m.organization.regionId,
+        isPrimary: m.isPrimary,
+      })),
+      coachName: coach ? fullName(coach) : null,
+      rankCode: a.ranks[0]?.sportRankCode ?? null,
+    };
   }
 
   /** Действующий представитель спортсмена. */

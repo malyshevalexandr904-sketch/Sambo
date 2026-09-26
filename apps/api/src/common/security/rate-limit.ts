@@ -25,6 +25,8 @@ export const RATE_LIMITS = {
   api: { limit: 600, windowSeconds: 60 },
   /** Загрузка файлов: по пользователю. */
   upload: { limit: 30, windowSeconds: 60 },
+  /** Публичный API только для чтения: по IP (API.md, 1.7). */
+  public: { limit: 120, windowSeconds: 60 },
 } as const;
 
 export type RateLimitGroup = keyof typeof RATE_LIMITS;
@@ -84,7 +86,8 @@ export class RateLimitGuard implements CanActivate {
       ]) ?? 'api';
     const req = context.switchToHttp().getRequest<Request>();
     const user = RequestContextStore.current().user;
-    const subject = group === 'auth' || !user ? `ip:${req.ip ?? 'unknown'}` : `user:${user.id}`;
+    const subject =
+      group === 'auth' || group === 'public' || !user ? `ip:${req.ip ?? 'unknown'}` : `user:${user.id}`;
     await this.limiter.hit(group, subject);
     return true;
   }

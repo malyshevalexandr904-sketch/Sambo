@@ -30,12 +30,22 @@ const ROLE_NAMES: Record<Locale, Record<string, string>> = {
     ORGANIZER: 'организатор',
     COACH: 'тренер',
     CLUB_MANAGER: 'руководитель клуба',
+    TOURNAMENT_MANAGER: 'руководитель турнира',
+    SECRETARY: 'секретарь',
+    CHIEF_REFEREE: 'главный судья',
+    REFEREE: 'судья',
+    MEDICAL_STAFF: 'врач турнира',
   },
   en: {
     FEDERATION_ADMIN: 'federation administrator',
     ORGANIZER: 'organizer',
     COACH: 'coach',
     CLUB_MANAGER: 'club manager',
+    TOURNAMENT_MANAGER: 'tournament manager',
+    SECRETARY: 'secretary',
+    CHIEF_REFEREE: 'chief referee',
+    REFEREE: 'referee',
+    MEDICAL_STAFF: 'tournament doctor',
   },
 };
 
@@ -106,6 +116,15 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       action: { label: 'Открыть документы', param: 'documentsUrl' },
       required: ['documentType', 'reason', 'documentsUrl'],
     },
+    'competition.invite': {
+      subject: 'Приглашение в персонал турнира «{competitionName}» — SAMBO Digital',
+      lines: [
+        'Вас пригласили в персонал турнира «{competitionName}» с ролью «{roleName}».',
+        'Ссылка действует 7 дней. Войдите или зарегистрируйтесь с этим адресом email, чтобы принять приглашение.',
+      ],
+      action: { label: 'Принять приглашение', param: 'acceptUrl' },
+      required: ['acceptUrl', 'competitionName', 'roleCode'],
+    },
   },
   en: {
     'auth.verify_email': {
@@ -172,6 +191,15 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       ],
       action: { label: 'Open documents', param: 'documentsUrl' },
       required: ['documentType', 'reason', 'documentsUrl'],
+    },
+    'competition.invite': {
+      subject: 'Invitation to the staff of “{competitionName}” — SAMBO Digital',
+      lines: [
+        'You have been invited to the staff of the competition “{competitionName}” as {roleName}.',
+        'The link is valid for 7 days. Sign in or sign up with this email address to accept.',
+      ],
+      action: { label: 'Accept invitation', param: 'acceptUrl' },
+      required: ['acceptUrl', 'competitionName', 'roleCode'],
     },
   },
 };

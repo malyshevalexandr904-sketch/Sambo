@@ -10,3 +10,13 @@ export {
   weightBounds,
   weightFits,
 } from './domain/eligibility';
+export { isActiveCategory, MERGEABLE } from './domain/category-machine';
+export {
+  CategoryExtensions,
+  type CategoryMergeHandler,
+  type CategoryTransitionCheck,
+  type EntryStats,
+} from './application/category-extensions';
+export { CompetitionCategoriesService } from './application/competition-categories.service';
+export { CompetitionRulesService } from './application/competition-rules.service';
+export type { CompetitionCategorySpec } from './application/category-mapper';

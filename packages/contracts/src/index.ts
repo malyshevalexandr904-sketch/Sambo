@@ -14,3 +14,6 @@ export * from './rulesets.js';
 export * from './categories.js';
 export * from './documents.js';
 export * from './imports.js';
+export * from './time.js';
+export * from './competitions.js';
+export * from './registrations.js';

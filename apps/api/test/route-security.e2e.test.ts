@@ -3,8 +3,10 @@
 import { RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { ModulesContainer } from '@nestjs/core';
+import { uuidv7 } from '@sde/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ROUTE_ACCESS, type RouteAccess } from '../src/modules/access';
+import { ROUTE_ACCESS, type RouteAccess, type ScopeRef } from '../src/modules/access';
+import { WRITE_AUTHORITY } from '../src/modules/venue-sync';
 import {
   createOrg,
   createTestApp,
@@ -15,11 +17,13 @@ import {
   type Session,
   type TestApp,
 } from './helpers/app';
+import { clubAthlete, ensureCompetition } from './helpers/phase4';
 
 interface Route {
   method: string;
   path: string;
   access: RouteAccess | undefined;
+  writeAuthority: ScopeRef | undefined;
   name: string;
 }
 
@@ -41,11 +45,18 @@ function collectRoutes(t: TestApp): Route[] {
         const method = Reflect.getMetadata(METHOD_METADATA, handler) as RequestMethod | undefined;
         if (sub === undefined || method === undefined) continue;
         const raw = `/${[base, sub].filter((p) => p && p !== '/').join('/')}`.replace(/\/+/g, '/');
-        const path = UNPREFIXED.has(raw) ? raw : `/api/v1${raw}`;
+        const path = UNPREFIXED.has(raw) || raw.startsWith('/api/public/') ? raw : `/api/v1${raw}`;
         const access =
           (Reflect.getMetadata(ROUTE_ACCESS, handler) as RouteAccess | undefined) ??
           (Reflect.getMetadata(ROUTE_ACCESS, cls) as RouteAccess | undefined);
-        routes.push({ method: RequestMethod[method], path, access, name: `${cls.name}.${key}` });
+        const writeAuthority = Reflect.getMetadata(WRITE_AUTHORITY, handler) as ScopeRef | undefined;
+        routes.push({
+          method: RequestMethod[method],
+          path,
+          access,
+          writeAuthority,
+          name: `${cls.name}.${key}`,
+        });
       }
     }
   }
@@ -139,6 +150,38 @@ describe('route security autotest', () => {
     expect(failures).toEqual([]);
   });
 
+  it('public API routes answer without a session and never under /api/v1', async () => {
+    const pub = routes.filter((r) => r.path.startsWith('/api/public/'));
+    expect(pub.length).toBeGreaterThan(0);
+    expect(pub.every((r) => r.access?.kind === 'public')).toBe(true);
+    const res = await t.http().get('/api/public/v1/competitions');
+    expect(res.status).toBe(200);
+    expect((await t.http().get('/api/v1/api/public/v1/competitions')).status).toBe(404);
+  });
+
+  it('every operational route ([L]) refuses writes while a venue node holds the write lease', async () => {
+    const operational = routes.filter((r) => r.writeAuthority);
+    expect(operational.length).toBeGreaterThanOrEqual(10);
+    const admin = await createUser(t, { platform: ['SUPER_ADMIN'] });
+    const s = await login(t, admin.email, { totp: true });
+    const ids = await leasedCompetition(t);
+    const failures: string[] = [];
+    for (const r of operational) {
+      const url = r.path.replace(/:(\w+)/g, (_, p: string) =>
+        p === 'id'
+          ? r.writeAuthority?.resolver === 'entry'
+            ? ids.entryId
+            : ids.competitionId
+          : ids.categoryId,
+      );
+      const method = r.method.toLowerCase() as 'post' | 'patch' | 'delete';
+      const res = await s.agent[method](url).set('x-csrf-token', s.csrf).set('if-match', '"v1"').send({});
+      if (res.status !== 409 || res.body.error?.code !== 'WRITE_AUTHORITY_ELSEWHERE')
+        failures.push(`${r.method} ${url} → ${res.status} ${res.body.error?.code ?? ''}`);
+    }
+    expect(failures).toEqual([]);
+  });
+
   it('identifiers in the body never widen access (role, userId, organizationId are ignored)', async () => {
     const res = await noRights.agent
       .get('/api/v1/admin/users')
@@ -153,3 +196,52 @@ describe('route security autotest', () => {
     expect(patch.status).toBe(403);
   });
 });
+
+/** Турнир с категорией, заявкой и участием, право записи которого у площадочного узла. */
+async function leasedCompetition(
+  t: TestApp,
+): Promise<{ competitionId: string; categoryId: string; entryId: string }> {
+  const competitionId = uuidv7();
+  await ensureCompetition(t, competitionId);
+  const categoryId = uuidv7();
+  await t.admin.competitionCategory.create({
+    data: {
+      id: categoryId,
+      competitionId,
+      code: 'M-38',
+      nameRu: 'до 38',
+      nameEn: 'up to 38',
+      gender: 'MALE',
+      agePolicy: 'BY_BIRTH_YEAR',
+      ageFrom: 12,
+      ageTo: 13,
+      weightKind: 'UP_TO',
+      weightUpperGrams: 38000,
+    },
+  });
+  const clubId = await createOrg(t);
+  const applicationId = uuidv7();
+  await t.admin.application.create({ data: { id: applicationId, competitionId, organizationId: clubId } });
+  const { athleteId } = await clubAthlete(t, { clubId });
+  const entryId = uuidv7();
+  await t.admin.entry.create({
+    data: {
+      id: entryId,
+      competitionId,
+      applicationId,
+      athleteId,
+      categoryId,
+      declaredCategoryId: categoryId,
+      snapLastName: 'Тест',
+      snapFirstName: 'Тест',
+      snapBirthDate: new Date('2013-01-01T00:00:00Z'),
+      snapGender: 'MALE',
+      publicName: 'Тест Т.',
+    },
+  });
+  await t.admin.competitionWriteLease.update({
+    where: { competitionId },
+    data: { holderType: 'NODE', holderNodeId: uuidv7(), epoch: 2 },
+  });
+  return { competitionId, categoryId, entryId };
+}
