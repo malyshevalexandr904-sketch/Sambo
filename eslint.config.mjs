@@ -5,6 +5,30 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 
+// Небезопасные варианты сырого SQL запрещены везде (SECURITY.md, 5).
+const RAW_SQL_RESTRICTIONS = [
+  {
+    object: 'prisma',
+    property: '$queryRawUnsafe',
+    message: 'Только tagged template $queryRaw (SECURITY.md, 5).',
+  },
+  {
+    object: 'prisma',
+    property: '$executeRawUnsafe',
+    message: 'Только tagged template $executeRaw (SECURITY.md, 5).',
+  },
+  {
+    object: 'tx',
+    property: '$queryRawUnsafe',
+    message: 'Только tagged template $queryRaw (SECURITY.md, 5).',
+  },
+  {
+    object: 'tx',
+    property: '$executeRawUnsafe',
+    message: 'Только tagged template $executeRaw (SECURITY.md, 5).',
+  },
+];
+
 export default tseslint.config(
   {
     ignores: [
@@ -41,35 +65,24 @@ export default tseslint.config(
       eqeqeq: ['error', 'always'],
       'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
       'max-lines-per-function': ['warn', { max: 60, skipBlankLines: true, skipComments: true }],
-      'no-restricted-properties': [
-        'error',
-        {
-          object: 'prisma',
-          property: '$queryRawUnsafe',
-          message: 'Только tagged template $queryRaw (SECURITY.md, 5).',
-        },
-        {
-          object: 'prisma',
-          property: '$executeRawUnsafe',
-          message: 'Только tagged template $executeRaw (SECURITY.md, 5).',
-        },
-        {
-          object: 'tx',
-          property: '$queryRawUnsafe',
-          message: 'Только tagged template $queryRaw (SECURITY.md, 5).',
-        },
-        {
-          object: 'tx',
-          property: '$executeRawUnsafe',
-          message: 'Только tagged template $executeRaw (SECURITY.md, 5).',
-        },
-      ],
+      'no-restricted-properties': ['error', ...RAW_SQL_RESTRICTIONS],
       'no-restricted-syntax': [
         'error',
         {
           selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
           message: 'dangerouslySetInnerHTML запрещён (SECURITY.md, 3.5).',
         },
+      ],
+    },
+  },
+  {
+    // Жеребьёвка воспроизводима только на своём генераторе (ARCHITECTURE.md, 14.5): Math.random() запрещён.
+    files: ['apps/api/src/modules/draws/**/*.ts', 'apps/api/src/modules/brackets/**/*.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        ...RAW_SQL_RESTRICTIONS,
+        { object: 'Math', property: 'random', message: 'Только генератор жеребьёвки (domain/prng.ts).' },
       ],
     },
   },

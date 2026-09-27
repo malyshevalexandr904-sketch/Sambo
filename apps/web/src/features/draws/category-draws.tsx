@@ -8,6 +8,7 @@ import {
   type DrawDto,
   type DrawFormat,
   isDrawFormat,
+  SEPARATION_KEYS,
   type SeparationKey,
 } from '@sde/contracts';
 import { Alert, Badge, Button, Card, CardTitle, Field, Input, Select } from '@sde/ui';
@@ -56,7 +57,8 @@ function CreateDraft({
         body: {
           format: format || undefined,
           seeding,
-          separation: { by: keys },
+          // Приоритет разведения фиксированный: команда важнее региона.
+          separation: { by: SEPARATION_KEYS.filter((k) => keys.includes(k)) },
           randomSeed: randomSeed || undefined,
         },
       });
