@@ -12,6 +12,19 @@ import { MAINTENANCE_JOBS, Maintenance, type MaintenanceJob } from './maintenanc
 import { NotificationConsumer, type NotificationJob } from './notifications/notification.consumer';
 import { type ConsumerQueue, OutboxDispatcher, type OutboxJob } from './outbox/dispatcher';
 
+/** Очередь с повторами по экспоненте; история выполненных и упавших задач ограничена. */
+function retryingQueue<T>(name: string, connection: Redis, attempts: number, delay: number): Queue<T> {
+  return new Queue<T>(name, {
+    connection,
+    defaultJobOptions: {
+      attempts,
+      backoff: { type: 'exponential', delay },
+      removeOnComplete: 1000,
+      removeOnFail: 5000,
+    },
+  });
+}
+
 async function main(): Promise<void> {
   let env;
   try {
@@ -33,33 +46,9 @@ async function main(): Promise<void> {
     credentials: { accessKeyId: env.STORAGE_ACCESS_KEY, secretAccessKey: env.STORAGE_SECRET_KEY },
   });
 
-  const emailQueue = new Queue<OutboxJob>('email', {
-    connection,
-    defaultJobOptions: {
-      attempts: 5,
-      backoff: { type: 'exponential', delay: 10_000 },
-      removeOnComplete: 1000,
-      removeOnFail: 5000,
-    },
-  });
-  const importQueue = new Queue<OutboxJob>('imports', {
-    connection,
-    defaultJobOptions: {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5_000 },
-      removeOnComplete: 1000,
-      removeOnFail: 5000,
-    },
-  });
-  const notificationQueue = new Queue<NotificationJob>('notifications', {
-    connection,
-    defaultJobOptions: {
-      attempts: 5,
-      backoff: { type: 'exponential', delay: 10_000 },
-      removeOnComplete: 1000,
-      removeOnFail: 5000,
-    },
-  });
+  const emailQueue = retryingQueue<OutboxJob>('email', connection, 5, 10_000);
+  const importQueue = retryingQueue<OutboxJob>('imports', connection, 3, 5_000);
+  const notificationQueue = retryingQueue<NotificationJob>('notifications', connection, 5, 10_000);
   const maintenanceQueue = new Queue<{ job: MaintenanceJob }>('maintenance', { connection });
 
   const mailer = createMailer(env, logger);

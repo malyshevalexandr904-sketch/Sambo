@@ -150,6 +150,23 @@ export class AdmissionService {
     return this.dtoOf(entryId, await this.canOverride(user, ctx.competitionScope));
   }
 
+  /**
+   * Пересчёт допуска турнира: после изменений без событий (истечение документов регламентной задачей worker,
+   * конец окон повторного взвешивания). Возвращает число участий по статусам.
+   */
+  async recomputeCompetition(competitionId: string): Promise<Record<string, number>> {
+    await this.db.tx(async (tx) => {
+      await this.leases.assertWritable(tx, competitionId);
+      await this.engine.recompute(tx, { competitionId });
+    });
+    const groups = await this.db.admission.groupBy({
+      by: ['status'],
+      where: { competitionId, entry: { status: 'APPROVED' } },
+      _count: { _all: true },
+    });
+    return Object.fromEntries(groups.map((g) => [g.status, g._count._all]));
+  }
+
   /** Исключение проверки из допуска с причиной (право `admission.override`); пройденную исключать незачем. */
   async waive(
     user: AuthUser,

@@ -36,6 +36,14 @@ export class AdmissionController {
     return this.admission.list(user, id, q);
   }
 
+  @Post('competitions/:id/admission/recompute')
+  @RequirePermission('admission.override', COMP)
+  @WriteAuthority(COMP)
+  @HttpCode(200)
+  async recomputeCompetition(@UuidParam('id') id: string): Promise<DataEnvelope<Record<string, number>>> {
+    return ok(await this.admission.recomputeCompetition(id));
+  }
+
   /** Персонал с `admission.view`, владелец заявки, спортсмен и представитель — проверка в сервисе. */
   @Get('entries/:id/admission')
   @Authenticated()

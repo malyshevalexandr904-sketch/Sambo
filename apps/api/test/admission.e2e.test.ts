@@ -518,6 +518,15 @@ describe('admission (G-06)', () => {
         .version,
     );
     expect(ready.status, JSON.stringify(ready.body)).toBe(200);
+    const recomputed = await send(
+      w.organizer,
+      'post',
+      `/api/v1/competitions/${w.competitionId}/admission/recompute`,
+    );
+    expect(recomputed.body.data).toEqual({ ADMITTED: 1, NOT_ADMITTED: 1 });
+    expect(
+      (await send(w.secretary, 'post', `/api/v1/competitions/${w.competitionId}/admission/recompute`)).status,
+    ).toBe(403);
     const competition = await w.organizer.agent.get(`/api/v1/competitions/${w.competitionId}`).expect(200);
     expect(competition.body.data.counters).toMatchObject({ arrived: 1, admitted: 1, notAdmitted: 1 });
 
