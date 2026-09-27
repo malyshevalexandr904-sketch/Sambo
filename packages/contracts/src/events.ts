@@ -42,9 +42,17 @@ export const EVENT_SCHEMAS = {
   'registration.application_submitted': z.object({ applicationId: Uuid }),
   'registration.application_returned': z.object({ applicationId: Uuid }),
   'registration.application_decided': z.object({ applicationId: Uuid, status: z.string() }),
+  'registration.application_cancelled': z.object({ applicationId: Uuid }),
   'registration.entry_decided': z.object({ entryId: Uuid, decision: z.string() }),
   'registration.entry_withdrawn': z.object({ entryId: Uuid }),
   'registration.entry_transferred': z.object({ entryId: Uuid, fromCategoryId: Uuid, toCategoryId: Uuid }),
+  // Phase 4b — источники пересчёта допуска и уведомлений.
+  'document.status_changed': z.object({ documentId: Uuid, status: z.string() }),
+  'consent.given': z.object({ consentId: Uuid, personId: Uuid }),
+  'competition.requirements_changed': z.object({ competitionId: Uuid }),
+  'checkin.updated': z.object({ athleteId: Uuid, status: z.string() }),
+  'weighin.recorded': z.object({ entryId: Uuid, attemptId: Uuid, result: z.string() }),
+  'medical.clearance_changed': z.object({ clearanceId: Uuid, athleteId: Uuid, status: z.string() }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

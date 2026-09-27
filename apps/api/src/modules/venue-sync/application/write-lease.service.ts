@@ -54,6 +54,20 @@ export class WriteLeaseService {
     if (!holdsWriteAuthority(lease, INSTANCE)) this.refuse(row?.holder_type ?? 'CLOUD', row?.epoch ?? 1);
   }
 
+  /**
+   * Право записи у этого экземпляра — без исключения. Для пересчёта проекций по событиям из облачных данных
+   * (проверка документа, согласие): пока право у узла, облако их не пересчитывает (ADR-21).
+   */
+  async holds(tx: Tx, competitionId: string): Promise<boolean> {
+    try {
+      await this.assertWritable(tx, competitionId);
+      return true;
+    } catch (e) {
+      if (e instanceof DomainError && e.code === 'WRITE_AUTHORITY_ELSEWHERE') return false;
+      throw e;
+    }
+  }
+
   private refuse(holder: LeaseHolder, epoch: number): never {
     throw new DomainError('WRITE_AUTHORITY_ELSEWHERE', { holder, epoch });
   }

@@ -3,7 +3,7 @@
 import type { EventType } from '@sde/contracts';
 import type { PrismaClient } from '@sde/db';
 import type { Logger } from '@sde/server-kit';
-import type { Queue } from 'bullmq';
+import type { JobsOptions } from 'bullmq';
 
 export interface OutboxJob {
   eventId: string;
@@ -15,7 +15,16 @@ export interface OutboxJob {
 export const CONSUMERS: Partial<Record<EventType, readonly string[]>> = {
   'email.requested': ['email'],
   'athlete.import_requested': ['imports'],
+  'registration.application_returned': ['notifications'],
+  'registration.application_decided': ['notifications'],
+  'registration.entry_decided': ['notifications'],
+  'document.rejected': ['notifications'],
 };
+
+/** Очередь потребителя: достаточно постановки задачи (очередь может принимать и другие задачи). */
+export interface ConsumerQueue {
+  add(name: string, data: OutboxJob, opts: JobsOptions): Promise<unknown>;
+}
 
 const MAX_ATTEMPTS = 10;
 const BATCH = 50;
@@ -33,7 +42,7 @@ export class OutboxDispatcher {
 
   constructor(
     private readonly db: PrismaClient,
-    private readonly queues: Map<string, Queue<OutboxJob>>,
+    private readonly queues: Map<string, ConsumerQueue>,
     private readonly logger: Logger,
     private readonly intervalMs = 1_000,
   ) {}

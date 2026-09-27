@@ -3,6 +3,7 @@
 // Phase 3: People (3.3), Rules & Setup — правила и категории (3.4), документы (3.5), ImportJob (3.9).
 // Phase 4a: турнир, место, категории турнира и правила допуска (3.4), заявки и участия (3.5),
 // право записи и журнал синхронизации (3.9, 7).
+// Phase 4b: допуск, прибытие, взвешивание, медицинский допуск (3.5), уведомления (3.8).
 // Конструкции, которые Prisma не выражает (partial unique, CHECK, генерируемые колонки, партиции,
 // REVOKE), пишутся SQL-шагами в миграциях (DATABASE.md, 10). Миграции пишутся и ревьюятся вручную.
 
@@ -130,6 +131,13 @@ model User {
   decidedEntries            Entry[]                  @relation("EntryDecider")
   withdrawnEntries          Entry[]                  @relation("EntryWithdrawer")
   acquiredLeases            CompetitionWriteLease[]  @relation("LeaseAcquirer")
+  waivedAdmissionChecks     AdmissionCheck[]         @relation("AdmissionCheckUpdater")
+  checkInOperations         CheckIn[]                @relation("CheckInOperator")
+  weighInAttempts           WeighInAttempt[]         @relation("WeighInOperator")
+  recordedClearances        MedicalClearance[]       @relation("ClearanceRecorder")
+  revokedClearances         MedicalClearance[]       @relation("ClearanceRevoker")
+  notifications             Notification[]
+  notificationPreferences   NotificationPreference[]
 
   @@index([status, createdAt])
   @@map("user")
@@ -736,6 +744,8 @@ model AthleteProfile {
   guardians   Guardian[]
   documents   Document[]
   entries     Entry[]
+  checkIns    CheckIn[]
+  clearances  MedicalClearance[]
 
   @@map("athlete_profile")
 }
@@ -1114,6 +1124,7 @@ model Document {
   reviewedBy   User?               @relation("DocumentReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
   rankRecords  AthleteRankRecord[] @relation("RankDocument")
   consents     Consent[]           @relation("ConsentDocument")
+  clearances   MedicalClearance[]  @relation("ClearanceDocument")
 
   @@index([athleteId, typeCode, status])
   @@index([applicationId])
@@ -1250,36 +1261,38 @@ model Venue {
 /// Турнир. Опубликованный турнир всегда с закреплённой версией правил (CHECK); после публикации
 /// дисциплина и версия правил не меняются. Сроки турнира — календарные даты в его timezone.
 model Competition {
-  id                      String               @id @default(uuid(7)) @db.Uuid
-  slug                    String               @unique
+  id                      String                @id @default(uuid(7)) @db.Uuid
+  slug                    String                @unique
   name                    String
-  shortName               String?              @map("short_name")
-  descriptionMd           String?              @map("description_md")
-  organizerOrganizationId String               @map("organizer_organization_id") @db.Uuid
-  venueId                 String?              @map("venue_id") @db.Uuid
+  shortName               String?               @map("short_name")
+  descriptionMd           String?               @map("description_md")
+  organizerOrganizationId String                @map("organizer_organization_id") @db.Uuid
+  venueId                 String?               @map("venue_id") @db.Uuid
   timezone                String
-  startDate               DateTime             @map("start_date") @db.Date
-  endDate                 DateTime             @map("end_date") @db.Date
-  registrationStartsAt    DateTime             @map("registration_starts_at") @db.Timestamptz(3)
-  registrationEndsAt      DateTime             @map("registration_ends_at") @db.Timestamptz(3)
-  status                  CompetitionStatus    @default(DRAFT)
+  startDate               DateTime              @map("start_date") @db.Date
+  endDate                 DateTime              @map("end_date") @db.Date
+  registrationStartsAt    DateTime              @map("registration_starts_at") @db.Timestamptz(3)
+  registrationEndsAt      DateTime              @map("registration_ends_at") @db.Timestamptz(3)
+  status                  CompetitionStatus     @default(DRAFT)
   level                   CompetitionLevel
-  disciplineCode          String               @map("discipline_code")
-  ruleSetVersionId        String?              @map("rule_set_version_id") @db.Uuid
-  logoFileId              String?              @map("logo_file_id") @db.Uuid
-  regulationFileId        String?              @map("regulation_file_id") @db.Uuid
-  requirementsMd          String?              @map("requirements_md")
-  contactInfo             Json?                @map("contact_info")
-  nameNorm                Unsupported("text")? @map("name_norm")
-  version                 Int                  @default(1)
-  createdById             String?              @map("created_by_id") @db.Uuid
-  updatedById             String?              @map("updated_by_id") @db.Uuid
-  publishedAt             DateTime?            @map("published_at") @db.Timestamptz(3)
-  cancelledAt             DateTime?            @map("cancelled_at") @db.Timestamptz(3)
-  cancelReason            String?              @map("cancel_reason")
-  createdAt               DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt               DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt               DateTime?            @map("deleted_at") @db.Timestamptz(3)
+  disciplineCode          String                @map("discipline_code")
+  ruleSetVersionId        String?               @map("rule_set_version_id") @db.Uuid
+  logoFileId              String?               @map("logo_file_id") @db.Uuid
+  regulationFileId        String?               @map("regulation_file_id") @db.Uuid
+  requirementsMd          String?               @map("requirements_md")
+  contactInfo             Json?                 @map("contact_info")
+  nameNorm                Unsupported("text")?  @map("name_norm")
+  version                 Int                   @default(1)
+  createdById             String?               @map("created_by_id") @db.Uuid
+  updatedById             String?               @map("updated_by_id") @db.Uuid
+  publishedAt             DateTime?             @map("published_at") @db.Timestamptz(3)
+  cancelledAt             DateTime?             @map("cancelled_at") @db.Timestamptz(3)
+  cancelReason            String?               @map("cancel_reason")
+  /// Исход неудачного официального взвешивания по положению (D-06).
+  weighInFailureOutcome   WeighInFailureOutcome @default(RECHECK) @map("weigh_in_failure_outcome")
+  createdAt               DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt               DateTime?             @map("deleted_at") @db.Timestamptz(3)
 
   organizer      Organization             @relation("CompetitionOrganizer", fields: [organizerOrganizationId], references: [id], onDelete: Restrict)
   venue          Venue?                   @relation(fields: [venueId], references: [id], onDelete: Restrict)
@@ -1298,6 +1311,12 @@ model Competition {
   writeLease     CompetitionWriteLease?
   documents      Document[]
   consents       Consent[]
+  admissions     Admission[]
+  checkIns       CheckIn[]
+  scales         Scale[]
+  weighInWindows WeighInWindow[]
+  weighInRecords WeighInRecord[]
+  clearances     MedicalClearance[]
 
   @@index([status, startDate])
   @@index([organizerOrganizationId, startDate])
@@ -1339,6 +1358,8 @@ model CompetitionCategory {
   requirements    CompetitionRequirement[]
   entries         Entry[]                  @relation("EntryCategory")
   declaredEntries Entry[]                  @relation("EntryDeclaredCategory")
+  weighInWindows  WeighInWindowCategory[]
+  weighInAttempts WeighInAttempt[]
 
   @@unique([competitionId, code])
   @@index([competitionId, status])
@@ -1484,6 +1505,9 @@ model Entry {
   decidedBy            User?               @relation("EntryDecider", fields: [decidedById], references: [id], onDelete: Restrict)
   withdrawnBy          User?               @relation("EntryWithdrawer", fields: [withdrawnById], references: [id], onDelete: Restrict)
   createdBy            User?               @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  admission            Admission?
+  weighInAttempts      WeighInAttempt[]
+  weighInRecord        WeighInRecord?
 
   @@index([competitionId, status])
   @@index([applicationId])
@@ -1547,4 +1571,338 @@ model SyncLog {
   @@index([competitionId, syncSeq])
   @@index([createdAt])
   @@map("sync_log")
+}
+
+// ============================================================
+// Допуск, прибытие, взвешивание, медицинский допуск (DATABASE.md, 3.5; G-05, G-06, D-06; Phase 4b)
+// Операционные таблицы турнира (кроме медицинского допуска) пишутся в журнал синхронизации триггерами
+// и несут competition_id: триггер берёт из строки идентификатор турнира (DATABASE.md, 7).
+// ============================================================
+
+enum WeighInFailureOutcome {
+  WITHDRAW
+  RECHECK
+  TRANSFER
+}
+
+enum AdmissionStatus {
+  PENDING
+  ADMITTED
+  NOT_ADMITTED
+}
+
+enum AdmissionCheckKind {
+  DOCUMENTS
+  CONSENTS
+  MEDICAL
+  INSURANCE
+  AGE
+  QUALIFICATION
+  WEIGHT
+  CHECK_IN
+}
+
+enum AdmissionCheckStatus {
+  PENDING
+  PASSED
+  FAILED
+  WAIVED
+}
+
+enum CheckInStatus {
+  EXPECTED
+  ARRIVED
+  NOT_ARRIVED
+  WITHDRAWN
+}
+
+enum CheckInMethod {
+  QR
+  SEARCH
+  MANUAL
+}
+
+enum WeighInWindowKind {
+  OFFICIAL
+  CONTROL
+}
+
+enum WeighInAttemptKind {
+  OFFICIAL
+  CONTROL
+  RECHECK
+}
+
+enum WeighInResult {
+  PASSED
+  FAILED
+}
+
+enum WeighInStatus {
+  EXPECTED
+  PASSED
+  FAILED
+  RECHECK_REQUIRED
+}
+
+enum MedicalClearanceStatus {
+  VALID
+  REVOKED
+}
+
+/// Допуск участия (G-06): проекция проверок, требуемых положением для категории участия. Статус вычисляется:
+/// любая проверка FAILED — NOT_ADMITTED, иначе любая PENDING — PENDING, иначе ADMITTED.
+model Admission {
+  id            String          @id @default(uuid(7)) @db.Uuid
+  competitionId String          @map("competition_id") @db.Uuid
+  entryId       String          @unique @map("entry_id") @db.Uuid
+  status        AdmissionStatus @default(PENDING)
+  decidedAt     DateTime?       @map("decided_at") @db.Timestamptz(3)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition      @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  entry       Entry            @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  checks      AdmissionCheck[]
+
+  @@index([competitionId, status])
+  @@map("admission")
+}
+
+/// Проверка допуска с кодом причины. Исключение (WAIVED) — только с причиной (CHECK).
+model AdmissionCheck {
+  id            String               @id @default(uuid(7)) @db.Uuid
+  competitionId String               @map("competition_id") @db.Uuid
+  admissionId   String               @map("admission_id") @db.Uuid
+  kind          AdmissionCheckKind
+  status        AdmissionCheckStatus
+  reasonCode    String?              @map("reason_code")
+  reasonParams  Json?                @map("reason_params")
+  waiverReason  String?              @map("waiver_reason")
+  updatedById   String?              @map("updated_by_id") @db.Uuid
+  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  admission Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  updatedBy User?     @relation("AdmissionCheckUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@unique([admissionId, kind])
+  @@index([competitionId, kind, status])
+  @@map("admission_check")
+}
+
+/// Прибытие спортсмена на турнир (раздел 15 ТЗ): одна строка на спортсмена, а не на участие.
+model CheckIn {
+  id            String         @id @default(uuid(7)) @db.Uuid
+  competitionId String         @map("competition_id") @db.Uuid
+  athleteId     String         @map("athlete_id") @db.Uuid
+  status        CheckInStatus  @default(EXPECTED)
+  method        CheckInMethod?
+  arrivedAt     DateTime?      @map("arrived_at") @db.Timestamptz(3)
+  operatorId    String?        @map("operator_id") @db.Uuid
+  note          String?
+  version       Int            @default(1)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition    @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  athlete     AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  operator    User?          @relation("CheckInOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+
+  @@unique([competitionId, athleteId])
+  @@index([competitionId, status])
+  @@map("check_in")
+}
+
+/// Весы турнира со сроком поверки: взвешивание на весах с истёкшей поверкой запрещено.
+model Scale {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  competitionId String   @map("competition_id") @db.Uuid
+  name          String
+  serialNumber  String?  @map("serial_number")
+  verifiedUntil DateTime @map("verified_until") @db.Date
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition      @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  attempts    WeighInAttempt[]
+
+  @@index([competitionId])
+  @@map("scale")
+}
+
+/// Окно взвешивания (D-06): время и категории. Официальные окна одной категории не пересекаются.
+model WeighInWindow {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  competitionId String            @map("competition_id") @db.Uuid
+  name          String
+  startsAt      DateTime          @map("starts_at") @db.Timestamptz(3)
+  endsAt        DateTime          @map("ends_at") @db.Timestamptz(3)
+  kind          WeighInWindowKind @default(OFFICIAL)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition             @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  categories  WeighInWindowCategory[]
+  attempts    WeighInAttempt[]
+
+  @@index([competitionId, startsAt])
+  @@map("weigh_in_window")
+}
+
+/// Категории окна. Суррогатный `id` — идентификатор строки для журнала синхронизации.
+model WeighInWindowCategory {
+  id            String @id @default(uuid(7)) @db.Uuid
+  competitionId String @map("competition_id") @db.Uuid
+  windowId      String @map("window_id") @db.Uuid
+  categoryId    String @map("category_id") @db.Uuid
+
+  window   WeighInWindow       @relation(fields: [windowId], references: [id], onDelete: Cascade)
+  category CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([windowId, categoryId])
+  @@index([categoryId])
+  @@map("weigh_in_window_category")
+}
+
+/// Попытка взвешивания. Append-only (раздел 16 ТЗ): у роли приложения нет UPDATE и DELETE. Границы категории
+/// и допуск — снимок на момент взвешивания.
+model WeighInAttempt {
+  id              String             @id @default(uuid(7)) @db.Uuid
+  competitionId   String             @map("competition_id") @db.Uuid
+  entryId         String             @map("entry_id") @db.Uuid
+  categoryId      String             @map("category_id") @db.Uuid
+  windowId        String             @map("window_id") @db.Uuid
+  scaleId         String             @map("scale_id") @db.Uuid
+  weightGrams     Int                @map("weight_grams")
+  measuredAt      DateTime           @map("measured_at") @db.Timestamptz(3)
+  kind            WeighInAttemptKind
+  result          WeighInResult
+  limitLowerGrams Int?               @map("limit_lower_grams")
+  limitUpperGrams Int?               @map("limit_upper_grams")
+  toleranceGrams  Int                @map("tolerance_grams")
+  operatorId      String?            @map("operator_id") @db.Uuid
+  note            String?
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  entry    Entry               @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  category CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  window   WeighInWindow       @relation(fields: [windowId], references: [id], onDelete: Restrict)
+  scale    Scale               @relation(fields: [scaleId], references: [id], onDelete: Restrict)
+  operator User?               @relation("WeighInOperator", fields: [operatorId], references: [id], onDelete: Restrict)
+  records  WeighInRecord[]
+
+  @@index([entryId, measuredAt])
+  @@index([competitionId, measuredAt])
+  @@map("weigh_in_attempt")
+}
+
+/// Итог взвешивания участия — проекция попыток, обновляется в той же транзакции, что и попытка.
+model WeighInRecord {
+  entryId       String        @id @map("entry_id") @db.Uuid
+  competitionId String        @map("competition_id") @db.Uuid
+  status        WeighInStatus @default(EXPECTED)
+  lastAttemptId String?       @map("last_attempt_id") @db.Uuid
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  entry       Entry           @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  competition Competition     @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  lastAttempt WeighInAttempt? @relation(fields: [lastAttemptId], references: [id], onDelete: Restrict)
+
+  @@index([competitionId, status])
+  @@map("weigh_in_record")
+}
+
+/// Медицинский допуск (G-05): факт, срок и кто выдал — без диагнозов. Только облако (DATABASE.md, 7).
+/// `competitionId` пуст — допуск на период, иначе — на конкретный турнир.
+model MedicalClearance {
+  id            String                 @id @default(uuid(7)) @db.Uuid
+  athleteId     String                 @map("athlete_id") @db.Uuid
+  competitionId String?                @map("competition_id") @db.Uuid
+  validUntil    DateTime               @map("valid_until") @db.Date
+  issuedBy      String                 @map("issued_by")
+  documentId    String?                @map("document_id") @db.Uuid
+  status        MedicalClearanceStatus @default(VALID)
+  recordedById  String?                @map("recorded_by_id") @db.Uuid
+  createdAt     DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  revokedAt     DateTime?              @map("revoked_at") @db.Timestamptz(3)
+  revokedById   String?                @map("revoked_by_id") @db.Uuid
+  revokeReason  String?                @map("revoke_reason")
+
+  athlete     AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  competition Competition?   @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  document    Document?      @relation("ClearanceDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  recordedBy  User?          @relation("ClearanceRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+  revokedBy   User?          @relation("ClearanceRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+
+  @@index([competitionId])
+  @@map("medical_clearance")
+}
+
+// ============================================================
+// Уведомления (DATABASE.md, 3.8; Phase 4b): шаблоны — в репозитории (web — в приложении, письма — в worker),
+// в `params` — только идентификаторы и коды.
+// ============================================================
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  TELEGRAM
+  MAX
+  PUSH
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model Notification {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  type          String
+  params        Json
+  competitionId String?   @map("competition_id") @db.Uuid
+  sourceEventId String?   @map("source_event_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  readAt        DateTime? @map("read_at") @db.Timestamptz(3)
+
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries NotificationDelivery[]
+
+  @@unique([sourceEventId, userId])
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("notification")
+}
+
+model NotificationDelivery {
+  id                String              @id @default(uuid(7)) @db.Uuid
+  notificationId    String              @map("notification_id") @db.Uuid
+  channel           NotificationChannel
+  status            DeliveryStatus      @default(PENDING)
+  attempts          Int                 @default(0)
+  lastErrorCode     String?             @map("last_error_code")
+  providerMessageId String?             @map("provider_message_id")
+  sentAt            DateTime?           @map("sent_at") @db.Timestamptz(3)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, channel])
+  @@index([status, channel])
+  @@map("notification_delivery")
+}
+
+/// Настройка канала для типа уведомления; строки нет — действует значение по умолчанию (включено).
+model NotificationPreference {
+  userId    String              @map("user_id") @db.Uuid
+  type      String
+  channel   NotificationChannel
+  enabled   Boolean
+  updatedAt DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, type, channel])
+  @@map("notification_preference")
 }

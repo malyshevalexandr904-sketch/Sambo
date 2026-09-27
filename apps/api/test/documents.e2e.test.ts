@@ -237,12 +237,18 @@ describe('review in the competition context', () => {
       3,
     );
     expect(again.body.error.code).toBe('DOCUMENT_ALREADY_REVIEWED');
-    const [mail] = await sentEmails(t, 'document.rejected');
-    expect(mail?.params).toMatchObject({
-      documentType: 'Медицинская справка о допуске',
-      reason: 'Нет печати врача',
-    });
+    // Письмо загрузившему — уведомлением по его настройкам (worker, Phase 4b), а не письмом из API.
+    expect(await sentEmails(t, 'document.rejected')).toEqual([]);
     expect(await t.admin.outboxEvent.count({ where: { type: 'document.rejected' } })).toBe(1);
+    const statuses = await t.admin.outboxEvent.findMany({
+      where: { type: 'document.status_changed', aggregateId: doc.id },
+      orderBy: { occurredAt: 'asc' },
+    });
+    expect(statuses.map((e) => (e.payload as { status: string }).status)).toEqual([
+      'UPLOADED',
+      'UNDER_REVIEW',
+      'REJECTED',
+    ]);
 
     const second = await medical(w, competitionId);
     const verified = await send(

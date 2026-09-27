@@ -1,5 +1,5 @@
 // Представление турнира в ответах API. Сущности БД наружу не отдаются (ARCHITECTURE.md, 5).
-import type { Competition, CompetitionSummary, RuleSetVersionRef } from '@sde/contracts';
+import type { Competition, CompetitionSummary, PermissionCode, RuleSetVersionRef } from '@sde/contracts';
 import type { Prisma } from '@sde/db';
 import type { RuleSetVersionInfo } from '../../rulesets';
 import { registrationWindow } from '../domain/competition-machine';
@@ -83,3 +83,31 @@ export function toRegulation(
     url: row.regulation.status === 'AVAILABLE' ? publicUrl(row.regulation.storageKey) : null,
   };
 }
+
+/** Права, которые UI получает в `allowedActions` турнира: вкладки и кнопки кабинетов. */
+export const ACTION_CANDIDATES: readonly PermissionCode[] = [
+  'competition.view',
+  'competition.update',
+  'competition.delete',
+  'competition.members.manage',
+  'competition_category.manage',
+  'category.merge',
+  'registration.view',
+  'registration.approve',
+  'registration.reject',
+  'registration.return',
+  'registration.export',
+  'entry.withdraw',
+  'entry.transfer',
+  'document.verify',
+  'audit.view',
+  'admission.view',
+  'admission.override',
+  'checkin.view',
+  'checkin.perform',
+  'weighin.view',
+  'weighin.record',
+  'weighin.manage',
+  'medical.view',
+  'medical.record',
+];

@@ -236,7 +236,11 @@ describe('competition lifecycle', () => {
       where: { competitionId: c.id },
       orderBy: { occurredAt: 'asc' },
     });
-    expect(events.map((e) => e.type)).toEqual(['competition.status_changed', 'competition.published']);
+    expect(events.map((e) => e.type)).toEqual([
+      'competition.requirements_changed',
+      'competition.status_changed',
+      'competition.published',
+    ]);
 
     const v = published.body.data.version;
     const locked = await send(

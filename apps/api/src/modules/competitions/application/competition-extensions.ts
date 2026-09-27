@@ -2,7 +2,7 @@
 // зависят от категорий, заявок, а позже — жеребьёвки и расписания. Модули регистрируют их при старте, поэтому
 // competitions не зависит от них (нет циклов модулей).
 import { Injectable } from '@nestjs/common';
-import type { CompetitionStatus } from '@sde/contracts';
+import type { CompetitionCountersDto, CompetitionStatus } from '@sde/contracts';
 import type { Tx } from '@sde/db';
 import type { CompetitionBasics } from './competition-scope.service';
 
@@ -26,12 +26,7 @@ export interface TransitionCheckResult {
 export type TransitionCheck = (ctx: TransitionContext) => Promise<TransitionCheckResult>;
 export type TransitionEffect = (ctx: TransitionContext) => Promise<void>;
 
-export interface CompetitionCounters {
-  categories: number;
-  applications: number;
-  entriesApproved: number;
-  entriesPending: number;
-}
+export type CompetitionCounters = CompetitionCountersDto;
 
 export type CountersProvider = (
   tx: Tx | null,
@@ -76,6 +71,9 @@ export class CompetitionExtensions {
       applications: 0,
       entriesApproved: 0,
       entriesPending: 0,
+      arrived: 0,
+      admitted: 0,
+      notAdmitted: 0,
     };
     for (const provider of this.counters) Object.assign(result, await provider(null, competitionId));
     return result;

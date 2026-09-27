@@ -1,4 +1,4 @@
-// Worker: диспетчер outbox, очередь писем, регламентные задачи (ARCHITECTURE.md, 3.1).
+// Worker: диспетчер outbox, очереди писем, импорта и уведомлений, регламентные задачи (ARCHITECTURE.md, 3.1).
 import { createServer } from 'node:http';
 import { S3Client } from '@aws-sdk/client-s3';
 import { createPrismaClient } from '@sde/db';
@@ -9,7 +9,8 @@ import { EmailConsumer } from './email/email.consumer';
 import { createMailer } from './email/mailer';
 import { ImportConsumer } from './imports/import.consumer';
 import { MAINTENANCE_JOBS, Maintenance, type MaintenanceJob } from './maintenance/maintenance';
-import { OutboxDispatcher, type OutboxJob } from './outbox/dispatcher';
+import { NotificationConsumer, type NotificationJob } from './notifications/notification.consumer';
+import { type ConsumerQueue, OutboxDispatcher, type OutboxJob } from './outbox/dispatcher';
 
 async function main(): Promise<void> {
   let env;
@@ -50,9 +51,20 @@ async function main(): Promise<void> {
       removeOnFail: 5000,
     },
   });
+  const notificationQueue = new Queue<NotificationJob>('notifications', {
+    connection,
+    defaultJobOptions: {
+      attempts: 5,
+      backoff: { type: 'exponential', delay: 10_000 },
+      removeOnComplete: 1000,
+      removeOnFail: 5000,
+    },
+  });
   const maintenanceQueue = new Queue<{ job: MaintenanceJob }>('maintenance', { connection });
 
-  const emailConsumer = new EmailConsumer(db, createMailer(env, logger), logger, env);
+  const mailer = createMailer(env, logger);
+  const emailConsumer = new EmailConsumer(db, mailer, logger, env);
+  const notificationConsumer = new NotificationConsumer(db, mailer, notificationQueue, logger, env);
   const maintenance = new Maintenance(db, s3, env, logger);
   const importConsumer = new ImportConsumer(db, s3, env, logger);
 
@@ -65,6 +77,14 @@ async function main(): Promise<void> {
       connection,
       concurrency: 2,
     }),
+    new Worker<NotificationJob>(
+      'notifications',
+      (job: Job<NotificationJob>) => notificationConsumer.handle(job),
+      {
+        connection,
+        concurrency: 5,
+      },
+    ),
     new Worker<{ job: MaintenanceJob }>('maintenance', (job) => maintenance.run(job.data.job), {
       connection,
       concurrency: 1,
@@ -86,9 +106,10 @@ async function main(): Promise<void> {
 
   const dispatcher = new OutboxDispatcher(
     db,
-    new Map([
+    new Map<string, ConsumerQueue>([
       ['email', emailQueue],
       ['imports', importQueue],
+      ['notifications', notificationQueue],
     ]),
     logger,
   );
@@ -108,7 +129,12 @@ async function main(): Promise<void> {
     health.close();
     await dispatcher.stop();
     await Promise.all(workers.map((w) => w.close()));
-    await Promise.all([emailQueue.close(), importQueue.close(), maintenanceQueue.close()]);
+    await Promise.all([
+      emailQueue.close(),
+      importQueue.close(),
+      notificationQueue.close(),
+      maintenanceQueue.close(),
+    ]);
     await db.$disconnect();
     connection.disconnect();
     process.exit(0);

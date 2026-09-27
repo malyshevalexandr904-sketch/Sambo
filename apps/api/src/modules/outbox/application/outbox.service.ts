@@ -19,8 +19,31 @@ export interface EnqueueEvent<T extends EventType> {
   competitionId?: string | null;
 }
 
+/** Событие для подписчика в транзакции: те же данные, что уходят в outbox. */
+export interface TxEvent<T extends EventType> {
+  type: T;
+  aggregate: { type: string; id: string };
+  payload: EventPayload<T>;
+  competitionId: string | null;
+}
+
+export type TxEventHandler<T extends EventType> = (tx: Tx, event: TxEvent<T>) => Promise<void>;
+
 @Injectable()
 export class OutboxService {
+  private readonly handlers = new Map<EventType, TxEventHandler<EventType>[]>();
+
+  /**
+   * Подписчик в той же транзакции (ARCHITECTURE.md, 12): проекции, которые должны меняться вместе с причиной, —
+   * например, допуск (DATABASE.md, 3.5) после проверки документа или решения по участию. Источник события не
+   * знает о подписчиках; ошибка подписчика откатывает всю команду.
+   */
+  subscribe<T extends EventType>(type: T, handler: TxEventHandler<T>): void {
+    const list = this.handlers.get(type) ?? [];
+    list.push(handler as unknown as TxEventHandler<EventType>);
+    this.handlers.set(type, list);
+  }
+
   async enqueue<T extends EventType>(tx: Tx, event: EnqueueEvent<T>): Promise<string> {
     const payload = EVENT_SCHEMAS[event.type].parse(event.payload) as Prisma.InputJsonValue;
     const id = uuidv7();
@@ -36,6 +59,13 @@ export class OutboxService {
         payload,
       },
     });
+    const txEvent: TxEvent<EventType> = {
+      type: event.type,
+      aggregate: event.aggregate,
+      payload: event.payload,
+      competitionId: event.competitionId ?? null,
+    };
+    for (const handler of this.handlers.get(event.type) ?? []) await handler(tx, txEvent);
     return id;
   }
 }

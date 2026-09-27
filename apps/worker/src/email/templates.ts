@@ -17,7 +17,7 @@ const escapeHtml = (v: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-interface TemplateDef {
+export interface TemplateDef {
   subject: string;
   lines: string[];
   action?: { label: string; param: string };
@@ -234,18 +234,27 @@ function fill(text: string, params: Params, escape: boolean, locale: Locale): st
 }
 
 export function renderEmail(template: EmailTemplate, locale: Locale, input: Params): RenderedEmail {
-  const def = TEMPLATES[locale][template];
-  const missing = def.required.filter((k) => !input[k]);
-  if (missing.length > 0)
-    throw new TemplateParamsError(`Missing params for ${template}: ${missing.join(', ')}`);
   const params: Params = {
     ...input,
     roleName: input.roleCode ? (ROLE_NAMES[locale][input.roleCode] ?? input.roleCode) : '',
   };
+  return renderDefinition(TEMPLATES[locale][template], template, locale, params);
+}
+
+/** Письмо по определению шаблона: обязательные параметры, безопасная ссылка, HTML с экранированием. */
+export function renderDefinition(
+  def: TemplateDef,
+  name: string,
+  locale: Locale,
+  params: Params,
+): RenderedEmail {
+  const missing = def.required.filter((k) => !params[k]);
+  if (missing.length > 0) throw new TemplateParamsError(`Missing params for ${name}: ${missing.join(', ')}`);
   const url = def.action ? params[def.action.param] : undefined;
-  if (url && !/^https?:\/\//.test(url)) throw new TemplateParamsError(`Unsafe link in ${template}`);
-  const textLines = def.lines.map((l) => fill(l, params, false, locale));
-  const htmlLines = def.lines.map((l) => `<p>${fill(l, params, true, locale)}</p>`);
+  if (url && !/^https?:\/\//.test(url)) throw new TemplateParamsError(`Unsafe link in ${name}`);
+  const lines = def.lines.filter((l) => !l.includes('{reason}') || params.reason);
+  const textLines = lines.map((l) => fill(l, params, false, locale));
+  const htmlLines = lines.map((l) => `<p>${fill(l, params, true, locale)}</p>`);
   if (def.action && url) {
     textLines.push('', `${def.action.label}: ${url}`);
     htmlLines.push(

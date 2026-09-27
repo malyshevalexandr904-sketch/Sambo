@@ -16,11 +16,13 @@ import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { RedisModule } from './infrastructure/redis/redis.module';
 import { StorageModule } from './infrastructure/storage/storage.module';
 import { AccessModule, PermissionGuard } from './modules/access';
+import { AdmissionModule } from './modules/admission';
 import { AdminModule } from './modules/admin';
 import { AthletesModule } from './modules/athletes';
 import { AuditModule } from './modules/audit';
 import { AuthGuard, AuthModule } from './modules/auth';
 import { CategoriesModule } from './modules/categories';
+import { CheckInModule } from './modules/checkin';
 import { CoachesModule } from './modules/coaches';
 import { CompetitionsModule } from './modules/competitions';
 import { ConsentsModule } from './modules/consents';
@@ -28,6 +30,8 @@ import { DictionariesModule } from './modules/dictionaries';
 import { DocumentsModule } from './modules/documents';
 import { FilesModule } from './modules/files';
 import { HealthModule } from './modules/health';
+import { MedicalModule } from './modules/medical';
+import { NotificationsModule } from './modules/notifications';
 import { OrganizationsModule } from './modules/organizations';
 import { OutboxModule } from './modules/outbox';
 import { PeopleModule } from './modules/people';
@@ -38,6 +42,7 @@ import { RuleSetsModule } from './modules/rulesets';
 import { SettingsModule } from './modules/settings';
 import { UsersModule } from './modules/users';
 import { VenuesModule } from './modules/venues';
+import { WeighInModule } from './modules/weighin';
 import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
 
 @Module({
@@ -92,6 +97,11 @@ import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
     CategoriesModule,
     VenuesModule,
     RegistrationsModule,
+    AdmissionModule,
+    CheckInModule,
+    WeighInModule,
+    MedicalModule,
+    NotificationsModule,
     PublicModule,
     AdminModule,
     DictionariesModule,
