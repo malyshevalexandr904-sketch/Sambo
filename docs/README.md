@@ -18,7 +18,7 @@
 | 2 Foundation | Выполнена (версия 0.2.1) |
 | 3 Athletes | Выполнена (версия 0.3.1) |
 | 4a Competitions: турнир, категории, заявки | Выполнена (версия 0.4.0) |
-| **4b Допуск, check-in, взвешивание, медицина, уведомления** | **Выполнена** (версия 0.5.0) |
+| **4b Допуск, check-in, взвешивание, медицина, уведомления** | **Выполнена** (версия 0.5.1) |
 | 5 Draw & Brackets | Следующая |
 | 6 Scheduling → 12 Hardening | Впереди (IMPLEMENTATION_PLAN.md) |
 
@@ -208,7 +208,7 @@
 | Аудит в транзакции, без ПДн; журналы append-only на уровне прав БД | Сделано |
 | Файлы: presigned POST с условиями, проверка размера, SHA-256 и сигнатуры, SVG запрещён, публичные медиа через карантин | Сделано. ClamAV — Phase 12 |
 | Логи: pino redaction, тест на отсутствие секретов и ПДн | Сделано |
-| Заголовки: HSTS, `nosniff`, Referrer-Policy, Permissions-Policy; CSP с nonce для скриптов | Сделано. `style-src` допускает `'unsafe-inline'`: nonce не покрывает атрибуты `style` |
+| Заголовки: HSTS, `nosniff`, Referrer-Policy, Permissions-Policy; CSP с nonce для скриптов | Сделано. `style-src` допускает `'unsafe-inline'`: nonce не покрывает атрибуты `style`. Permissions-Policy: камера — только своему origin (`camera=(self)`, сканер QR на прибытии, 0.5.1), микрофон и геолокация запрещены |
 | gitleaks, `pnpm audit` в CI | Сделано |
 | Фиксация базовых образов по digest, подпись образов | Phase 12 |
 
