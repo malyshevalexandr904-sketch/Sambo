@@ -329,7 +329,5 @@ export async function seedPhase3(db: PrismaClient): Promise<string[]> {
     `Phase 3: ${SEED_ATHLETES.length} athletes (2011–2014), coach profiles for coach1/coach2, referees, consent texts,`,
     '  rule set SAMBO_YOUTH_DEMO v1 (published), age groups Y12_14/Y14_16 with weights, category template.',
     `  parent1@sambo.local — verified guardian of Орлов Дмитрий (consents not given yet).`,
-    `  secretary@sambo.local — SECRETARY of the training competition ${SEED_IDS.competition}`,
-    '  (upload a document with this competition ID for the secretary to review).',
   ];
 }

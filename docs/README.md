@@ -4,7 +4,7 @@
 
 Архитектурные документы Phase 1 (согласованы заказчиком 2026-09-23) ведутся в проекте Claude «sambo-online.ru»:
 `ARCHITECTURE.md`, `DATABASE.md`, `API.md`, `PERMISSIONS.md`, `SECURITY.md`, `ADR.md`, `PROJECT_ANALYSIS.md`, `IMPLEMENTATION_PLAN.md`.
-Каждая фаза дополняет их; ниже — изменения, внесённые Phase 2 и Phase 3. В репозитории — эксплуатационные документы:
+Каждая фаза дополняет их; ниже — изменения, внесённые Phase 2, Phase 3 и Phase 4a. В репозитории — эксплуатационные документы:
 
 - [DEPLOYMENT.md](DEPLOYMENT.md) — окружения, переменные, роли БД, миграции, хранилище.
 - [../CONTRIBUTING.md](../CONTRIBUTING.md) — правила работы с кодом.
@@ -16,8 +16,56 @@
 |---|---|
 | 0 Analysis, 1 Architecture | Выполнены, согласованы |
 | 2 Foundation | Выполнена (версия 0.2.1) |
-| **3 Athletes** | **Выполнена** (версия 0.3.0) |
-| 4 Competitions → 12 Hardening | Впереди (IMPLEMENTATION_PLAN.md) |
+| 3 Athletes | Выполнена (версия 0.3.1) |
+| **4a Competitions: турнир, категории, заявки** | **Выполнена** (версия 0.4.0) |
+| 4b Допуск, check-in, взвешивание, медицина, уведомления | Следующая |
+| 5 Draw → 12 Hardening | Впереди (IMPLEMENTATION_PLAN.md) |
+
+## Изменения Phase 4a
+
+По решению заказчика (2026-09-26) Phase 4 разделена на две части. 4a — турнир, категории, заявки и участия, право записи (ADR-21) и минимальная публичная страница; 4b — допуск, check-in, взвешивание, медицина, уведомления. Ниже — уточнения, найденные при реализации 4a. Согласованную архитектуру они не меняют.
+
+### DATABASE.md
+
+| Сущность | Изменение | Причина |
+|---|---|---|
+| `Competition` | `nameNorm` — генерируемая колонка (нижний регистр, `ё → е`) с trgm-индексом; CHECK: `slug`, IANA-пояс, `startDate ≤ endDate`, `registrationStartsAt < registrationEndsAt`, окончание регистрации не позже двух суток после даты начала (точную границу в поясе турнира проверяет сервис), `ruleSetVersionId` обязателен вне `DRAFT` / `CANCELLED`, причина отмены у `CANCELLED` | Поиск по названию; инварианты ADR-13 и публикации — страховка в БД поверх проверки в сервисе |
+| `CompetitionMembership` | `userId` nullable + `invitedEmail` (citext); уникальность действующей роли — только для `userId IS NOT NULL`, отдельный partial unique приглашения по email | Приглашение в персонал человека без аккаунта: членство привязывается к пользователю при принятии |
+| `Consent`, `Document` | FK на `competition` (и `Document.applicationId` на `application`) добавлены `NOT VALID` и проверяются в той же миграции, если висячих ссылок нет | До Phase 4 турнир «существовал» через свой персонал; на стенде могли остаться документы с идентификатором несуществующего турнира — миграция не падает, FK проверяется вручную (DEPLOYMENT.md) |
+| `CompetitionCategory` | CHECK: код `^[A-Z0-9][A-Z0-9_+-]{1,39}$`, границы веса по виду (`UP_TO` — верхняя обязательна, `ABOVE` — только нижняя), возраст или годы рождения по политике, `MERGED ⇔ mergedIntoId`; unique `(competitionId, code)` | Снимок границ из шаблона и правила объединения (D-03) |
+| `CategoryRule`, `CompetitionRequirement` | Требование: CHECK вида (`DOCUMENT`/`INSURANCE` — тип документа, `CONSENT` — вид согласия); unique `(competition, category, kind, documentType, consentKind)` `NULLS NOT DISTINCT` | Список заменяется целиком (`PUT`), дубли отсекает БД |
+| `Entry` | Partial unique `(categoryId, athleteId)` для статусов кроме `REJECTED`/`WITHDRAWN`; CHECK: `REJECTED` — с `decisionReason`, `WITHDRAWN` — с `withdrawReason`, заявленный вес в пределах `Grams`; + `withdrawnAt`/`withdrawnById` | Повторная подача после отклонения; причины решений для аудита и клуба |
+| `CompetitionWriteLease` | Создаётся вместе с турниром (держатель — облако, эпоха 1) | Guard права записи читает её в той же транзакции (`FOR SHARE`) |
+| `SyncLog` | Пишется триггером `sync_log_capture` на `competition`, `competition_category`, `competition_membership`, `entry` (кроме сессий с `app.replication = on`); у приложения нет `UPDATE`/`TRUNCATE`; хранение — 30 дней для турниров у облака (worker) | ADR-21: журнал для площадочного узла ведётся с первого дня, а не с Phase 9.5 |
+| `Venue` | Владелец — организация; soft delete | Места проведения организатора переиспользуются между турнирами |
+
+### API.md
+
+- **Публичный API** — `/api/public/v1/competitions` и `/{slug}` вне префикса `/api/v1`, лимит 120 в минуту на IP, `Cache-Control: public, max-age=60, stale-while-revalidate=300`. Ответы собираются по белому списку полей (ADR-15): участники не раскрываются, в категориях — только число одобренных участий. Черновики и удалённые турниры — `404`.
+- `GET /competitions` + `mine=true` (турниры с моей служебной ролью, включая черновики) и `registrationOpen=true`. **Опубликованный турнир видит любой вошедший** (иначе клуб не найдёт турнир, чтобы подать заявку); черновик — только с `competition.view`.
+- `POST /competitions`: создатель становится `TOURNAMENT_MANAGER`, **кроме создания через платформенную роль** — как с организациями в 0.2.1, администратор платформы не получает прав турнира неявно. Вместе с турниром создаётся право записи облака.
+- `POST /competitions/{id}/transitions` + `confirm` и `registrationEndsAt`. Условия с предупреждением (например, «есть нерассмотренные заявки» при переходе в `CHECK_IN`) возвращают `TRANSITION_PRECONDITIONS_NOT_MET` с `details.warnings`; повтор с `confirm: true` выполняет переход. Повторное открытие регистрации требует причины и нового срока окончания в будущем. Закрытие регистрации по сроку выполняет worker (`closeRegistrations`, каждые 5 минут) от имени системы.
+- `PATCH /competitions/{id}` после публикации: изменение сроков требует `reason` и порождает `competition.dates_changed`; дисциплина, версия правил и `slug` — `TRANSITION_PRECONDITIONS_NOT_MET` (`published_*_locked`).
+- **Персонал:** `POST /competitions/{id}/members` принимает `email` (приглашение письмом) или `userId`; себе роль назначить и свою роль изменить нельзя (`FORBIDDEN`, `self_assignment`) — разделение обязанностей. Добавлен `POST /competition-invites/accept` (`{ token }`).
+- **Категории:** добавлены `GET /competitions/{id}/categories/{cId}` и `DELETE` (только категория без участий и только до мандатной комиссии). Переход `CLOSED → REGISTRATION` (при повторном открытии регистрации) требует причины. Объединение — только категорий одного пола и одной политики возраста; спортсмен, заявленный сразу в несколько объединяемых категорий, блокирует объединение (`athlete_in_several_categories`).
+- `PUT /team-standing-rule` перенесён в Phase 9 (вместе с командным зачётом): правило без расчёта нечем проверить.
+- **Заявки:** `eligible-categories` принимает `declaredWeightGrams` и возвращает `athlete` и `weightMatch` у категорий (вес не делает категорию несовместимой — решает взвешивание). Первое решение персонала по участию переводит заявку `SUBMITTED → UNDER_REVIEW`. Повторная подача после возврата возвращает отклонённые участия в `PENDING`, если спортсмен не заявлен в ту же категорию заново. `CONSENT_MISSING` — нет действующего согласия на обработку ПДн (`PD_PROCESSING`) при добавлении участия; требования турнира к согласиям проверяет допуск (4b).
+- Добавлены `POST /entries/{id}/refresh-snapshot` (владелец до подачи), `GET /me/applications` (кабинет клуба и тренера), `GET /athletes/{id}/entries` (карточка спортсмена и выбор турнира при загрузке документа).
+- Документы, принадлежащие заявке (`owner.applicationId`), по-прежнему `not_supported`: в 4a документы загружаются на спортсмена с выбором турнира.
+- CSV участников: `;`, UTF-8 с BOM, CRLF, защита от формул (ячейка, начинающаяся с `=`, `+`, `-`, `@`, табуляции или перевода строки, начинается с апострофа); выгрузка пишется в аудит (`entry.exported`).
+- **Право записи [L]:** guard `WriteAuthorityGuard` проверяет держателя до обработчика, сервис повторяет проверку в транзакции команды. Автотест проходит по всем командам турнира и требует `409 WRITE_AUTHORITY_ELSEWHERE`, когда право у узла.
+
+### PERMISSIONS.md
+
+- Область `COMPETITION` получила данные из таблицы `competition` (организатор и его предки для наследования ▲); временный источник Phase 3 удалён.
+- Владелец заявки — пользователь с `registration.create` в организации заявки (`APPLICATION_OWNER`); персонал турнира видит все заявки, владелец — только свои, включая `GET /competitions/{id}/entries`.
+- Приглашение в персонал выдаёт роль только из `COMPETITION_ROLE_CODES`; приглашающий не назначает себя (см. API).
+
+### ARCHITECTURE.md
+
+- Модули `competitions`, `categories`, `registrations`, `venues`, `venue-sync`, `public`. Связи без циклов — через точки расширения: `CompetitionExtensions` (условия и последствия переходов турнира, счётчики), `CategoryExtensions` (статистика участий, объединение, условия переходов категорий). Допуск и взвешивание 4b подключаются так же.
+- Время (ADR-13): расчёт дат в поясе турнира — `packages/contracts/src/time.ts` (общий для API, worker и web); проверки расписания `scheduleIssues` — одни и те же на клиенте и сервере.
+- Публичные страницы `/{locale}/tournaments` и `/{locale}/tournaments/{slug}` рендерит сервер web из публичного API с кэшем 60 секунд в процессе.
 
 ## Изменения Phase 3
 
