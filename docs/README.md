@@ -4,7 +4,7 @@
 
 Архитектурные документы Phase 1 (согласованы заказчиком 2026-09-23) ведутся в проекте Claude «sambo-online.ru»:
 `ARCHITECTURE.md`, `DATABASE.md`, `API.md`, `PERMISSIONS.md`, `SECURITY.md`, `ADR.md`, `PROJECT_ANALYSIS.md`, `IMPLEMENTATION_PLAN.md`.
-Каждая фаза дополняет их; ниже — изменения, внесённые Phase 2, Phase 3 и Phase 4a. В репозитории — эксплуатационные документы:
+Каждая фаза дополняет их; ниже — изменения, внесённые Phase 2, 3, 4a, 4b и 5a. В репозитории — эксплуатационные документы:
 
 - [DEPLOYMENT.md](DEPLOYMENT.md) — окружения, переменные, роли БД, миграции, хранилище.
 - [../CONTRIBUTING.md](../CONTRIBUTING.md) — правила работы с кодом.
@@ -18,9 +18,74 @@
 | 2 Foundation | Выполнена (версия 0.2.1) |
 | 3 Athletes | Выполнена (версия 0.3.1) |
 | 4a Competitions: турнир, категории, заявки | Выполнена (версия 0.4.0) |
-| **4b Допуск, check-in, взвешивание, медицина, уведомления** | **Выполнена** (версия 0.5.1) |
-| 5 Draw & Brackets | Следующая |
+| 4b Допуск, check-in, взвешивание, медицина, уведомления | Выполнена (версия 0.5.1) |
+| **5a Draw & Brackets: жеребьёвка, круговая, олимпийская, выбывание с утешительными** | **Выполнена** (версия 0.6.0) |
+| 5b Остальные форматы: двойное выбывание, штрафные очки, группы, группы + плей-офф | До Phase 12, порядок — по потребностям пилота |
+| 6 Scheduling | Следующая |
 | 6 Scheduling → 12 Hardening | Впереди (IMPLEMENTATION_PLAN.md) |
+
+## Изменения Phase 5a
+
+Phase 5 выполняется в две части: 5a — жеребьёвка, основные форматы самбо, сетки и схватки сеток; 5b — остальные форматы ТЗ отдельными стратегиями без изменения ядра (IMPLEMENTATION_PLAN, Phase 5). Ниже — уточнения, найденные при реализации. Согласованную архитектуру они не меняют.
+
+### DATABASE.md
+
+| Сущность | Изменение | Причина |
+|---|---|---|
+| `Draw` | `number` — номер версии в категории (unique `(categoryId, number)`), `version` — оптимистическая блокировка (If-Match); + `supersededAt`, `supersededById`, `updatedAt`. CHECK: seed — 32 hex не из одних нулей, `inputHash` — 64 hex, опубликованная — с `publishedAt`, `SUPERSEDED` ⇔ `supersededAt` и причина. Триггер `draw_immutable`: опубликованная и заменённая версии не удаляются; единственное изменение — `PUBLISHED → SUPERSEDED` без изменения содержимого | В ER поле `version` имело два смысла: номер версии и счётчик блокировки |
+| `DrawSlot` | + `competitionId`; partial unique `(drawId, seedNumber)`; CHECK: подгруппа `A`/`B`, номер посева — только у участника; триггер `draw_slot_immutable`: слоты версии, которая уже не черновик, не меняются и не удаляются | Раздел 53: опубликованную жеребьёвку нельзя тихо изменить; заменённая версия остаётся для проверки повтора |
+| `Bracket` | + `competitionId`; unique `(drawId, stageOrder)`; в 5a этапы `MAIN`, `REPECHAGE`, `POOL` | Журнал синхронизации; один этап каждого вида на версию |
+| `BracketNode` | + `competitionId`, `key` (устойчивый ключ узла: `MAIN:2:1`, `REPECHAGE:A:1`, `POOL:3:2`, unique в этапе), `label` (код подписи круга); связь со схваткой хранится один раз — `Match.bracketNodeId`, поля `BracketNode.matchId` нет | Встречные FK узел ↔ схватка избыточны; ключ связывает строку с узлом графа стратегии |
+| `Match` | В 5a: номер (сквозной в турнире, у схватки без соперника — `NULL`), `roundLabel`, статус (весь перечень C-01), снимок длительности, `winnerSide`, `finishedAt`, `version`. Ковёр, состояние счёта (`state`, `stateSeq`), `readyAt`/`startedAt` — Phase 6–7. CHECK: публичный номер base58, победитель — только у завершённой, завершённая — с `finishedAt` | Схватки создаются при публикации (их планирует Phase 6), проводятся с Phase 7 |
+| `MatchParticipant` | + `competitionId` | Журнал синхронизации |
+| `MatchResult` | Ещё нет: схватка без соперника в 5a — `FINISHED` с `winnerSide`; результат `BYE` для таких схваток создаст миграция Phase 7 | Результаты и их подтверждение — Phase 7 |
+| Все шесть таблиц | Триггеры `sync_log_capture`; права роли приложения — DML | ADR-21: жеребьёвка и сетки — операционные данные турнира |
+
+### API.md, 6.1 — спецификация
+
+Команды — операционные (**[L]**): пока право записи у площадочного узла, облако отвечает `409 WRITE_AUTHORITY_ELSEWHERE`.
+
+| Метод | Путь | Авторизация | Запрос → ответ | Ошибки |
+|---|---|---|---|---|
+| GET | `/api/v1/competitions/{id}/draws` (добавлен) | `competition.view` | → `200 { data: DrawOverviewRow[] }`: категория, допущено, ждут допуска, предлагаемый формат, опубликованная версия, число черновиков | — |
+| GET | `/api/v1/categories/{id}/draws` | `competition.view` | → `200 { data: CategoryDrawsDto }`: готовность, предлагаемый формат, допущенные участники (для посева), версии со статусом «устарел», `allowedActions: ["draw.create"]` | — |
+| POST | `/api/v1/categories/{id}/draws` | `draw.create`; **[L]** | `DrawCreate` → `201 { data: DrawDto }` (черновик) | `CATEGORY_NOT_READY_FOR_DRAW` (`details.status`), `DRAW_ALREADY_PUBLISHED`, `DRAW_NOT_ENOUGH_PARTICIPANTS` (`details.admitted`), `TRANSITION_PRECONDITIONS_NOT_MET` (`competition_status`), `VALIDATION_FAILED` (`format_not_available`, `too_many_participants`, посев: `not_admitted`, `duplicate`, `out_of_range`) |
+| GET | `/api/v1/draws/{id}` | `competition.view` | → `200 { data: DrawDto }`: seed, `inputHash`, слоты, участники, отчёт о разведении, сетка (для черновика и заменённой версии — по слотам, без схваток) | — |
+| POST | `/api/v1/draws/{id}/publish` | `draw.publish`; If-Match; **[L]** | → `200 { data: DrawDto }` — сетка, схватки, категория → `DRAWN`; событие `draw.published` | `DRAW_ALREADY_PUBLISHED`, `INVALID_TRANSITION`, `TRANSITION_PRECONDITIONS_NOT_MET` (`draw_input_changed`, `competition_status`), `VERSION_CONFLICT` |
+| POST | `/api/v1/draws/{id}/supersede` | `draw.republish`; If-Match; **[L]** | `{ reason: Reason }` → `200 { data: DrawDto }` — версия `SUPERSEDED`, сетка и схватки удалены, категория → `READY_FOR_DRAW`; событие `draw.superseded` | `INVALID_TRANSITION`, `TRANSITION_PRECONDITIONS_NOT_MET` (`matches_started`), `VERSION_CONFLICT` |
+| POST | `/api/v1/draws/{id}/verify` | `competition.view` | → `200 { data: { reproducible, inputHashMatches, slotsMatch, currentInput, algorithmVersion } }` | — |
+| GET | `/api/v1/categories/{id}/brackets` | `competition.view` | → `200 { data: { category, draw, bracket } }`: узлы, стороны (участник, BYE или источник: «победитель № 7», «проигравший победителю подгруппы A в 1-м круге»), схватки с номерами; нет опубликованной — `draw: null` | — |
+
+```ts
+DrawCreate = { format?: "ROUND_ROBIN" | "SINGLE_ELIMINATION" | "ELIMINATION_WITH_REPECHAGE",
+               seeding: [{ entryId: Uuid, seedNumber: int.min(1).max(256) }].max(64) = [],
+               separation: { by: ("ORGANIZATION" | "REGION")[] } = { by: ["ORGANIZATION", "REGION"] },  // порядок — приоритет
+               randomSeed?: /^[0-9a-f]{32}$/, не все нули }
+```
+
+- **Когда:** турнир на этапе `DRAWING`, `SCHEDULED` или `IN_PROGRESS` (многодневный турнир тянет категории следующих дней); категория — `READY_FOR_DRAW`. Участники — одобренные участия с допуском `ADMITTED`; не допущенные в жеребьёвку не попадают.
+- **Формат:** из запроса, иначе `formatOverride` категории, иначе `formatSelection` закреплённых правил по числу участников. Формат 5b — `format_not_available` с предлагаемым форматом в `details.suggested`.
+- **Команда** участника для разведения — организация представительства, иначе клуб из снимка участия, иначе организация заявки; **регион** — представительства или из снимка.
+- **Устаревший черновик:** допущенные участники или их команды изменились после жеребьёвки — хеш текущего входа не совпадает; черновик виден со `stale: true`, публикация — `draw_input_changed`.
+- `supersede` требует If-Match по общему правилу 1.4 (переход статуса версионируемого ресурса).
+- Турнир `DRAWING → CHECK_IN` — `TRANSITION_PRECONDITIONS_NOT_MET` (`draws_published`), пока в турнире есть опубликованная жеребьёвка.
+- Номера схваток — сквозные в турнире, в порядке: основная сетка по кругам, утешительные, финал последним; параллельные публикации одного турнира нумеруются по очереди. Номера удалённых при новой версии схваток могут освободиться; Phase 6 может перенумеровать схватки по расписанию.
+- Длительность схватки — из правил по младшему возрасту категории, утешительные — `repechageMatchSeconds`.
+- **Движок продвижения** для Phase 7: `BracketsService.applyConfirmedResult(tx, matchId, winnerSide)` — победитель и продвижение в одной транзакции; стороны зависимых схваток приводятся к состоянию сетки, начатую или сыгранную схватку изменить нельзя (`DEPENDENT_MATCHES_STARTED`). Снятие участника после жеребьёвки пока не меняет сетку: в ней участник помечен «снят», поражение неявкой — Phase 7.
+- Сетки видит персонал турнира (`competition.view`); тренерам, спортсменам и зрителям они откроются на публичной странице (Phase 9).
+- Коды ошибок `DRAW_ALREADY_PUBLISHED`, `DRAW_NOT_ENOUGH_PARTICIPANTS`, `MATCH_PARTICIPANTS_INCOMPLETE`, `DEPENDENT_MATCHES_STARTED` добавлены в каталог `packages/contracts`; события `draw.published`, `draw.superseded`; действия аудита `draw.created`, `draw.published`, `draw.superseded`, `bracket.advanced`.
+
+### PERMISSIONS.md
+
+- Новых прав нет: матрица `draw.create` / `draw.publish` / `draw.republish` — как согласовано (новую версию делает только главный судья). Области прав: `competitionCategory` (категория → её турнир) и `draw`.
+- `allowedActions` турнира содержат права жеребьёвки: веб показывает вкладку «Жеребьёвка» персоналу с `competition.view`.
+
+### ARCHITECTURE.md
+
+- Модули `draws` (генератор, вход и хеш, посев, BYE, разведение, версии), `brackets` (стратегии форматов, граф, состояние, продвижение, места) и `matches` (владелец таблиц схваток: в 5a — создание, стороны, удаление; машина состояний — Phase 7). Зависимости: `draws → brackets → matches`; категории переводит `CategoryWorkflowService` модуля `categories` (системные переходы `READY_FOR_DRAW ⇄ DRAWN` с аудитом и событием).
+- **14.4:** стратегия — `validate`, `build` (граф по размеру жеребьёвки), `dynamic` (правило источника `DYNAMIC`), `placements`. Вместо `onResultConfirmed` состояние сетки — чистая функция `resolve(граф, жеребьёвка, подтверждённые исходы)`, а стороны схваток приводятся к ней сравнением: так же работают BYE при публикации, продвижение, утешительные схватки и (в Phase 7) изменение результата.
+- **14.5:** состояние xoshiro128** — сами 128 бит seed (без хеширования), чтобы повтор мог проверить кто угодно; разведение — штраф пары `4^(K − круг встречи)`, ключи сравниваются по приоритету; сначала расставляются самые большие команды, затем два прохода попарных обменов. Отчёт: для каждой группы — лучший возможный и фактический круг первой встречи. В круговой системе разведение не применяется, посеянные получают номер жеребьёвки, равный номеру посева.
+- **Места** (правило согласуется с главным судьёй до Phase 7): олимпийская система — 1, 2, 3, 3, далее по кругу выбывания (5, 9, …); выбывание с утешительными — 1, 2, два 3-х (победители утешительных), проигравшие последней утешительной — 5-е, предыдущей — 7-е и т. д.; участники утешительных выше проигравших в основной сетке не финалистам, те — по кругу выбывания; круговая система — победы, затем победы во встречах между собой (рекурсивно), затем чистые победы и победы по преимуществу, иначе место делится.
 
 ## Изменения Phase 4b
 
