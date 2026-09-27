@@ -141,5 +141,9 @@ export const AUDIT_ACTIONS = [
   'weigh_in.recorded',
   'medical.clearance_recorded',
   'medical.clearance_revoked',
+  'draw.created',
+  'draw.published',
+  'draw.superseded',
+  'bracket.advanced',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

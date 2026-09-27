@@ -53,6 +53,9 @@ export const EVENT_SCHEMAS = {
   'checkin.updated': z.object({ athleteId: Uuid, status: z.string() }),
   'weighin.recorded': z.object({ entryId: Uuid, attemptId: Uuid, result: z.string() }),
   'medical.clearance_changed': z.object({ clearanceId: Uuid, athleteId: Uuid, status: z.string() }),
+  // Phase 5a — жеребьёвка. Потребители (публичные страницы, уведомления заявителям) — Phase 8–9.
+  'draw.published': z.object({ drawId: Uuid, categoryId: Uuid }),
+  'draw.superseded': z.object({ drawId: Uuid, categoryId: Uuid }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

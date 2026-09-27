@@ -167,12 +167,13 @@ describe('route security autotest', () => {
     const ids = await leasedCompetition(t);
     const failures: string[] = [];
     for (const r of operational) {
+      const byResolver: Record<string, string> = {
+        entry: ids.entryId,
+        competitionCategory: ids.categoryId,
+        draw: ids.drawId,
+      };
       const url = r.path.replace(/:(\w+)/g, (_, p: string) =>
-        p === 'id'
-          ? r.writeAuthority?.resolver === 'entry'
-            ? ids.entryId
-            : ids.competitionId
-          : ids.categoryId,
+        p === 'id' ? (byResolver[r.writeAuthority?.resolver ?? ''] ?? ids.competitionId) : ids.categoryId,
       );
       const method = r.method.toLowerCase() as 'post' | 'patch' | 'delete';
       const res = await s.agent[method](url).set('x-csrf-token', s.csrf).set('if-match', '"v1"').send({});
@@ -197,10 +198,10 @@ describe('route security autotest', () => {
   });
 });
 
-/** Турнир с категорией, заявкой и участием, право записи которого у площадочного узла. */
+/** Турнир с категорией, заявкой, участием и черновиком жеребьёвки, право записи которого у площадочного узла. */
 async function leasedCompetition(
   t: TestApp,
-): Promise<{ competitionId: string; categoryId: string; entryId: string }> {
+): Promise<{ competitionId: string; categoryId: string; entryId: string; drawId: string }> {
   const competitionId = uuidv7();
   await ensureCompetition(t, competitionId);
   const categoryId = uuidv7();
@@ -239,9 +240,24 @@ async function leasedCompetition(
       publicName: 'Тест Т.',
     },
   });
+  const drawId = uuidv7();
+  await t.admin.draw.create({
+    data: {
+      id: drawId,
+      competitionId,
+      categoryId,
+      number: 1,
+      format: 'ROUND_ROBIN',
+      algorithmVersion: 'draw-v1',
+      randomSeed: '0123456789abcdef0123456789abcdef',
+      inputHash: 'c'.repeat(64),
+      input: {},
+      separationReport: {},
+    },
+  });
   await t.admin.competitionWriteLease.update({
     where: { competitionId },
     data: { holderType: 'NODE', holderNodeId: uuidv7(), epoch: 2 },
   });
-  return { competitionId, categoryId, entryId };
+  return { competitionId, categoryId, entryId, drawId };
 }
