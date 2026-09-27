@@ -238,6 +238,8 @@ export interface CategoryDrawsDto {
   /** Одобренные участия, допуск которых ещё не решён. */
   admissionPending: number;
   suggestedFormat: CompetitionFormatCode | null;
+  /** Допущенные участники (для посева в черновике): без позиции. */
+  participants: DrawParticipantDto[];
   draws: DrawSummaryDto[];
   allowedActions: string[];
 }

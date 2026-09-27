@@ -110,4 +110,7 @@ export const ACTION_CANDIDATES: readonly PermissionCode[] = [
   'weighin.manage',
   'medical.view',
   'medical.record',
+  'draw.create',
+  'draw.publish',
+  'draw.republish',
 ];

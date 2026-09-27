@@ -65,6 +65,8 @@ describe('draft', () => {
       draws: [],
       allowedActions: ['draw.create'],
     });
+    expect(r.body.data.participants).toHaveLength(10);
+    expect(r.body.data.participants.map((p: { entryId: string }) => p.entryId)).not.toContain(cat.notAdmitted);
     const overview = await w.staff.secretary.agent.get(`/api/v1/competitions/${w.competitionId}/draws`);
     expect(overview.status).toBe(200);
     expect(

@@ -27,3 +27,15 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Печать сеток и протоколов: альбомная страница, без фона интерфейса. */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  body {
+    @apply bg-white text-[11px];
+  }
+}

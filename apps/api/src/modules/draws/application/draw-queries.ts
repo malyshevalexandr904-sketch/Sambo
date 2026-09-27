@@ -124,6 +124,17 @@ export class DrawQueriesService {
       admitted: ctx.admitted.length,
       admissionPending: ctx.admissionPending,
       suggestedFormat: ctx.suggestedFormat,
+      participants: ctx.admitted.map((p) => ({
+        entryId: p.entryId,
+        publicName: p.publicName,
+        birthYear: p.birthYear,
+        organization: p.organization,
+        region: p.region,
+        seedNumber: null,
+        position: null,
+        pool: null,
+        entryStatus: p.entryStatus,
+      })),
       draws: rows.map((r) => {
         const stale = this.stale(r, ctx);
         return toDrawSummary(r, stale, this.summaryActions(v, category, r, stale));

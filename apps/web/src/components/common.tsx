@@ -66,6 +66,7 @@ export function ReasonAction({
   variant = 'secondary',
   size = 'md',
   required = true,
+  describeError,
   onConfirm,
 }: {
   label: string;
@@ -75,6 +76,8 @@ export function ReasonAction({
   /** Кнопка в строке списка — маленькая. */
   size?: 'sm' | 'md';
   required?: boolean;
+  /** Текст ошибки с подробностями (например, несовпавшие условия); по умолчанию — по коду ошибки. */
+  describeError?: (error: unknown) => string;
   onConfirm: (reason: string) => Promise<void>;
 }) {
   const t = useTranslations('common');
@@ -123,7 +126,7 @@ export function ReasonAction({
               setOpen(false);
               setReason('');
             } catch (e) {
-              setError(errorMessage(e));
+              setError(describeError ? describeError(e) : errorMessage(e));
             } finally {
               setBusy(false);
             }

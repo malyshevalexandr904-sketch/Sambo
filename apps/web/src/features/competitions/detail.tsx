@@ -13,6 +13,7 @@ import { AdmissionTab } from '@/features/operations/admission-tab';
 import { CheckInTab } from '@/features/operations/checkin-tab';
 import { MedicalTab } from '@/features/operations/medical-tab';
 import { WeighInTab } from '@/features/operations/weighin-tab';
+import { DrawsTab } from '@/features/draws/draws-tab';
 import { ApplicationsTab, EntriesTab } from './registrations-tabs';
 import { CategoriesTab } from './categories';
 import { OverviewTab } from './overview';
@@ -31,8 +32,12 @@ const TABS = [
   'checkin',
   'weighin',
   'medical',
+  'draws',
 ] as const;
 type Tab = (typeof TABS)[number];
+
+/** До мандатной комиссии жеребьёвки нет — вкладка не нужна. */
+const BEFORE_DRAW: readonly string[] = ['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'];
 
 function visibleTabs(c: Competition): Tab[] {
   const can = (a: string): boolean => c.allowedActions.includes(a);
@@ -43,6 +48,7 @@ function visibleTabs(c: Competition): Tab[] {
     if (tab === 'checkin') return can('checkin.view') && c.status !== 'DRAFT';
     if (tab === 'weighin') return can('weighin.view') && c.status !== 'DRAFT';
     if (tab === 'medical') return can('medical.view') && c.status !== 'DRAFT';
+    if (tab === 'draws') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
     return true;
   });
 }
@@ -72,50 +78,52 @@ export function CompetitionPage({ id }: { id: string }) {
         const tab: Tab = requested && tabs.includes(requested) ? requested : 'overview';
         return (
           <>
-            <PageHeader
-              title={c.name}
-              description={
-                <>
-                  {formatDates(c.startDate, c.endDate, locale)} · {c.organizer.name}
-                  {c.venue ? ` · ${c.venue.name}${c.venue.city ? `, ${c.venue.city}` : ''}` : ''}
-                </>
-              }
-              actions={
-                <div className="flex flex-wrap items-center gap-2">
-                  {c.writeAuthority.holder === 'NODE' ? (
-                    <Badge tone="warning">{t('leaseAtNode')}</Badge>
-                  ) : null}
-                  <CompetitionStatusBadge status={c.status} />
-                </div>
-              }
-            />
-            {c.status === 'CANCELLED' && c.cancelReason ? (
-              <Alert tone="danger" className="mb-4">
-                {t('cancelledBecause', { reason: c.cancelReason })}
-              </Alert>
-            ) : null}
-            <nav
-              className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200"
-              aria-label={t('tabs.label')}
-            >
-              {tabs.map((x) => (
-                <button
-                  key={x}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === x}
-                  className={cn(
-                    'min-h-11 whitespace-nowrap border-b-2 px-3 text-sm font-medium',
-                    tab === x
-                      ? 'border-blue-700 text-blue-800'
-                      : 'border-transparent text-slate-600 hover:text-slate-900',
-                  )}
-                  onClick={() => router.replace({ pathname, query: x === 'overview' ? {} : { tab: x } })}
-                >
-                  {t(`tabs.${x}`)}
-                </button>
-              ))}
-            </nav>
+            <div className="print:hidden">
+              <PageHeader
+                title={c.name}
+                description={
+                  <>
+                    {formatDates(c.startDate, c.endDate, locale)} · {c.organizer.name}
+                    {c.venue ? ` · ${c.venue.name}${c.venue.city ? `, ${c.venue.city}` : ''}` : ''}
+                  </>
+                }
+                actions={
+                  <div className="flex flex-wrap items-center gap-2">
+                    {c.writeAuthority.holder === 'NODE' ? (
+                      <Badge tone="warning">{t('leaseAtNode')}</Badge>
+                    ) : null}
+                    <CompetitionStatusBadge status={c.status} />
+                  </div>
+                }
+              />
+              {c.status === 'CANCELLED' && c.cancelReason ? (
+                <Alert tone="danger" className="mb-4">
+                  {t('cancelledBecause', { reason: c.cancelReason })}
+                </Alert>
+              ) : null}
+              <nav
+                className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200"
+                aria-label={t('tabs.label')}
+              >
+                {tabs.map((x) => (
+                  <button
+                    key={x}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === x}
+                    className={cn(
+                      'min-h-11 whitespace-nowrap border-b-2 px-3 text-sm font-medium',
+                      tab === x
+                        ? 'border-blue-700 text-blue-800'
+                        : 'border-transparent text-slate-600 hover:text-slate-900',
+                    )}
+                    onClick={() => router.replace({ pathname, query: x === 'overview' ? {} : { tab: x } })}
+                  >
+                    {t(`tabs.${x}`)}
+                  </button>
+                ))}
+              </nav>
+            </div>
             {tab === 'overview' ? <OverviewTab competition={c} /> : null}
             {tab === 'regulation' ? <RegulationTab competition={c} /> : null}
             {tab === 'categories' ? <CategoriesTab competition={c} /> : null}
@@ -126,6 +134,7 @@ export function CompetitionPage({ id }: { id: string }) {
             {tab === 'checkin' ? <CheckInTab competition={c} /> : null}
             {tab === 'weighin' ? <WeighInTab competition={c} /> : null}
             {tab === 'medical' ? <MedicalTab competition={c} /> : null}
+            {tab === 'draws' ? <DrawsTab competition={c} /> : null}
           </>
         );
       }}

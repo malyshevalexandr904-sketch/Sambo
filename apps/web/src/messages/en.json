@@ -348,7 +348,14 @@
     "empty_patch": "No changes",
     "parameters_or_base_required": "Specify parameters or a base version",
     "invalid_uuid": "Invalid identifier",
-    "invalid_name": "Letters, space, hyphen and apostrophe only"
+    "invalid_name": "Letters, space, hyphen and apostrophe only",
+    "format_not_available": "This format is not available yet: choose round robin, single elimination or elimination with repechage",
+    "not_admitted": "The participant is not admitted in this category",
+    "out_of_range": "The seed number is greater than the number of participants",
+    "invalid_seed": "32 hexadecimal characters, not all zeros",
+    "duplicate_key": "The separation key is given twice",
+    "too_many_participants": "Too many participants for one bracket",
+    "not_enough_participants": "At least two participants are needed"
   },
   "errors": {
     "VALIDATION_FAILED": "Please check the form fields.",
@@ -404,13 +411,17 @@
     "MAX_CATEGORIES_EXCEEDED": "The athlete is already entered in the maximum number of categories.",
     "CONSENT_MISSING": "The athlete has no valid consent to personal data processing.",
     "APPLICATION_EMPTY": "The application has no athletes.",
-    "CATEGORY_NOT_READY_FOR_DRAW": "The category has already been drawn, merged or cancelled.",
+    "CATEGORY_NOT_READY_FOR_DRAW": "The category is not ready for the draw or has already been drawn.",
     "CATEGORY_TRANSFER_NOT_ALLOWED": "The entry cannot be transferred to this category.",
     "ADMISSION_REQUIREMENTS_NOT_MET": "Admission requirements are not met.",
     "WEIGH_IN_REQUIRED": "Weigh-in is required first.",
     "NOT_CHECKED_IN": "The athlete has not checked in — mark the arrival first.",
     "WEIGH_IN_WINDOW_CLOSED": "The weigh-in window is closed now.",
-    "SCALE_CALIBRATION_EXPIRED": "The scale verification has expired — choose another scale."
+    "SCALE_CALIBRATION_EXPIRED": "The scale verification has expired — choose another scale.",
+    "DRAW_ALREADY_PUBLISHED": "A draw is already published in this category. It can only be replaced by a new version (chief referee).",
+    "DRAW_NOT_ENOUGH_PARTICIPANTS": "A draw needs at least two admitted participants: cancel the category or merge it with another one.",
+    "MATCH_PARTICIPANTS_INCOMPLETE": "The participants of the match are not known yet.",
+    "DEPENDENT_MATCHES_STARTED": "Matches that depend on this result have already started."
   },
   "people": {
     "lastName": "Last name",
@@ -833,7 +844,8 @@
       "admission": "Admission",
       "checkin": "Check-in",
       "weighin": "Weigh-in",
-      "medical": "Medical"
+      "medical": "Medical",
+      "draws": "Draw"
     },
     "statuses": {
       "DRAFT": "Draft",
@@ -900,7 +912,10 @@
       "entry_not_approved": "the entry is not approved",
       "category_status": "the category is not at this stage",
       "scale_has_attempts": "weigh-ins were already recorded on this scale",
-      "window_has_attempts": "weigh-ins were already recorded in this window"
+      "window_has_attempts": "weigh-ins were already recorded in this window",
+      "draws_published": "draws are already published in the competition",
+      "draw_input_changed": "the participants of the category changed after the draw — draw again",
+      "matches_started": "matches of the category have already started or been played"
     },
     "dates": "Dates",
     "registrationWindow": "Registration",
@@ -1478,5 +1493,144 @@
     },
     "saved": "Saved",
     "noValue": "—"
+  },
+  "draws": {
+    "title": "Draw",
+    "hint": "The draw is held per category ready for the draw: approved participants with admission take part. A draft changes nothing; publication creates the bracket and matches.",
+    "notDrawingStage": "The draw opens once the competition is moved to the “Draw” stage (Overview tab). For now you can only review category readiness.",
+    "noCategories": "The competition has no categories",
+    "progress": "Draw published in {drawn} of {total} categories",
+    "admittedCount": "{admitted} admitted",
+    "pendingCount": "{pending} more awaiting admission",
+    "suggestedShort": "format by the rules: {format}",
+    "noFormat": "no format set by the rules",
+    "notReady": "The category is not ready for the draw yet: finish check-in and weigh-in first (Categories tab, “Ready for draw” transition).",
+    "drafts": "{count, plural, one {# draft} other {# drafts}}",
+    "open": "Open",
+    "back": "All categories",
+    "versions": "Draw versions",
+    "version": "Version {number}",
+    "participants": "{count, plural, one {# participant} other {# participants}}",
+    "noDraws": "No draw has been held in this category yet.",
+    "staleShort": "outdated",
+    "stale": "The participants of the category changed after this draw: the draft is outdated and cannot be published. Draw again.",
+    "previewTitle": "Bracket preview",
+    "bracketTitle": "Bracket",
+    "supersededTitle": "Layout of the superseded version",
+    "print": "Print",
+    "statuses": {
+      "DRAFT": "Draft",
+      "PUBLISHED": "Published",
+      "SUPERSEDED": "Superseded"
+    },
+    "formats": {
+      "ROUND_ROBIN": "Round robin",
+      "SINGLE_ELIMINATION": "Single elimination",
+      "ELIMINATION_WITH_REPECHAGE": "Elimination with repechage",
+      "DOUBLE_ELIMINATION": "Double elimination",
+      "PENALTY_POINTS_ELIMINATION": "Penalty points elimination",
+      "GROUP_STAGE": "Groups",
+      "GROUP_PLUS_PLAYOFF": "Groups and playoff"
+    },
+    "create": {
+      "title": "New draft",
+      "hint": "The server draws the admitted participants. A draft can be reviewed and compared with others; only one version gets published.",
+      "format": "Format",
+      "suggested": "By the competition rules: {format}",
+      "noSuggestion": "The competition rules set no format for this number of participants — choose one.",
+      "chooseFormat": "Choose a format",
+      "separation": "Separation",
+      "separationHint": "Athletes of one team and one region are placed in different halves and quarters of the bracket. The team comes before the region.",
+      "keys": {
+        "ORGANIZATION": "Team (club)",
+        "REGION": "Region"
+      },
+      "seeding": "Seeding (optional)",
+      "seedingHint": "Seeds 1 and 2 end up in different halves, seeds 1–4 in different quarters; in an incomplete bracket BYEs go to the top seeds.",
+      "seedNumber": "Seed number",
+      "advanced": "Seed for a repeat",
+      "randomSeed": "Seed",
+      "randomSeedHint": "32 hexadecimal characters. Leave empty and the server creates a random one. The same seed with the same participants repeats the draw exactly.",
+      "randomSeedInvalid": "32 characters 0–9 and a–f, not all zeros",
+      "submit": "Hold the draw"
+    },
+    "details": {
+      "format": "Format",
+      "created": "Held",
+      "published": "Published",
+      "superseded": "Superseded",
+      "seed": "Seed and input",
+      "inputHash": "input hash"
+    },
+    "publish": {
+      "action": "Publish",
+      "title": "Publish the draw?",
+      "consequences": "The bracket and numbered matches will be created, athletes without an opponent advance without a match, and the category becomes “Drawn”. A published draw can only be replaced by a new version — by the chief referee with a reason, while no match has started.",
+      "confirm": "Publish",
+      "cancel": "Cancel"
+    },
+    "supersede": {
+      "action": "New version",
+      "title": "Replace the published draw",
+      "description": "The bracket and matches of the category will be removed and the category returns to the draw. The version and its layout are kept for verification. Only possible while no match has started."
+    },
+    "verify": {
+      "action": "Verify the repeat",
+      "ok": "Repeating with the seed gives the same layout",
+      "fail": "The repeat does not match the saved layout",
+      "current": "participants unchanged",
+      "notCurrent": "participants changed after the draw"
+    },
+    "separation": {
+      "title": "Separation",
+      "notApplicable": "In round robin everybody meets everybody — no separation is needed.",
+      "none": "Nothing to separate: all participants have different teams and regions.",
+      "keys": {
+        "ORGANIZATION": "Team",
+        "REGION": "Region"
+      },
+      "athletes": "{count, plural, one {# athlete} other {# athletes}}",
+      "meet": "meet no earlier than “{round}”",
+      "met": "best possible",
+      "unmet": "could be kept apart until “{round}”",
+      "unmetCount": "{count, plural, one {One group} other {# groups}} could not be separated better — check the seeding or draw again."
+    }
+  },
+  "bracket": {
+    "main": "Main bracket",
+    "poolsHint": "The upper half of the bracket is pool A, the lower half is pool B. The pool winners meet in the final.",
+    "repechage": "Repechage",
+    "repechageHint": "Those who lost to the winner of their pool meet in the order of the rounds they lost in; the repechage winners take the third places.",
+    "pool": "Pool {pool}",
+    "rounds": {
+      "label": "Rounds",
+      "FINAL": "Final",
+      "SEMIFINAL": "Semi-final",
+      "QUARTERFINAL": "Quarter-final",
+      "ROUND_OF_16": "Round of 16",
+      "ROUND_OF_32": "Round of 32",
+      "ROUND_OF_64": "Round of 64",
+      "ROUND_OF_128": "Round of 128",
+      "ROUND_OF_256": "Round of 256",
+      "REPECHAGE": "Repechage",
+      "BRONZE": "Bronze",
+      "ROUND_ROBIN": "Round robin"
+    },
+    "roundN": "Round {round}",
+    "crossTable": "Cross table",
+    "roundsList": "Rounds",
+    "participant": "Participant",
+    "match": "No. {number}",
+    "walkover": "no match",
+    "bye": "BYE — no opponent",
+    "waiting": "to be decided",
+    "waitingWinner": "winner of match No. {number}",
+    "waitingDynamic": "loser to the winner of pool {pool} in round {round}",
+    "forThird": "for 3rd place",
+    "red": "Red corner",
+    "blue": "Blue corner",
+    "winner": "winner",
+    "seed": "seed {seed}",
+    "withdrawn": "withdrawn"
   }
 }
