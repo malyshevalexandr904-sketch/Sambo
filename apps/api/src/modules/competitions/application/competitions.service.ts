@@ -10,7 +10,6 @@ import {
   type CompetitionSummary,
   type CompetitionTransitionRequest,
   type Page,
-  type PermissionCode,
 } from '@sde/contracts';
 import { type Tx, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
@@ -45,6 +44,7 @@ import { listWhere, staffFilter } from './competition-queries';
 import { CompetitionReferences } from './competition-references';
 import { type CompetitionBasics, CompetitionScopeService } from './competition-scope.service';
 import {
+  ACTION_CANDIDATES,
   COMPETITION_INCLUDE,
   type CompetitionRow,
   toBasics,
@@ -52,25 +52,6 @@ import {
   toRuleSetVersionRef,
   toSummary,
 } from './competition-mapper';
-
-/** Действия над турниром для allowedActions (UI скрывает недоступное, решает сервер). */
-const ACTION_CANDIDATES: readonly PermissionCode[] = [
-  'competition.view',
-  'competition.update',
-  'competition.delete',
-  'competition.members.manage',
-  'competition_category.manage',
-  'category.merge',
-  'registration.view',
-  'registration.approve',
-  'registration.reject',
-  'registration.return',
-  'registration.export',
-  'entry.withdraw',
-  'entry.transfer',
-  'document.verify',
-  'audit.view',
-];
 
 @Injectable()
 export class CompetitionsService {
@@ -145,6 +126,7 @@ export class CompetitionsService {
       cancelledAt: row.cancelledAt?.toISOString() ?? null,
       cancelReason: row.cancelReason,
       counters: await this.extensions.countersFor(row.id),
+      weighInFailureOutcome: row.weighInFailureOutcome,
       writeAuthority: await this.leases.authority(row.id),
       viewer: { roles, staff: actions.includes('competition.view') },
       version: row.version,

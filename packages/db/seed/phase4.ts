@@ -20,18 +20,18 @@ export const P4 = {
   venue: id('801b', 1),
 } as const;
 
-const TIMEZONE = 'Europe/Moscow';
-const DAY = 24 * 60 * 60 * 1000;
-const dateOnly = (d: Date): string => d.toISOString().slice(0, 10);
-const asDate = (d: string): Date => new Date(`${d}T00:00:00.000Z`);
+export const TIMEZONE = 'Europe/Moscow';
+export const DAY = 24 * 60 * 60 * 1000;
+export const dateOnly = (d: Date): string => d.toISOString().slice(0, 10);
+export const asDate = (d: string): Date => new Date(`${d}T00:00:00.000Z`);
 
-const userByEmail = (email: string): (typeof SEED_USERS)[number] => {
+export const userByEmail = (email: string): (typeof SEED_USERS)[number] => {
   const u = SEED_USERS.find((x) => x.email === email);
   if (!u) throw new Error(`Seed: user ${email} not found`);
   return u;
 };
 
-interface SeedCategory {
+export interface SeedCategory {
   n: number;
   code: string;
   nameRu: string;
@@ -43,7 +43,7 @@ interface SeedCategory {
 }
 
 /** Категории шаблона 12–14 лет — как их строит генерация API: «M-Y12_14-38», «Юноши 12–14 лет, до 38 кг». */
-function categoriesFromTemplate(): SeedCategory[] {
+export function categoriesFromTemplate(): SeedCategory[] {
   const group = SEED_AGE_GROUPS.find((g) => g.code === 'Y12_14');
   if (!group) throw new Error('Seed: age group Y12_14 not found');
   const words = {
@@ -206,7 +206,7 @@ async function seedRequirements(db: PrismaClient): Promise<void> {
 }
 
 /** Категория «до N кг», в которую проходит заявленный вес: для демонстрации берём вторую по весу. */
-function pickCategory(categories: SeedCategory[], gender: 'MALE' | 'FEMALE'): SeedCategory {
+export function pickCategory(categories: SeedCategory[], gender: 'MALE' | 'FEMALE'): SeedCategory {
   const list = categories.filter((c) => c.gender === gender && c.kind === 'UP_TO');
   const c = list[1] ?? list[0];
   if (!c) throw new Error('Seed: no category to enter');
@@ -241,18 +241,22 @@ const APPLICATIONS: SeedApplication[] = [
   },
 ];
 
-type ClubWithRegion = Prisma.OrganizationGetPayload<{ include: { region: true } }>;
+export type ClubWithRegion = Prisma.OrganizationGetPayload<{ include: { region: true } }>;
 
 /** Участие со снимком данных спортсмена на момент заявки (ADR-10). */
-function entryData(
+export function entryData(
   a: SeedAthlete,
   club: ClubWithRegion,
   coachName: string,
   category: SeedCategory,
-): Omit<Prisma.EntryUncheckedCreateInput, 'id' | 'applicationId' | 'createdById'> {
-  const categoryId = P4.category(category.n);
-  return {
+  target: { competitionId: string; categoryId: string } = {
     competitionId: P4.competition,
+    categoryId: P4.category(category.n),
+  },
+): Omit<Prisma.EntryUncheckedCreateInput, 'id' | 'applicationId' | 'createdById'> {
+  const { categoryId } = target;
+  return {
+    competitionId: target.competitionId,
     athleteId: P3.athlete(a.n),
     categoryId,
     declaredCategoryId: categoryId,

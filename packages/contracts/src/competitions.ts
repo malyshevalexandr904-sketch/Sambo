@@ -181,6 +181,10 @@ export interface VenueRef {
   city: string | null;
 }
 
+/** Исход неудачного официального взвешивания по положению (D-06). */
+export const WEIGH_IN_FAILURE_OUTCOMES = ['WITHDRAW', 'RECHECK', 'TRANSFER'] as const;
+export type WeighInFailureOutcome = (typeof WEIGH_IN_FAILURE_OUTCOMES)[number];
+
 export interface WriteAuthority {
   holder: LeaseHolder;
   epoch: number;
@@ -216,6 +220,17 @@ export interface RuleSetVersionRef {
   checksum: string | null;
 }
 
+/** Счётчики дашборда организатора (раздел 34 ТЗ): категории, заявки, участия, прибытие и допуск. */
+export interface CompetitionCountersDto {
+  categories: number;
+  applications: number;
+  entriesApproved: number;
+  entriesPending: number;
+  arrived: number;
+  admitted: number;
+  notAdmitted: number;
+}
+
 export interface Competition extends CompetitionSummary {
   descriptionMd: string | null;
   ruleSetVersion: RuleSetVersionRef | null;
@@ -226,7 +241,9 @@ export interface Competition extends CompetitionSummary {
   publishedAt: string | null;
   cancelledAt: string | null;
   cancelReason: string | null;
-  counters: { categories: number; applications: number; entriesApproved: number; entriesPending: number };
+  counters: CompetitionCountersDto;
+  /** Исход неудачного официального взвешивания по положению (D-06). */
+  weighInFailureOutcome: WeighInFailureOutcome;
   writeAuthority: WriteAuthority;
   /** Роли пользователя в турнире и отношение к нему (для кабинетов). */
   viewer: { roles: RoleCode[]; staff: boolean };
@@ -241,6 +258,7 @@ export interface Competition extends CompetitionSummary {
 export const RegulationUpdate = z.object({
   regulationFileId: Uuid.nullable().optional(),
   requirementsMd: MarkdownText,
+  weighInFailureOutcome: z.enum(WEIGH_IN_FAILURE_OUTCOMES).optional(),
 });
 export type RegulationUpdate = z.infer<typeof RegulationUpdate>;
 

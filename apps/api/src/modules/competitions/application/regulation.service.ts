@@ -1,12 +1,15 @@
 // Положение турнира (раздел 12 ТЗ; API.md, 5.1): публичный PDF и текст требований. Сроки, место и категории —
 // поля турнира и категории турнира; обязательные документы и согласия — требования (модуль категорий).
 import { Injectable } from '@nestjs/common';
-import type { RegulationUpdate } from '@sde/contracts';
+import type { CompetitionStatus, RegulationUpdate } from '@sde/contracts';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { AuditService } from '../../audit';
 import { FilesService } from '../../files';
+
+/** Исход взвешивания (D-06) меняется до начала мандатной комиссии и взвешивания. */
+const BEFORE_WEIGH_IN: readonly CompetitionStatus[] = ['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'];
 
 @Injectable()
 export class RegulationService {
@@ -37,11 +40,15 @@ export class RegulationService {
           'REGULATION',
           'regulationFileId',
         );
+      const outcome = input.weighInFailureOutcome;
+      if (outcome && outcome !== current.weighInFailureOutcome && !BEFORE_WEIGH_IN.includes(current.status))
+        throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed: ['weigh_in_started'] });
       const { count } = await tx.competition.updateMany({
         where: { id: competitionId, version },
         data: {
           regulationFileId: input.regulationFileId,
           requirementsMd: input.requirementsMd.trim() === '' ? null : input.requirementsMd,
+          weighInFailureOutcome: outcome,
           updatedById: user.id,
           version: { increment: 1 },
         },
@@ -56,11 +63,13 @@ export class RegulationService {
         before: {
           regulationFileId: current.regulationFileId,
           requirementsLength: current.requirementsMd?.length ?? 0,
+          weighInFailureOutcome: current.weighInFailureOutcome,
         },
         after: {
           regulationFileId:
             input.regulationFileId === undefined ? current.regulationFileId : input.regulationFileId,
           requirementsLength: input.requirementsMd.length,
+          weighInFailureOutcome: outcome ?? current.weighInFailureOutcome,
         },
       });
     });

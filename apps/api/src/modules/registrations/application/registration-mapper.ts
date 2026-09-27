@@ -8,6 +8,8 @@ export const ENTRY_INCLUDE = {
   application: { select: { organization: { select: { id: true, name: true, shortName: true } } } },
   representationOrg: { select: { id: true, name: true, shortName: true } },
   representationRegion: { select: { id: true, nameRu: true, nameEn: true } },
+  // Проекция допуска (модуль admission, Phase 4b) — только чтение: статус и непройденные проверки.
+  admission: { select: { status: true, checks: { select: { kind: true, status: true } } } },
 } satisfies Prisma.EntryInclude;
 
 export type EntryRow = Prisma.EntryGetPayload<{ include: typeof ENTRY_INCLUDE }>;
@@ -67,6 +69,14 @@ export function toEntryDto(e: EntryRow, allowedActions: string[]): EntryDto {
     withdrawReason: e.withdrawReason,
     version: e.version,
     createdAt: e.createdAt.toISOString(),
+    admission:
+      e.status === 'APPROVED' && e.admission
+        ? {
+            status: e.admission.status,
+            failed: e.admission.checks.filter((c) => c.status === 'FAILED').map((c) => c.kind),
+            pending: e.admission.checks.filter((c) => c.status === 'PENDING').map((c) => c.kind),
+          }
+        : null,
     allowedActions,
   };
 }

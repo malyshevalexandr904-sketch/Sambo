@@ -14,6 +14,7 @@ import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { AuditService } from '../../audit';
 import { CompetitionScopeService } from '../../competitions';
+import { OutboxService } from '../../outbox';
 import { WriteLeaseService } from '../../venue-sync';
 import type { CategoryRuleSpec } from '../domain/eligibility';
 import { CompetitionCategoriesService } from './competition-categories.service';
@@ -28,6 +29,7 @@ export class CompetitionRulesService {
     private readonly competitions: CompetitionScopeService,
     private readonly leases: WriteLeaseService,
     private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
   ) {}
 
   async requirements(user: AuthUser, competitionId: string): Promise<RequirementDto[]> {
@@ -140,6 +142,12 @@ export class CompetitionRulesService {
         competitionId,
         before: { count: before },
         after: { count: input.requirements.length, kinds: input.requirements.map((r) => r.kind) },
+      });
+      await this.outbox.enqueue(tx, {
+        type: 'competition.requirements_changed',
+        aggregate: { type: 'Competition', id: competitionId },
+        competitionId,
+        payload: { competitionId },
       });
     });
   }

@@ -8,3 +8,4 @@ export {
   normalizeName,
 } from './people';
 export { createPrismaClient, type DbClient, type Tx } from './client';
+export { type NotificationSource, notificationSource } from './notifications';

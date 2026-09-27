@@ -130,5 +130,16 @@ export const AUDIT_ACTIONS = [
   'entry.withdrawn',
   'entry.transferred',
   'entry.exported',
+  'admission.check_waived',
+  'checkin.updated',
+  'scale.created',
+  'scale.updated',
+  'scale.deleted',
+  'weigh_in_window.created',
+  'weigh_in_window.updated',
+  'weigh_in_window.deleted',
+  'weigh_in.recorded',
+  'medical.clearance_recorded',
+  'medical.clearance_revoked',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

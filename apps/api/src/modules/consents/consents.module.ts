@@ -15,5 +15,6 @@ import { ConsentTemplatesService } from './application/consent-templates.service
   imports: [AthletesModule, CompetitionsModule, DocumentsModule, PeopleModule],
   controllers: [ConsentTemplatesController, AdminConsentTemplatesController, ConsentsController],
   providers: [ConsentsService, ConsentTemplatesService],
+  exports: [ConsentsService],
 })
 export class ConsentsModule {}

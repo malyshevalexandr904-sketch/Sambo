@@ -56,7 +56,8 @@
     "rulesets": "Правила",
     "consentTemplates": "Тексты согласий",
     "competitions": "Турниры",
-    "applications": "Мои заявки"
+    "applications": "Мои заявки",
+    "notifications": "Уведомления"
   },
   "auth": {
     "email": "Email",
@@ -404,7 +405,12 @@
     "CONSENT_MISSING": "Нет действующего согласия на обработку персональных данных спортсмена.",
     "APPLICATION_EMPTY": "В заявке нет спортсменов.",
     "CATEGORY_NOT_READY_FOR_DRAW": "Категория уже прошла жеребьёвку, объединена или отменена.",
-    "CATEGORY_TRANSFER_NOT_ALLOWED": "Перевести участника в эту категорию нельзя."
+    "CATEGORY_TRANSFER_NOT_ALLOWED": "Перевести участника в эту категорию нельзя.",
+    "ADMISSION_REQUIREMENTS_NOT_MET": "Не выполнены условия допуска.",
+    "WEIGH_IN_REQUIRED": "Сначала нужно взвешивание.",
+    "NOT_CHECKED_IN": "Спортсмен не отмечен прибывшим — сначала отметьте прибытие.",
+    "WEIGH_IN_WINDOW_CLOSED": "Окно взвешивания сейчас закрыто.",
+    "SCALE_CALIBRATION_EXPIRED": "Срок поверки весов истёк — выберите другие весы."
   },
   "people": {
     "lastName": "Фамилия",
@@ -823,7 +829,11 @@
       "categories": "Категории",
       "staff": "Персонал",
       "applications": "Заявки",
-      "entries": "Участники"
+      "entries": "Участники",
+      "admission": "Допуск",
+      "checkin": "Прибытие",
+      "weighin": "Взвешивание",
+      "medical": "Медицина"
     },
     "statuses": {
       "DRAFT": "Черновик",
@@ -884,7 +894,13 @@
       "ruleset_not_published": "версия правил не опубликована",
       "timezone": "некорректный часовой пояс",
       "used_in_templates": "используется в шаблонах",
-      "weigh_in_required": "сначала нужно взвешивание"
+      "weigh_in_required": "сначала нужно взвешивание",
+      "admission_pending": "допуск решён не по всем участникам категории",
+      "weigh_in_started": "мандатная комиссия и взвешивание уже начались",
+      "entry_not_approved": "участие не одобрено",
+      "category_status": "категория не на этом этапе",
+      "scale_has_attempts": "на этих весах уже взвешивали",
+      "window_has_attempts": "в этом окне уже взвешивали"
     },
     "dates": "Даты",
     "registrationWindow": "Регистрация",
@@ -893,7 +909,10 @@
       "categories": "Категорий",
       "applications": "Заявок",
       "entriesApproved": "Одобрено участий",
-      "entriesPending": "Ждут решения"
+      "entriesPending": "Ждут решения",
+      "arrived": "Прибыло",
+      "admitted": "Допущено",
+      "notAdmitted": "Не допущено"
     },
     "publicPage": "Публичная страница турнира",
     "readiness": {
@@ -951,7 +970,9 @@
       "pdfHint": "PDF до 20 МБ. Файл будет доступен на публичной странице турнира.",
       "text": "Требования к участникам",
       "textHint": "Текст для публичной страницы: допуск, документы, форма.",
-      "save": "Сохранить"
+      "save": "Сохранить",
+      "outcome": "Если вес не соответствует категории",
+      "outcomeHint": "Так решает положение (D-06); после начала мандатной комиссии не меняется."
     },
     "requirements": {
       "title": "Требования к допуску",
@@ -1058,7 +1079,12 @@
       "goToCompetition": "Открыть турнир",
       "needLogin": "Войдите с тем адресом email, на который пришло приглашение, и откройте ссылку снова."
     },
-    "registrationUntil": "Заявки до {date}"
+    "registrationUntil": "Заявки до {date}",
+    "outcomes": {
+      "WITHDRAW": "снятие с соревнований",
+      "RECHECK": "повторное взвешивание в пределах окна",
+      "TRANSFER": "перевод в категорию по весу"
+    }
   },
   "applications": {
     "cardTitle": "Заявка на турнир",
@@ -1213,5 +1239,244 @@
     "participantsTotal": "Одобрено участий: {count}",
     "category": "Категория",
     "participants": "Участников"
+  },
+  "admission": {
+    "statuses": {
+      "PENDING": "Ждёт решения",
+      "ADMITTED": "Допущен",
+      "NOT_ADMITTED": "Не допущен"
+    },
+    "checkKinds": {
+      "DOCUMENTS": "Документы",
+      "CONSENTS": "Согласия",
+      "MEDICAL": "Медицинский допуск",
+      "INSURANCE": "Страховка",
+      "AGE": "Возраст",
+      "QUALIFICATION": "Квалификация",
+      "WEIGHT": "Вес",
+      "CHECK_IN": "Прибытие"
+    },
+    "checkStatuses": {
+      "PENDING": "ждёт",
+      "PASSED": "пройдено",
+      "FAILED": "не пройдено",
+      "WAIVED": "исключено"
+    },
+    "reasons": {
+      "document_missing": "нет документа: {types}",
+      "document_not_verified": "документ на проверке: {types}",
+      "document_rejected": "документ отклонён: {types}",
+      "document_expired": "срок документа истёк: {types}",
+      "consent_missing": "нет согласия: {kinds}",
+      "medical_missing": "нет медицинского допуска",
+      "medical_revoked": "медицинский допуск отозван",
+      "weigh_in_expected": "не взвешен",
+      "weigh_in_recheck_required": "нужно повторное взвешивание",
+      "weigh_in_failed": "вес {weight} кг не проходит в категорию",
+      "check_in_expected": "прибытие не отмечено",
+      "not_arrived": "не прибыл",
+      "check_in_withdrawn": "снят на мандатной комиссии"
+    },
+    "title": "Мандатная комиссия",
+    "hint": "Проверки задаёт положение турнира. Допуск пересчитывается сам после проверки документов, отметки прибытия, взвешивания и медицинского допуска.",
+    "status": "Допуск",
+    "allStatuses": "Все",
+    "checkKind": "Непройденная проверка",
+    "anyCheck": "Любая",
+    "problemsOnly": "Только с проблемами",
+    "search": "Спортсмен или клуб",
+    "athlete": "Спортсмен",
+    "category": "Категория",
+    "checks": "Проверки",
+    "checkIn": "Прибытие",
+    "weighIn": "Взвешивание",
+    "empty": "Одобренных участий пока нет.",
+    "loadMore": "Показать ещё",
+    "waive": "Исключить: {kind}",
+    "waiveTitle": "Исключить проверку «{kind}» для {name}",
+    "waiveHint": "Проверка перестанет влиять на допуск. Причина попадёт в журнал аудита.",
+    "waivedBecause": "исключено: {reason}",
+    "recompute": "Пересчитать допуск",
+    "recomputed": "Допуск пересчитан.",
+    "noChecks": "Положение не требует проверок — участник допущен.",
+    "summaryTitle": "Допуск"
+  },
+  "checkin": {
+    "statuses": {
+      "EXPECTED": "Ожидается",
+      "ARRIVED": "Прибыл",
+      "NOT_ARRIVED": "Не прибыл",
+      "WITHDRAWN": "Снят"
+    },
+    "methods": {
+      "QR": "по QR",
+      "SEARCH": "поиском",
+      "MANUAL": "вручную"
+    },
+    "summary": {
+      "declared": "Заявлено",
+      "approved": "Подтверждено",
+      "expected": "Ожидается",
+      "arrived": "Прибыло",
+      "notArrived": "Не прибыло",
+      "withdrawn": "Снято",
+      "problemDocuments": "Проблемы с документами"
+    },
+    "scanTitle": "Сканер QR",
+    "scanHint": "Наведите камеру на QR участника или введите код вручную. Сканирование только находит спортсмена — отметку ставите вы.",
+    "startCamera": "Включить камеру",
+    "stopCamera": "Выключить камеру",
+    "cameraUnavailable": "Камера недоступна — введите код вручную.",
+    "manualToken": "Код из QR",
+    "find": "Найти",
+    "scanned": "Найден по QR",
+    "set": {
+      "ARRIVED": "Прибыл",
+      "NOT_ARRIVED": "Не прибыл",
+      "WITHDRAWN": "Снят"
+    },
+    "search": "Фамилия или имя",
+    "status": "Прибытие",
+    "allStatuses": "Все",
+    "empty": "Спортсменов с одобренными участиями нет.",
+    "loadMore": "Показать ещё",
+    "closedHint": "Отметки прибытия ставятся с начала мандатной комиссии.",
+    "since": "с {time}",
+    "qrTitle": "QR участника",
+    "qrHint": "Покажите код на мандатной комиссии. В коде нет персональных данных.",
+    "showQr": "QR",
+    "hideQr": "Скрыть QR",
+    "qrValidUntil": "Действует до {date}",
+    "withdrawTitle": "Снять с турнира: {name}"
+  },
+  "weighin": {
+    "statuses": {
+      "EXPECTED": "Не взвешен",
+      "PASSED": "Вес подтверждён",
+      "FAILED": "Не прошёл",
+      "RECHECK_REQUIRED": "Повторное взвешивание"
+    },
+    "kinds": {
+      "OFFICIAL": "Официальное",
+      "CONTROL": "Контрольное",
+      "RECHECK": "Повторное"
+    },
+    "results": {
+      "PASSED": "Проходит",
+      "FAILED": "Не проходит"
+    },
+    "windowKinds": {
+      "OFFICIAL": "Официальное",
+      "CONTROL": "Контрольное"
+    },
+    "settings": "Допуск по весу: {tolerance} г · при несоответствии — {outcome}",
+    "setupTitle": "Весы и окна взвешивания",
+    "scalesTitle": "Весы",
+    "scaleName": "Название",
+    "serial": "Заводской номер",
+    "verifiedUntil": "Поверка до",
+    "scaleExpired": "поверка истекла",
+    "addScale": "Добавить весы",
+    "deleteScale": "Удалить",
+    "windowsTitle": "Окна взвешивания",
+    "windowName": "Название",
+    "startsAt": "Начало",
+    "endsAt": "Окончание",
+    "windowKind": "Вид",
+    "windowCategories": "Категории",
+    "allCategoriesOption": "Все категории",
+    "addWindow": "Добавить окно",
+    "deleteWindow": "Удалить",
+    "windowOpen": "идёт",
+    "noWindows": "Окон взвешивания нет.",
+    "noScales": "Весов нет.",
+    "attemptsCount": "попыток: {count}",
+    "stationTitle": "Взвешивание",
+    "window": "Окно",
+    "scale": "Весы",
+    "chooseWindow": "Выберите окно",
+    "noOpenWindow": "Сейчас нет открытого окна взвешивания.",
+    "weight": "Вес, кг",
+    "kind": "Попытка",
+    "record": "Записать",
+    "preview": "{result} в категорию {category}",
+    "weightInvalid": "Введите вес в килограммах, например 37,4",
+    "lastWeight": "последний вес {weight} кг",
+    "recorded": "{kind}: {weight} кг — {result}",
+    "suggested": "Подходит по весу:",
+    "transferTo": "Перевести в {category}",
+    "transferReason": "Вес не соответствует категории на взвешивании — перевод по положению",
+    "status": "Итог",
+    "allStatuses": "Все",
+    "search": "Фамилия или клуб",
+    "empty": "Участников нет.",
+    "loadMore": "Показать ещё",
+    "declared": "заявлен {weight} кг",
+    "notArrived": "не отмечен прибывшим",
+    "history": "История попыток",
+    "categoriesCount": "Категорий: {count}"
+  },
+  "medical": {
+    "states": {
+      "VALID": "Допуск есть",
+      "REVOKED": "Допуск отозван",
+      "MISSING": "Нет допуска"
+    },
+    "notice": "Сведения видит только медицинский персонал турнира; каждый просмотр списка записывается в журнал доступа. Диагнозы не хранятся — только факт допуска, срок и кто выдал.",
+    "state": "Медицинский допуск",
+    "allStates": "Все",
+    "search": "Фамилия или имя",
+    "athlete": "Спортсмен",
+    "validUntil": "Действует до",
+    "issuedBy": "Кем выдан",
+    "competitionOnly": "Только на этот турнир",
+    "record": "Внести допуск",
+    "recordTitle": "Медицинский допуск: {name}",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "revoke": "Отозвать",
+    "revokeTitle": "Отозвать медицинский допуск: {name}",
+    "revokedBecause": "отозван: {reason}",
+    "empty": "Спортсменов с одобренными участиями нет.",
+    "loadMore": "Показать ещё",
+    "forCompetition": "на этот турнир"
+  },
+  "notifications": {
+    "title": "Уведомления",
+    "empty": "Уведомлений пока нет.",
+    "markAll": "Прочитать все",
+    "unreadOnly": "Только непрочитанные",
+    "bell": "Уведомления, непрочитанных: {count}",
+    "open": "Открыть",
+    "markRead": "Прочитано",
+    "loadMore": "Показать ещё",
+    "types": {
+      "application_returned": {
+        "title": "Заявка возвращена на исправление",
+        "body": "Турнир «{competitionName}», {organizationName}. Комментарий: {reason}"
+      },
+      "application_decided": {
+        "title": "Решение по заявке: {status}",
+        "body": "Турнир «{competitionName}», {organizationName}."
+      },
+      "entry_rejected": {
+        "title": "Участие отклонено: {athleteName}",
+        "body": "Турнир «{competitionName}». Причина: {reason}"
+      },
+      "document_rejected": {
+        "title": "Документ отклонён: {documentType}",
+        "body": "Причина: {reason}. Загрузите исправленный документ."
+      }
+    },
+    "preferencesTitle": "Письма на email",
+    "preferencesHint": "Уведомления всегда видны здесь. Письма можно отключить по видам.",
+    "prefs": {
+      "application_returned": "Заявка возвращена",
+      "application_decided": "Решение по заявке",
+      "entry_rejected": "Участие отклонено",
+      "document_rejected": "Документ отклонён"
+    },
+    "saved": "Сохранено",
+    "noValue": "—"
   }
 }

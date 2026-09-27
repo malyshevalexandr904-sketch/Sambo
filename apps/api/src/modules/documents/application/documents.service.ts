@@ -1,9 +1,10 @@
 // Документы (API.md, 4.6): загрузка в приватное хранилище, проверка в контексте турнира, журнал доступа.
 // Статусы — ARCHITECTURE.md, 16.4; EXPIRED выставляет worker по сроку действия.
-import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import {
   type DocumentCreate,
   type DocumentDto,
+  type DocumentStatus,
   type DocumentsQuery,
   type DocumentTransitionRequest,
   type DownloadUrl,
@@ -11,11 +12,9 @@ import {
   type Page,
 } from '@sde/contracts';
 import { type Prisma, type Tx, uuidv7 } from '@sde/db';
-import type { Env } from '@sde/server-kit';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
 import { decodeCursor, toPage } from '../../../common/http/http';
-import { ENV } from '../../../config/config.module';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { PolicyService } from '../../access';
 import { AthleteAccessService, AthleteExtensions } from '../../athletes';
@@ -23,7 +22,7 @@ import { AuditService, DataAccessLogService } from '../../audit';
 import { CompetitionScopeService } from '../../competitions';
 import { FilesService } from '../../files';
 import { OrganizationScopeService } from '../../organizations';
-import { EmailRequestService, OutboxService } from '../../outbox';
+import { OutboxService } from '../../outbox';
 import { canDelete, checkReview, isExpired, mimeAllowed } from '../domain/document-rules';
 import { DocumentAccessService } from './document-access.service';
 
@@ -66,6 +65,14 @@ function toDto(d: Row, allowedActions: string[]): DocumentDto {
   };
 }
 
+export interface AdmissionDocumentFact {
+  athleteId: string | null;
+  applicationId: string | null;
+  typeCode: string;
+  status: DocumentStatus;
+  expirationDate: string | null;
+}
+
 @Injectable()
 export class DocumentsService implements OnModuleInit {
   constructor(
@@ -80,8 +87,6 @@ export class DocumentsService implements OnModuleInit {
     private readonly audit: AuditService,
     private readonly accessLog: DataAccessLogService,
     private readonly outbox: OutboxService,
-    private readonly emails: EmailRequestService,
-    @Inject(ENV) private readonly env: Env,
   ) {}
 
   onModuleInit(): void {
@@ -220,6 +225,7 @@ export class DocumentsService implements OnModuleInit {
           expirationDate: input.expirationDate ?? null,
         },
       });
+      await this.statusChanged(tx, doc.id, doc.status);
       return doc.id;
     });
     const created = await this.db.document.findUniqueOrThrow({ where: { id }, include: INCLUDE });
@@ -295,40 +301,27 @@ export class DocumentsService implements OnModuleInit {
         after: { status: req.to },
         reason: req.reason ?? null,
       });
-      if (req.to === 'REJECTED')
-        await this.notifyRejected(tx, doc.id, doc.typeCode, doc.uploadedById, req.reason ?? '');
+      await this.statusChanged(tx, doc.id, req.to);
     });
     return this.get(user, id);
   }
 
-  /** «Документ отклонён» — загрузившему: событие для уведомлений (Phase 4) и письмо сразу. */
-  private async notifyRejected(
-    tx: Tx,
-    documentId: string,
-    typeCode: string,
-    uploadedById: string | null,
-    reason: string,
-  ): Promise<void> {
+  /**
+   * Статус документа изменился: пересчёт допуска (подписчик в транзакции) и уведомления. «Документ отклонён»
+   * загрузившему — уведомлением с письмом по его настройкам (Phase 4b), а не письмом из API.
+   */
+  private async statusChanged(tx: Tx, documentId: string, status: string): Promise<void> {
     await this.outbox.enqueue(tx, {
-      type: 'document.rejected',
+      type: 'document.status_changed',
       aggregate: { type: 'Document', id: documentId },
-      payload: { documentId },
+      payload: { documentId, status },
     });
-    const uploader = uploadedById ? await tx.user.findUnique({ where: { id: uploadedById } }) : null;
-    if (!uploader?.email) return;
-    const type = await tx.documentType.findUniqueOrThrow({ where: { code: typeCode } });
-    const locale = uploader.locale === 'en' ? 'en' : 'ru';
-    await this.emails.request(tx, {
-      template: 'document.rejected',
-      to: uploader.email,
-      userId: uploader.id,
-      locale,
-      params: {
-        documentType: locale === 'en' ? type.nameEn : type.nameRu,
-        reason,
-        documentsUrl: `${this.env.APP_URL.replace(/\/$/, '')}/${locale}/documents`,
-      },
-    });
+    if (status === 'REJECTED')
+      await this.outbox.enqueue(tx, {
+        type: 'document.rejected',
+        aggregate: { type: 'Document', id: documentId },
+        payload: { documentId },
+      });
   }
 
   /** Удалить может загрузивший, пока документ не взят на проверку (мягкое удаление). */
@@ -346,7 +339,47 @@ export class DocumentsService implements OnModuleInit {
         before: { status: doc.status },
         after: { deleted: true },
       });
+      await this.statusChanged(tx, id, 'DELETED');
     });
+  }
+
+  /**
+   * Документы для проверки допуска (модуль admission): спортсменов и заявок, нужных типов, общие и этого турнира.
+   * Удалённые не учитываются.
+   */
+  async admissionFacts(
+    tx: Tx,
+    q: { athleteIds: string[]; applicationIds: string[]; typeCodes: string[]; competitionId: string },
+  ): Promise<AdmissionDocumentFact[]> {
+    if (q.typeCodes.length === 0) return [];
+    const rows = await tx.document.findMany({
+      where: {
+        deletedAt: null,
+        typeCode: { in: q.typeCodes },
+        OR: [{ athleteId: { in: q.athleteIds } }, { applicationId: { in: q.applicationIds } }],
+        AND: [{ OR: [{ competitionId: null }, { competitionId: q.competitionId }] }],
+      },
+      select: { athleteId: true, applicationId: true, typeCode: true, status: true, expirationDate: true },
+    });
+    return rows.map((r) => ({
+      athleteId: r.athleteId,
+      applicationId: r.applicationId,
+      typeCode: r.typeCode,
+      status: r.status,
+      expirationDate: r.expirationDate?.toISOString().slice(0, 10) ?? null,
+    }));
+  }
+
+  /** Спортсмен и заявка документа — для пересчёта допуска после изменения. */
+  async owners(
+    tx: Tx,
+    documentId: string,
+  ): Promise<{ athleteId: string | null; applicationId: string | null }> {
+    const doc = await tx.document.findUnique({
+      where: { id: documentId },
+      select: { athleteId: true, applicationId: true },
+    });
+    return { athleteId: doc?.athleteId ?? null, applicationId: doc?.applicationId ?? null };
   }
 
   /** Документ — скан согласия этого спортсмена, не отклонён и не просрочен (для бумажного согласия). */

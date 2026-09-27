@@ -19,3 +19,7 @@ export * from './competitions.js';
 export * from './competition-categories.js';
 export * from './public.js';
 export * from './registrations.js';
+export * from './admission.js';
+export * from './weighin.js';
+export * from './medical.js';
+export * from './notifications.js';

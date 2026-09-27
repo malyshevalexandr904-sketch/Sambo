@@ -8,6 +8,7 @@ import { type OrganizationType, PrismaClient, type RoleScope } from '../generate
 import { SEED_ORGANIZATIONS, SEED_USERS } from './data';
 import { seedPhase3 } from './phase3';
 import { seedPhase4 } from './phase4';
+import { seedPhase4b } from './phase4b';
 
 const envFile = path.resolve(__dirname, '..', '..', '..', '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
@@ -157,6 +158,7 @@ async function main(): Promise<void> {
     await seedUsers(db, required('SEED_PASSWORD'), required('SEED_ADMIN_TOTP_SECRET'), key);
     const summary = await seedPhase3(db);
     summary.push(...(await seedPhase4(db)));
+    summary.push(...(await seedPhase4b(db)));
     await seedCompetitionGrants(db);
     process.stdout.write(
       [

@@ -8,6 +8,8 @@ export const SEED_IDS = {
   organizer: '01920000-0000-7000-8000-000000000004',
   /** Учебный турнир «Кубок Юности» (seed Phase 4a): секретарь — secretary@sambo.local. */
   competition: '01920000-0000-7000-8015-000000000001',
+  /** Турнир на мандатной комиссии (seed Phase 4b): секретарь — secretary@sambo.local, врач — doctor@sambo.local. */
+  competitionCheckIn: '01920000-0000-7000-8015-000000000002',
 } as const;
 
 export interface SeedOrganization {
@@ -195,6 +197,21 @@ export const SEED_USERS: SeedUser[] = [
     displayName: 'Секретарь «Кубка Юности»',
     totp: false,
     person: { lastName: 'Протоколова', firstName: 'Вера', birthDate: '1991-01-22', gender: 'FEMALE' },
-    grants: [{ id: g(11), role: 'SECRETARY', organizationId: null, competitionId: SEED_IDS.competition }],
+    grants: [
+      { id: g(11), role: 'SECRETARY', organizationId: null, competitionId: SEED_IDS.competition },
+      { id: g(13), role: 'SECRETARY', organizationId: null, competitionId: SEED_IDS.competitionCheckIn },
+    ],
+  },
+  {
+    id: u(12),
+    identityId: i(12),
+    personId: p(12),
+    email: 'doctor@sambo.local',
+    displayName: 'Врач турнира',
+    totp: false,
+    person: { lastName: 'Здравова', firstName: 'Инна', birthDate: '1983-05-11', gender: 'FEMALE' },
+    grants: [
+      { id: g(12), role: 'MEDICAL_STAFF', organizationId: null, competitionId: SEED_IDS.competitionCheckIn },
+    ],
   },
 ];

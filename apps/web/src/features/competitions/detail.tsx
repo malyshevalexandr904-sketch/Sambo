@@ -1,5 +1,6 @@
 'use client';
-// Страница турнира: обзор и переходы, положение, категории, персонал, заявки и участники. Вкладки и действия —
+// Страница турнира: обзор и переходы, положение, категории, персонал, заявки и участники, мандатная комиссия
+// (допуск, прибытие, взвешивание, медицина). Вкладки и действия —
 // по allowedActions турнира: интерфейс лишь скрывает недоступное, решает сервер.
 import { type Competition } from '@sde/contracts';
 import { Alert, Badge, EmptyState, PageHeader, cn } from '@sde/ui';
@@ -8,6 +9,10 @@ import { useSearchParams } from 'next/navigation';
 import { QueryState } from '@/components/common';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { ApiError } from '@/lib/api';
+import { AdmissionTab } from '@/features/operations/admission-tab';
+import { CheckInTab } from '@/features/operations/checkin-tab';
+import { MedicalTab } from '@/features/operations/medical-tab';
+import { WeighInTab } from '@/features/operations/weighin-tab';
 import { ApplicationsTab, EntriesTab } from './registrations-tabs';
 import { CategoriesTab } from './categories';
 import { OverviewTab } from './overview';
@@ -15,7 +20,18 @@ import { RegulationTab } from './regulation';
 import { CompetitionStatusBadge, formatDates, useCompetition } from './shared';
 import { StaffTab } from './staff';
 
-const TABS = ['overview', 'regulation', 'categories', 'staff', 'applications', 'entries'] as const;
+const TABS = [
+  'overview',
+  'regulation',
+  'categories',
+  'staff',
+  'applications',
+  'entries',
+  'admission',
+  'checkin',
+  'weighin',
+  'medical',
+] as const;
 type Tab = (typeof TABS)[number];
 
 function visibleTabs(c: Competition): Tab[] {
@@ -23,6 +39,10 @@ function visibleTabs(c: Competition): Tab[] {
   return TABS.filter((tab) => {
     if (tab === 'staff') return can('competition.view');
     if (tab === 'entries') return can('registration.view');
+    if (tab === 'admission') return can('admission.view') && c.status !== 'DRAFT';
+    if (tab === 'checkin') return can('checkin.view') && c.status !== 'DRAFT';
+    if (tab === 'weighin') return can('weighin.view') && c.status !== 'DRAFT';
+    if (tab === 'medical') return can('medical.view') && c.status !== 'DRAFT';
     return true;
   });
 }
@@ -102,6 +122,10 @@ export function CompetitionPage({ id }: { id: string }) {
             {tab === 'staff' ? <StaffTab competition={c} /> : null}
             {tab === 'applications' ? <ApplicationsTab competition={c} /> : null}
             {tab === 'entries' ? <EntriesTab competition={c} /> : null}
+            {tab === 'admission' ? <AdmissionTab competition={c} /> : null}
+            {tab === 'checkin' ? <CheckInTab competition={c} /> : null}
+            {tab === 'weighin' ? <WeighInTab competition={c} /> : null}
+            {tab === 'medical' ? <MedicalTab competition={c} /> : null}
           </>
         );
       }}

@@ -1,6 +1,6 @@
 {
   "name": "@sde/web",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Веб-клиент: публичные страницы, кабинеты, админ-панель (Next.js)",
   "scripts": {
@@ -17,6 +17,7 @@
     "@sde/contracts": "workspace:*",
     "@sde/ui": "workspace:*",
     "@tanstack/react-query": "5.103.2",
+    "jsqr": "1.4.0",
     "next": "15.5.26",
     "next-intl": "4.14.6",
     "react": "19.3.0",

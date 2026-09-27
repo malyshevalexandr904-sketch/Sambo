@@ -11,7 +11,7 @@ import {
   fullName,
   isAdultOn,
 } from '@sde/contracts';
-import { type Prisma, uuidv7 } from '@sde/db';
+import { type Prisma, type Tx, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -72,6 +72,26 @@ export class ConsentsService implements OnModuleInit {
         ) as ConsentsStatus,
       ]),
     );
+  }
+
+  /** Действующие согласия по видам: общие и на этот турнир (проверка допуска, модуль admission). */
+  async activeKinds(
+    tx: Tx,
+    personIds: string[],
+    competitionId: string,
+  ): Promise<Map<string, Set<ConsentKind>>> {
+    const rows = await tx.consent.findMany({
+      where: {
+        subjectPersonId: { in: personIds },
+        revokedAt: null,
+        OR: [{ competitionId: null }, { competitionId }],
+      },
+      select: { subjectPersonId: true, template: { select: { kind: true } } },
+    });
+    const result = new Map<string, Set<ConsentKind>>();
+    for (const r of rows)
+      result.set(r.subjectPersonId, (result.get(r.subjectPersonId) ?? new Set()).add(r.template.kind));
+    return result;
   }
 
   private toDto(c: Row, subjectPersonId: string): ConsentDto {
@@ -208,6 +228,12 @@ export class ConsentsService implements OnModuleInit {
           method: input.method,
           givenBy: givenByPersonId === athlete.personId ? 'SELF' : 'GUARDIAN',
         },
+      });
+      await this.outbox.enqueue(tx, {
+        type: 'consent.given',
+        aggregate: { type: 'Consent', id: consent.id },
+        competitionId: consent.competitionId,
+        payload: { consentId: consent.id, personId: athlete.personId },
       });
       return consent.id;
     });

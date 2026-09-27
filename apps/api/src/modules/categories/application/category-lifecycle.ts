@@ -54,7 +54,7 @@ export class CategoryLifecycle implements OnModuleInit {
 
   /**
    * Регистрация турнира закрыта — закрыта и в категориях; продлена — категории, закрытые вместе с турниром,
-   * снова принимают заявки.
+   * снова принимают заявки. Начало мандатной комиссии открывает взвешивание в закрытых категориях.
    */
   private async effect(ctx: TransitionContext): Promise<void> {
     const { tx, competition, from, to } = ctx;
@@ -67,6 +67,11 @@ export class CategoryLifecycle implements OnModuleInit {
       await tx.competitionCategory.updateMany({
         where: { competitionId: competition.id, status: 'CLOSED' },
         data: { status: 'REGISTRATION', version: { increment: 1 } },
+      });
+    if (from === 'REGISTRATION_CLOSED' && to === 'CHECK_IN')
+      await tx.competitionCategory.updateMany({
+        where: { competitionId: competition.id, status: 'CLOSED' },
+        data: { status: 'WEIGH_IN', version: { increment: 1 } },
       });
   }
 }

@@ -4,4 +4,6 @@ export {
   OutboxService,
   type EmailRequest,
   type EnqueueEvent,
+  type TxEvent,
+  type TxEventHandler,
 } from './application/outbox.service';

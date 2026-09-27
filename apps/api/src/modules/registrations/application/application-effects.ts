@@ -43,7 +43,7 @@ export async function entryCounts(db: Tx, ids: string[]): Promise<Map<string, En
   return result;
 }
 
-/** События заявки в outbox: подана, возвращена на исправление, решение. */
+/** События заявки в outbox: подана, возвращена на исправление, отозвана, решение. */
 export async function applicationEvents(
   outbox: OutboxService,
   tx: Tx,
@@ -62,6 +62,13 @@ export async function applicationEvents(
   if (to === 'WAITING_DOCUMENTS')
     await outbox.enqueue(tx, {
       type: 'registration.application_returned',
+      aggregate,
+      competitionId,
+      payload: { applicationId: id },
+    });
+  if (to === 'CANCELLED')
+    await outbox.enqueue(tx, {
+      type: 'registration.application_cancelled',
       aggregate,
       competitionId,
       payload: { applicationId: id },
