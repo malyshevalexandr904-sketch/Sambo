@@ -1,6 +1,7 @@
 // Заявки и участия (API.md, 5.3; DATABASE.md, 3.5; C-02; ARCHITECTURE.md, 16.3).
 // Application — заявка клуба на турнир; Entry — спортсмен × категория со снимком данных (ADR-10).
 import { z } from 'zod';
+import type { AdmissionSummary } from './admission.js';
 import type { EligibilityReason } from './categories.js';
 import { Grams, type LocalizedText, PageQuery, Reason, Uuid } from './common.js';
 import type { CategoryRef, CategoryWeight } from './competition-categories.js';
@@ -148,6 +149,8 @@ export interface EntryDto {
   withdrawReason: string | null;
   version: number;
   createdAt: string;
+  /** Допуск одобренного участия (Phase 4b): статус и непройденные проверки; null — допуска ещё нет. */
+  admission: AdmissionSummary | null;
   allowedActions: string[];
 }
 

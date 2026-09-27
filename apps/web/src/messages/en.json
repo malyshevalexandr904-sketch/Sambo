@@ -56,7 +56,8 @@
     "rulesets": "Rules",
     "consentTemplates": "Consent texts",
     "competitions": "Competitions",
-    "applications": "My applications"
+    "applications": "My applications",
+    "notifications": "Notifications"
   },
   "auth": {
     "email": "Email",
@@ -404,7 +405,12 @@
     "CONSENT_MISSING": "The athlete has no valid consent to personal data processing.",
     "APPLICATION_EMPTY": "The application has no athletes.",
     "CATEGORY_NOT_READY_FOR_DRAW": "The category has already been drawn, merged or cancelled.",
-    "CATEGORY_TRANSFER_NOT_ALLOWED": "The entry cannot be transferred to this category."
+    "CATEGORY_TRANSFER_NOT_ALLOWED": "The entry cannot be transferred to this category.",
+    "ADMISSION_REQUIREMENTS_NOT_MET": "Admission requirements are not met.",
+    "WEIGH_IN_REQUIRED": "Weigh-in is required first.",
+    "NOT_CHECKED_IN": "The athlete has not checked in — mark the arrival first.",
+    "WEIGH_IN_WINDOW_CLOSED": "The weigh-in window is closed now.",
+    "SCALE_CALIBRATION_EXPIRED": "The scale verification has expired — choose another scale."
   },
   "people": {
     "lastName": "Last name",
@@ -823,7 +829,11 @@
       "categories": "Categories",
       "staff": "Staff",
       "applications": "Applications",
-      "entries": "Entries"
+      "entries": "Entries",
+      "admission": "Admission",
+      "checkin": "Check-in",
+      "weighin": "Weigh-in",
+      "medical": "Medical"
     },
     "statuses": {
       "DRAFT": "Draft",
@@ -884,7 +894,13 @@
       "ruleset_not_published": "the rules version is not published",
       "timezone": "invalid time zone",
       "used_in_templates": "used in templates",
-      "weigh_in_required": "weigh-in is required first"
+      "weigh_in_required": "weigh-in is required first",
+      "admission_pending": "admission is not decided for every entry of the category",
+      "weigh_in_started": "check-in and weigh-in have already started",
+      "entry_not_approved": "the entry is not approved",
+      "category_status": "the category is not at this stage",
+      "scale_has_attempts": "weigh-ins were already recorded on this scale",
+      "window_has_attempts": "weigh-ins were already recorded in this window"
     },
     "dates": "Dates",
     "registrationWindow": "Registration",
@@ -893,7 +909,10 @@
       "categories": "Categories",
       "applications": "Applications",
       "entriesApproved": "Approved entries",
-      "entriesPending": "Pending entries"
+      "entriesPending": "Pending entries",
+      "arrived": "Arrived",
+      "admitted": "Admitted",
+      "notAdmitted": "Not admitted"
     },
     "publicPage": "Public competition page",
     "readiness": {
@@ -951,7 +970,9 @@
       "pdfHint": "PDF up to 20 MB. The file will be available on the public competition page.",
       "text": "Requirements for participants",
       "textHint": "Text for the public page: eligibility, documents, attire.",
-      "save": "Save"
+      "save": "Save",
+      "outcome": "If the weight does not fit the category",
+      "outcomeHint": "As the regulation says (D-06); cannot change once check-in has started."
     },
     "requirements": {
       "title": "Admission requirements",
@@ -1058,7 +1079,12 @@
       "goToCompetition": "Open competition",
       "needLogin": "Sign in with the email address the invitation was sent to and open the link again."
     },
-    "registrationUntil": "Entries until {date}"
+    "registrationUntil": "Entries until {date}",
+    "outcomes": {
+      "WITHDRAW": "withdrawal from the competition",
+      "RECHECK": "a recheck within the window",
+      "TRANSFER": "transfer to a category that fits"
+    }
   },
   "applications": {
     "cardTitle": "Competition application",
@@ -1213,5 +1239,242 @@
     "participantsTotal": "Approved entries: {count}",
     "category": "Category",
     "participants": "Entries"
+  },
+  "admission": {
+    "statuses": {
+      "PENDING": "Pending",
+      "ADMITTED": "Admitted",
+      "NOT_ADMITTED": "Not admitted"
+    },
+    "checkKinds": {
+      "DOCUMENTS": "Documents",
+      "CONSENTS": "Consents",
+      "MEDICAL": "Medical clearance",
+      "INSURANCE": "Insurance",
+      "AGE": "Age",
+      "QUALIFICATION": "Qualification",
+      "WEIGHT": "Weight",
+      "CHECK_IN": "Arrival"
+    },
+    "checkStatuses": {
+      "PENDING": "pending",
+      "PASSED": "passed",
+      "FAILED": "failed",
+      "WAIVED": "waived"
+    },
+    "reasons": {
+      "document_missing": "no document: {types}",
+      "document_not_verified": "document under review: {types}",
+      "document_rejected": "document rejected: {types}",
+      "document_expired": "document expired: {types}",
+      "consent_missing": "no consent: {kinds}",
+      "medical_missing": "no medical clearance",
+      "medical_revoked": "medical clearance revoked",
+      "weigh_in_expected": "not weighed",
+      "weigh_in_recheck_required": "recheck required",
+      "weigh_in_failed": "weight {weight} kg does not fit the category",
+      "check_in_expected": "arrival not marked",
+      "not_arrived": "did not arrive",
+      "check_in_withdrawn": "withdrawn at check-in"
+    },
+    "title": "Admission commission",
+    "hint": "Checks come from the regulation. Admission is recomputed automatically after document review, check-in, weigh-in and medical clearance.",
+    "status": "Admission",
+    "allStatuses": "All",
+    "checkKind": "Failing check",
+    "anyCheck": "Any",
+    "problemsOnly": "Problems only",
+    "search": "Athlete or club",
+    "athlete": "Athlete",
+    "category": "Category",
+    "checks": "Checks",
+    "checkIn": "Arrival",
+    "weighIn": "Weigh-in",
+    "empty": "No approved entries yet.",
+    "loadMore": "Show more",
+    "waive": "Waive: {kind}",
+    "waiveTitle": "Waive the “{kind}” check for {name}",
+    "waiveHint": "The check will no longer affect admission. The reason goes to the audit log.",
+    "waivedBecause": "waived: {reason}",
+    "recompute": "Recompute admission",
+    "recomputed": "Admission recomputed.",
+    "noChecks": "The regulation requires no checks — the entry is admitted.",
+    "summaryTitle": "Admission"
+  },
+  "checkin": {
+    "statuses": {
+      "EXPECTED": "Expected",
+      "ARRIVED": "Arrived",
+      "NOT_ARRIVED": "Did not arrive",
+      "WITHDRAWN": "Withdrawn"
+    },
+    "methods": {
+      "QR": "by QR",
+      "SEARCH": "by search",
+      "MANUAL": "manually"
+    },
+    "summary": {
+      "declared": "Declared",
+      "approved": "Approved",
+      "expected": "Expected",
+      "arrived": "Arrived",
+      "notArrived": "Did not arrive",
+      "withdrawn": "Withdrawn",
+      "problemDocuments": "Document problems"
+    },
+    "scanTitle": "QR scanner",
+    "scanHint": "Point the camera at the participant QR or type the code. Scanning only finds the athlete — you set the mark.",
+    "startCamera": "Turn camera on",
+    "stopCamera": "Turn camera off",
+    "cameraUnavailable": "Camera unavailable — type the code.",
+    "manualToken": "QR code",
+    "find": "Find",
+    "scanned": "Found by QR",
+    "set": {
+      "ARRIVED": "Arrived",
+      "NOT_ARRIVED": "Did not arrive",
+      "WITHDRAWN": "Withdrawn"
+    },
+    "search": "Last or first name",
+    "status": "Arrival",
+    "allStatuses": "All",
+    "empty": "No athletes with approved entries.",
+    "loadMore": "Show more",
+    "closedHint": "Arrivals are marked once check-in has started.",
+    "since": "since {time}",
+    "qrTitle": "Participant QR",
+    "qrHint": "Show the code at check-in. It contains no personal data.",
+    "showQr": "QR",
+    "hideQr": "Hide QR",
+    "qrValidUntil": "Valid until {date}"
+  },
+  "weighin": {
+    "statuses": {
+      "EXPECTED": "Not weighed",
+      "PASSED": "Weight confirmed",
+      "FAILED": "Failed",
+      "RECHECK_REQUIRED": "Recheck required"
+    },
+    "kinds": {
+      "OFFICIAL": "Official",
+      "CONTROL": "Control",
+      "RECHECK": "Recheck"
+    },
+    "results": {
+      "PASSED": "Fits",
+      "FAILED": "Does not fit"
+    },
+    "windowKinds": {
+      "OFFICIAL": "Official",
+      "CONTROL": "Control"
+    },
+    "settings": "Weight tolerance: {tolerance} g · on mismatch — {outcome}",
+    "setupTitle": "Scales and weigh-in windows",
+    "scalesTitle": "Scales",
+    "scaleName": "Name",
+    "serial": "Serial number",
+    "verifiedUntil": "Verified until",
+    "scaleExpired": "verification expired",
+    "addScale": "Add scale",
+    "deleteScale": "Delete",
+    "windowsTitle": "Weigh-in windows",
+    "windowName": "Name",
+    "startsAt": "Start",
+    "endsAt": "End",
+    "windowKind": "Kind",
+    "windowCategories": "Categories",
+    "allCategoriesOption": "All categories",
+    "addWindow": "Add window",
+    "deleteWindow": "Delete",
+    "windowOpen": "open",
+    "noWindows": "No weigh-in windows.",
+    "noScales": "No scales.",
+    "attemptsCount": "attempts: {count}",
+    "stationTitle": "Weigh-in",
+    "window": "Window",
+    "scale": "Scale",
+    "chooseWindow": "Choose a window",
+    "noOpenWindow": "No weigh-in window is open now.",
+    "weight": "Weight, kg",
+    "kind": "Attempt",
+    "record": "Record",
+    "preview": "{result} for {category}",
+    "weightInvalid": "Enter the weight in kilograms, e.g. 37.4",
+    "lastWeight": "last weight {weight} kg",
+    "recorded": "{kind}: {weight} kg — {result}",
+    "suggested": "Fits by weight:",
+    "transferTo": "Transfer to {category}",
+    "transferReason": "Weight did not fit the category at weigh-in — transfer by the regulation",
+    "status": "Result",
+    "allStatuses": "All",
+    "search": "Last name or club",
+    "empty": "No entries.",
+    "loadMore": "Show more",
+    "declared": "declared {weight} kg",
+    "notArrived": "arrival not marked",
+    "history": "Attempt history"
+  },
+  "medical": {
+    "states": {
+      "VALID": "Cleared",
+      "REVOKED": "Clearance revoked",
+      "MISSING": "No clearance"
+    },
+    "notice": "Only the medical staff of the competition sees this; every view of the list is logged. No diagnoses are stored — only the fact of clearance, its term and who issued it.",
+    "state": "Medical clearance",
+    "allStates": "All",
+    "search": "Last or first name",
+    "athlete": "Athlete",
+    "validUntil": "Valid until",
+    "issuedBy": "Issued by",
+    "competitionOnly": "For this competition only",
+    "record": "Record clearance",
+    "recordTitle": "Medical clearance: {name}",
+    "save": "Save",
+    "cancel": "Cancel",
+    "revoke": "Revoke",
+    "revokeTitle": "Revoke the medical clearance: {name}",
+    "revokedBecause": "revoked: {reason}",
+    "empty": "No athletes with approved entries.",
+    "loadMore": "Show more",
+    "forCompetition": "for this competition"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications yet.",
+    "markAll": "Mark all as read",
+    "unreadOnly": "Unread only",
+    "bell": "Notifications, unread: {count}",
+    "open": "Open",
+    "markRead": "Read",
+    "loadMore": "Show more",
+    "types": {
+      "application_returned": {
+        "title": "Application returned for correction",
+        "body": "“{competitionName}”, {organizationName}. Comment: {reason}"
+      },
+      "application_decided": {
+        "title": "Application decision: {status}",
+        "body": "“{competitionName}”, {organizationName}."
+      },
+      "entry_rejected": {
+        "title": "Entry rejected: {athleteName}",
+        "body": "“{competitionName}”. Reason: {reason}"
+      },
+      "document_rejected": {
+        "title": "Document rejected: {documentType}",
+        "body": "Reason: {reason}. Please upload a corrected document."
+      }
+    },
+    "preferencesTitle": "Email",
+    "preferencesHint": "Notifications are always shown here. Emails can be switched off per kind.",
+    "prefs": {
+      "application_returned": "Application returned",
+      "application_decided": "Application decision",
+      "entry_rejected": "Entry rejected",
+      "document_rejected": "Document rejected"
+    },
+    "saved": "Saved",
+    "noValue": "—"
   }
 }

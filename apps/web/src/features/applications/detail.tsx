@@ -16,6 +16,8 @@ import { useErrorMessage } from '@/lib/errors';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { pickName, qk } from '@/lib/queries';
 import { AddEntryCard } from './add-entry';
+import { EntryQr } from '@/features/operations/entry-qr';
+import { AdmissionSummaryView } from '@/features/operations/shared';
 import { EntryActions } from './entry-actions';
 
 /** Переходы, для которых сервер требует комментарий (попадает клубу). */
@@ -233,9 +235,19 @@ function EntriesCard({
                   {e.withdrawReason ? (
                     <p className="mt-1 text-xs text-slate-600">{e.withdrawReason}</p>
                   ) : null}
+                  {e.admission ? (
+                    <div className="mt-1">
+                      <AdmissionSummaryView summary={e.admission} />
+                    </div>
+                  ) : null}
                 </Td>
                 <Td>
                   <EntryActions entry={e} categories={categories} onChanged={onChanged} />
+                  {e.status === 'APPROVED' ? (
+                    <div className="mt-2">
+                      <EntryQr entryId={e.id} />
+                    </div>
+                  ) : null}
                 </Td>
               </tr>
             ))}

@@ -1,9 +1,16 @@
 // Проверка словарей в CI (ARCHITECTURE.md, 19): ключи ru и en совпадают, у каждого кода ошибки,
-// роли, типа и статуса организации, статусов и видов из справочников Phase 3 и турниров Phase 4 есть перевод.
+// роли, типа и статуса организации, статусов и видов из справочников Phase 3, турниров Phase 4a и допуска,
+// прибытия, взвешивания, медицины и уведомлений Phase 4b есть перевод.
 import {
+  ADMISSION_CHECK_KINDS,
+  ADMISSION_CHECK_STATUSES,
+  ADMISSION_REASONS,
+  ADMISSION_STATUSES,
   AGE_POLICIES,
   APPLICATION_STATUSES,
   CATEGORY_STATUSES,
+  CHECK_IN_METHODS,
+  CHECK_IN_STATUSES,
   COMPETITION_LEVELS,
   COMPETITION_STATUSES,
   CONSENT_KINDS,
@@ -15,6 +22,8 @@ import {
   GUARDIAN_VERIFICATION_BASES,
   IMPORT_COLUMNS,
   IMPORT_FILE_ERRORS,
+  MEDICAL_STATES,
+  NOTIFICATION_TYPES,
   ORGANIZATION_STATUSES,
   ORGANIZATION_TYPES,
   PROFILE_STATUSES,
@@ -23,6 +32,11 @@ import {
   RULESET_VERSION_STATUSES,
   SYSTEM_SETTING_DEFAULTS,
   USER_STATUSES,
+  WEIGH_IN_ATTEMPT_KINDS,
+  WEIGH_IN_FAILURE_OUTCOMES,
+  WEIGH_IN_RESULTS,
+  WEIGH_IN_STATUSES,
+  WEIGH_IN_WINDOW_KINDS,
 } from '@sde/contracts';
 import { describe, expect, it } from 'vitest';
 import en from './en.json';
@@ -66,6 +80,22 @@ describe('i18n dictionaries', () => {
       ...ENTRY_STATUSES.map((s) => `applications.entryStatuses.${s}`),
       ...ELIGIBILITY_REASONS.map((r) => `applications.reasons.${r}`),
       ...REQUIREMENT_KINDS.map((k) => `tournaments.requirementKinds.${k}`),
+      ...ADMISSION_STATUSES.map((s) => `admission.statuses.${s}`),
+      ...ADMISSION_CHECK_KINDS.map((k) => `admission.checkKinds.${k}`),
+      ...ADMISSION_CHECK_STATUSES.map((s) => `admission.checkStatuses.${s}`),
+      ...ADMISSION_REASONS.map((r) => `admission.reasons.${r}`),
+      ...CHECK_IN_STATUSES.map((s) => `checkin.statuses.${s}`),
+      ...CHECK_IN_METHODS.map((m) => `checkin.methods.${m}`),
+      ...WEIGH_IN_STATUSES.map((s) => `weighin.statuses.${s}`),
+      ...WEIGH_IN_ATTEMPT_KINDS.map((k) => `weighin.kinds.${k}`),
+      ...WEIGH_IN_RESULTS.map((r) => `weighin.results.${r}`),
+      ...WEIGH_IN_WINDOW_KINDS.map((k) => `weighin.windowKinds.${k}`),
+      ...WEIGH_IN_FAILURE_OUTCOMES.map((o) => `competitions.outcomes.${o}`),
+      ...MEDICAL_STATES.map((s) => `medical.states.${s}`),
+      ...NOTIFICATION_TYPES.flatMap((n) => [
+        `notifications.types.${n.replace('.', '_')}.title`,
+        `notifications.prefs.${n.replace('.', '_')}`,
+      ]),
     ];
     expect(required.filter((k) => !all.has(k))).toEqual([]);
   });

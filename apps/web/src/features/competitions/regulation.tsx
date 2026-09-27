@@ -9,6 +9,8 @@ import {
   type DataEnvelope,
   type RequirementDto,
   type RequirementInput,
+  WEIGH_IN_FAILURE_OUTCOMES,
+  type WeighInFailureOutcome,
 } from '@sde/contracts';
 import { Alert, Button, Card, CardTitle, Field, Input, Select, Textarea } from '@sde/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -39,9 +41,17 @@ function RegulationCard({ competition: c, editable }: { competition: Competition
   const t = useTranslations('competitions.regulation');
   const queryClient = useQueryClient();
   const action = useAction();
+  const outcomes = useTranslations('competitions.outcomes');
   const [text, setText] = useState(c.requirementsMd ?? '');
+  const [outcome, setOutcome] = useState(c.weighInFailureOutcome);
   useEffect(() => setText(c.requirementsMd ?? ''), [c.requirementsMd]);
-  const save = (body: { regulationFileId?: string | null; requirementsMd: string }): void =>
+  useEffect(() => setOutcome(c.weighInFailureOutcome), [c.weighInFailureOutcome]);
+  const outcomeEditable = ['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(c.status);
+  const save = (body: {
+    regulationFileId?: string | null;
+    requirementsMd: string;
+    weighInFailureOutcome?: WeighInFailureOutcome;
+  }): void =>
     void action.run(async () => {
       const res = await api<DataEnvelope<Competition>>(`/competitions/${c.id}/regulation`, {
         method: 'PUT',
@@ -102,13 +112,39 @@ function RegulationCard({ competition: c, editable }: { competition: Competition
               maxLength={20000}
             />
           </Field>
-          <Button loading={action.busy} onClick={() => save({ requirementsMd: text })}>
+          <Field id="reg-outcome" label={t('outcome')} hint={t('outcomeHint')}>
+            <Select
+              id="reg-outcome"
+              value={outcome}
+              disabled={!outcomeEditable}
+              onChange={(e) => setOutcome(e.target.value as WeighInFailureOutcome)}
+            >
+              {WEIGH_IN_FAILURE_OUTCOMES.map((o) => (
+                <option key={o} value={o}>
+                  {outcomes(o)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Button
+            loading={action.busy}
+            onClick={() =>
+              save({ requirementsMd: text, ...(outcomeEditable ? { weighInFailureOutcome: outcome } : {}) })
+            }
+          >
             {t('save')}
           </Button>
         </div>
-      ) : c.requirementsMd ? (
-        <MarkdownLite text={c.requirementsMd} className="prose-sm mt-4 space-y-2" />
-      ) : null}
+      ) : (
+        <>
+          {c.requirementsMd ? (
+            <MarkdownLite text={c.requirementsMd} className="prose-sm mt-4 space-y-2" />
+          ) : null}
+          <p className="mt-4 text-sm text-slate-600">
+            {t('outcome')}: {outcomes(c.weighInFailureOutcome)}
+          </p>
+        </>
+      )}
     </Card>
   );
 }

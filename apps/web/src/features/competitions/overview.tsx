@@ -23,6 +23,9 @@ import { useAction } from '@/lib/use-action';
 import { EditCard } from './edit-card';
 import { formatDates, formatInZone, useFailedText } from './shared';
 
+/** Мандатная комиссия и соревнования: на дашборде — прибытие и допуск (раздел 34 ТЗ). */
+const OPERATIONS: readonly string[] = ['CHECK_IN', 'DRAWING', 'SCHEDULED', 'IN_PROGRESS', 'FINISHED'];
+
 export function OverviewTab({ competition: c }: { competition: Competition }) {
   const can = (a: string): boolean => c.allowedActions.includes(a);
   return (
@@ -64,7 +67,15 @@ function InfoCard({ competition: c }: { competition: Competition }) {
       </dl>
       {c.viewer.staff ? (
         <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {(['categories', 'applications', 'entriesApproved', 'entriesPending'] as const).map((k) => (
+          {(
+            [
+              'categories',
+              'applications',
+              'entriesApproved',
+              'entriesPending',
+              ...(OPERATIONS.includes(c.status) ? (['arrived', 'admitted', 'notAdmitted'] as const) : []),
+            ] as const
+          ).map((k) => (
             <div key={k} className="rounded-md bg-slate-50 p-3">
               <dt className="text-xs text-slate-600">{t(`counters.${k}`)}</dt>
               <dd className="text-2xl font-semibold">{c.counters[k]}</dd>

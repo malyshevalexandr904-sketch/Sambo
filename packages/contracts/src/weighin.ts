@@ -166,6 +166,8 @@ export interface WeighInRecordDto {
 
 export interface WeighInRow {
   entryId: string;
+  /** Версия участия — для перевода в другую категорию (If-Match). */
+  entryVersion: number;
   athlete: AthleteBrief;
   organization: OrganizationRef;
   category: CategoryRef & { weight: CategoryWeight };

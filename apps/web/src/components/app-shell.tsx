@@ -10,6 +10,7 @@ import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { hasAnywhere, platformHas } from '@/lib/access';
 import { useMe, useMyAthletes } from '@/lib/queries';
+import { NotificationBell } from '@/features/notifications/bell';
 import { LocaleSwitcher } from './locale-switcher';
 
 export function hasPlatformPermission(me: Me | undefined, permission: PermissionCode): boolean {
@@ -87,6 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       label: t('nav.settings'),
       visible: hasPlatformPermission(user, 'platform.settings.manage'),
     },
+    { href: '/notifications', label: t('nav.notifications'), visible: true },
     { href: '/account', label: t('nav.account'), visible: true },
   ];
   const isActive = (href: string): boolean =>
@@ -113,6 +115,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <Link href="/admin" className="font-bold">
           SAMBO Digital
         </Link>
+        <span className="ml-auto mr-1">
+          <NotificationBell />
+        </span>
         <Button
           variant="ghost"
           aria-expanded={open}
@@ -129,9 +134,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <Link href="/admin" className="mb-6 hidden text-lg font-bold lg:block">
-          SAMBO Digital
-        </Link>
+        <div className="mb-6 hidden items-center justify-between lg:flex">
+          <Link href="/admin" className="text-lg font-bold">
+            SAMBO Digital
+          </Link>
+          <NotificationBell />
+        </div>
         <nav aria-label={t('common.menu')}>
           <ul className="space-y-1">
             {nav

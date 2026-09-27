@@ -361,6 +361,7 @@ export class WeighInService {
       take: q.limit + 1,
       select: {
         ...ENTRY_VIEW_SELECT,
+        version: true,
         category: { select: CATEGORY_SELECT },
         weighInRecord: { select: { status: true, lastAttempt: { include: ATTEMPT_INCLUDE } } },
       },
@@ -376,6 +377,7 @@ export class WeighInService {
       (r) => ({ k: r.snapLastName, id: r.id }),
       (r): WeighInRow => ({
         entryId: r.id,
+        entryVersion: r.version,
         athlete: toAthleteBrief(r),
         organization: organizationOf(r),
         category: withWeight(r.category),
