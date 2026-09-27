@@ -11,38 +11,47 @@ import {
   type CompetitionTransitionRequest,
   type Page,
   type PermissionCode,
-  ROLE_PERMISSIONS,
-  ROLES,
-  type RoleCode,
-  scheduleIssues,
 } from '@sde/contracts';
-import { type Prisma, type Tx, uuidv7 } from '@sde/db';
+import { type Tx, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
-import { decodeCursor, toPage } from '../../../common/http/http';
+import { toPage } from '../../../common/http/http';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { type EffectiveGrants, PolicyService } from '../../access';
+import { PolicyService } from '../../access';
 import { AuditService } from '../../audit';
 import { FilesService } from '../../files';
-import { OrganizationScopeService, slugify } from '../../organizations';
+import { OrganizationScopeService } from '../../organizations';
 import { OutboxService } from '../../outbox';
 import { RuleSetsService } from '../../rulesets';
 import { WriteLeaseService } from '../../venue-sync';
 import {
   findTransition,
-  isPublished,
   publishIssues,
   registrationWindow,
   reopenIssues,
   transitionsFrom,
 } from '../domain/competition-machine';
-import { competitionSlugBase } from '../domain/competition-slug';
+import {
+  assertEditable,
+  auditDiff,
+  createData,
+  dateOnly,
+  mergedSchedule,
+  transitionData,
+  updateData,
+} from './competition-edit';
 import { CompetitionExtensions, type TransitionContext } from './competition-extensions';
+import { listWhere, staffFilter } from './competition-queries';
+import { CompetitionReferences } from './competition-references';
 import { type CompetitionBasics, CompetitionScopeService } from './competition-scope.service';
-import { COMPETITION_INCLUDE, type CompetitionRow, toBasics, toSummary } from './competition-mapper';
-
-const toDate = (d: string): Date => new Date(`${d}T00:00:00.000Z`);
-const dateOnly = (d: Date): string => d.toISOString().slice(0, 10);
+import {
+  COMPETITION_INCLUDE,
+  type CompetitionRow,
+  toBasics,
+  toRegulation,
+  toRuleSetVersionRef,
+  toSummary,
+} from './competition-mapper';
 
 /** Действия над турниром для allowedActions (UI скрывает недоступное, решает сервер). */
 const ACTION_CANDIDATES: readonly PermissionCode[] = [
@@ -63,15 +72,6 @@ const ACTION_CANDIDATES: readonly PermissionCode[] = [
   'audit.view',
 ];
 
-/** Поля расписания: их изменение у опубликованного турнира требует причины и уведомляет участников. */
-const SCHEDULE_FIELDS = [
-  'timezone',
-  'startDate',
-  'endDate',
-  'registrationStartsAt',
-  'registrationEndsAt',
-] as const;
-
 @Injectable()
 export class CompetitionsService {
   constructor(
@@ -83,64 +83,15 @@ export class CompetitionsService {
     private readonly leases: WriteLeaseService,
     private readonly rulesets: RuleSetsService,
     private readonly files: FilesService,
+    private readonly refs: CompetitionReferences,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
   ) {}
 
   // ---------- Чтение ----------
 
-  /**
-   * Видимость черновиков: платформа, организации с правом просмотра турниров (организатор ▲, федерация — с
-   * дочерними) и персонал турнира. Опубликованные турниры видит любой вошедший.
-   */
-  private staffFilter(grants: EffectiveGrants): Prisma.CompetitionWhereInput | 'all' {
-    const canView = (roles: RoleCode[]): boolean =>
-      roles.some((r) => ROLE_PERMISSIONS[r]['competition.view'] !== undefined);
-    if (canView(grants.platform)) return 'all';
-    const direct: string[] = [];
-    const withDescendants: string[] = [];
-    for (const g of grants.organizations) {
-      if (g.organizationStatus !== 'ACTIVE') continue;
-      for (const r of g.roles) {
-        if (ROLE_PERMISSIONS[r]['competition.view'] === undefined) continue;
-        (ROLES[r].inheritsToDescendants ? withDescendants : direct).push(g.organizationId);
-      }
-    }
-    const or: Prisma.CompetitionWhereInput[] = [];
-    if (direct.length > 0) or.push({ organizerOrganizationId: { in: direct } });
-    if (withDescendants.length > 0)
-      or.push({ organizer: { ancestors: { some: { ancestorId: { in: withDescendants } } } } });
-    const staffOf = grants.competitions.filter((g) => canView(g.roles)).map((g) => g.competitionId);
-    if (staffOf.length > 0) or.push({ id: { in: staffOf } });
-    return or.length > 0 ? { OR: or } : { id: { in: [] } };
-  }
-
   async list(user: AuthUser, q: CompetitionsQuery): Promise<Page<CompetitionSummary>> {
-    const staff = this.staffFilter(await this.policy.grants(user));
-    const and: Prisma.CompetitionWhereInput[] = [{ deletedAt: null }];
-    if (q.mine) {
-      if (staff !== 'all') and.push(staff);
-    } else if (staff !== 'all') {
-      and.push({ OR: [{ status: { not: 'DRAFT' } }, staff] });
-    }
-    if (q.status) and.push({ status: q.status });
-    if (q.organizerId) and.push({ organizerOrganizationId: q.organizerId });
-    if (q.from) and.push({ endDate: { gte: toDate(q.from) } });
-    if (q.to) and.push({ startDate: { lte: toDate(q.to) } });
-    if (q.q) and.push({ name: { contains: q.q, mode: 'insensitive' } });
-    if (q.registrationOpen) {
-      const now = new Date();
-      and.push({
-        status: 'REGISTRATION_OPEN',
-        registrationStartsAt: { lte: now },
-        registrationEndsAt: { gt: now },
-      });
-    }
-    const cursor = decodeCursor(q.cursor);
-    if (cursor) {
-      const at = toDate(cursor.k);
-      and.push({ OR: [{ startDate: { lt: at } }, { startDate: at, id: { lt: cursor.id } }] });
-    }
+    const and = listWhere(q, staffFilter(await this.policy.grants(user)), new Date());
     const rows = await this.db.competition.findMany({
       where: { AND: and },
       orderBy: [{ startDate: 'desc' }, { id: 'desc' }],
@@ -185,26 +136,9 @@ export class CompetitionsService {
     return {
       ...toSummary(row, new Date(), (key) => this.files.publicUrl(key)),
       descriptionMd: row.descriptionMd,
-      ruleSetVersion: version
-        ? {
-            id: version.id,
-            ruleSetId: version.ruleSetId,
-            ruleSetCode: version.ruleSetCode,
-            ruleSetName: version.ruleSetName,
-            version: version.version,
-            status: version.status,
-            checksum: version.checksum,
-          }
-        : null,
+      ruleSetVersion: version ? toRuleSetVersionRef(version) : null,
       logoFileId: row.logoFileId,
-      regulation: row.regulation
-        ? {
-            fileId: row.regulation.id,
-            fileName: row.regulation.originalName,
-            url:
-              row.regulation.status === 'AVAILABLE' ? this.files.publicUrl(row.regulation.storageKey) : null,
-          }
-        : null,
+      regulation: toRegulation(row, (key) => this.files.publicUrl(key)),
       requirementsMd: row.requirementsMd,
       contactInfo: (row.contactInfo as Competition['contactInfo']) ?? null,
       publishedAt: row.publishedAt?.toISOString() ?? null,
@@ -220,62 +154,6 @@ export class CompetitionsService {
     };
   }
 
-  // ---------- Проверки ссылок ----------
-
-  private async assertDiscipline(tx: Tx, code: string): Promise<void> {
-    if (!(await tx.discipline.findUnique({ where: { code } })))
-      throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'disciplineCode', code: 'not_found' }] });
-  }
-
-  /** Место — организатора или вышестоящей организации (федерации). */
-  private async assertVenue(tx: Tx, venueId: string, organizerId: string): Promise<void> {
-    const venue = await tx.venue.findFirst({ where: { id: venueId, deletedAt: null } });
-    const lineage = (await this.orgScopes.scopeOf(organizerId)).ancestorIds;
-    if (!venue || !lineage.includes(venue.ownerOrganizationId))
-      throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'venueId', code: 'not_found' }] });
-  }
-
-  /** Закрепляется только опубликованная версия правил дисциплины турнира, доступная организатору. */
-  private async assertRuleSetVersion(
-    tx: Tx,
-    versionId: string,
-    disciplineCode: string,
-    organizerId: string,
-  ): Promise<void> {
-    const v = await this.rulesets.versionInfo(versionId, tx);
-    const lineage = (await this.orgScopes.scopeOf(organizerId)).ancestorIds;
-    const fail = (code: string): never => {
-      throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'ruleSetVersionId', code }] });
-    };
-    if (!v || (v.ownerOrganizationId !== null && !lineage.includes(v.ownerOrganizationId))) fail('not_found');
-    if (v?.status !== 'PUBLISHED') fail('ruleset_not_published');
-    if (v?.disciplineCode !== disciplineCode) fail('ruleset_discipline_mismatch');
-  }
-
-  private async uniqueSlug(
-    tx: Tx,
-    name: string,
-    startDate: string,
-    requested?: string,
-    excludeId?: string,
-  ): Promise<string> {
-    const taken = async (slug: string): Promise<boolean> =>
-      (await tx.competition.findFirst({
-        where: { slug, id: excludeId ? { not: excludeId } : undefined },
-        select: { id: true },
-      })) !== null;
-    if (requested) {
-      if (await taken(requested)) throw new DomainError('SLUG_TAKEN');
-      return requested;
-    }
-    const base = competitionSlugBase(slugify(name), startDate);
-    for (let i = 1; i < 50; i++) {
-      const candidate = i === 1 ? base : `${base.slice(0, 74)}-${i}`;
-      if (!(await taken(candidate))) return candidate;
-    }
-    return `${base.slice(0, 60)}-${uuidv7().slice(-8)}`;
-  }
-
   // ---------- Команды ----------
 
   /**
@@ -288,57 +166,21 @@ export class CompetitionsService {
     if (!orgScope.visibleToAll)
       throw new DomainError('ORGANIZATION_NOT_ACTIVE', { organizationId: input.organizerOrganizationId });
     const id = await this.db.tx(async (tx) => {
-      await this.assertDiscipline(tx, input.disciplineCode);
-      if (input.venueId) await this.assertVenue(tx, input.venueId, input.organizerOrganizationId);
+      await this.refs.assertDiscipline(tx, input.disciplineCode);
+      if (input.venueId) await this.refs.assertVenue(tx, input.venueId, input.organizerOrganizationId);
       if (input.ruleSetVersionId)
-        await this.assertRuleSetVersion(
+        await this.refs.assertRuleSetVersion(
           tx,
           input.ruleSetVersionId,
           input.disciplineCode,
           input.organizerOrganizationId,
         );
-      if (input.logoFileId)
-        await this.files.assertAttachable(tx, input.logoFileId, user.id, 'COMPETITION_LOGO', 'logoFileId');
+      if (input.logoFileId) await this.refs.assertLogo(tx, input.logoFileId, user);
       const competitionId = uuidv7();
-      const slug = await this.uniqueSlug(tx, input.name, input.startDate, input.slug);
-      await tx.competition.create({
-        data: {
-          id: competitionId,
-          slug,
-          name: input.name,
-          shortName: input.shortName ?? null,
-          descriptionMd: input.descriptionMd ?? null,
-          organizerOrganizationId: input.organizerOrganizationId,
-          venueId: input.venueId ?? null,
-          timezone: input.timezone,
-          startDate: toDate(input.startDate),
-          endDate: toDate(input.endDate),
-          registrationStartsAt: new Date(input.registrationStartsAt),
-          registrationEndsAt: new Date(input.registrationEndsAt),
-          level: input.level,
-          disciplineCode: input.disciplineCode,
-          ruleSetVersionId: input.ruleSetVersionId ?? null,
-          logoFileId: input.logoFileId ?? null,
-          contactInfo: input.contactInfo ?? undefined,
-          createdById: user.id,
-          updatedById: user.id,
-        },
-      });
+      const slug = await this.refs.uniqueSlug(tx, input.name, input.startDate, input.slug);
+      await tx.competition.create({ data: createData(input, competitionId, slug, user.id) });
       await this.leases.createCloudLease(tx, competitionId, user.id);
-      if (!access.viaPlatform) {
-        const role = await tx.role.findUniqueOrThrow({ where: { code: 'TOURNAMENT_MANAGER' } });
-        await tx.competitionMembership.create({
-          data: {
-            id: uuidv7(),
-            competitionId,
-            userId: user.id,
-            roleId: role.id,
-            status: 'ACTIVE',
-            invitedById: user.id,
-          },
-        });
-        await tx.user.update({ where: { id: user.id }, data: { permissionsVersion: { increment: 1 } } });
-      }
+      if (!access.viaPlatform) await this.grantManager(tx, competitionId, user.id);
       await this.audit.record(tx, {
         action: 'competition.created',
         entityType: 'Competition',
@@ -361,121 +203,46 @@ export class CompetitionsService {
   }
 
   async update(user: AuthUser, id: string, version: number, patch: CompetitionPatch): Promise<Competition> {
-    const updated = await this.db.tx(async (tx) => {
+    await this.db.tx(async (tx) => {
       await this.leases.assertWritable(tx, id);
       const current = await tx.competition.findFirst({ where: { id, deletedAt: null } });
       if (!current) throw new DomainError('NOT_FOUND', { resource: 'competition' });
       if (current.version !== version) throw versionConflict(current.version);
-      if (['FINISHED', 'ARCHIVED', 'CANCELLED'].includes(current.status))
-        throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed: ['competition_closed'] });
-      const published = isPublished(current.status);
-      const failed: string[] = [];
-      if (published && patch.disciplineCode !== undefined && patch.disciplineCode !== current.disciplineCode)
-        failed.push('published_discipline_locked');
-      if (
-        published &&
-        patch.ruleSetVersionId !== undefined &&
-        patch.ruleSetVersionId !== current.ruleSetVersionId
-      )
-        failed.push('published_ruleset_locked');
-      if (published && patch.slug !== undefined && patch.slug !== current.slug)
-        failed.push('published_slug_locked');
-      if (failed.length > 0) throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed });
-
-      const merged = {
-        timezone: patch.timezone ?? current.timezone,
-        startDate: patch.startDate ?? dateOnly(current.startDate),
-        endDate: patch.endDate ?? dateOnly(current.endDate),
-        registrationStartsAt: patch.registrationStartsAt ?? current.registrationStartsAt.toISOString(),
-        registrationEndsAt: patch.registrationEndsAt ?? current.registrationEndsAt.toISOString(),
-      };
-      const issues = scheduleIssues(merged);
-      if (issues.length > 0) throw new DomainError('VALIDATION_FAILED', { fields: issues });
-      const scheduleChanged = SCHEDULE_FIELDS.some((f) => {
-        const next = patch[f];
-        if (next === undefined) return false;
-        if (f === 'timezone') return next !== current.timezone;
-        if (f === 'startDate' || f === 'endDate') return next !== dateOnly(current[f]);
-        return Date.parse(next) !== current[f].getTime();
-      });
-      if (published && scheduleChanged && !patch.reason) throw new DomainError('REASON_REQUIRED');
-
-      const discipline = patch.disciplineCode ?? current.disciplineCode;
-      if (patch.disciplineCode !== undefined) await this.assertDiscipline(tx, patch.disciplineCode);
-      if (patch.venueId) await this.assertVenue(tx, patch.venueId, current.organizerOrganizationId);
-      if (patch.ruleSetVersionId)
-        await this.assertRuleSetVersion(
-          tx,
-          patch.ruleSetVersionId,
-          discipline,
-          current.organizerOrganizationId,
-        );
-      else if (
-        patch.disciplineCode !== undefined &&
-        current.ruleSetVersionId &&
-        patch.ruleSetVersionId !== null
-      ) {
-        const v = await this.rulesets.versionInfo(current.ruleSetVersionId, tx);
-        if (v?.disciplineCode !== discipline)
-          throw new DomainError('VALIDATION_FAILED', {
-            fields: [{ path: 'ruleSetVersionId', code: 'ruleset_discipline_mismatch' }],
-          });
-      }
-      if (patch.logoFileId && patch.logoFileId !== current.logoFileId)
-        await this.files.assertAttachable(tx, patch.logoFileId, user.id, 'COMPETITION_LOGO', 'logoFileId');
+      const { scheduleChanged } = assertEditable(current, patch);
+      await this.refs.assertPatch(tx, user, current, patch);
       const slug =
         patch.slug !== undefined && patch.slug !== current.slug
-          ? await this.uniqueSlug(tx, current.name, merged.startDate, patch.slug, id)
+          ? await this.refs.uniqueSlug(
+              tx,
+              current.name,
+              mergedSchedule(current, patch).startDate,
+              patch.slug,
+              id,
+            )
           : undefined;
-
-      const data: Prisma.CompetitionUncheckedUpdateManyInput = {
-        name: patch.name,
-        shortName: patch.shortName,
-        slug,
-        descriptionMd: patch.descriptionMd,
-        venueId: patch.venueId,
-        timezone: patch.timezone,
-        startDate: patch.startDate ? toDate(patch.startDate) : undefined,
-        endDate: patch.endDate ? toDate(patch.endDate) : undefined,
-        registrationStartsAt: patch.registrationStartsAt ? new Date(patch.registrationStartsAt) : undefined,
-        registrationEndsAt: patch.registrationEndsAt ? new Date(patch.registrationEndsAt) : undefined,
-        level: patch.level,
-        disciplineCode: patch.disciplineCode,
-        ruleSetVersionId: patch.ruleSetVersionId,
-        logoFileId: patch.logoFileId,
-        contactInfo: patch.contactInfo !== undefined ? patch.contactInfo : undefined,
-        updatedById: user.id,
-        version: { increment: 1 },
-      };
-      const { count } = await tx.competition.updateMany({ where: { id, version }, data });
+      const { count } = await tx.competition.updateMany({
+        where: { id, version },
+        data: updateData(patch, slug, user.id),
+      });
       if (count === 0) throw versionConflict(current.version + 1);
-      const before: Record<string, unknown> = {};
-      const after: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(patch)) {
-        if (k === 'reason' || v === undefined) continue;
-        before[k] = (current as Record<string, unknown>)[k] ?? null;
-        after[k] = v;
-      }
       await this.audit.record(tx, {
         action: 'competition.updated',
         entityType: 'Competition',
         entityId: id,
         competitionId: id,
         organizationId: current.organizerOrganizationId,
-        before,
-        after,
+        ...auditDiff(current, patch),
         reason: patch.reason ?? null,
       });
-      if (published && scheduleChanged)
+      if (scheduleChanged)
         await this.outbox.enqueue(tx, {
           type: 'competition.dates_changed',
           aggregate: { type: 'Competition', id },
           competitionId: id,
           payload: { competitionId: id },
         });
-      return id;
     });
-    return this.toDto(user, await this.loadRow(updated));
+    return this.toDto(user, await this.loadRow(id));
   }
 
   /** Удаляется только черновик (soft delete); его персонал теряет роли. */
@@ -554,31 +321,8 @@ export class CompetitionsService {
         userId: user.id,
         now,
       };
-      const checks = await this.extensions.check(ctx);
-      if (checks.blocking.length > 0)
-        throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', {
-          failed: checks.blocking,
-          warnings: checks.warnings,
-        });
-      if (checks.warnings.length > 0 && !req.confirm)
-        throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', {
-          failed: [],
-          warnings: checks.warnings,
-          confirmable: true,
-        });
-
-      const data: Prisma.CompetitionUncheckedUpdateInput = {
-        status: req.to,
-        version: { increment: 1 },
-        updatedById: user.id,
-      };
-      if (req.to === 'REGISTRATION_OPEN' && basics.status === 'DRAFT') data.publishedAt = now;
-      if (req.to === 'REGISTRATION_OPEN' && basics.status === 'REGISTRATION_CLOSED' && req.registrationEndsAt)
-        data.registrationEndsAt = new Date(req.registrationEndsAt);
-      if (req.to === 'CANCELLED') {
-        data.cancelledAt = now;
-        data.cancelReason = req.reason ?? null;
-      }
+      const warnings = await this.checkExtensions(ctx, req.confirm === true);
+      const data = transitionData(basics.status, req, user.id, now);
       await tx.competition.update({ where: { id }, data });
       await this.extensions.apply(ctx);
       await this.audit.record(tx, {
@@ -591,26 +335,65 @@ export class CompetitionsService {
         after: {
           status: req.to,
           ...(data.registrationEndsAt ? { registrationEndsAt: req.registrationEndsAt } : {}),
-          ...(checks.warnings.length > 0 ? { confirmedWarnings: checks.warnings } : {}),
+          ...(warnings.length > 0 ? { confirmedWarnings: warnings } : {}),
         },
         reason: req.reason ?? null,
         platformIntervention: access.viaPlatform,
       });
-      await this.outbox.enqueue(tx, {
-        type: 'competition.status_changed',
-        aggregate: { type: 'Competition', id },
-        competitionId: id,
-        payload: { competitionId: id, from: basics.status, to: req.to },
-      });
-      if (req.to === 'REGISTRATION_OPEN' && basics.status === 'DRAFT')
-        await this.outbox.enqueue(tx, {
-          type: 'competition.published',
-          aggregate: { type: 'Competition', id },
-          competitionId: id,
-          payload: { competitionId: id },
-        });
+      await this.transitionEvents(tx, id, basics.status, req.to);
     });
     return this.toDto(user, await this.loadRow(id));
+  }
+
+  /**
+   * Условия модулей-расширений: блокирующие — отказ; предупреждения — отказ с `confirmable`, пока пользователь
+   * не подтвердит переход (`confirm: true`). Возвращает подтверждённые предупреждения.
+   */
+  private async checkExtensions(ctx: TransitionContext, confirm: boolean): Promise<string[]> {
+    const checks = await this.extensions.check(ctx);
+    if (checks.blocking.length > 0)
+      throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', {
+        failed: checks.blocking,
+        warnings: checks.warnings,
+      });
+    if (checks.warnings.length > 0 && !confirm)
+      throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', {
+        failed: [],
+        warnings: checks.warnings,
+        confirmable: true,
+      });
+    return checks.warnings;
+  }
+
+  private async transitionEvents(
+    tx: Tx,
+    id: string,
+    from: CompetitionStatus,
+    to: CompetitionStatus,
+  ): Promise<void> {
+    const aggregate = { type: 'Competition', id };
+    await this.outbox.enqueue(tx, {
+      type: 'competition.status_changed',
+      aggregate,
+      competitionId: id,
+      payload: { competitionId: id, from, to },
+    });
+    if (to === 'REGISTRATION_OPEN' && from === 'DRAFT')
+      await this.outbox.enqueue(tx, {
+        type: 'competition.published',
+        aggregate,
+        competitionId: id,
+        payload: { competitionId: id },
+      });
+  }
+
+  /** Создатель турнира — его руководитель; права пересчитываются по новой версии пользователя. */
+  private async grantManager(tx: Tx, competitionId: string, userId: string): Promise<void> {
+    const role = await tx.role.findUniqueOrThrow({ where: { code: 'TOURNAMENT_MANAGER' } });
+    await tx.competitionMembership.create({
+      data: { id: uuidv7(), competitionId, userId, roleId: role.id, status: 'ACTIVE', invitedById: userId },
+    });
+    await tx.user.update({ where: { id: userId }, data: { permissionsVersion: { increment: 1 } } });
   }
 
   /** Условия самого турнира: правила и сроки при публикации, новый срок при продлении регистрации. */

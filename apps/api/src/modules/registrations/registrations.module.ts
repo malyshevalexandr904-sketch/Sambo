@@ -14,6 +14,7 @@ import {
 import { ApplicationsService } from './application/applications.service';
 import { EligibilityService } from './application/eligibility.service';
 import { EntriesService } from './application/entries.service';
+import { EntryDecisionsService } from './application/entry-decisions.service';
 import { EntriesExportService } from './application/export.service';
 import { RegistrationAccessService } from './application/registration-access.service';
 import { RegistrationLifecycle } from './application/registration-lifecycle';
@@ -38,6 +39,7 @@ import { RegistrationLifecycle } from './application/registration-lifecycle';
     RegistrationAccessService,
     EligibilityService,
     EntriesService,
+    EntryDecisionsService,
     ApplicationsService,
     EntriesExportService,
     RegistrationLifecycle,

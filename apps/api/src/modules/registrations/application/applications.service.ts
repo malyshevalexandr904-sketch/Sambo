@@ -1,5 +1,5 @@
 // Заявки клубов на турнир (API.md, 5.3; ARCHITECTURE.md, 16.3): создание, подача, рассмотрение, возврат на
-// исправление, одобрение и отклонение. Решения по участникам — в EntriesService.
+// исправление, одобрение и отклонение. Решения по участникам — в EntryDecisionsService.
 import { Injectable } from '@nestjs/common';
 import {
   type ApplicationCreate,
@@ -34,17 +34,20 @@ import {
 } from '../domain/application-machine';
 import { type ApplicationContext, RegistrationAccessService } from './registration-access.service';
 import {
+  applicationCursorWhere,
+  applicationEvents,
+  applyToEntries,
+  currentPeriod,
+  entryCounts,
+} from './application-effects';
+import { EntriesService } from './entries.service';
+import { assertWindowOpen } from './entry-commands';
+import {
   APPLICATION_INCLUDE,
   type ApplicationRow,
   EMPTY_COUNTS,
-  type EntryCounts,
   toApplicationSummary,
 } from './registration-mapper';
-import { EntriesService } from './entries.service';
-
-const currentPeriod = () => ({
-  OR: [{ validTo: null }, { validTo: { gte: new Date(new Date().toISOString().slice(0, 10)) } }],
-});
 
 @Injectable()
 export class ApplicationsService {
@@ -60,27 +63,6 @@ export class ApplicationsService {
   ) {}
 
   // ---------- Чтение ----------
-
-  private async counts(ids: string[]): Promise<Map<string, EntryCounts>> {
-    if (ids.length === 0) return new Map();
-    const groups = await this.db.entry.groupBy({
-      by: ['applicationId', 'status'],
-      where: { applicationId: { in: ids } },
-      _count: { _all: true },
-    });
-    const result = new Map<string, EntryCounts>();
-    for (const g of groups) {
-      const c = { ...(result.get(g.applicationId) ?? EMPTY_COUNTS) };
-      const n = g._count._all;
-      if (g.status === 'PENDING') c.pending += n;
-      if (g.status === 'APPROVED') c.approved += n;
-      if (g.status === 'REJECTED') c.rejected += n;
-      if (g.status === 'WITHDRAWN') c.withdrawn += n;
-      if (g.status === 'PENDING' || g.status === 'APPROVED') c.entries += n;
-      result.set(g.applicationId, c);
-    }
-    return result;
-  }
 
   /** Действия над заявкой: переходы владельца и персонала, доступные сейчас. */
   private async actions(
@@ -117,7 +99,10 @@ export class ApplicationsService {
   }
 
   private async summaries(user: AuthUser, rows: ApplicationRow[]): Promise<ApplicationSummary[]> {
-    const counts = await this.counts(rows.map((r) => r.id));
+    const counts = await entryCounts(
+      this.db,
+      rows.map((r) => r.id),
+    );
     const result: ApplicationSummary[] = [];
     for (const r of rows) {
       const competition = await this.competitions.require(r.competitionId);
@@ -138,12 +123,6 @@ export class ApplicationsService {
       );
     }
     return result;
-  }
-
-  private cursorWhere(cursor: ReturnType<typeof decodeCursor>): Prisma.ApplicationWhereInput {
-    if (!cursor) return {};
-    const at = new Date(cursor.k);
-    return { OR: [{ updatedAt: { lt: at } }, { updatedAt: at, id: { lt: cursor.id } }] };
   }
 
   /** Очередь секретариата — все заявки турнира; владельцу — заявки своих организаций. */
@@ -170,7 +149,7 @@ export class ApplicationsService {
           { organization: { shortName: { contains: q.q, mode: 'insensitive' } } },
         ],
       });
-    and.push(this.cursorWhere(decodeCursor(q.cursor)));
+    and.push(applicationCursorWhere(decodeCursor(q.cursor)));
     const rows = await this.db.application.findMany({
       where: { AND: and },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
@@ -194,7 +173,7 @@ export class ApplicationsService {
     if (q.competitionId) and.push({ competitionId: q.competitionId });
     if (q.status) and.push({ status: q.status });
     and.push({ competition: { deletedAt: null } });
-    and.push(this.cursorWhere(decodeCursor(q.cursor)));
+    and.push(applicationCursorWhere(decodeCursor(q.cursor)));
     const rows = await this.db.application.findMany({
       where: { AND: and },
       orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
@@ -214,7 +193,7 @@ export class ApplicationsService {
     const ctx = await this.access.applicationContext(id);
     const role = await this.access.assertVisible(user, ctx);
     const row = await this.db.application.findUniqueOrThrow({ where: { id }, include: APPLICATION_INCLUDE });
-    const counts = (await this.counts([id])).get(id) ?? EMPTY_COUNTS;
+    const counts = (await entryCounts(this.db, [id])).get(id) ?? EMPTY_COUNTS;
     const actions = await this.actions(user, row, ctx.competition, role);
     return {
       ...toApplicationSummary(row, counts, actions),
@@ -233,18 +212,6 @@ export class ApplicationsService {
   }
 
   // ---------- Команды ----------
-
-  private assertWindow(competition: CompetitionBasics): void {
-    const window = registrationWindow(competition, new Date());
-    if (window === 'NOT_OPEN')
-      throw new DomainError('REGISTRATION_NOT_OPEN', {
-        registrationStartsAt: competition.registrationStartsAt.toISOString(),
-      });
-    if (window === 'CLOSED')
-      throw new DomainError('REGISTRATION_CLOSED', {
-        registrationEndsAt: competition.registrationEndsAt.toISOString(),
-      });
-  }
 
   /** Тренер заявки — тренер клуба; представительство — организация и регион с существующими записями. */
   private async assertReferences(
@@ -283,7 +250,7 @@ export class ApplicationsService {
     await this.policy.assert(user, 'registration.create', orgScope);
     if (orgScope.kind === 'ORGANIZATION' && !orgScope.visibleToAll)
       throw new DomainError('ORGANIZATION_NOT_ACTIVE', { organizationId: input.organizationId });
-    this.assertWindow(competition);
+    assertWindowOpen(competition);
     const coachId = input.coachId ?? (await this.coaches.coachIdOfUser(user));
     const id = await this.db.tx(async (tx) => {
       await this.assertReferences(tx, input.organizationId, {
@@ -415,7 +382,7 @@ export class ApplicationsService {
         data.reviewComment = comment ?? (req.to === 'UNDER_REVIEW' ? current.reviewComment : null);
       }
       await tx.application.update({ where: { id }, data });
-      await this.entries.onApplicationTransition(tx, id, from, req.to, comment);
+      await applyToEntries(tx, id, from, req.to, comment);
       await this.audit.record(tx, {
         action: 'application.status_changed',
         entityType: 'Application',
@@ -427,7 +394,7 @@ export class ApplicationsService {
         reason: comment,
         platformIntervention: viaPlatform,
       });
-      await this.events(tx, id, current.competitionId, req.to);
+      await applicationEvents(this.outbox, tx, id, current.competitionId, req.to);
     });
     return this.get(user, id);
   }
@@ -440,7 +407,7 @@ export class ApplicationsService {
   ): Promise<void> {
     const from = ctx.application.status;
     if (to === 'SUBMITTED') {
-      if (from === 'DRAFT') this.assertWindow(competition);
+      if (from === 'DRAFT') assertWindowOpen(competition);
       else if (!resubmissionAllowed(competition.status))
         throw new DomainError('REGISTRATION_CLOSED', {
           registrationEndsAt: competition.registrationEndsAt.toISOString(),
@@ -457,30 +424,5 @@ export class ApplicationsService {
       if (pending > 0)
         throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed: ['entries_pending'], pending });
     }
-  }
-
-  private async events(tx: Tx, id: string, competitionId: string, to: string): Promise<void> {
-    const aggregate = { type: 'Application', id };
-    if (to === 'SUBMITTED')
-      await this.outbox.enqueue(tx, {
-        type: 'registration.application_submitted',
-        aggregate,
-        competitionId,
-        payload: { applicationId: id },
-      });
-    if (to === 'WAITING_DOCUMENTS')
-      await this.outbox.enqueue(tx, {
-        type: 'registration.application_returned',
-        aggregate,
-        competitionId,
-        payload: { applicationId: id },
-      });
-    if (to === 'APPROVED' || to === 'REJECTED')
-      await this.outbox.enqueue(tx, {
-        type: 'registration.application_decided',
-        aggregate,
-        competitionId,
-        payload: { applicationId: id, status: to },
-      });
   }
 }

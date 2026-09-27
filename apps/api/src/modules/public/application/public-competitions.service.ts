@@ -38,6 +38,75 @@ type SummaryRow = Prisma.CompetitionGetPayload<{ select: typeof SUMMARY_SELECT }
 const PUBLIC_WHERE: Prisma.CompetitionWhereInput = { deletedAt: null, status: { not: 'DRAFT' } };
 const dateOnly = (d: Date): string => d.toISOString().slice(0, 10);
 
+/** Поля страницы турнира: белый список (ADR-15) — никаких участников, только число одобренных участий. */
+const DETAIL_SELECT = {
+  ...SUMMARY_SELECT,
+  descriptionMd: true,
+  requirementsMd: true,
+  contactInfo: true,
+  cancelReason: true,
+  discipline: { select: { nameRu: true, nameEn: true } },
+  regulation: { select: { storageKey: true, status: true } },
+  requirements: {
+    orderBy: [{ kind: 'asc' }, { id: 'asc' }],
+    select: {
+      kind: true,
+      consentKind: true,
+      mandatory: true,
+      noteMd: true,
+      category: { select: { code: true } },
+      documentType: { select: { nameRu: true, nameEn: true } },
+    },
+  },
+  categories: {
+    where: { status: { notIn: ['MERGED', 'CANCELLED'] } },
+    orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+    select: {
+      id: true,
+      code: true,
+      nameRu: true,
+      nameEn: true,
+      gender: true,
+      status: true,
+      agePolicy: true,
+      ageFrom: true,
+      ageTo: true,
+      birthYearFrom: true,
+      birthYearTo: true,
+      ageReferenceDate: true,
+      weightKind: true,
+      weightLowerGrams: true,
+      weightUpperGrams: true,
+    },
+  },
+} satisfies Prisma.CompetitionSelect;
+
+type PublicCategoryRow = Prisma.CompetitionCategoryGetPayload<{
+  select: (typeof DETAIL_SELECT)['categories']['select'];
+}>;
+
+function toPublicCategory(
+  c: PublicCategoryRow,
+  participants: number,
+): PublicCompetition['categories'][number] {
+  return {
+    code: c.code,
+    name: { ru: c.nameRu, en: c.nameEn },
+    gender: c.gender,
+    status: c.status,
+    age: {
+      policy: c.agePolicy,
+      ageFrom: c.ageFrom,
+      ageTo: c.ageTo,
+      birthYearFrom: c.birthYearFrom,
+      birthYearTo: c.birthYearTo,
+      referenceDate: c.ageReferenceDate ? dateOnly(c.ageReferenceDate) : null,
+    },
+    weight: { kind: c.weightKind, lowerGrams: c.weightLowerGrams, upperGrams: c.weightUpperGrams },
+    participants,
+  };
+}
+
 @Injectable()
 export class PublicCompetitionsService {
   constructor(
@@ -98,47 +167,7 @@ export class PublicCompetitionsService {
   async get(slug: string): Promise<PublicCompetition> {
     const row = await this.db.competition.findFirst({
       where: { ...PUBLIC_WHERE, slug },
-      select: {
-        ...SUMMARY_SELECT,
-        descriptionMd: true,
-        requirementsMd: true,
-        contactInfo: true,
-        cancelReason: true,
-        discipline: { select: { nameRu: true, nameEn: true } },
-        regulation: { select: { storageKey: true, status: true } },
-        requirements: {
-          orderBy: [{ kind: 'asc' }, { id: 'asc' }],
-          select: {
-            kind: true,
-            consentKind: true,
-            mandatory: true,
-            noteMd: true,
-            category: { select: { code: true } },
-            documentType: { select: { nameRu: true, nameEn: true } },
-          },
-        },
-        categories: {
-          where: { status: { notIn: ['MERGED', 'CANCELLED'] } },
-          orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
-          select: {
-            id: true,
-            code: true,
-            nameRu: true,
-            nameEn: true,
-            gender: true,
-            status: true,
-            agePolicy: true,
-            ageFrom: true,
-            ageTo: true,
-            birthYearFrom: true,
-            birthYearTo: true,
-            ageReferenceDate: true,
-            weightKind: true,
-            weightLowerGrams: true,
-            weightUpperGrams: true,
-          },
-        },
-      },
+      select: DETAIL_SELECT,
     });
     if (!row) throw new DomainError('NOT_FOUND', { resource: 'competition' });
     const counts = await this.db.entry.groupBy({
@@ -164,22 +193,7 @@ export class PublicCompetitionsService {
         mandatory: r.mandatory,
         noteMd: r.noteMd,
       })),
-      categories: row.categories.map((c) => ({
-        code: c.code,
-        name: { ru: c.nameRu, en: c.nameEn },
-        gender: c.gender,
-        status: c.status,
-        age: {
-          policy: c.agePolicy,
-          ageFrom: c.ageFrom,
-          ageTo: c.ageTo,
-          birthYearFrom: c.birthYearFrom,
-          birthYearTo: c.birthYearTo,
-          referenceDate: c.ageReferenceDate ? dateOnly(c.ageReferenceDate) : null,
-        },
-        weight: { kind: c.weightKind, lowerGrams: c.weightLowerGrams, upperGrams: c.weightUpperGrams },
-        participants: participants.get(c.id) ?? 0,
-      })),
+      categories: row.categories.map((c) => toPublicCategory(c, participants.get(c.id) ?? 0)),
       contacts: contact,
       cancelReason: row.status === 'CANCELLED' ? row.cancelReason : null,
     };

@@ -2,9 +2,7 @@
 // объединение (D-03). Снимок границ хранится в категории: правка шаблона не меняет турнир.
 import { Injectable } from '@nestjs/common';
 import type {
-  CategoryGenerateRequest,
   CategoryInput,
-  CategoryMergeRequest,
   CategoryPatch,
   CategoriesQuery,
   CategoryTransitionRequest,
@@ -13,9 +11,9 @@ import type {
   Page,
   PermissionCode,
 } from '@sde/contracts';
-import { type CompetitionCategory, type Prisma, type Tx, uuidv7 } from '@sde/db';
+import { type Prisma, type Tx, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
-import { DomainError, versionConflict } from '../../../common/errors/domain-error';
+import { DomainError } from '../../../common/errors/domain-error';
 import { decodeCursor, toPage } from '../../../common/http/http';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { PolicyService, type ResourceScope } from '../../access';
@@ -31,9 +29,8 @@ import {
   manualTransitionsFrom,
   MERGEABLE,
 } from '../domain/category-machine';
-import { generateCategories, type TemplateItem } from '../domain/category-generation';
-import { type MergeBounds, mergedBounds, mergeIssues, renameForWeight } from '../domain/category-merge';
 import { CategoryExtensions, type EntryStats } from './category-extensions';
+import { blocked, lockCategory, lockCompetitionShared } from './category-locks';
 import {
   boundsOf,
   type CategoryRow,
@@ -68,9 +65,6 @@ const ACTION_CANDIDATES: readonly PermissionCode[] = [
   'category.merge',
   'competition.transition',
 ];
-
-const blocked = (...failed: string[]): DomainError =>
-  new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed });
 
 @Injectable()
 export class CompetitionCategoriesService {
@@ -194,24 +188,7 @@ export class CompetitionCategoriesService {
   /** Право записи и блокировка турнира на чтение: переход турнира (FOR UPDATE) ждёт команд над категориями. */
   private async lockCompetition(tx: Tx, competitionId: string): Promise<CompetitionStatus> {
     await this.leases.assertWritable(tx, competitionId);
-    const rows = await tx.$queryRaw<{ status: CompetitionStatus }[]>`
-      SELECT status FROM competition WHERE id = ${competitionId}::uuid AND deleted_at IS NULL FOR SHARE`;
-    if (!rows[0]) throw new DomainError('NOT_FOUND', { resource: 'competition' });
-    return rows[0].status;
-  }
-
-  private async lockCategory(
-    tx: Tx,
-    competitionId: string,
-    categoryId: string,
-    version?: number,
-  ): Promise<CategoryRow> {
-    const rows = await tx.$queryRaw<{ id: string }[]>`
-      SELECT id FROM competition_category WHERE id = ${categoryId}::uuid AND competition_id = ${competitionId}::uuid FOR UPDATE`;
-    if (!rows[0]) throw new DomainError('NOT_FOUND', { resource: 'category' });
-    const row = await tx.competitionCategory.findUniqueOrThrow({ where: { id: categoryId } });
-    if (version !== undefined && row.version !== version) throw versionConflict(row.version);
-    return row;
+    return lockCompetitionShared(tx, competitionId);
   }
 
   /** Возрастная группа — из справочника платформы или организатора (его предков) той же дисциплины. */
@@ -297,7 +274,7 @@ export class CompetitionCategoriesService {
     await this.db.tx(async (tx) => {
       const status = await this.lockCompetition(tx, competitionId);
       if (CLOSED_COMPETITION.includes(status)) throw blocked('competition_closed');
-      const row = await this.lockCategory(tx, competitionId, categoryId, version);
+      const row = await lockCategory(tx, competitionId, categoryId, version);
       if (!isActiveCategory(row.status)) throw blocked('category_inactive');
       const boundsChanged = patch.age !== undefined || patch.weight !== undefined;
       if (boundsChanged) {
@@ -336,7 +313,7 @@ export class CompetitionCategoriesService {
     await this.db.tx(async (tx) => {
       const status = await this.lockCompetition(tx, competitionId);
       if (!REGISTRATION_PHASE.includes(status)) throw blocked('competition_status');
-      const row = await this.lockCategory(tx, competitionId, categoryId);
+      const row = await lockCategory(tx, competitionId, categoryId);
       if ((await this.extensions.statsOf(tx, categoryId)).total > 0) throw blocked('category_has_entries');
       if (
         await tx.competitionCategory.findFirst({ where: { mergedIntoId: categoryId }, select: { id: true } })
@@ -353,113 +330,6 @@ export class CompetitionCategoriesService {
     });
   }
 
-  /**
-   * Генерация из шаблона (API.md, 5.2). `replaceExisting` заменяет все категории, пока в турнире нет участий;
-   * иначе добавляются категории с новыми кодами, существующие не меняются.
-   */
-  async generate(
-    user: AuthUser,
-    competitionId: string,
-    req: CategoryGenerateRequest,
-  ): Promise<CompetitionCategoryDto[]> {
-    const competition = await this.competitions.require(competitionId);
-    const createdIds = await this.db.tx(async (tx) => {
-      const status = await this.lockCompetition(tx, competitionId);
-      if (!REGISTRATION_PHASE.includes(status)) throw blocked('competition_status');
-      const items = await this.templateItems(tx, req.templateId, competition);
-      const existing = await tx.competitionCategory.findMany({ where: { competitionId } });
-      if (req.replaceExisting && existing.length > 0) {
-        const stats = await this.extensions.stats(
-          tx,
-          existing.map((c) => c.id),
-        );
-        if ([...stats.values()].some((s) => s.total > 0)) throw blocked('categories_have_entries');
-        await tx.competitionCategory.updateMany({
-          where: { competitionId, mergedIntoId: { not: null } },
-          data: { mergedIntoId: null, status: 'CANCELLED' },
-        });
-        await tx.competitionCategory.deleteMany({ where: { competitionId } });
-      }
-      const taken = new Set(req.replaceExisting ? [] : existing.map((c) => c.code));
-      const base = req.replaceExisting ? 0 : Math.max(0, ...existing.map((c) => c.sortOrder));
-      const generated = generateCategories(items, competition.startDate).filter((g) => !taken.has(g.code));
-      const initial = initialCategoryStatus(status);
-      const ids: string[] = [];
-      for (const g of generated) {
-        const id = uuidv7();
-        ids.push(id);
-        await tx.competitionCategory.create({
-          data: {
-            id,
-            competitionId,
-            code: g.code,
-            nameRu: g.nameRu,
-            nameEn: g.nameEn,
-            gender: g.gender,
-            ageGroupId: g.ageGroupId,
-            agePolicy: g.agePolicy,
-            ageFrom: g.ageFrom,
-            ageTo: g.ageTo,
-            birthYearFrom: g.birthYearFrom,
-            birthYearTo: g.birthYearTo,
-            weightKind: g.weight.kind,
-            weightLowerGrams: g.weight.lowerGrams,
-            weightUpperGrams: g.weight.upperGrams,
-            status: initial,
-            sortOrder: base + g.sortOrder,
-          },
-        });
-      }
-      await this.audit.record(tx, {
-        action: 'category.generated',
-        entityType: 'Competition',
-        entityId: competitionId,
-        competitionId,
-        after: {
-          templateId: req.templateId,
-          replaceExisting: req.replaceExisting,
-          created: generated.map((g) => g.code),
-          removed: req.replaceExisting ? existing.map((c) => c.code) : [],
-        },
-      });
-      return ids;
-    });
-    const page = await this.list(user, competitionId, { limit: 500 });
-    return page.data.filter((c) => createdIds.includes(c.id));
-  }
-
-  /** Шаблон платформы или организатора (его предков) той же дисциплины, что и турнир. */
-  private async templateItems(
-    tx: Tx,
-    templateId: string,
-    competition: CompetitionBasics,
-  ): Promise<TemplateItem[]> {
-    const lineage = (await this.orgScopes.scopeOf(competition.organizerOrganizationId)).ancestorIds;
-    const template = await tx.categoryTemplate.findFirst({
-      where: { id: templateId, deletedAt: null },
-      include: { items: { include: { ageGroup: true, weightCategory: true } } },
-    });
-    if (
-      !template ||
-      template.disciplineCode !== competition.disciplineCode ||
-      (template.ownerOrganizationId !== null && !lineage.includes(template.ownerOrganizationId))
-    )
-      throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'templateId', code: 'not_found' }] });
-    return template.items.map((i) => ({
-      ageGroup: {
-        id: i.ageGroup.id,
-        code: i.ageGroup.code,
-        nameRu: i.ageGroup.nameRu,
-        nameEn: i.ageGroup.nameEn,
-        policy: i.ageGroup.policy,
-        ageFrom: i.ageGroup.ageFrom,
-        ageTo: i.ageGroup.ageTo,
-      },
-      gender: i.gender,
-      weight: { kind: i.weightCategory.kind, limitGrams: i.weightCategory.limitGrams },
-    }));
-  }
-
   /** Переход категории вручную (ARCHITECTURE.md, 16.2): право `competition.transition`, условия — по статусу турнира. */
   async transition(
     user: AuthUser,
@@ -470,7 +340,7 @@ export class CompetitionCategoriesService {
   ): Promise<CompetitionCategoryDto> {
     await this.db.tx(async (tx) => {
       const status = await this.lockCompetition(tx, competitionId);
-      const row = await this.lockCategory(tx, competitionId, categoryId, version);
+      const row = await lockCategory(tx, competitionId, categoryId, version);
       const def = findCategoryTransition(row.status, req.to);
       if (!def?.manual)
         throw new DomainError('INVALID_TRANSITION', {
@@ -514,96 +384,4 @@ export class CompetitionCategoriesService {
     });
     return this.get(user, competitionId, categoryId);
   }
-
-  /**
-   * Объединение категорий (D-03): до жеребьёвки, одного пола и способа расчёта возраста. Действующие участия
-   * переносятся в целевую категорию, заявленная категория участия сохраняется; границы целевой категории
-   * расширяются до объединения границ, исходные категории получают статус MERGED.
-   */
-  async merge(
-    user: AuthUser,
-    competitionId: string,
-    req: CategoryMergeRequest,
-  ): Promise<CompetitionCategoryDto> {
-    const handler = this.extensions.merge();
-    await this.db.tx(async (tx) => {
-      const status = await this.lockCompetition(tx, competitionId);
-      if (CLOSED_COMPETITION.includes(status)) throw blocked('competition_closed');
-      const ids = [req.targetCategoryId, ...req.sourceCategoryIds].sort();
-      const rows = new Map<string, CompetitionCategory>();
-      for (const id of ids) rows.set(id, await this.lockCategory(tx, competitionId, id));
-      const target = rows.get(req.targetCategoryId) as CompetitionCategory;
-      const sources = req.sourceCategoryIds.map((id) => rows.get(id) as CompetitionCategory);
-      if ([target, ...sources].some((c) => !MERGEABLE.includes(c.status)))
-        throw new DomainError('CATEGORY_NOT_READY_FOR_DRAW', {
-          categoryIds: [target, ...sources].filter((c) => !MERGEABLE.includes(c.status)).map((c) => c.id),
-        });
-      const toBounds = (c: CompetitionCategory): MergeBounds => ({ gender: c.gender, ...flat(c) });
-      const issues = mergeIssues(toBounds(target), sources.map(toBounds));
-      if (issues.length > 0) throw blocked(...issues);
-      const conflicts = handler ? await handler.conflicts(tx, ids) : [];
-      if (conflicts.length > 0)
-        throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', {
-          failed: ['athlete_in_several_categories'],
-          athleteIds: conflicts,
-        });
-      const moved = handler ? await handler.move(tx, req.sourceCategoryIds, target.id) : 0;
-      await tx.competitionCategory.updateMany({
-        where: { id: { in: req.sourceCategoryIds } },
-        data: { status: 'MERGED', mergedIntoId: target.id, version: { increment: 1 } },
-      });
-      const merged = mergedBounds(toBounds(target), sources.map(toBounds));
-      const before = flat(target);
-      await tx.competitionCategory.update({
-        where: { id: target.id },
-        data: {
-          ageFrom: merged.ageFrom,
-          ageTo: merged.ageTo,
-          birthYearFrom: merged.birthYearFrom,
-          birthYearTo: merged.birthYearTo,
-          weightKind: merged.weight.kind,
-          weightLowerGrams: merged.weight.lowerGrams,
-          weightUpperGrams: merged.weight.upperGrams,
-          nameRu: renameForWeight(target.nameRu, before.weight, merged.weight, 'ru'),
-          nameEn: renameForWeight(target.nameEn, before.weight, merged.weight, 'en'),
-          version: { increment: 1 },
-        },
-      });
-      await this.audit.record(tx, {
-        action: 'category.merged',
-        entityType: 'CompetitionCategory',
-        entityId: target.id,
-        competitionId,
-        before: { target: target.code, sources: sources.map((s) => s.code), ...before },
-        after: {
-          movedEntries: moved,
-          ageFrom: merged.ageFrom,
-          ageTo: merged.ageTo,
-          birthYearFrom: merged.birthYearFrom,
-          birthYearTo: merged.birthYearTo,
-          weight: merged.weight,
-        },
-        reason: req.reason,
-      });
-      await this.outbox.enqueue(tx, {
-        type: 'category.merged',
-        aggregate: { type: 'CompetitionCategory', id: target.id },
-        competitionId,
-        payload: { targetCategoryId: target.id, sourceCategoryIds: req.sourceCategoryIds },
-      });
-    });
-    return this.get(user, competitionId, req.targetCategoryId);
-  }
-}
-
-function flat(c: CompetitionCategory): Omit<MergeBounds, 'gender'> {
-  const b = boundsOf(c);
-  return {
-    agePolicy: b.age.policy,
-    ageFrom: b.age.ageFrom,
-    ageTo: b.age.ageTo,
-    birthYearFrom: b.age.birthYearFrom,
-    birthYearTo: b.age.birthYearTo,
-    weight: b.weight,
-  };
 }

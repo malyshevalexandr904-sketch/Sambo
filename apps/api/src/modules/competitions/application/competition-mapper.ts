@@ -1,6 +1,7 @@
 // Представление турнира в ответах API. Сущности БД наружу не отдаются (ARCHITECTURE.md, 5).
-import type { CompetitionSummary } from '@sde/contracts';
+import type { Competition, CompetitionSummary, RuleSetVersionRef } from '@sde/contracts';
 import type { Prisma } from '@sde/db';
+import type { RuleSetVersionInfo } from '../../rulesets';
 import { registrationWindow } from '../domain/competition-machine';
 import type { CompetitionBasics } from './competition-scope.service';
 
@@ -54,5 +55,31 @@ export function toSummary(
     disciplineCode: row.disciplineCode,
     registrationOpenNow: registrationWindow(row, now) === 'OPEN',
     logoUrl: row.logo?.status === 'AVAILABLE' ? publicUrl(row.logo.storageKey) : null,
+  };
+}
+
+/** Закреплённая версия правил в ответе турнира. */
+export function toRuleSetVersionRef(v: RuleSetVersionInfo): RuleSetVersionRef {
+  return {
+    id: v.id,
+    ruleSetId: v.ruleSetId,
+    ruleSetCode: v.ruleSetCode,
+    ruleSetName: v.ruleSetName,
+    version: v.version,
+    status: v.status,
+    checksum: v.checksum,
+  };
+}
+
+/** Файл положения: ссылка — только когда файл проверен и лежит в публичном хранилище. */
+export function toRegulation(
+  row: CompetitionRow,
+  publicUrl: (storageKey: string) => string,
+): Competition['regulation'] {
+  if (!row.regulation) return null;
+  return {
+    fileId: row.regulation.id,
+    fileName: row.regulation.originalName,
+    url: row.regulation.status === 'AVAILABLE' ? publicUrl(row.regulation.storageKey) : null,
   };
 }

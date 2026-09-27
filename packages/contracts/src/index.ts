@@ -16,4 +16,6 @@ export * from './documents.js';
 export * from './imports.js';
 export * from './time.js';
 export * from './competitions.js';
+export * from './competition-categories.js';
+export * from './public.js';
 export * from './registrations.js';

@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  CategoryMergeRequest,
-  CategoryWeightInput,
-  CompetitionCreate,
-  RequirementInput,
-  scheduleIssues,
-} from './competitions.js';
+import { CategoryMergeRequest, CategoryWeightInput } from './competition-categories.js';
+import { CompetitionCreate, RequirementInput, scheduleIssues } from './competitions.js';
 import { localDateIn, localDateTimeIn, zonedToInstant } from './time.js';
 
 describe('competition time zone helpers (ADR-13)', () => {

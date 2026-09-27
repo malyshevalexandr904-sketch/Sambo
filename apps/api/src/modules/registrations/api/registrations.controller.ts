@@ -30,6 +30,7 @@ import { WriteAuthority } from '../../venue-sync';
 import { ApplicationsService } from '../application/applications.service';
 import { EligibilityService } from '../application/eligibility.service';
 import { EntriesService } from '../application/entries.service';
+import { EntryDecisionsService } from '../application/entry-decisions.service';
 import { EntriesExportService } from '../application/export.service';
 
 const COMP = { resolver: 'competition', param: 'id' };
@@ -176,7 +177,10 @@ export class ApplicationsController {
 
 @Controller('entries')
 export class EntriesController {
-  constructor(private readonly entries: EntriesService) {}
+  constructor(
+    private readonly entries: EntriesService,
+    private readonly decisions: EntryDecisionsService,
+  ) {}
 
   /** Одобрение — `registration.approve`, отклонение — `registration.reject` (в сервисе по решению). */
   @Post(':id/decision')
@@ -189,7 +193,7 @@ export class EntriesController {
     @IfMatchVersion() version: number,
     @ValidBody(EntryDecisionRequest) body: EntryDecisionRequest,
   ): Promise<DataEnvelope<EntryDto>> {
-    return ok(await this.entries.decide(user, id, version, body));
+    return ok(await this.decisions.decide(user, id, version, body));
   }
 
   /** Владелец заявки — до окончания регистрации; персонал — `entry.withdraw`. */
@@ -203,7 +207,7 @@ export class EntriesController {
     @IfMatchVersion() version: number,
     @ValidBody(EntryWithdrawRequest) body: EntryWithdrawRequest,
   ): Promise<DataEnvelope<EntryDto>> {
-    return ok(await this.entries.withdraw(user, id, version, body));
+    return ok(await this.decisions.withdraw(user, id, version, body));
   }
 
   @Post(':id/transfer-category')
@@ -216,7 +220,7 @@ export class EntriesController {
     @IfMatchVersion() version: number,
     @ValidBody(EntryTransferRequest) body: EntryTransferRequest,
   ): Promise<DataEnvelope<EntryDto>> {
-    return ok(await this.entries.transfer(user, id, version, body));
+    return ok(await this.decisions.transfer(user, id, version, body));
   }
 
   @Post(':id/refresh-snapshot')

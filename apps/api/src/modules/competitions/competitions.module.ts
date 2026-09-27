@@ -8,6 +8,7 @@ import { RuleSetsModule } from '../rulesets';
 import { CompetitionInvitesController, CompetitionsController } from './api/competitions.controller';
 import { CompetitionExtensions } from './application/competition-extensions';
 import { CompetitionScopeService } from './application/competition-scope.service';
+import { CompetitionReferences } from './application/competition-references';
 import { CompetitionsService } from './application/competitions.service';
 import { RegulationService } from './application/regulation.service';
 import { StaffService } from './application/staff.service';
@@ -22,6 +23,7 @@ import { StaffService } from './application/staff.service';
   providers: [
     CompetitionScopeService,
     CompetitionExtensions,
+    CompetitionReferences,
     CompetitionsService,
     RegulationService,
     StaffService,

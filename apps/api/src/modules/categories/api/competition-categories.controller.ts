@@ -20,6 +20,7 @@ import { IfMatchVersion, ok } from '../../../common/http/http';
 import { UuidParam, ValidBody, ValidQuery } from '../../../common/validation/zod.pipe';
 import { Authenticated, RequirePermission } from '../../access';
 import { WriteAuthority } from '../../venue-sync';
+import { CategoryBulkService } from '../application/category-bulk.service';
 import { CompetitionCategoriesService } from '../application/competition-categories.service';
 import { CompetitionRulesService } from '../application/competition-rules.service';
 
@@ -33,6 +34,7 @@ const COMP = { resolver: 'competition', param: 'id' };
 export class CompetitionCategoriesController {
   constructor(
     private readonly categories: CompetitionCategoriesService,
+    private readonly bulk: CategoryBulkService,
     private readonly rules: CompetitionRulesService,
   ) {}
 
@@ -54,7 +56,7 @@ export class CompetitionCategoriesController {
     @UuidParam('id') id: string,
     @ValidBody(CategoryGenerateRequest) body: CategoryGenerateRequest,
   ): Promise<DataEnvelope<CompetitionCategoryDto[]>> {
-    return ok(await this.categories.generate(user, id, body));
+    return ok(await this.bulk.generate(user, id, body));
   }
 
   @Post('categories/merge')
@@ -66,7 +68,7 @@ export class CompetitionCategoriesController {
     @UuidParam('id') id: string,
     @ValidBody(CategoryMergeRequest) body: CategoryMergeRequest,
   ): Promise<DataEnvelope<CompetitionCategoryDto>> {
-    return ok(await this.categories.merge(user, id, body));
+    return ok(await this.bulk.merge(user, id, body));
   }
 
   @Post('categories')

@@ -11,7 +11,7 @@ import {
   type Page,
   type RoleCode,
 } from '@sde/contracts';
-import { type Prisma, uuidv7 } from '@sde/db';
+import { type Prisma, type Tx, uuidv7 } from '@sde/db';
 import type { Env } from '@sde/server-kit';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
@@ -86,17 +86,7 @@ export class StaffService {
     const competition = await this.scopes.require(competitionId);
     if (['FINISHED', 'ARCHIVED', 'CANCELLED'].includes(competition.status))
       throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed: ['competition_closed'] });
-    let email = req.email ?? null;
-    if (req.userId) {
-      const target = await this.db.user.findFirst({
-        where: { id: req.userId, status: 'ACTIVE', deletedAt: null },
-        select: { email: true },
-      });
-      if (!target?.email)
-        throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'userId', code: 'not_found' }] });
-      email = target.email;
-    }
-    if (!email) throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'email', code: 'required' }] });
+    const email = await this.inviteeEmail(req);
     if (selfAssignment(user, { userId: req.userId, email }))
       throw new DomainError('FORBIDDEN', { reason: 'self_assignment' });
     const created = await this.db.tx(async (tx) => {
@@ -121,21 +111,9 @@ export class StaffService {
         },
         include: INCLUDE,
       });
-      const token = await this.tokens.issue(tx, 'INVITE', {
-        userId: null,
-        ttlSeconds: INVITE_TTL_SECONDS,
-        payload: { competitionMembershipId: membership.id },
-      });
-      await this.emails.request(tx, {
-        template: 'competition.invite',
-        to: email,
-        userId: null,
-        locale,
-        params: {
-          competitionName: competition.name,
-          roleCode: req.roleCode,
-          acceptUrl: `${this.env.APP_URL.replace(/\/$/, '')}/${locale}/invites/competition?token=${encodeURIComponent(token)}`,
-        },
+      await this.sendInvite(tx, membership.id, email, locale, {
+        competitionName: competition.name,
+        roleCode: req.roleCode,
       });
       await this.audit.record(tx, {
         action: 'competition.member_invited',
@@ -148,6 +126,48 @@ export class StaffService {
       return membership;
     });
     return toDto(created);
+  }
+
+  /** Email приглашённого: указанный или email существующего активного пользователя. */
+  private async inviteeEmail(req: CompetitionMemberInvite): Promise<string> {
+    if (!req.userId) {
+      if (!req.email)
+        throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'email', code: 'required' }] });
+      return req.email;
+    }
+    const target = await this.db.user.findFirst({
+      where: { id: req.userId, status: 'ACTIVE', deletedAt: null },
+      select: { email: true },
+    });
+    if (!target?.email)
+      throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'userId', code: 'not_found' }] });
+    return target.email;
+  }
+
+  /** Одноразовая ссылка приглашения письмом (outbox): принять — после входа с этим email. */
+  private async sendInvite(
+    tx: Tx,
+    membershipId: string,
+    email: string,
+    locale: Locale,
+    params: { competitionName: string; roleCode: string },
+  ): Promise<void> {
+    const token = await this.tokens.issue(tx, 'INVITE', {
+      userId: null,
+      ttlSeconds: INVITE_TTL_SECONDS,
+      payload: { competitionMembershipId: membershipId },
+    });
+    const base = this.env.APP_URL.replace(/\/$/, '');
+    await this.emails.request(tx, {
+      template: 'competition.invite',
+      to: email,
+      userId: null,
+      locale,
+      params: {
+        ...params,
+        acceptUrl: `${base}/${locale}/invites/competition?token=${encodeURIComponent(token)}`,
+      },
+    });
   }
 
   /** Принять приглашение может только владелец приглашённого email, подтвердивший его. */

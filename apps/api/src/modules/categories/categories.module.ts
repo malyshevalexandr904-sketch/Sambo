@@ -12,6 +12,7 @@ import { AgeGroupsService } from './application/age-groups.service';
 import { CategoryExtensions } from './application/category-extensions';
 import { CategoryLifecycle } from './application/category-lifecycle';
 import { CategoryTemplatesService } from './application/category-templates.service';
+import { CategoryBulkService } from './application/category-bulk.service';
 import { CompetitionCategoriesService } from './application/competition-categories.service';
 import { CompetitionRulesService } from './application/competition-rules.service';
 import { OwnerScopeService } from './application/owner-scope.service';
@@ -35,6 +36,7 @@ import { OwnerScopeService } from './application/owner-scope.service';
     CategoryExtensions,
     CategoryLifecycle,
     CompetitionCategoriesService,
+    CategoryBulkService,
     CompetitionRulesService,
   ],
   exports: [CategoryExtensions, CompetitionCategoriesService, CompetitionRulesService],

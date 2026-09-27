@@ -3,7 +3,8 @@
 import { z } from 'zod';
 import type { EligibilityReason } from './categories.js';
 import { Grams, type LocalizedText, PageQuery, Reason, Uuid } from './common.js';
-import type { CategoryRef, CategoryWeight, CompetitionStatus } from './competitions.js';
+import type { CategoryRef, CategoryWeight } from './competition-categories.js';
+import type { CompetitionStatus } from './competitions.js';
 import type { OrganizationRef } from './organizations.js';
 import type { Gender } from './people.js';
 
