@@ -300,7 +300,12 @@ function WindowsCard({ competition: c, manage }: { competition: Competition; man
               {formatInZone(w.startsAt, c.timezone, locale)} —{' '}
               {localDateTimeIn(w.endsAt, c.timezone).slice(11)}
             </p>
-            <p className="text-xs text-slate-600">{w.categories.map((x) => x.code).join(', ')}</p>
+            <details className="text-xs text-slate-600">
+              <summary className="cursor-pointer">
+                {t('categoriesCount', { count: w.categories.length })}
+              </summary>
+              {w.categories.map((x) => pickName(x.name, locale)).join('; ')}
+            </details>
           </li>
         ))}
       </ul>
@@ -314,12 +319,26 @@ function WindowsCard({ competition: c, manage }: { competition: Competition; man
   );
 }
 
+/**
+ * Настройка свёрнута, когда весы и окна уже есть: на экране взвешивания главное — список участников
+ * (на телефоне и планшете иначе до него долго листать).
+ */
 export function WeighInSetup({ competition: c }: { competition: Competition }) {
+  const t = useTranslations('weighin');
   const manage = c.allowedActions.includes('weighin.manage');
+  const scales = useScales(c.id);
+  const windows = useWindows(c.id);
+  if (scales.isPending || windows.isPending) return null;
+  const ready = (scales.data ?? []).length > 0 && (windows.data ?? []).length > 0;
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <ScalesCard competition={c} manage={manage} />
-      <WindowsCard competition={c} manage={manage} />
-    </div>
+    <details open={!ready} className="rounded-md border border-slate-200 bg-white">
+      <summary className="flex min-h-11 cursor-pointer items-center px-4 font-medium">
+        {t('setupTitle')}
+      </summary>
+      <div className="grid gap-4 p-4 pt-0 lg:grid-cols-2">
+        <ScalesCard competition={c} manage={manage} />
+        <WindowsCard competition={c} manage={manage} />
+      </div>
+    </details>
   );
 }

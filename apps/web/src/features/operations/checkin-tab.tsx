@@ -14,7 +14,7 @@ import { Alert, Button, Card, CardTitle, EmptyState, Field, Input, Select } from
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
-import { QueryState } from '@/components/common';
+import { QueryState, ReasonAction } from '@/components/common';
 import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { pickName } from '@/lib/queries';
@@ -101,26 +101,38 @@ export function CheckInCard({
       {action.error ? <Alert tone="danger">{action.error}</Alert> : null}
       {targets.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          {targets.map((to) => (
-            <Button
-              key={to}
-              size={to === 'ARRIVED' ? 'md' : 'sm'}
-              variant={to === 'ARRIVED' ? 'primary' : 'secondary'}
-              loading={action.busy}
-              onClick={() =>
-                void action.run(async () => {
-                  await api(`/competitions/${competitionId}/check-in/${row.athlete.id}`, {
-                    method: 'POST',
-                    body: { status: to, method },
-                    version: row.checkIn.version,
-                  });
-                  await onChanged();
-                })
-              }
-            >
-              {t(`set.${to}`)}
-            </Button>
-          ))}
+          {targets.map((to) => {
+            const mark = (note?: string) =>
+              api(`/competitions/${competitionId}/check-in/${row.athlete.id}`, {
+                method: 'POST',
+                body: { status: to, method, note },
+                version: row.checkIn.version,
+              }).then(onChanged);
+            // Снятие окончательно (участие не допускается) — только с причиной.
+            if (to === 'WITHDRAWN')
+              return (
+                <ReasonAction
+                  key={to}
+                  size="sm"
+                  label={t(`set.${to}`)}
+                  title={t('withdrawTitle', { name: row.athlete.publicName })}
+                  onConfirm={async (reason) => {
+                    await mark(reason);
+                  }}
+                />
+              );
+            return (
+              <Button
+                key={to}
+                size={to === 'ARRIVED' ? 'md' : 'sm'}
+                variant={to === 'ARRIVED' ? 'primary' : 'secondary'}
+                loading={action.busy}
+                onClick={() => void action.run(() => mark())}
+              >
+                {t(`set.${to}`)}
+              </Button>
+            );
+          })}
         </div>
       ) : null}
     </div>

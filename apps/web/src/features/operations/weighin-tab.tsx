@@ -125,8 +125,7 @@ function WeighRow({
       <div className="flex flex-wrap items-center gap-2">
         <p className="font-medium">{athleteName(row.athlete)}</p>
         <span className="text-sm text-slate-600">
-          {pickName(row.category.name, locale)} · {weightLabel(row.category.weight)} ·{' '}
-          {row.organization.shortName || row.organization.name}
+          {pickName(row.category.name, locale)} · {row.organization.shortName || row.organization.name}
         </span>
         <WeighInBadge status={row.record.status} />
         {row.checkIn.status !== 'ARRIVED' ? <CheckInBadge status={row.checkIn.status} /> : null}
@@ -282,7 +281,7 @@ export function WeighInTab({ competition: c }: { competition: Competition }) {
       <WeighInSetup competition={c} />
       <Card>
         <CardTitle>{t('stationTitle')}</CardTitle>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field id="st-window" label={t('window')}>
             <Select id="st-window" value={current?.id ?? ''} onChange={(e) => setWindowId(e.target.value)}>
               {(windows.data ?? []).length === 0 ? <option value="">{t('chooseWindow')}</option> : null}
