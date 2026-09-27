@@ -359,6 +359,29 @@ describe('new version of a published draw', () => {
     expect(noVersion.status).toBe(400);
   });
 
+  it('waits until admission is decided again (the category returns to READY_FOR_DRAW)', async () => {
+    // После публикации положение потребовало взвешивания: допуск снова не решён — к жеребьёвке категорию не вернуть.
+    const requirement = await t.admin.competitionRequirement.create({
+      data: { competitionId: w.competitionId, categoryId: cat.categoryId, kind: 'WEIGH_IN', mandatory: true },
+    });
+    const view = (await w.staff.chief.agent.get(`/api/v1/draws/${d.id}`)).body.data as DrawDto;
+    const r = await send(
+      w.staff.chief,
+      'post',
+      `/api/v1/draws/${d.id}/supersede`,
+      { reason: 'Ошибка в посеве' },
+      view.version,
+    );
+    expect(r.status).toBe(422);
+    expect(r.body.error.details.failed).toEqual(['admission_pending']);
+    expect((await t.admin.draw.findUniqueOrThrow({ where: { id: d.id } })).status).toBe('PUBLISHED');
+    await t.admin.competitionRequirement.delete({ where: { id: requirement.id } });
+    await t.admin.admission.updateMany({
+      where: { entryId: { in: cat.entries } },
+      data: { status: 'ADMITTED' },
+    });
+  });
+
   it('removes the bracket, returns the category to READY_FOR_DRAW and allows a new version', async () => {
     const view = (await w.staff.chief.agent.get(`/api/v1/draws/${d.id}`)).body.data as DrawDto;
     expect(view.allowedActions).toEqual(['draw.verify', 'draw.supersede']);
