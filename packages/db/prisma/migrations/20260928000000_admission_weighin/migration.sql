@@ -466,3 +466,22 @@ BEGIN
   END IF;
 END
 $$;
+
+-- ---------- Турниры, уже начавшие мандатную комиссию ----------
+-- Строки прибытия и этап взвешивания в закрытых категориях создаёт переход REGISTRATION_CLOSED → CHECK_IN. Для
+-- турниров, прошедших его до этой миграции, они создаются здесь (после триггеров — изменения попадают в журнал
+-- синхронизации). Допуск таких турниров пересчитывает POST /competitions/{id}/admission/recompute (DEPLOYMENT.md).
+
+INSERT INTO "check_in" ("id", "competition_id", "athlete_id", "status", "version", "created_at", "updated_at")
+SELECT gen_random_uuid(), x."competition_id", x."athlete_id", 'EXPECTED', 1, now(), now()
+FROM (
+  SELECT DISTINCT e."competition_id", e."athlete_id"
+  FROM "entry" e JOIN "competition" c ON c."id" = e."competition_id"
+  WHERE e."status" = 'APPROVED' AND c."status" IN ('CHECK_IN', 'DRAWING', 'SCHEDULED', 'IN_PROGRESS')
+) x
+ON CONFLICT ("competition_id", "athlete_id") DO NOTHING;
+
+UPDATE "competition_category" cc
+SET "status" = 'WEIGH_IN', "version" = cc."version" + 1, "updated_at" = now()
+FROM "competition" c
+WHERE c."id" = cc."competition_id" AND c."status" = 'CHECK_IN' AND cc."status" = 'CLOSED';

@@ -43,6 +43,7 @@ export class AdmissionLifecycle implements OnModuleInit {
     sub('competition.requirements_changed', (e) => ({ competitionId: e.payload.competitionId }));
     sub('consent.given', (e) => ({ athlete: { personId: e.payload.personId } }));
     sub('consent.revoked', (e) => ({ athleteId: e.payload.athleteId }));
+    sub('athlete.merged', (e) => ({ athleteId: e.payload.targetAthleteId }));
     sub('document.status_changed', (e, tx) => this.documentOwners(tx, e.payload.documentId));
     this.competitions.registerEffect(async ({ tx, competition, from, to }) => {
       if (from === 'REGISTRATION_CLOSED' && to === 'CHECK_IN')

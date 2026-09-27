@@ -3,6 +3,7 @@
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { AdmissionSources, type CheckOutcome, evaluateCheckIn } from '../../admission';
+import { AthleteExtensions } from '../../athletes';
 import { CompetitionExtensions } from '../../competitions';
 import { OutboxService } from '../../outbox';
 import { CHECK_IN_PHASE } from '../domain/checkin-rules';
@@ -16,6 +17,7 @@ export class CheckInLifecycle implements OnModuleInit {
     private readonly sources: AdmissionSources,
     private readonly competitions: CompetitionExtensions,
     private readonly outbox: OutboxService,
+    private readonly athletes: AthleteExtensions,
   ) {}
 
   onModuleInit(): void {
@@ -42,6 +44,20 @@ export class CheckInLifecycle implements OnModuleInit {
         select: { athleteId: true },
       });
       await this.checkins.ensureRows(tx, e.competitionId, [entry.athleteId]);
+    });
+    // Слияние дублей: отметки прибытия переходят к основному профилю (если на том же турнире у него своей нет).
+    this.athletes.registerMergeParticipant(async (tx, source, target) => {
+      const taken = await tx.checkIn.findMany({
+        where: { athleteId: target.athleteId },
+        select: { competitionId: true },
+      });
+      await tx.checkIn.deleteMany({
+        where: { athleteId: source.athleteId, competitionId: { in: taken.map((t) => t.competitionId) } },
+      });
+      await tx.checkIn.updateMany({
+        where: { athleteId: source.athleteId },
+        data: { athleteId: target.athleteId, version: { increment: 1 } },
+      });
     });
     this.competitions.registerCounters(async (tx, competitionId) => ({
       arrived: await (tx ?? this.db).checkIn.count({

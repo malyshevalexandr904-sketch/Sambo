@@ -92,10 +92,15 @@ export class AdmissionEngine {
    * Турнир, право записи которого у площадочного узла, пропускается (ADR-21).
    */
   async recompute(tx: Tx, where: Prisma.EntryWhereInput, now = new Date()): Promise<void> {
-    const entries = await tx.entry.findMany({
+    const candidates = await tx.entry.findMany({
       where: { AND: [where, { competition: { status: { in: [...ACTIVE] } } }] },
-      select: ENTRY_SELECT,
+      select: { id: true },
     });
+    if (candidates.length === 0) return;
+    const entries = await this.lockEntries(
+      tx,
+      candidates.map((c) => c.id),
+    );
     const byCompetition = new Map<string, EntryFact[]>();
     for (const e of entries)
       byCompetition.set(e.competitionId, [...(byCompetition.get(e.competitionId) ?? []), e]);
@@ -108,6 +113,16 @@ export class AdmissionEngine {
       const competition = await this.competition(tx, competitionId);
       await this.persist(tx, competitionId, await this.evaluate(tx, competition, approved, now), now);
     }
+  }
+
+  /**
+   * Пересчёты одного участия идут по очереди: строки участий блокируются (в порядке id — без взаимных
+   * блокировок), и факты читаются уже после блокировки. Иначе параллельные отметка прибытия и взвешивание
+   * посчитали бы допуск каждый по своему устаревшему снимку и записали бы неверный итог.
+   */
+  private async lockEntries(tx: Tx, ids: string[]): Promise<EntryFact[]> {
+    await tx.$queryRaw`SELECT id FROM entry WHERE id = ANY(${ids}::uuid[]) ORDER BY id FOR UPDATE`;
+    return tx.entry.findMany({ where: { id: { in: ids } }, select: ENTRY_SELECT });
   }
 
   async competition(tx: Tx, competitionId: string): Promise<AdmissionCompetition> {

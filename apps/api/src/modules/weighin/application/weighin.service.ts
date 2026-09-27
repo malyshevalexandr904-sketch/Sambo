@@ -247,7 +247,9 @@ export class WeighInService {
     const verifiedUntil = scale.verifiedUntil.toISOString().slice(0, 10);
     if (verifiedUntil < todayIn(competition.timezone, now))
       throw new DomainError('SCALE_CALIBRATION_EXPIRED', { verifiedUntil });
-    const phase = req.kind === 'CONTROL' ? CONTROL_PHASE : (['WEIGH_IN'] as const);
+    // Официальное — на этапе взвешивания; контрольное и повторное (в том числе после неудачного контрольного
+    // уже после жеребьёвки) — до окончания соревнований в категории.
+    const phase = req.kind === 'OFFICIAL' ? (['WEIGH_IN'] as const) : CONTROL_PHASE;
     if (!(phase as readonly string[]).includes(category.status)) throw blocked('category_status');
     await this.assertArrived(tx, competition.id, entry);
     const current = (await this.records.refresh(tx, competition, [entry.id], now)).get(entry.id);

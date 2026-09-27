@@ -46,6 +46,14 @@ export class WeighInSetupService {
     return c.timezone;
   }
 
+  /**
+   * Изменения окон турнира — по очереди (advisory-блокировка транзакции): иначе два параллельных запроса
+   * прошли бы проверку пересечения каждый по своему снимку.
+   */
+  private async lockWindows(tx: Tx, competitionId: string): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`weigh_in_windows:${competitionId}`}))`;
+  }
+
   // ---------- Весы ----------
 
   async scales(competitionId: string): Promise<ScaleDto[]> {
@@ -211,6 +219,7 @@ export class WeighInSetupService {
   async createWindow(competitionId: string, input: WeighInWindowInput): Promise<WeighInWindowDto[]> {
     await this.db.tx(async (tx) => {
       await this.lockOpen(tx, competitionId);
+      await this.lockWindows(tx, competitionId);
       const id = uuidv7();
       const period = { startsAt: new Date(input.startsAt), endsAt: new Date(input.endsAt) };
       await this.assertWindow(tx, competitionId, {
@@ -247,6 +256,7 @@ export class WeighInSetupService {
   ): Promise<WeighInWindowDto[]> {
     await this.db.tx(async (tx) => {
       await this.lockOpen(tx, competitionId);
+      await this.lockWindows(tx, competitionId);
       const current = await tx.weighInWindow.findFirst({
         where: { id: windowId, competitionId },
         include: { categories: { select: { categoryId: true } } },

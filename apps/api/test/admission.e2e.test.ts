@@ -530,6 +530,45 @@ describe('admission (G-06)', () => {
     const competition = await w.organizer.agent.get(`/api/v1/competitions/${w.competitionId}`).expect(200);
     expect(competition.body.data.counters).toMatchObject({ arrived: 1, admitted: 1, notAdmitted: 1 });
 
+    // Контрольное взвешивание после готовности к жеребьёвке: перевес требует повторного, повторное — тоже после
+    // этапа взвешивания; пока его нет, допуск снова ждёт.
+    const control = await send(
+      w.organizer,
+      'post',
+      `/api/v1/competitions/${w.competitionId}/weigh-in-windows`,
+      {
+        name: 'Контрольное перед финалами',
+        startsAt: new Date(Date.now() - hour).toISOString(),
+        endsAt: new Date(Date.now() + hour).toISOString(),
+        kind: 'CONTROL',
+        categoryIds: [m38.id],
+      },
+    );
+    expect(control.status, JSON.stringify(control.body)).toBe(201);
+    const controlWindowId = (control.body.data as { id: string; kind: string }[]).find(
+      (x) => x.kind === 'CONTROL',
+    )?.id;
+    const controlFailed = await weigh(w.secretary, boy1.id, {
+      windowId: controlWindowId,
+      scaleId,
+      weightGrams: 38_400,
+      kind: 'CONTROL',
+    });
+    expect(controlFailed.body.data).toMatchObject({
+      record: { status: 'RECHECK_REQUIRED', allowedKinds: ['RECHECK'] },
+      admission: { status: 'PENDING' },
+    });
+    const controlRecheck = await weigh(w.secretary, boy1.id, {
+      windowId: controlWindowId,
+      scaleId,
+      weightGrams: 37_900,
+      kind: 'RECHECK',
+    });
+    expect(controlRecheck.body.data).toMatchObject({
+      record: { status: 'PASSED' },
+      admission: { status: 'ADMITTED' },
+    });
+
     // Каждая операционная таблица пишет журнал синхронизации.
     const tables = await t.admin.syncLog.findMany({
       where: { competitionId: w.competitionId },

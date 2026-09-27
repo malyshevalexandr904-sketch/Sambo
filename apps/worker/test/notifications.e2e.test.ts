@@ -27,9 +27,13 @@ class FakeMailer implements Mailer {
   }
 }
 
+/** Очередь с дедупликацией по jobId — как BullMQ. */
 class FakeQueue {
   jobs: DeliveryJob[] = [];
-  async add(_name: string, data: NotificationJob): Promise<void> {
+  private readonly ids = new Set<string>();
+  async add(_name: string, data: NotificationJob, opts?: { jobId?: string }): Promise<void> {
+    if (opts?.jobId && this.ids.has(opts.jobId)) return;
+    if (opts?.jobId) this.ids.add(opts.jobId);
     this.jobs.push(data as DeliveryJob);
   }
 }
@@ -64,6 +68,7 @@ async function user(email: string, opts: { verified?: boolean; locale?: string }
 async function applicationFixture(
   submittedBy: string,
   createdBy: string,
+  opts: { creatorLeft?: boolean } = {},
 ): Promise<{ applicationId: string }> {
   const orgId = uuidv7();
   await db.organization.create({
@@ -93,6 +98,16 @@ async function applicationFixture(
       disciplineCode: 'SPORT_SAMBO',
     },
   });
+  for (const [userId, status] of [
+    [submittedBy, 'ACTIVE'],
+    [createdBy, opts.creatorLeft ? 'ENDED' : 'ACTIVE'],
+  ] as const) {
+    if (await db.organizationMembership.findFirst({ where: { userId, organizationId: orgId } })) continue;
+    const role = await db.role.findUniqueOrThrow({ where: { code: 'COACH' } });
+    await db.organizationMembership.create({
+      data: { id: uuidv7(), organizationId: orgId, userId, roleId: role.id, status },
+    });
+  }
   const applicationId = uuidv7();
   await db.application.create({
     data: {
@@ -206,6 +221,53 @@ describe('notifications', () => {
       status: 'FAILED',
       attempts: 2,
     });
+  });
+
+  it('a creator who has left the club gets nothing about the application', async () => {
+    const submitter = await user('coach@club.test');
+    const former = await user('former@club.test');
+    const { applicationId } = await applicationFixture(submitter, former, { creatorLeft: true });
+    const queue = new FakeQueue();
+    const consumer = new NotificationConsumer(
+      db,
+      new FakeMailer(),
+      queue as unknown as Queue<NotificationJob>,
+      logger,
+      env,
+    );
+    const eventId = await event('registration.application_returned', { applicationId });
+    await consumer.handle(
+      job<OutboxJob>({ eventId, type: 'registration.application_returned', traceId: null }),
+    );
+    const rows = await db.notification.findMany();
+    expect(rows.map((r) => r.userId)).toEqual([submitter]);
+  });
+
+  it('a lost enqueue is repaired by the retry of the event job', async () => {
+    const coach = await user('coach@club.test');
+    const { applicationId } = await applicationFixture(coach, coach);
+    const queue = new FakeQueue();
+    let fail = true;
+    const flaky = {
+      add: async (name: string, data: NotificationJob, opts?: { jobId?: string }) => {
+        if (fail) throw new Error('redis down');
+        return queue.add(name, data, opts);
+      },
+    };
+    const consumer = new NotificationConsumer(
+      db,
+      new FakeMailer(),
+      flaky as unknown as Queue<NotificationJob>,
+      logger,
+      env,
+    );
+    const eventId = await event('registration.application_returned', { applicationId });
+    const outboxJob = job<OutboxJob>({ eventId, type: 'registration.application_returned', traceId: null });
+    await expect(consumer.handle(outboxJob)).rejects.toThrow('redis down');
+    fail = false;
+    await consumer.handle(outboxJob);
+    expect(queue.jobs).toHaveLength(1);
+    expect(await db.notification.count()).toBe(1);
   });
 
   it('an unverified email gets only the in-app notification', async () => {
