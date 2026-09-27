@@ -20,7 +20,6 @@ export type WeighInResult = (typeof WEIGH_IN_RESULTS)[number];
 export const WEIGH_IN_STATUSES = ['EXPECTED', 'PASSED', 'FAILED', 'RECHECK_REQUIRED'] as const;
 export type WeighInStatus = (typeof WEIGH_IN_STATUSES)[number];
 
-
 export interface WeightLimits {
   kind: WeightLimitKind;
   lowerGrams: number | null;
