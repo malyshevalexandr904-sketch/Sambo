@@ -32,7 +32,7 @@ import {
   lockAthleteInCompetition,
   lockEntry,
 } from './entry-commands';
-import { RegistrationAccessService } from './registration-access.service';
+import { type ApplicationContext, RegistrationAccessService } from './registration-access.service';
 
 type ApplicationRow = Awaited<ReturnType<typeof lockApplication>>;
 
@@ -126,9 +126,10 @@ export class EntryDecisionsService {
     req: EntryWithdrawRequest,
   ): Promise<EntryDto> {
     const ctx = await this.access.entryContext(entryId);
+    const owner = await this.access.isOwner(user, ctx.application.organizationId);
+    await this.hideDraft(ctx, owner);
     const staff = await this.access.canStaff(user, 'entry.withdraw', ctx.competitionScope);
     if (!staff) {
-      const owner = await this.access.isOwner(user, ctx.application.organizationId);
       if (!owner) {
         await this.access.assertVisible(user, ctx);
         throw new DomainError('FORBIDDEN', { permission: 'entry.withdraw' });
@@ -185,6 +186,7 @@ export class EntryDecisionsService {
     req: EntryTransferRequest,
   ): Promise<EntryDto> {
     const ctx = await this.access.entryContext(entryId);
+    await this.hideDraft(ctx, await this.access.isOwner(user, ctx.application.organizationId));
     await this.db.tx(async (tx) => {
       const competitionId = ctx.application.competitionId;
       await this.leases.assertWritable(tx, competitionId);
@@ -233,6 +235,12 @@ export class EntryDecisionsService {
       });
     });
     return this.entries.get(user, entryId);
+  }
+
+  /** Черновик заявки виден только владельцу: персоналу участие черновика — 404. */
+  private async hideDraft(ctx: ApplicationContext, owner: boolean): Promise<void> {
+    if (ctx.application.status === 'DRAFT' && !owner)
+      throw new DomainError('NOT_FOUND', { resource: 'entry' });
   }
 
   /** Первое решение по поданной заявке берёт её в работу: SUBMITTED → UNDER_REVIEW. */

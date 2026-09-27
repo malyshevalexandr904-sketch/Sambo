@@ -26,7 +26,9 @@ export class RegistrationLifecycle implements OnModuleInit {
       const [applications, approved, pending] = await Promise.all([
         client.application.count({ where: { competitionId, status: { notIn: ['DRAFT', 'CANCELLED'] } } }),
         client.entry.count({ where: { competitionId, status: 'APPROVED' } }),
-        client.entry.count({ where: { competitionId, status: 'PENDING' } }),
+        client.entry.count({
+          where: { competitionId, status: 'PENDING', application: { status: { not: 'DRAFT' } } },
+        }),
       ]);
       return { applications, entriesApproved: approved, entriesPending: pending };
     });

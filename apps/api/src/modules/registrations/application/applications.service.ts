@@ -125,7 +125,7 @@ export class ApplicationsService {
     return result;
   }
 
-  /** Очередь секретариата — все заявки турнира; владельцу — заявки своих организаций. */
+  /** Очередь секретариата — поданные заявки турнира (без чужих черновиков); владельцу — свои. */
   async listForCompetition(
     user: AuthUser,
     competitionId: string,
@@ -135,11 +135,10 @@ export class ApplicationsService {
     const scope = await this.competitions.scopeFor(competition);
     const staff = await this.policy.can(user, 'registration.view', scope);
     if (!staff && competition.status === 'DRAFT') await this.policy.assert(user, 'registration.view', scope);
-    const and: Prisma.ApplicationWhereInput[] = [{ competitionId }];
-    if (!staff) {
-      const own = await this.access.ownerOrganizations(user);
-      if (own !== 'all') and.push({ organizationId: { in: own } });
-    }
+    const and: Prisma.ApplicationWhereInput[] = [
+      { competitionId },
+      await this.access.visibleApplications(user, staff),
+    ];
     if (q.status) and.push({ status: q.status });
     if (q.organizationId) and.push({ organizationId: q.organizationId });
     if (q.q)

@@ -121,9 +121,10 @@ export class EntriesService {
     const scope = await this.competitions.scopeFor(competition);
     const staff = await this.policy.can(user, 'registration.view', scope);
     if (!staff && competition.status === 'DRAFT') await this.policy.assert(user, 'registration.view', scope);
-    const own = staff ? 'all' : await this.access.ownerOrganizations(user);
-    const and: Prisma.EntryWhereInput[] = [{ competitionId }];
-    if (own !== 'all') and.push({ application: { organizationId: { in: own } } });
+    const and: Prisma.EntryWhereInput[] = [
+      { competitionId },
+      { application: await this.access.visibleApplications(user, staff) },
+    ];
     if (q.categoryId) and.push({ categoryId: q.categoryId });
     if (q.status) and.push({ status: q.status });
     if (q.organizationId) and.push({ application: { organizationId: q.organizationId } });

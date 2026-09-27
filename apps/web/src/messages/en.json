@@ -781,7 +781,6 @@
       "NATIONAL": "National",
       "INTERNATIONAL": "International"
     },
-    "registrationOpenNow": "Registration open",
     "createTitle": "New competition",
     "createHint": "The competition is created as a draft visible only to the organiser and staff. Publish it once rules, categories and dates are ready.",
     "sectionMain": "General",
@@ -1058,7 +1057,8 @@
       "success": "Invitation accepted.",
       "goToCompetition": "Open competition",
       "needLogin": "Sign in with the email address the invitation was sent to and open the link again."
-    }
+    },
+    "registrationUntil": "Entries until {date}"
   },
   "applications": {
     "cardTitle": "Competition application",
@@ -1212,8 +1212,6 @@
     "categoriesTbd": "Categories are not set yet.",
     "participantsTotal": "Approved entries: {count}",
     "category": "Category",
-    "gender": "Gender",
-    "weight": "Weight",
     "participants": "Entries"
   }
 }

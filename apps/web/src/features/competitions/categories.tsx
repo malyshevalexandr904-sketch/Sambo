@@ -155,7 +155,7 @@ function CategoryActions({
           <ReasonAction
             key={to}
             size="sm"
-            variant={to === 'CANCELLED' ? 'danger' : 'secondary'}
+            variant="secondary"
             label={t(`transitionTo.${to}`)}
             title={t(`transitionTitle.${to}`)}
             onConfirm={(reason) => transition(to, reason)}

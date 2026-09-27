@@ -2,7 +2,7 @@
 // (APPLICATION_OWNER), персонал турнира — по турнирным правам. Остальным заявка не видна (404).
 import { Injectable, type OnModuleInit } from '@nestjs/common';
 import type { PermissionCode } from '@sde/contracts';
-import type { Application, Entry } from '@sde/db';
+import type { Application, Entry, Prisma } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -57,12 +57,27 @@ export class RegistrationAccessService implements OnModuleInit {
     return this.policy.can(user, permission, scope);
   }
 
-  /** Заявку видят владелец и персонал с `registration.view`; остальным — 404. */
+  /**
+   * Заявку видят владелец и персонал с `registration.view`; черновик — только владелец (рабочая заявка клуба
+   * до подачи секретариату не видна). Остальным — 404.
+   */
   async assertVisible(user: AuthUser, ctx: ApplicationContext): Promise<{ owner: boolean; staff: boolean }> {
     const owner = await this.isOwner(user, ctx.application.organizationId);
     const staff = await this.canStaff(user, 'registration.view', ctx.competitionScope);
-    if (!owner && !staff) throw new DomainError('NOT_FOUND', { resource: 'application' });
+    if (!owner && (!staff || ctx.application.status === 'DRAFT'))
+      throw new DomainError('NOT_FOUND', { resource: 'application' });
     return { owner, staff };
+  }
+
+  /**
+   * Видимые заявки турнира: персоналу — все, кроме черновиков чужих организаций; владельцу — свои.
+   * Условие на `Application`; для участий оборачивается в `{ application: … }`.
+   */
+  async visibleApplications(user: AuthUser, staff: boolean): Promise<Prisma.ApplicationWhereInput> {
+    const own = await this.ownerOrganizations(user);
+    if (own === 'all') return {};
+    const mine: Prisma.ApplicationWhereInput = { organizationId: { in: own } };
+    return staff ? { OR: [{ status: { not: 'DRAFT' } }, mine] } : mine;
   }
 
   /** Команда владельца: не владелец, но видит заявку — 403; не видит — 404. */

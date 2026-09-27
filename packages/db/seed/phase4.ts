@@ -42,7 +42,7 @@ interface SeedCategory {
   upper: number | null;
 }
 
-/** Категории шаблона 12–14 лет — как их строит генерация API (коды «M-Y12_14-38», «F-Y12_14-59+»). */
+/** Категории шаблона 12–14 лет — как их строит генерация API: «M-Y12_14-38», «Юноши 12–14 лет, до 38 кг». */
 function categoriesFromTemplate(): SeedCategory[] {
   const group = SEED_AGE_GROUPS.find((g) => g.code === 'Y12_14');
   if (!group) throw new Error('Seed: age group Y12_14 not found');
@@ -68,8 +68,8 @@ function categoriesFromTemplate(): SeedCategory[] {
       out.push({
         n: out.length + 1,
         code: `${g.code}-${group.code}-${kg}${b.kind === 'ABOVE' ? '+' : ''}`,
-        nameRu: `${g.ru} ${group.nameRu}, ${categoryWeightLabel(w, 'ru')}`,
-        nameEn: `${g.en} ${group.nameEn}, ${categoryWeightLabel(w, 'en')}`,
+        nameRu: `${g.ru} ${group.ageFrom}–${group.ageTo} лет, ${categoryWeightLabel(w, 'ru')}`,
+        nameEn: `${g.en} ${group.ageFrom}–${group.ageTo}, ${categoryWeightLabel(w, 'en')}`,
         gender,
         ...b,
       });

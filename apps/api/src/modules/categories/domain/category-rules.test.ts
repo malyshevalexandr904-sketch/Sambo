@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateCategories, type TemplateItem } from './category-generation';
+import { ageLabel, generateCategories, type TemplateItem } from './category-generation';
 import { findCategoryTransition, initialCategoryStatus, manualTransitionsFrom } from './category-machine';
 import { type MergeBounds, mergedBounds, mergeIssues, renameForWeight } from './category-merge';
 
@@ -65,6 +65,11 @@ describe('categories from a template', () => {
     ]);
     expect(result[2]?.nameRu).toBe('Юноши 12–13 лет, до 38,5 кг');
     expect(result[3]?.nameEn).toBe('Boys 12–13, over 38 kg');
+    expect([ageLabel(18, 21, 'ru'), ageLabel(20, 22, 'ru'), ageLabel(16, 16, 'ru')]).toEqual([
+      '18–21 год',
+      '20–22 года',
+      '16 лет',
+    ]);
     expect(result[0]).toMatchObject({ birthYearFrom: 2013, birthYearTo: 2014, agePolicy: 'BY_BIRTH_YEAR' });
     expect(new Set(result.map((c) => c.sortOrder)).size).toBe(result.length);
   });

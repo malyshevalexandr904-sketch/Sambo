@@ -293,6 +293,12 @@ describe('application cycle', () => {
       .get(`/api/v1/competitions/${w.competitionId}/applications`)
       .expect(200);
     expect(theirs.body.data.map((a: { id: string }) => a.id)).toEqual([appB.id]);
+    // Черновик клуба секретариату не виден: ни в очереди, ни по ссылке.
+    const all = await w.secretary.agent
+      .get(`/api/v1/competitions/${w.competitionId}/applications`)
+      .expect(200);
+    expect(all.body.data.map((a: { id: string }) => a.id)).toEqual([app.id]);
+    await w.secretary.agent.get(`/api/v1/applications/${appB.id}`).expect(404);
 
     const full = await w.secretary.agent.get(`/api/v1/applications/${app.id}`).expect(200);
     const entry = (name: string) =>
@@ -609,6 +615,22 @@ describe('entries after submission', () => {
       status: 'WITHDRAWN',
       withdrawReason: 'Травма на тренировке',
     });
+    // Черновик персоналу не виден: снять участие черновика секретариат не может.
+    const hidden = await send(
+      w.organizer,
+      'post',
+      `/api/v1/entries/${e2.body.data.id}/withdraw`,
+      { reason: 'Не прибыл на турнир' },
+      e2.body.data.version,
+    );
+    expect(hidden.status).toBe(404);
+    await send(
+      w.coachA,
+      'post',
+      `/api/v1/applications/${app.id}/transitions`,
+      { to: 'SUBMITTED' },
+      await appVersion(w.coachA, app.id),
+    ).expect(200);
 
     const c = await w.organizer.agent.get(`/api/v1/competitions/${w.competitionId}`).expect(200);
     await send(

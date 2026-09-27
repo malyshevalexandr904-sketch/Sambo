@@ -173,28 +173,27 @@ export default async function TournamentPage({
             <p className="mb-2 text-sm text-slate-600">
               {t('participantsTotal', { count: totalParticipants })}
             </p>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[480px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="py-2 pr-3 font-medium">{t('category')}</th>
-                    <th className="py-2 pr-3 font-medium">{t('gender')}</th>
-                    <th className="py-2 pr-3 font-medium">{t('weight')}</th>
-                    <th className="py-2 font-medium">{t('participants')}</th>
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="py-2 pr-3 font-medium">{t('category')}</th>
+                  <th className="py-2 text-right font-medium">{t('participants')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {c.categories.map((x) => (
+                  <tr key={x.code} className="border-b border-slate-100 align-top">
+                    <td className="py-2 pr-3">
+                      <span className="block">{name(x.name)}</span>
+                      <span className="text-xs text-slate-600">
+                        {tg(x.gender)} · {categoryWeightLabel(x.weight, lang)}
+                      </span>
+                    </td>
+                    <td className="py-2 text-right tabular-nums">{x.participants}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {c.categories.map((x) => (
-                    <tr key={x.code} className="border-b border-slate-100">
-                      <td className="py-2 pr-3">{name(x.name)}</td>
-                      <td className="py-2 pr-3">{tg(x.gender)}</td>
-                      <td className="py-2 pr-3">{categoryWeightLabel(x.weight, lang)}</td>
-                      <td className="py-2">{x.participants}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </>
         )}
       </section>

@@ -19,6 +19,12 @@ import { formatDate } from '@/lib/format';
 import { pickName, qk } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 
+/** Категории, куда проходит заявленный вес, — первыми; порядок турнира внутри групп сохраняется. */
+function byWeightMatch<T extends { weightMatch: boolean | null }>(list: T[]): T[] {
+  const rank = (c: T): number => (c.weightMatch === true ? 0 : c.weightMatch === null ? 1 : 2);
+  return [...list].sort((a, b) => rank(a) - rank(b));
+}
+
 export function AddEntryCard({
   application: a,
   onAdded,
@@ -128,7 +134,7 @@ export function AddEntryCard({
                       <p className="text-sm text-slate-600">{t('noEligible')}</p>
                     ) : (
                       <ul className="space-y-2">
-                        {eligible.data.eligible.map((c) => (
+                        {byWeightMatch(eligible.data.eligible).map((c) => (
                           <li
                             key={c.id}
                             className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 p-3"

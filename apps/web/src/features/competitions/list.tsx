@@ -11,7 +11,7 @@ import { Link } from '@/i18n/navigation';
 import { hasAnywhere } from '@/lib/access';
 import { api } from '@/lib/api';
 import { qk, useMe } from '@/lib/queries';
-import { CompetitionStatusBadge, formatDates } from './shared';
+import { CompetitionStatusBadge, formatDates, formatInZone } from './shared';
 
 type Scope = 'mine' | 'open' | 'all';
 
@@ -109,7 +109,9 @@ function CompetitionCard({ competition: c }: { competition: CompetitionSummary }
       </p>
       <p className="mt-1 text-sm text-slate-600">{t(`levels.${c.level}`)}</p>
       {c.registrationOpenNow ? (
-        <p className="mt-2 text-sm font-medium text-green-800">{t('registrationOpenNow')}</p>
+        <p className="mt-2 text-sm font-medium text-green-800">
+          {t('registrationUntil', { date: formatInZone(c.registrationEndsAt, c.timezone, locale) })}
+        </p>
       ) : null}
     </Card>
   );

@@ -40,6 +40,24 @@ const GENDER_WORD: Record<Gender, { ru: string; en: string; code: string }> = {
   FEMALE: { ru: 'Девушки', en: 'Girls', code: 'F' },
 };
 
+/** «год» / «года» / «лет» по последнему числу. */
+function ruYears(n: number): string {
+  const d = n % 10;
+  const dd = n % 100;
+  if (d === 1 && dd !== 11) return 'год';
+  if (d >= 2 && d <= 4 && (dd < 12 || dd > 14)) return 'года';
+  return 'лет';
+}
+
+/**
+ * Возраст в названии категории — из границ группы, а не из её названия: название группы в справочнике может
+ * уже содержать пол («Юноши и девушки 12–14 лет»). «12–14 лет», «18 лет»; англ. — «12–14».
+ */
+export function ageLabel(ageFrom: number, ageTo: number, locale: 'ru' | 'en'): string {
+  const range = ageFrom === ageTo ? String(ageFrom) : `${ageFrom}–${ageTo}`;
+  return locale === 'ru' ? `${range} ${ruYears(ageTo)}` : range;
+}
+
 /** Код веса в коде категории: 38 кг → «38», 38,5 кг → «38_5», свыше 72 кг → «72+». */
 function weightCode(w: CategoryWeight): string {
   const grams = w.kind === 'ABOVE' ? (w.lowerGrams ?? 0) : (w.upperGrams ?? 0);
@@ -89,8 +107,8 @@ export function generateCategories(
       const g = GENDER_WORD[first.gender];
       result.push({
         code: `${g.code}-${ag.code}-${weightCode(w)}`,
-        nameRu: `${g.ru} ${ag.nameRu}, ${categoryWeightLabel(w, 'ru')}`,
-        nameEn: `${g.en} ${ag.nameEn}, ${categoryWeightLabel(w, 'en')}`,
+        nameRu: `${g.ru} ${ageLabel(ag.ageFrom, ag.ageTo, 'ru')}, ${categoryWeightLabel(w, 'ru')}`,
+        nameEn: `${g.en} ${ageLabel(ag.ageFrom, ag.ageTo, 'en')}, ${categoryWeightLabel(w, 'en')}`,
         gender: first.gender,
         ageGroupId: ag.id,
         agePolicy: ag.policy,
