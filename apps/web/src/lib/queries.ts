@@ -43,6 +43,21 @@ export const qk = {
   ruleset: (id: string) => ['rulesets', id] as const,
   ageGroups: (params: object) => ['age-groups', params] as const,
   categoryTemplates: (params: object) => ['category-templates', params] as const,
+  competitions: (params: object) => ['competitions', params] as const,
+  competition: (id: string) => ['competitions', id] as const,
+  competitionCategories: (id: string) => ['competitions', id, 'categories'] as const,
+  competitionRequirements: (id: string) => ['competitions', id, 'requirements'] as const,
+  competitionRules: (id: string) => ['competitions', id, 'category-rules'] as const,
+  competitionMembers: (id: string) => ['competitions', id, 'members'] as const,
+  competitionApplications: (id: string, params: object) =>
+    ['competitions', id, 'applications', params] as const,
+  competitionEntries: (id: string, params: object) => ['competitions', id, 'entries', params] as const,
+  application: (id: string) => ['applications', id] as const,
+  myApplications: (params: object) => ['me', 'applications', params] as const,
+  eligible: (competitionId: string, athleteId: string, weight: number | null) =>
+    ['competitions', competitionId, 'eligible', athleteId, weight] as const,
+  athleteEntries: (id: string) => ['athletes', id, 'entries'] as const,
+  venues: (params: object) => ['venues', params] as const,
 };
 
 export function useMe() {

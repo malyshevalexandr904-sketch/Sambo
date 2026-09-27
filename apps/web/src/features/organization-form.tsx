@@ -5,7 +5,7 @@ import { type Organization, ORGANIZATION_TYPES, type OrganizationSummary, type P
 import { Alert, Button, Card, CardTitle, Field, Input, Select } from '@sde/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { api, ApiError } from '@/lib/api';
 import { applyFieldErrors, useErrorMessage, useFieldMessage } from '@/lib/errors';
@@ -110,6 +110,29 @@ function toPayload(v: OrganizationFormValues, mode: 'create' | 'edit'): Record<s
   return payload;
 }
 
+/** Вышестоящая организация ищется по названию: организаций может быть больше, чем помещается в список. */
+function useParentSearch(initial: Organization | undefined) {
+  const [parentText, setParentText] = useState('');
+  const [parentQ, setParentQ] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setParentQ(parentText.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [parentText]);
+  const parents = useQuery({
+    queryKey: qk.organizations({ purpose: 'parents', q: parentQ }),
+    queryFn: () =>
+      api<Page<OrganizationSummary>>('/organizations', {
+        query: { status: 'ACTIVE', q: parentQ || undefined, limit: 50 },
+      }),
+  });
+  const found = parents.data?.data ?? [];
+  const parentOptions: { id: string; shortName: string }[] = [
+    ...(initial?.parent && !found.some((p) => p.id === initial.parent?.id) ? [initial.parent] : []),
+    ...found,
+  ];
+  return { parentText, setParentText, parentOptions };
+}
+
 export function OrganizationForm({
   initial,
   mode,
@@ -135,11 +158,7 @@ export function OrganizationForm({
   const withManager = mode === 'create' && canCreateWithAuthority(me.data);
   const countries = useCountries();
   const regions = useRegions(countryCode);
-  const parents = useQuery({
-    queryKey: qk.organizations({ purpose: 'parents' }),
-    queryFn: () =>
-      api<Page<OrganizationSummary>>('/organizations', { query: { status: 'ACTIVE', limit: 100 } }),
-  });
+  const { parentText, setParentText, parentOptions } = useParentSearch(initial);
   const { errors, isSubmitting } = form.formState;
   const err = (name: keyof OrganizationFormValues): string | undefined => fieldMessage(errors[name]?.message);
 
@@ -177,10 +196,19 @@ export function OrganizationForm({
               ))}
             </Select>
           </Field>
+          <Field id="parentSearch" label={t('parentSearch')}>
+            <Input
+              id="parentSearch"
+              type="search"
+              value={parentText}
+              onChange={(e) => setParentText(e.target.value)}
+              maxLength={100}
+            />
+          </Field>
           <Field id="parentId" label={t('parent')} error={err('parentId')}>
             <Select id="parentId" {...form.register('parentId')}>
               <option value="">{t('noParent')}</option>
-              {(parents.data?.data ?? [])
+              {parentOptions
                 .filter((p) => p.id !== initial?.id)
                 .map((p) => (
                   <option key={p.id} value={p.id}>

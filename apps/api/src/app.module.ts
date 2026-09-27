@@ -31,10 +31,14 @@ import { HealthModule } from './modules/health';
 import { OrganizationsModule } from './modules/organizations';
 import { OutboxModule } from './modules/outbox';
 import { PeopleModule } from './modules/people';
+import { PublicModule } from './modules/public';
+import { RegistrationsModule } from './modules/registrations';
 import { RefereesModule } from './modules/referees';
 import { RuleSetsModule } from './modules/rulesets';
 import { SettingsModule } from './modules/settings';
 import { UsersModule } from './modules/users';
+import { VenuesModule } from './modules/venues';
+import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
 
 @Module({
   imports: [
@@ -69,6 +73,7 @@ import { UsersModule } from './modules/users';
     StorageModule,
     SecurityModule,
     AccessModule,
+    VenueSyncModule,
     AuditModule,
     OutboxModule,
     SettingsModule,
@@ -85,6 +90,9 @@ import { UsersModule } from './modules/users';
     ConsentsModule,
     RuleSetsModule,
     CategoriesModule,
+    VenuesModule,
+    RegistrationsModule,
+    PublicModule,
     AdminModule,
     DictionariesModule,
     HealthModule,
@@ -96,6 +104,8 @@ import { UsersModule } from './modules/users';
     { provide: APP_GUARD, useExisting: RateLimitGuard },
     { provide: APP_GUARD, useExisting: CsrfGuard },
     { provide: APP_GUARD, useExisting: PermissionGuard },
+    // Право записи турнира (ADR-21): после прав, до разбора тела запроса.
+    { provide: APP_GUARD, useExisting: WriteAuthorityGuard },
     // После guards: ключ идемпотентности привязан к проверенному пользователю (API.md, 1.5).
     { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],

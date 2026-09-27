@@ -53,6 +53,20 @@ export function validateParameters(parameters: unknown): RuleSetParametersV1 {
   });
 }
 
+/** Версия правил для закрепления турниром (ADR-09) и чтения параметров другими модулями. */
+export interface RuleSetVersionInfo {
+  id: string;
+  ruleSetId: string;
+  ruleSetCode: string;
+  ruleSetName: string;
+  disciplineCode: string;
+  ownerOrganizationId: string | null;
+  version: number;
+  status: 'DRAFT' | 'PUBLISHED' | 'RETIRED';
+  checksum: string | null;
+  parameters: unknown;
+}
+
 @Injectable()
 export class RuleSetsService implements OnModuleInit {
   constructor(
@@ -65,6 +79,28 @@ export class RuleSetsService implements OnModuleInit {
 
   onModuleInit(): void {
     this.registry.register('ruleset', (id) => this.scopeOf(id));
+  }
+
+  async versionInfo(id: string, tx?: Tx): Promise<RuleSetVersionInfo | null> {
+    const v = await (tx ?? this.db).ruleSetVersion.findUnique({
+      where: { id },
+      include: {
+        ruleSet: { select: { code: true, name: true, disciplineCode: true, ownerOrganizationId: true } },
+      },
+    });
+    if (!v) return null;
+    return {
+      id: v.id,
+      ruleSetId: v.ruleSetId,
+      ruleSetCode: v.ruleSet.code,
+      ruleSetName: v.ruleSet.name,
+      disciplineCode: v.ruleSet.disciplineCode,
+      ownerOrganizationId: v.ruleSet.ownerOrganizationId,
+      version: v.version,
+      status: v.status,
+      checksum: v.checksum,
+      parameters: v.parameters,
+    };
   }
 
   /** Шаблон платформы — область платформы; набор организации — её область. */

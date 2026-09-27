@@ -58,6 +58,8 @@ export async function createTestApp(env: Record<string, string> = {}): Promise<T
 /** Очистка данных между файлами тестов; каталог прав и справочники остаются. */
 export async function resetData(t: TestApp): Promise<void> {
   await t.admin.$executeRaw`TRUNCATE
+    sync_log, entry, application, category_rule, competition_requirement, competition_category,
+    competition_write_lease, competition, venue,
     audit_log, data_access_log, outbox_event, processed_event, system_setting, stored_file,
     refresh_token, verification_token, auth_identity, platform_role_assignment,
     organization_membership, competition_membership, organization_closure, organization_legal_details,

@@ -11,6 +11,8 @@ export const MAINTENANCE_JOBS = {
   cleanupOutbox: { every: DAY },
   cleanupPendingUploads: { every: 60 * 60 * 1000 },
   expireDocuments: { every: 60 * 60 * 1000 },
+  closeRegistrations: { every: 5 * 60 * 1000 },
+  cleanupSyncLog: { every: DAY },
 } as const;
 
 export type MaintenanceJob = keyof typeof MAINTENANCE_JOBS;
@@ -35,6 +37,12 @@ export class Maintenance {
         return this.cleanupPendingUploads();
       case 'expireDocuments':
         await this.expireDocuments();
+        return;
+      case 'closeRegistrations':
+        await this.closeRegistrations();
+        return;
+      case 'cleanupSyncLog':
+        await this.cleanupSyncLog();
         return;
     }
   }
@@ -130,5 +138,89 @@ export class Maintenance {
     }
     if (expired > 0) this.logger.info({ count: expired }, 'Documents expired');
     return expired;
+  }
+
+  /**
+   * Срок регистрации истёк — регистрация турнира закрывается (ARCHITECTURE.md, 16.1: переход
+   * REGISTRATION_OPEN → REGISTRATION_CLOSED выполняет фоновая задача в `registrationEndsAt`), а с ней и
+   * категории. Только турниры, право записи которых у облака; переход — в аудит от имени системы и в outbox.
+   * Заявки после срока не принимаются и без этой задачи: окно проверяет API.
+   */
+  async closeRegistrations(now: Date = new Date()): Promise<number> {
+    const due = await this.db.competition.findMany({
+      where: {
+        status: 'REGISTRATION_OPEN',
+        deletedAt: null,
+        registrationEndsAt: { lte: now },
+        writeLease: { holderType: 'CLOUD' },
+      },
+      select: { id: true, organizerOrganizationId: true },
+      take: 100,
+    });
+    let closed = 0;
+    for (const c of due) {
+      await this.db.$transaction(async (tx) => {
+        const { count } = await tx.competition.updateMany({
+          where: { id: c.id, status: 'REGISTRATION_OPEN', registrationEndsAt: { lte: now } },
+          data: { status: 'REGISTRATION_CLOSED', version: { increment: 1 } },
+        });
+        if (count === 0) return;
+        closed += 1;
+        await tx.competitionCategory.updateMany({
+          where: { competitionId: c.id, status: 'REGISTRATION' },
+          data: { status: 'CLOSED', version: { increment: 1 } },
+        });
+        await tx.auditLog.create({
+          data: {
+            id: uuidv7(),
+            actorType: 'SYSTEM',
+            action: 'competition.status_changed',
+            entityType: 'Competition',
+            entityId: c.id,
+            competitionId: c.id,
+            organizationId: c.organizerOrganizationId,
+            before: { status: 'REGISTRATION_OPEN' },
+            after: { status: 'REGISTRATION_CLOSED' },
+            reason: 'registration_deadline',
+            traceId: 'maintenance:closeRegistrations',
+          },
+        });
+        await tx.outboxEvent.create({
+          data: {
+            id: uuidv7(),
+            type: 'competition.status_changed',
+            aggregateType: 'Competition',
+            aggregateId: c.id,
+            competitionId: c.id,
+            traceId: 'maintenance:closeRegistrations',
+            payload: { competitionId: c.id, from: 'REGISTRATION_OPEN', to: 'REGISTRATION_CLOSED' },
+          },
+        });
+      });
+    }
+    if (closed > 0) this.logger.info({ count: closed }, 'Registrations closed');
+    return closed;
+  }
+
+  /**
+   * Журнал синхронизации в облаке нужен, пока турнир может уйти на площадочный узел и вернуться:
+   * записи старше 30 дней удаляются у турниров, право записи которых у облака (DATABASE.md, 9).
+   */
+  async cleanupSyncLog(now: Date = new Date()): Promise<number> {
+    const { count } = await this.db.syncLog.deleteMany({
+      where: {
+        createdAt: { lt: new Date(now.getTime() - 30 * DAY) },
+        competitionId: {
+          in: (
+            await this.db.competitionWriteLease.findMany({
+              where: { holderType: 'CLOUD' },
+              select: { competitionId: true },
+            })
+          ).map((l) => l.competitionId),
+        },
+      },
+    });
+    if (count > 0) this.logger.info({ count }, 'Old sync log records removed');
+    return count;
   }
 }

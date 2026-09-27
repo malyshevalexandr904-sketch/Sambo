@@ -50,6 +50,19 @@ pnpm db:migrate            # prisma migrate deploy (DATABASE_ADMIN_URL)
 pnpm db:seed               # учебные данные, только dev
 ```
 
+**Phase 4a (`20260927000000_competitions`).** Внешние ключи на турнир и заявку у таблиц Phase 2–3 (`competition_membership.competition_id`, `consent.competition_id`, `document.competition_id`, `document.application_id`) создаются `NOT VALID` и проверяются той же миграцией, только если висячих ссылок нет: до Phase 4 турнир «существовал» через свой персонал, и на стенде с seed Phase 3 есть секретарь учебного турнира, строки которого в `competition` ещё нет. Новые строки ограничение проверяет сразу. После миграции:
+
+1. `pnpm db:seed` — создаёт учебный турнир с тем же идентификатором.
+2. Проверьте, что непроверенных ограничений не осталось:
+
+```sql
+SELECT conname FROM pg_constraint WHERE NOT convalidated AND conname IN (
+  'competition_membership_competition_id_fkey', 'consent_competition_id_fkey',
+  'document_competition_id_fkey', 'document_application_id_fkey');
+```
+
+3. Для каждого найденного — от владельца схемы (`DATABASE_ADMIN_URL`, у роли приложения нет DDL): `ALTER TABLE document VALIDATE CONSTRAINT document_competition_id_fkey;` и т. д. Если проверка падает — найдите висячие ссылки (`SELECT id, competition_id FROM document WHERE competition_id IS NOT NULL AND competition_id NOT IN (SELECT id FROM competition)`) и исправьте их.
+
 Изменения каталога прав — отдельной миграцией данных (см. CONTRIBUTING.md). Миграция данных идемпотентна и увеличивает `permissions_version` всех пользователей: кэш прав сбрасывается.
 
 ## Хранилище
@@ -69,9 +82,11 @@ MinIO берётся с `quay.io` (публикация community-образов
 - Next.js проксирует `/api/*` на `API_INTERNAL_URL`: браузер работает с одним origin, cookie и CSRF без CORS. Адрес вшивается при сборке образа web (`--build-arg API_INTERNAL_URL`).
 - За reverse proxy установите `TRUST_PROXY=true`, иначе rate limit и аудит увидят IP прокси.
 - `/health` и `/ready` в production открываются только во внутренней сети.
+- Публичный API (`/api/public/v1`) можно отдавать через CDN: ответы `Cache-Control: public, max-age=60`. Публичные страницы турниров web получает с `API_INTERNAL_URL` во время запроса и кэширует на 60 секунд в процессе.
 
 ## Чек-лист проверки стенда
 
 1. `docker compose up --build` — все сервисы `healthy`, `migrate` завершился с кодом 0.
 2. Вход `admin@sambo.local` с TOTP → создание организации → приглашение участника → запись в журнале аудита, письмо в Mailpit.
 3. `curl localhost:4000/ready` → `{"status":"ok"}`.
+4. Seed: `/ru/tournaments` показывает «Кубок Юности» с открытой регистрацией; `organizer@sambo.local` видит заявку «Самбо-Север» в разделе «Заявки» турнира.

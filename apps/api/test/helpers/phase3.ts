@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import type { RoleCode, UploadPurpose } from '@sde/contracts';
 import { uuidv7 } from '@sde/db';
 import type { Session, TestApp } from './app';
+import { ensureCompetition } from './phase4';
 
 export const PDF = Buffer.concat([
   Buffer.from('%PDF-1.7\n'),
@@ -64,13 +65,14 @@ export async function upload(
   return fileId;
 }
 
-/** Персонал турнира (CompetitionMembership). Таблица турнира появится в Phase 4. */
+/** Персонал турнира (CompetitionMembership); турнира-заготовки нет — он создаётся черновиком. */
 export async function competitionStaff(
   t: TestApp,
   userId: string,
   competitionId: string,
   role: RoleCode,
 ): Promise<void> {
+  await ensureCompetition(t, competitionId);
   const r = await t.admin.role.findUniqueOrThrow({ where: { code: role } });
   await t.admin.competitionMembership.create({
     data: { id: uuidv7(), competitionId, userId, roleId: r.id, status: 'ACTIVE' },

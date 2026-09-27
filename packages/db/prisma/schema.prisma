@@ -1,6 +1,8 @@
 // SAMBO DIGITAL ECOSYSTEM — схема БД (DATABASE.md).
 // Phase 2: Identity & Access (3.1), Organizations (3.2), Platform (3.9), справочники Phase 2 (API.md, 3.7).
 // Phase 3: People (3.3), Rules & Setup — правила и категории (3.4), документы (3.5), ImportJob (3.9).
+// Phase 4a: турнир, место, категории турнира и правила допуска (3.4), заявки и участия (3.5),
+// право записи и журнал синхронизации (3.9, 7).
 // Конструкции, которые Prisma не выражает (partial unique, CHECK, генерируемые колонки, партиции,
 // REVOKE), пишутся SQL-шагами в миграциях (DATABASE.md, 10). Миграции пишутся и ревьюятся вручную.
 
@@ -118,6 +120,16 @@ model User {
   uploadedDocuments         Document[]               @relation("DocumentUploader")
   reviewedDocuments         Document[]               @relation("DocumentReviewer")
   importJobs                ImportJob[]              @relation("ImportCreator")
+  createdVenues             Venue[]                  @relation("VenueCreator")
+  createdCompetitions       Competition[]            @relation("CompetitionCreator")
+  updatedCompetitions       Competition[]            @relation("CompetitionUpdater")
+  createdApplications       Application[]            @relation("ApplicationCreator")
+  submittedApplications     Application[]            @relation("ApplicationSubmitter")
+  reviewedApplications      Application[]            @relation("ApplicationReviewer")
+  createdEntries            Entry[]                  @relation("EntryCreator")
+  decidedEntries            Entry[]                  @relation("EntryDecider")
+  withdrawnEntries          Entry[]                  @relation("EntryWithdrawer")
+  acquiredLeases            CompetitionWriteLease[]  @relation("LeaseAcquirer")
 
   @@index([status, createdAt])
   @@map("user")
@@ -258,12 +270,13 @@ model OrganizationMembership {
   @@map("organization_membership")
 }
 
-/// Персонал турнира. Таблица создана в Phase 2, используется с Phase 4;
-/// внешний ключ на `competition` добавляется миграцией Phase 4 вместе с таблицей турнира.
+/// Персонал турнира. Как и в организации, приглашение по email ждёт принятия: до него `userId` пуст,
+/// а `invitedEmail` хранит адрес (Phase 4).
 model CompetitionMembership {
   id            String           @id @default(uuid(7)) @db.Uuid
   competitionId String           @map("competition_id") @db.Uuid
-  userId        String           @map("user_id") @db.Uuid
+  userId        String?          @map("user_id") @db.Uuid
+  invitedEmail  String?          @map("invited_email") @db.Citext
   roleId        String           @map("role_id") @db.Uuid
   status        MembershipStatus @default(INVITED)
   invitedById   String?          @map("invited_by_id") @db.Uuid
@@ -271,9 +284,10 @@ model CompetitionMembership {
   createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  user      User  @relation("CompetitionMembershipUser", fields: [userId], references: [id], onDelete: Restrict)
-  role      Role  @relation(fields: [roleId], references: [id], onDelete: Restrict)
-  invitedBy User? @relation("CompetitionMembershipInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  user        User?       @relation("CompetitionMembershipUser", fields: [userId], references: [id], onDelete: Restrict)
+  role        Role        @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  invitedBy   User?       @relation("CompetitionMembershipInviter", fields: [invitedById], references: [id], onDelete: Restrict)
 
   @@index([userId, status])
   @@index([competitionId, roleId])
@@ -365,9 +379,13 @@ model Region {
   nameRu      String @map("name_ru")
   nameEn      String @map("name_en")
 
-  country       Country        @relation(fields: [countryCode], references: [code], onDelete: Restrict)
-  organizations Organization[]
-  persons       Person[]
+  country            Country        @relation(fields: [countryCode], references: [code], onDelete: Restrict)
+  organizations      Organization[]
+  persons            Person[]
+  venues             Venue[]
+  representedApps    Application[]  @relation("ApplicationRegion")
+  entrySnapRegions   Entry[]        @relation("EntrySnapRegion")
+  representedEntries Entry[]        @relation("EntryRepresentationRegion")
 
   @@unique([countryCode, code])
   @@unique([code])
@@ -415,6 +433,12 @@ model Organization {
   categoryTemplates  CategoryTemplate[]  @relation("CategoryTemplateOwner")
   documents          Document[]          @relation("OrganizationDocument")
   importJobs         ImportJob[]         @relation("ImportOrganization")
+  venues             Venue[]             @relation("VenueOwner")
+  competitions       Competition[]       @relation("CompetitionOrganizer")
+  applications       Application[]       @relation("ApplicationOrganization")
+  representedApps    Application[]       @relation("ApplicationRepresentation")
+  entrySnapClubs     Entry[]             @relation("EntrySnapClub")
+  representedEntries Entry[]             @relation("EntryRepresentation")
 
   @@index([parentId])
   @@index([regionId, type, status])
@@ -488,6 +512,7 @@ model Discipline {
   ruleSets          RuleSet[]
   ageGroups         AgeGroup[]
   categoryTemplates CategoryTemplate[]
+  competitions      Competition[]
 
   @@map("discipline")
 }
@@ -501,7 +526,8 @@ model DocumentType {
   maxSizeBytes  Int         @map("max_size_bytes")
   retentionDays Int         @map("retention_days")
 
-  documents Document[]
+  documents    Document[]
+  requirements CompetitionRequirement[]
 
   @@map("document_type")
 }
@@ -561,6 +587,8 @@ model StoredFile {
   personPhotos      Person[]       @relation("PersonPhoto")
   document          Document?      @relation("DocumentFile")
   importJobs        ImportJob[]    @relation("ImportFile")
+  competitionLogos  Competition[]  @relation("CompetitionLogo")
+  regulations       Competition[]  @relation("CompetitionRegulation")
 
   @@index([status, createdAt])
   @@map("stored_file")
@@ -707,6 +735,7 @@ model AthleteProfile {
   ranks       AthleteRankRecord[]
   guardians   Guardian[]
   documents   Document[]
+  entries     Entry[]
 
   @@map("athlete_profile")
 }
@@ -720,10 +749,11 @@ model CoachProfile {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  person      Person            @relation(fields: [personId], references: [id], onDelete: Restrict)
-  createdBy   User?             @relation("CoachCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  memberships CoachMembership[]
-  athletes    AthleteCoach[]
+  person       Person            @relation(fields: [personId], references: [id], onDelete: Restrict)
+  createdBy    User?             @relation("CoachCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  memberships  CoachMembership[]
+  athletes     AthleteCoach[]
+  applications Application[]
 
   @@map("coach_profile")
 }
@@ -874,7 +904,7 @@ model ConsentTemplate {
   @@map("consent_template")
 }
 
-/// Согласие. `competitionId` — без FK до появления таблицы турнира (Phase 4).
+/// Согласие: на всё время (`competitionId` пуст) или на конкретный турнир.
 model Consent {
   id              String        @id @default(uuid(7)) @db.Uuid
   subjectPersonId String        @map("subject_person_id") @db.Uuid
@@ -890,12 +920,13 @@ model Consent {
   recordedById    String?       @map("recorded_by_id") @db.Uuid
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  subject    Person          @relation("ConsentSubject", fields: [subjectPersonId], references: [id], onDelete: Restrict)
-  givenBy    Person          @relation("ConsentGiver", fields: [givenByPersonId], references: [id], onDelete: Restrict)
-  template   ConsentTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
-  document   Document?       @relation("ConsentDocument", fields: [documentId], references: [id], onDelete: Restrict)
-  revokedBy  User?           @relation("ConsentRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
-  recordedBy User?           @relation("ConsentRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+  subject     Person          @relation("ConsentSubject", fields: [subjectPersonId], references: [id], onDelete: Restrict)
+  competition Competition?    @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  givenBy     Person          @relation("ConsentGiver", fields: [givenByPersonId], references: [id], onDelete: Restrict)
+  template    ConsentTemplate @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  document    Document?       @relation("ConsentDocument", fields: [documentId], references: [id], onDelete: Restrict)
+  revokedBy   User?           @relation("ConsentRevoker", fields: [revokedById], references: [id], onDelete: Restrict)
+  recordedBy  User?           @relation("ConsentRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
 
   @@index([givenByPersonId])
   @@map("consent")
@@ -957,9 +988,10 @@ model RuleSetVersion {
   createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  ruleSet     RuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Restrict)
-  publishedBy User?   @relation("RuleSetPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
-  createdBy   User?   @relation("RuleSetVersionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  ruleSet      RuleSet       @relation(fields: [ruleSetId], references: [id], onDelete: Restrict)
+  publishedBy  User?         @relation("RuleSetPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
+  createdBy    User?         @relation("RuleSetVersionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  competitions Competition[]
 
   @@unique([ruleSetId, version])
   @@map("rule_set_version")
@@ -980,11 +1012,12 @@ model AgeGroup {
   updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt           DateTime?            @map("deleted_at") @db.Timestamptz(3)
 
-  discipline        Discipline             @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
-  ownerOrganization Organization?          @relation("AgeGroupOwner", fields: [ownerOrganizationId], references: [id], onDelete: Restrict)
-  createdBy         User?                  @relation("AgeGroupCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  weightCategories  WeightCategory[]
-  templateItems     CategoryTemplateItem[]
+  discipline            Discipline             @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
+  ownerOrganization     Organization?          @relation("AgeGroupOwner", fields: [ownerOrganizationId], references: [id], onDelete: Restrict)
+  createdBy             User?                  @relation("AgeGroupCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  weightCategories      WeightCategory[]
+  templateItems         CategoryTemplateItem[]
+  competitionCategories CompetitionCategory[]
 
   @@index([disciplineCode])
   @@map("age_group")
@@ -1041,7 +1074,7 @@ model CategoryTemplateItem {
 }
 
 // ============================================================
-// Documents (DATABASE.md, 3.5; Phase 3). `applicationId`, `competitionId` — без FK до Phase 4.
+// Documents (DATABASE.md, 3.5; Phase 3). Владелец — спортсмен, заявка или организация; турнир — контекст проверки.
 // ============================================================
 
 enum DocumentStatus {
@@ -1073,7 +1106,9 @@ model Document {
 
   type         DocumentType        @relation(fields: [typeCode], references: [code], onDelete: Restrict)
   athlete      AthleteProfile?     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  application  Application?        @relation(fields: [applicationId], references: [id], onDelete: Restrict)
   organization Organization?       @relation("OrganizationDocument", fields: [organizationId], references: [id], onDelete: Restrict)
+  competition  Competition?        @relation(fields: [competitionId], references: [id], onDelete: Restrict)
   file         StoredFile          @relation("DocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
   uploadedBy   User?               @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
   reviewedBy   User?               @relation("DocumentReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
@@ -1122,4 +1157,394 @@ model ImportJob {
 
   @@index([createdById, createdAt])
   @@map("import_job")
+}
+
+// ============================================================
+// Competitions — турнир, место, категории турнира, правила допуска, требования (DATABASE.md, 3.4; Phase 4a)
+// ============================================================
+
+enum CompetitionStatus {
+  DRAFT
+  REGISTRATION_OPEN
+  REGISTRATION_CLOSED
+  CHECK_IN
+  DRAWING
+  SCHEDULED
+  IN_PROGRESS
+  FINISHED
+  ARCHIVED
+  CANCELLED
+}
+
+enum CompetitionLevel {
+  CLUB
+  CITY
+  REGIONAL
+  INTERREGIONAL
+  NATIONAL
+  INTERNATIONAL
+}
+
+enum CategoryStatus {
+  REGISTRATION
+  CLOSED
+  WEIGH_IN
+  READY_FOR_DRAW
+  DRAWN
+  IN_PROGRESS
+  COMPLETED
+  RESULTS_PUBLISHED
+  MERGED
+  CANCELLED
+}
+
+enum CompetitionFormatCode {
+  ROUND_ROBIN
+  SINGLE_ELIMINATION
+  ELIMINATION_WITH_REPECHAGE
+  DOUBLE_ELIMINATION
+  PENALTY_POINTS_ELIMINATION
+  GROUP_STAGE
+  GROUP_PLUS_PLAYOFF
+}
+
+enum CategoryRuleKind {
+  MIN_RANK
+  MAX_RANK
+  ALLOW_YOUNGER
+  MAX_CATEGORIES_PER_ATHLETE
+  REGION_ONLY
+}
+
+enum RequirementKind {
+  DOCUMENT
+  CONSENT
+  MEDICAL_CLEARANCE
+  INSURANCE
+  WEIGH_IN
+  CHECK_IN
+}
+
+model Venue {
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  ownerOrganizationId String    @map("owner_organization_id") @db.Uuid
+  name                String
+  address             String?
+  city                String?
+  regionId            String?   @map("region_id") @db.Uuid
+  timezone            String
+  createdById         String?   @map("created_by_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  owner        Organization  @relation("VenueOwner", fields: [ownerOrganizationId], references: [id], onDelete: Restrict)
+  region       Region?       @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  createdBy    User?         @relation("VenueCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  competitions Competition[]
+
+  @@index([ownerOrganizationId])
+  @@map("venue")
+}
+
+/// Турнир. Опубликованный турнир всегда с закреплённой версией правил (CHECK); после публикации
+/// дисциплина и версия правил не меняются. Сроки турнира — календарные даты в его timezone.
+model Competition {
+  id                      String               @id @default(uuid(7)) @db.Uuid
+  slug                    String               @unique
+  name                    String
+  shortName               String?              @map("short_name")
+  descriptionMd           String?              @map("description_md")
+  organizerOrganizationId String               @map("organizer_organization_id") @db.Uuid
+  venueId                 String?              @map("venue_id") @db.Uuid
+  timezone                String
+  startDate               DateTime             @map("start_date") @db.Date
+  endDate                 DateTime             @map("end_date") @db.Date
+  registrationStartsAt    DateTime             @map("registration_starts_at") @db.Timestamptz(3)
+  registrationEndsAt      DateTime             @map("registration_ends_at") @db.Timestamptz(3)
+  status                  CompetitionStatus    @default(DRAFT)
+  level                   CompetitionLevel
+  disciplineCode          String               @map("discipline_code")
+  ruleSetVersionId        String?              @map("rule_set_version_id") @db.Uuid
+  logoFileId              String?              @map("logo_file_id") @db.Uuid
+  regulationFileId        String?              @map("regulation_file_id") @db.Uuid
+  requirementsMd          String?              @map("requirements_md")
+  contactInfo             Json?                @map("contact_info")
+  nameNorm                Unsupported("text")? @map("name_norm")
+  version                 Int                  @default(1)
+  createdById             String?              @map("created_by_id") @db.Uuid
+  updatedById             String?              @map("updated_by_id") @db.Uuid
+  publishedAt             DateTime?            @map("published_at") @db.Timestamptz(3)
+  cancelledAt             DateTime?            @map("cancelled_at") @db.Timestamptz(3)
+  cancelReason            String?              @map("cancel_reason")
+  createdAt               DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt               DateTime?            @map("deleted_at") @db.Timestamptz(3)
+
+  organizer      Organization             @relation("CompetitionOrganizer", fields: [organizerOrganizationId], references: [id], onDelete: Restrict)
+  venue          Venue?                   @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  discipline     Discipline               @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
+  ruleSetVersion RuleSetVersion?          @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
+  logo           StoredFile?              @relation("CompetitionLogo", fields: [logoFileId], references: [id], onDelete: Restrict)
+  regulation     StoredFile?              @relation("CompetitionRegulation", fields: [regulationFileId], references: [id], onDelete: Restrict)
+  createdBy      User?                    @relation("CompetitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy      User?                    @relation("CompetitionUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+  staff          CompetitionMembership[]
+  categories     CompetitionCategory[]
+  categoryRules  CategoryRule[]
+  requirements   CompetitionRequirement[]
+  applications   Application[]
+  entries        Entry[]
+  writeLease     CompetitionWriteLease?
+  documents      Document[]
+  consents       Consent[]
+
+  @@index([status, startDate])
+  @@index([organizerOrganizationId, startDate])
+  @@map("competition")
+}
+
+/// Категория турнира со снимком границ возраста и веса: правка шаблона не меняет турнир.
+/// Своя машина состояний (ARCHITECTURE.md, 16.2); объединённая категория указывает на целевую.
+model CompetitionCategory {
+  id               String                 @id @default(uuid(7)) @db.Uuid
+  competitionId    String                 @map("competition_id") @db.Uuid
+  code             String
+  nameRu           String                 @map("name_ru")
+  nameEn           String                 @map("name_en")
+  gender           Gender
+  ageGroupId       String?                @map("age_group_id") @db.Uuid
+  agePolicy        AgeCalculationPolicy   @map("age_policy")
+  ageFrom          Int?                   @map("age_from")
+  ageTo            Int?                   @map("age_to")
+  birthYearFrom    Int?                   @map("birth_year_from")
+  birthYearTo      Int?                   @map("birth_year_to")
+  ageReferenceDate DateTime?              @map("age_reference_date") @db.Date
+  weightKind       WeightLimitKind        @map("weight_kind")
+  weightLowerGrams Int?                   @map("weight_lower_grams")
+  weightUpperGrams Int?                   @map("weight_upper_grams")
+  formatOverride   CompetitionFormatCode? @map("format_override")
+  status           CategoryStatus         @default(REGISTRATION)
+  mergedIntoId     String?                @map("merged_into_id") @db.Uuid
+  sortOrder        Int                    @default(0) @map("sort_order")
+  version          Int                    @default(1)
+  createdAt        DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition     Competition              @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  ageGroup        AgeGroup?                @relation(fields: [ageGroupId], references: [id], onDelete: Restrict)
+  mergedInto      CompetitionCategory?     @relation("CategoryMerge", fields: [mergedIntoId], references: [id], onDelete: Restrict)
+  mergedFrom      CompetitionCategory[]    @relation("CategoryMerge")
+  rules           CategoryRule[]
+  requirements    CompetitionRequirement[]
+  entries         Entry[]                  @relation("EntryCategory")
+  declaredEntries Entry[]                  @relation("EntryDeclaredCategory")
+
+  @@unique([competitionId, code])
+  @@index([competitionId, status])
+  @@index([competitionId, gender, ageFrom])
+  @@map("competition_category")
+}
+
+/// Правило допуска: на весь турнир (`categoryId` пуст) или на категорию. `params` — схема по `kind`.
+model CategoryRule {
+  id            String           @id @default(uuid(7)) @db.Uuid
+  competitionId String           @map("competition_id") @db.Uuid
+  categoryId    String?          @map("category_id") @db.Uuid
+  kind          CategoryRuleKind
+  params        Json
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  competition Competition          @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category    CompetitionCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([competitionId, categoryId])
+  @@map("category_rule")
+}
+
+/// Требование положения для допуска (документ, согласие, медицинский допуск, страховка, взвешивание, прибытие).
+model CompetitionRequirement {
+  id               String          @id @default(uuid(7)) @db.Uuid
+  competitionId    String          @map("competition_id") @db.Uuid
+  categoryId       String?         @map("category_id") @db.Uuid
+  kind             RequirementKind
+  documentTypeCode String?         @map("document_type_code")
+  consentKind      ConsentKind?    @map("consent_kind")
+  mandatory        Boolean         @default(true)
+  noteMd           String?         @map("note_md")
+
+  competition  Competition          @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category     CompetitionCategory? @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  documentType DocumentType?        @relation(fields: [documentTypeCode], references: [code], onDelete: Restrict)
+
+  @@index([competitionId])
+  @@map("competition_requirement")
+}
+
+// ============================================================
+// Registrations — заявки и участия (DATABASE.md, 3.5; C-02; Phase 4a)
+// ============================================================
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WAITING_DOCUMENTS
+  CANCELLED
+}
+
+enum EntryStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+/// Заявка клуба или спортшколы на турнир. Остаётся в облаке (DATABASE.md, 7).
+model Application {
+  id                           String            @id @default(uuid(7)) @db.Uuid
+  competitionId                String            @map("competition_id") @db.Uuid
+  organizationId               String            @map("organization_id") @db.Uuid
+  coachId                      String?           @map("coach_id") @db.Uuid
+  status                       ApplicationStatus @default(DRAFT)
+  representationOrganizationId String?           @map("representation_organization_id") @db.Uuid
+  representationRegionId       String?           @map("representation_region_id") @db.Uuid
+  submittedAt                  DateTime?         @map("submitted_at") @db.Timestamptz(3)
+  submittedByUserId            String?           @map("submitted_by_user_id") @db.Uuid
+  reviewedAt                   DateTime?         @map("reviewed_at") @db.Timestamptz(3)
+  reviewedById                 String?           @map("reviewed_by_id") @db.Uuid
+  reviewComment                String?           @map("review_comment")
+  version                      Int               @default(1)
+  createdById                  String?           @map("created_by_id") @db.Uuid
+  createdAt                    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition          Competition   @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  organization         Organization  @relation("ApplicationOrganization", fields: [organizationId], references: [id], onDelete: Restrict)
+  coach                CoachProfile? @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  representationOrg    Organization? @relation("ApplicationRepresentation", fields: [representationOrganizationId], references: [id], onDelete: Restrict)
+  representationRegion Region?       @relation("ApplicationRegion", fields: [representationRegionId], references: [id], onDelete: Restrict)
+  submittedBy          User?         @relation("ApplicationSubmitter", fields: [submittedByUserId], references: [id], onDelete: Restrict)
+  reviewedBy           User?         @relation("ApplicationReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  createdBy            User?         @relation("ApplicationCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  entries              Entry[]
+  documents            Document[]
+
+  @@index([competitionId, status])
+  @@index([organizationId, competitionId])
+  @@map("application")
+}
+
+/// Участие спортсмена в категории со снимком данных на момент заявки (ADR-10). Результаты ссылаются на Entry.
+model Entry {
+  id                           String      @id @default(uuid(7)) @db.Uuid
+  competitionId                String      @map("competition_id") @db.Uuid
+  applicationId                String      @map("application_id") @db.Uuid
+  athleteId                    String      @map("athlete_id") @db.Uuid
+  categoryId                   String      @map("category_id") @db.Uuid
+  declaredCategoryId           String      @map("declared_category_id") @db.Uuid
+  status                       EntryStatus @default(PENDING)
+  snapLastName                 String      @map("snap_last_name")
+  snapFirstName                String      @map("snap_first_name")
+  snapMiddleName               String?     @map("snap_middle_name")
+  snapBirthDate                DateTime    @map("snap_birth_date") @db.Date
+  snapGender                   Gender      @map("snap_gender")
+  snapClubId                   String?     @map("snap_club_id") @db.Uuid
+  snapClubName                 String?     @map("snap_club_name")
+  snapCoachName                String?     @map("snap_coach_name")
+  snapRegionId                 String?     @map("snap_region_id") @db.Uuid
+  snapRegionName               String?     @map("snap_region_name")
+  snapRankCode                 String?     @map("snap_rank_code")
+  representationOrganizationId String?     @map("representation_organization_id") @db.Uuid
+  representationRegionId       String?     @map("representation_region_id") @db.Uuid
+  publicName                   String      @map("public_name")
+  declaredWeightGrams          Int?        @map("declared_weight_grams")
+  decidedAt                    DateTime?   @map("decided_at") @db.Timestamptz(3)
+  decidedById                  String?     @map("decided_by_id") @db.Uuid
+  decisionReason               String?     @map("decision_reason")
+  withdrawnAt                  DateTime?   @map("withdrawn_at") @db.Timestamptz(3)
+  withdrawnById                String?     @map("withdrawn_by_id") @db.Uuid
+  withdrawReason               String?     @map("withdraw_reason")
+  version                      Int         @default(1)
+  createdById                  String?     @map("created_by_id") @db.Uuid
+  createdAt                    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition          Competition         @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  application          Application         @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  athlete              AthleteProfile      @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  category             CompetitionCategory @relation("EntryCategory", fields: [categoryId], references: [id], onDelete: Restrict)
+  declaredCategory     CompetitionCategory @relation("EntryDeclaredCategory", fields: [declaredCategoryId], references: [id], onDelete: Restrict)
+  snapClub             Organization?       @relation("EntrySnapClub", fields: [snapClubId], references: [id], onDelete: Restrict)
+  snapRegion           Region?             @relation("EntrySnapRegion", fields: [snapRegionId], references: [id], onDelete: Restrict)
+  representationOrg    Organization?       @relation("EntryRepresentation", fields: [representationOrganizationId], references: [id], onDelete: Restrict)
+  representationRegion Region?             @relation("EntryRepresentationRegion", fields: [representationRegionId], references: [id], onDelete: Restrict)
+  decidedBy            User?               @relation("EntryDecider", fields: [decidedById], references: [id], onDelete: Restrict)
+  withdrawnBy          User?               @relation("EntryWithdrawer", fields: [withdrawnById], references: [id], onDelete: Restrict)
+  createdBy            User?               @relation("EntryCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([competitionId, status])
+  @@index([applicationId])
+  @@index([athleteId])
+  @@index([categoryId, status])
+  @@map("entry")
+}
+
+// ============================================================
+// Venue sync — право записи турнира и журнал синхронизации (DATABASE.md, 3.9, 7; ADR-21; Phase 4a)
+// Узел (VenueNode, NodeAccessCode) — Phase 9.5; до неё держатель права — всегда облако.
+// ============================================================
+
+enum LeaseHolder {
+  CLOUD
+  NODE
+}
+
+enum LeaseStatus {
+  ACTIVE
+  CHECKING_OUT
+  RETURNING
+  RECOVERED
+}
+
+enum SyncOp {
+  INSERT
+  UPDATE
+  DELETE
+}
+
+model CompetitionWriteLease {
+  competitionId      String      @id @map("competition_id") @db.Uuid
+  holderType         LeaseHolder @default(CLOUD) @map("holder_type")
+  holderNodeId       String?     @map("holder_node_id") @db.Uuid
+  epoch              Int         @default(1)
+  status             LeaseStatus @default(ACTIVE)
+  lastAppliedSyncSeq BigInt?     @map("last_applied_sync_seq")
+  acquiredAt         DateTime    @default(now()) @map("acquired_at") @db.Timestamptz(3)
+  acquiredById       String?     @map("acquired_by_id") @db.Uuid
+  updatedAt          DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  acquiredBy  User?       @relation("LeaseAcquirer", fields: [acquiredById], references: [id], onDelete: Restrict)
+
+  @@map("competition_write_lease")
+}
+
+/// Поток изменений операционных таблиц турнира. Пишут только триггеры (DATABASE.md, 7): код приложения
+/// ничего для этого не делает, поэтому пропустить изменение нельзя.
+model SyncLog {
+  syncSeq       BigInt   @id @default(autoincrement()) @map("sync_seq")
+  competitionId String   @map("competition_id") @db.Uuid
+  epoch         Int
+  tableName     String   @map("table_name")
+  rowId         String   @map("row_id") @db.Uuid
+  op            SyncOp
+  rowImage      Json?    @map("row_image")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([competitionId, syncSeq])
+  @@index([createdAt])
+  @@map("sync_log")
 }

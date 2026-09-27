@@ -14,6 +14,7 @@ export const EMAIL_TEMPLATES = [
   'organization.invite',
   'guardian.invite',
   'document.rejected',
+  'competition.invite',
 ] as const;
 export type EmailTemplate = (typeof EMAIL_TEMPLATES)[number];
 
@@ -32,6 +33,18 @@ export const EVENT_SCHEMAS = {
   'athlete.merged': z.object({ sourceAthleteId: Uuid, targetAthleteId: Uuid }),
   'consent.revoked': z.object({ consentId: Uuid, athleteId: Uuid, kind: z.string() }),
   'document.rejected': z.object({ documentId: Uuid }),
+  // Phase 4a — турнир и заявки. Потребители (уведомления, публичные страницы) — с Phase 4b.
+  'competition.published': z.object({ competitionId: Uuid }),
+  'competition.status_changed': z.object({ competitionId: Uuid, from: z.string(), to: z.string() }),
+  'competition.dates_changed': z.object({ competitionId: Uuid }),
+  'category.status_changed': z.object({ categoryId: Uuid, from: z.string(), to: z.string() }),
+  'category.merged': z.object({ targetCategoryId: Uuid, sourceCategoryIds: z.array(Uuid) }),
+  'registration.application_submitted': z.object({ applicationId: Uuid }),
+  'registration.application_returned': z.object({ applicationId: Uuid }),
+  'registration.application_decided': z.object({ applicationId: Uuid, status: z.string() }),
+  'registration.entry_decided': z.object({ entryId: Uuid, decision: z.string() }),
+  'registration.entry_withdrawn': z.object({ entryId: Uuid }),
+  'registration.entry_transferred': z.object({ entryId: Uuid, fromCategoryId: Uuid, toCategoryId: Uuid }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

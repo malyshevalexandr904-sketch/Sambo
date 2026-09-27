@@ -1,11 +1,13 @@
 // Seed для разработки (раздел 47 ТЗ; DATABASE.md, 11). Все данные вымышленные. Идемпотентен: повторный запуск
 // обновляет те же записи. Phase 3: спортсмены, тренеры, судьи, представители, согласия, правила, категории.
+// Phase 4a: учебный турнир с открытой регистрацией, категориями и заявками; роли в турнире — после турнира.
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { hashPassword, sealTotpSecret, totpKey } from '@sde/server-kit';
 import { type OrganizationType, PrismaClient, type RoleScope } from '../generated/client';
 import { SEED_ORGANIZATIONS, SEED_USERS } from './data';
 import { seedPhase3 } from './phase3';
+import { seedPhase4 } from './phase4';
 
 const envFile = path.resolve(__dirname, '..', '..', '..', '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
@@ -94,7 +96,8 @@ async function seedUsers(
       },
       update: { secretHash },
     });
-    for (const grant of u.grants) {
+    // Роли в турнире выдаются после создания турнира (seedCompetitionGrants): у членства есть FK на турнир.
+    for (const grant of u.grants.filter((g) => !g.competitionId)) {
       const role = roles.get(grant.role);
       if (!role) throw new Error(`Seed: role ${grant.role} not found — apply migrations first`);
       await seedGrant(db, u.id, role.id, grant);
@@ -103,6 +106,17 @@ async function seedUsers(
 }
 
 type SeedGrant = (typeof SEED_USERS)[number]['grants'][number];
+
+async function seedCompetitionGrants(db: PrismaClient): Promise<void> {
+  const roles = new Map((await db.role.findMany()).map((r) => [r.code, r.id]));
+  for (const u of SEED_USERS) {
+    for (const grant of u.grants.filter((g) => g.competitionId)) {
+      const roleId = roles.get(grant.role);
+      if (!roleId) throw new Error(`Seed: role ${grant.role} not found — apply migrations first`);
+      await seedGrant(db, u.id, roleId, grant);
+    }
+  }
+}
 
 /** Роль в турнире, на платформе или в организации. */
 async function seedGrant(db: PrismaClient, userId: string, roleId: string, grant: SeedGrant): Promise<void> {
@@ -142,6 +156,8 @@ async function main(): Promise<void> {
     await seedOrganizations(db);
     await seedUsers(db, required('SEED_PASSWORD'), required('SEED_ADMIN_TOTP_SECRET'), key);
     const summary = await seedPhase3(db);
+    summary.push(...(await seedPhase4(db)));
+    await seedCompetitionGrants(db);
     process.stdout.write(
       [
         'Seed completed. Fictional accounts (password from SEED_PASSWORD):',

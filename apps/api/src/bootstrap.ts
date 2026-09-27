@@ -1,5 +1,5 @@
 // Настройка приложения: общая для main.ts и интеграционных тестов.
-import type { INestApplication } from '@nestjs/common';
+import { type INestApplication, RequestMethod } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { Env } from '@sde/server-kit';
 import cookieParser from 'cookie-parser';
@@ -48,7 +48,10 @@ export function configureApp(app: NestExpressApplication, opts: { useLogger: boo
     ],
     exposedHeaders: ['ETag', 'X-Request-Id', 'Retry-After'],
   });
-  app.setGlobalPrefix('api/v1', { exclude: ['health', 'ready'] });
+  // Публичный API только для чтения — свой префикс `/api/public/v1` (API.md, 1.1).
+  app.setGlobalPrefix('api/v1', {
+    exclude: ['health', 'ready', { path: 'api/public/v1/{*path}', method: RequestMethod.ALL }],
+  });
   app.enableShutdownHooks();
   return app;
 }

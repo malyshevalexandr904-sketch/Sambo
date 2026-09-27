@@ -19,7 +19,8 @@ afterAll(async () => {
   await db.$disconnect();
 });
 beforeEach(async () => {
-  await db.$executeRaw`TRUNCATE import_job, document, athlete_coach, athlete_membership, athlete_profile,
+  await db.$executeRaw`TRUNCATE sync_log, competition_category, competition_write_lease, competition,
+    outbox_event, import_job, document, athlete_coach, athlete_membership, athlete_profile,
     coach_membership, coach_profile, stored_file, audit_log, organization_closure, organization, "user", person CASCADE`;
 });
 
@@ -177,3 +178,97 @@ describe('document expiry', () => {
     expect(await maintenance.expireDocuments(new Date('2026-09-24T00:00:00Z'))).toBe(0);
   });
 });
+
+describe('registration deadline', () => {
+  it('closes registration and its categories when the deadline passes, only while the cloud holds the lease', async () => {
+    const organizer = await org();
+    const make = async (endsAt: Date, holder: 'CLOUD' | 'NODE') => {
+      const id = uuidv7();
+      await db.competition.create({
+        data: {
+          id,
+          slug: `c-${id.slice(-12)}`,
+          name: 'Турнир',
+          organizerOrganizationId: organizer,
+          timezone: 'Europe/Moscow',
+          startDate: new Date('2026-10-20T00:00:00Z'),
+          endDate: new Date('2026-10-20T00:00:00Z'),
+          registrationStartsAt: new Date('2026-09-01T00:00:00Z'),
+          registrationEndsAt: endsAt,
+          level: 'CLUB',
+          disciplineCode: 'SPORT_SAMBO',
+          status: 'REGISTRATION_OPEN',
+          ruleSetVersionId: await ruleSetVersion(),
+        },
+      });
+      await db.competitionWriteLease.create({
+        data: { competitionId: id, holderType: holder, holderNodeId: holder === 'NODE' ? uuidv7() : null },
+      });
+      await db.competitionCategory.create({
+        data: {
+          id: uuidv7(),
+          competitionId: id,
+          code: 'M-38',
+          nameRu: 'до 38',
+          nameEn: 'up to 38',
+          gender: 'MALE',
+          agePolicy: 'BY_BIRTH_YEAR',
+          ageFrom: 12,
+          ageTo: 13,
+          weightKind: 'UP_TO',
+          weightUpperGrams: 38000,
+        },
+      });
+      return id;
+    };
+    const now = new Date('2026-10-01T12:00:00Z');
+    const due = await make(new Date('2026-10-01T11:00:00Z'), 'CLOUD');
+    const later = await make(new Date('2026-10-02T00:00:00Z'), 'CLOUD');
+    const onNode = await make(new Date('2026-10-01T11:00:00Z'), 'NODE');
+    const maintenance = new Maintenance(db, s3, env, logger);
+    expect(await maintenance.closeRegistrations(now)).toBe(1);
+    const status = async (id: string) => (await db.competition.findUniqueOrThrow({ where: { id } })).status;
+    expect(await status(due)).toBe('REGISTRATION_CLOSED');
+    expect(await status(later)).toBe('REGISTRATION_OPEN');
+    expect(await status(onNode)).toBe('REGISTRATION_OPEN');
+    expect((await db.competitionCategory.findFirstOrThrow({ where: { competitionId: due } })).status).toBe(
+      'CLOSED',
+    );
+    const audit = await db.auditLog.findFirstOrThrow({ where: { entityId: due } });
+    expect(audit).toMatchObject({
+      actorType: 'SYSTEM',
+      action: 'competition.status_changed',
+      reason: 'registration_deadline',
+    });
+    expect(
+      await db.outboxEvent.count({ where: { competitionId: due, type: 'competition.status_changed' } }),
+    ).toBe(1);
+    expect(await maintenance.closeRegistrations(now)).toBe(0);
+  });
+});
+
+async function ruleSetVersion(): Promise<string> {
+  const ruleSetId = uuidv7();
+  await db.ruleSet.create({
+    data: {
+      id: ruleSetId,
+      code: `W_${ruleSetId.slice(-8).toUpperCase()}`,
+      disciplineCode: 'SPORT_SAMBO',
+      name: 'Правила',
+    },
+  });
+  const id = uuidv7();
+  await db.ruleSetVersion.create({
+    data: {
+      id,
+      ruleSetId,
+      version: 1,
+      schemaVersion: 1,
+      parameters: {},
+      checksum: 'b'.repeat(64),
+      status: 'PUBLISHED',
+      publishedAt: new Date(),
+    },
+  });
+  return id;
+}
