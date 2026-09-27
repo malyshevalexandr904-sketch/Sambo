@@ -1,6 +1,12 @@
 'use client';
 // Документы спортсмена на его карточке (API.md, 4.6): загрузка в приватное хранилище, статусы проверки.
-import { type Athlete, type DocumentDto, type Page } from '@sde/contracts';
+import {
+  type Athlete,
+  type AthleteEntryDto,
+  type DataEnvelope,
+  type DocumentDto,
+  type Page,
+} from '@sde/contracts';
 import { Alert, Card, CardTitle, Field, Input, Select } from '@sde/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
@@ -27,6 +33,23 @@ export function AthleteDocuments({ athlete }: { athlete: Athlete }) {
   const [typeCode, setTypeCode] = useState('');
   const [expirationDate, setExpirationDate] = useState('');
   const [competitionId, setCompetitionId] = useState('');
+  // Турниры, в которых спортсмен заявлен (действующие участия, турнир не завершён): документ для такого турнира
+  // проверяет секретарь турнира.
+  const entries = useQuery({
+    queryKey: qk.athleteEntries(athlete.id),
+    queryFn: async () => (await api<DataEnvelope<AthleteEntryDto[]>>(`/athletes/${athlete.id}/entries`)).data,
+  });
+  const competitions = [
+    ...new Map(
+      (entries.data ?? [])
+        .filter(
+          (e) =>
+            (e.status === 'PENDING' || e.status === 'APPROVED') &&
+            !['FINISHED', 'ARCHIVED', 'CANCELLED'].includes(e.competition.status),
+        )
+        .map((e) => [e.competition.id, e.competition]),
+    ).values(),
+  ];
   const [errors, setErrors] = useState<Record<string, string>>({});
   const upload = useAction();
   const canUpload = athlete.allowedActions.includes('document.upload');
@@ -69,12 +92,18 @@ export function AthleteDocuments({ athlete }: { athlete: Athlete }) {
             error={tf(errors.competitionId)}
             className="sm:col-span-2"
           >
-            <Input
+            <Select
               id="doc-competition"
               value={competitionId}
-              placeholder="00000000-0000-0000-0000-000000000000"
               onChange={(e) => setCompetitionId(e.target.value)}
-            />
+            >
+              <option value="">{t('documents.noCompetition')}</option>
+              {competitions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
           </Field>
           <div className="sm:col-span-2">
             {selected ? (
@@ -94,11 +123,12 @@ export function AthleteDocuments({ athlete }: { athlete: Athlete }) {
                           fileId: stored.id,
                           owner: { athleteId: athlete.id },
                           ...(expirationDate ? { expirationDate } : {}),
-                          ...(competitionId.trim() ? { competitionId: competitionId.trim() } : {}),
+                          ...(competitionId ? { competitionId } : {}),
                         },
                       });
                       setTypeCode('');
                       setExpirationDate('');
+                      setCompetitionId('');
                       await refresh();
                     } catch (err) {
                       setErrors(fieldErrors(err));

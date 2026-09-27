@@ -1,9 +1,15 @@
 // Проверка словарей в CI (ARCHITECTURE.md, 19): ключи ru и en совпадают, у каждого кода ошибки,
-// роли, типа и статуса организации, статусов и видов из справочников Phase 3 есть перевод.
+// роли, типа и статуса организации, статусов и видов из справочников Phase 3 и турниров Phase 4 есть перевод.
 import {
   AGE_POLICIES,
+  APPLICATION_STATUSES,
+  CATEGORY_STATUSES,
+  COMPETITION_LEVELS,
+  COMPETITION_STATUSES,
   CONSENT_KINDS,
   DOCUMENT_STATUSES,
+  ELIGIBILITY_REASONS,
+  ENTRY_STATUSES,
   ERROR_CODES,
   GUARDIAN_RELATIONS,
   GUARDIAN_VERIFICATION_BASES,
@@ -12,6 +18,7 @@ import {
   ORGANIZATION_STATUSES,
   ORGANIZATION_TYPES,
   PROFILE_STATUSES,
+  REQUIREMENT_KINDS,
   ROLE_CODES,
   RULESET_VERSION_STATUSES,
   SYSTEM_SETTING_DEFAULTS,
@@ -51,6 +58,14 @@ describe('i18n dictionaries', () => {
       ...IMPORT_COLUMNS.map((c) => `imports.columns.${c}`),
       ...AGE_POLICIES.map((p) => `catalog.policies.${p}`),
       ...RULESET_VERSION_STATUSES.map((s) => `rulesets.statuses.${s}`),
+      ...COMPETITION_STATUSES.map((s) => `competitions.statuses.${s}`),
+      ...COMPETITION_STATUSES.map((s) => `tournaments.status.${s}`),
+      ...COMPETITION_LEVELS.map((l) => `competitions.levels.${l}`),
+      ...CATEGORY_STATUSES.map((s) => `competitions.categoryStatuses.${s}`),
+      ...APPLICATION_STATUSES.map((s) => `applications.statuses.${s}`),
+      ...ENTRY_STATUSES.map((s) => `applications.entryStatuses.${s}`),
+      ...ELIGIBILITY_REASONS.map((r) => `applications.reasons.${r}`),
+      ...REQUIREMENT_KINDS.map((k) => `tournaments.requirementKinds.${k}`),
     ];
     expect(required.filter((k) => !all.has(k))).toEqual([]);
   });

@@ -61,6 +61,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const user = me.data;
   const nav: NavItem[] = [
     { href: '/admin', label: t('nav.dashboard'), visible: true },
+    { href: '/competitions', label: t('nav.competitions'), visible: true },
+    {
+      href: '/applications',
+      label: t('nav.applications'),
+      visible: hasAnywhere(user, 'registration.create'),
+    },
     { href: '/athletes', label: t('nav.athletes'), visible: hasAnywhere(user, 'athlete.view') },
     { href: '/children', label: t('nav.children'), visible: (myAthletes.data?.length ?? 0) > 0 },
     { href: '/coaches', label: t('nav.coaches'), visible: hasAnywhere(user, 'coach.manage') },

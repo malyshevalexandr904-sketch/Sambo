@@ -24,6 +24,12 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           {t('register')}
         </Link>
         <Link
+          href="/tournaments"
+          className="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-5 font-medium text-slate-900 hover:bg-slate-50"
+        >
+          {t('tournaments')}
+        </Link>
+        <Link
           href="/admin"
           className="inline-flex min-h-11 items-center px-2 font-medium text-blue-700 underline-offset-4 hover:underline"
         >

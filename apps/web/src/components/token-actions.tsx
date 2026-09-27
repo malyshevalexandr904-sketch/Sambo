@@ -1,6 +1,6 @@
 'use client';
 // Действия по ссылке из письма: подтверждение email и принятие приглашения.
-import { type DataEnvelope, type Me, type Membership } from '@sde/contracts';
+import { type CompetitionMember, type DataEnvelope, type Me, type Membership } from '@sde/contracts';
 import { Alert, Card, Spinner } from '@sde/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
@@ -91,6 +91,67 @@ export function AcceptInvite() {
           {t('success')}{' '}
           <Link href={`/admin/organizations/${state.organizationId}`} className="font-medium underline">
             {t('goToOrganization')}
+          </Link>
+        </Alert>
+      ) : null}
+      {state.kind === 'login' ? (
+        <Alert tone="info">
+          {t('needLogin')}{' '}
+          <Link href={{ pathname: '/login', query: { next } }} className="font-medium underline">
+            →
+          </Link>
+        </Alert>
+      ) : null}
+      {state.kind === 'error' ? <Alert tone="danger">{state.message}</Alert> : null}
+    </Card>
+  );
+}
+
+/** Приглашение в персонал турнира (API.md, 5.1): письмо ведёт сюда, после входа — на страницу турнира. */
+export function AcceptCompetitionInvite() {
+  const t = useTranslations('competitions.invite');
+  const errorMessage = useErrorMessage();
+  const token = useSearchParams().get('token') ?? '';
+  const queryClient = useQueryClient();
+  const [state, setState] = useState<
+    | { kind: 'pending' }
+    | { kind: 'done'; competitionId: string }
+    | { kind: 'login' }
+    | { kind: 'error'; message: string }
+  >({ kind: 'pending' });
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    api<DataEnvelope<CompetitionMember>>('/competition-invites/accept', { method: 'POST', body: { token } })
+      .then((res) => {
+        void queryClient.invalidateQueries({ queryKey: qk.me });
+        setState({ kind: 'done', competitionId: res.data.competitionId });
+      })
+      .catch((e: unknown) => {
+        if (e instanceof ApiError && e.status === 401) setState({ kind: 'login' });
+        else setState({ kind: 'error', message: errorMessage(e) });
+      });
+  }, [token, queryClient, errorMessage]);
+
+  const next =
+    typeof window === 'undefined'
+      ? ''
+      : `${window.location.pathname.replace(/^\/(ru|en)/, '')}${window.location.search}`;
+  return (
+    <Card>
+      <h1 className="mb-4 text-2xl font-semibold">{t('title')}</h1>
+      {state.kind === 'pending' ? (
+        <p className="flex items-center gap-2">
+          <Spinner /> {t('accepting')}
+        </p>
+      ) : null}
+      {state.kind === 'done' ? (
+        <Alert tone="success">
+          {t('success')}{' '}
+          <Link href={`/competitions/${state.competitionId}`} className="font-medium underline">
+            {t('goToCompetition')}
           </Link>
         </Alert>
       ) : null}
