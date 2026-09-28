@@ -54,7 +54,7 @@ export class MatchesService {
     return (last._max.matchNumber ?? 0) + 1;
   }
 
-  /** Схватки узлов сетки в порядке нумерации; схватки без соперника номера не получают. */
+  /** Схватки узлов сетки в порядке нумерации; схватки, уже решённые без соперника (BYE), номера не получают. */
   async createForBracket(
     tx: Tx,
     competitionId: string,
@@ -167,20 +167,18 @@ export class MatchesService {
       });
     }
     const status = statusFor(spec);
-    const reopened = status === 'SCHEDULED' && m.matchNumber === null;
+    // Номер, выданный при публикации, не меняется: по нему работают печатная сетка и расписание. Схватка,
+    // оставшаяся без соперника, сохраняет номер (в сетке — «без схватки»); номер получает только схватка,
+    // которая была без соперника с публикации и стала настоящей.
+    const matchNumber =
+      m.matchNumber ?? (status === 'SCHEDULED' ? await this.nextNumber(tx, competitionId) : null);
     await tx.match.update({
       where: { id: m.id },
       data: {
         status,
         winnerSide: spec.resolution === 'WALKOVER' ? spec.winnerSide : null,
         finishedAt: status === 'FINISHED' ? new Date() : null,
-        // Схватка без соперника номер не занимает; снова ставшая настоящей — получает новый.
-        matchNumber:
-          status === 'SCHEDULED'
-            ? reopened
-              ? await this.nextNumber(tx, competitionId)
-              : m.matchNumber
-            : null,
+        matchNumber,
         version: { increment: 1 },
       },
     });

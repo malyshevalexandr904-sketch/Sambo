@@ -40,29 +40,55 @@ export function compareVectors(a: readonly number[], b: readonly number[]): numb
   return 0;
 }
 
-/** Размещение: позиция → участник. Штраф считается по уже размещённым участникам той же группы. */
+/**
+ * Размещение: позиция → участник. Для каждой группы разведения хранится число её участников в каждом блоке сетки
+ * (блоки по 2^(r−1) позиций для r = 1…K): соперник из соседнего блока уровня r встречается в круге r. Поэтому штраф
+ * позиции считается за O(K), а не перебором группы.
+ */
 export class Placement {
   private readonly byPosition = new Map<number, DrawParticipant>();
   private readonly positionOf = new Map<string, number>();
-  /** Ключ разведения → значение → участники группы. */
-  private readonly groups: Map<string, Set<string>>[];
+  /** Ключ разведения → значение → уровень r−1 → число участников группы в блоке. */
+  private readonly counts: Map<string, Int32Array[]>[];
 
   constructor(
     private readonly rounds: number,
     private readonly keys: readonly SeparationKey[],
   ) {
-    this.groups = keys.map(() => new Map<string, Set<string>>());
+    this.counts = keys.map(() => new Map<string, Int32Array[]>());
   }
 
-  place(p: DrawParticipant, position: number): void {
-    this.byPosition.set(position, p);
-    this.positionOf.set(p.entryId, position);
+  private levels(keyIndex: number, value: string): Int32Array[] {
+    const map = this.counts[keyIndex] as Map<string, Int32Array[]>;
+    let levels = map.get(value);
+    if (!levels) {
+      levels = Array.from({ length: this.rounds }, (_, r) => new Int32Array(2 ** (this.rounds - r)));
+      map.set(value, levels);
+    }
+    return levels;
+  }
+
+  private count(p: DrawParticipant, position: number, delta: 1 | -1): void {
     this.keys.forEach((key, i) => {
       const value = keyValue(p, key);
       if (value === null) return;
-      const map = this.groups[i] as Map<string, Set<string>>;
-      map.set(value, (map.get(value) ?? new Set()).add(p.entryId));
+      this.levels(i, value).forEach((blocks, r) => {
+        const block = (position - 1) >> r;
+        blocks[block] = (blocks[block] ?? 0) + delta;
+      });
     });
+  }
+
+  /** Ставит участника на позицию; уже размещённый участник переносится. */
+  place(p: DrawParticipant, position: number): void {
+    const old = this.positionOf.get(p.entryId);
+    if (old !== undefined) {
+      this.count(p, old, -1);
+      if (this.byPosition.get(old) === p) this.byPosition.delete(old);
+    }
+    this.byPosition.set(position, p);
+    this.positionOf.set(p.entryId, position);
+    this.count(p, position, 1);
   }
 
   at(position: number): DrawParticipant | undefined {
@@ -77,16 +103,28 @@ export class Placement {
     return [...this.byPosition.entries()];
   }
 
+  private pairPenalty(a: number, b: number): number {
+    return 4 ** (this.rounds - meetingRound(a, b));
+  }
+
   /** Штраф участника на позиции относительно размещённых (кроме исключённых) — по каждому ключу. */
-  penalty(p: DrawParticipant, position: number, exclude: ReadonlySet<string> = new Set()): number[] {
+  penalty(p: DrawParticipant, position: number, exclude: readonly DrawParticipant[] = []): number[] {
     return this.keys.map((key, i) => {
       const value = keyValue(p, key);
       if (value === null) return 0;
+      const levels = (this.counts[i] as Map<string, Int32Array[]>).get(value);
+      if (!levels) return 0;
       let sum = 0;
-      for (const other of this.groups[i]?.get(value) ?? []) {
-        if (other === p.entryId || exclude.has(other)) continue;
-        const pos = this.positionOf.get(other);
-        if (pos !== undefined) sum += 4 ** (this.rounds - meetingRound(position, pos));
+      levels.forEach((blocks, r) => {
+        const sibling = ((position - 1) >> r) ^ 1;
+        sum += (blocks[sibling] ?? 0) * 4 ** (this.rounds - r - 1);
+      });
+      // Сам участник и исключённые из той же группы, если они уже стоят в сетке, не считаются.
+      for (const other of [p, ...exclude]) {
+        if (other !== p && keyValue(other, key) !== value) continue;
+        if (other !== p && other.entryId === p.entryId) continue;
+        const pos = this.positionOf.get(other.entryId);
+        if (pos !== undefined && pos !== position) sum -= this.pairPenalty(position, pos);
       }
       return sum;
     });
@@ -98,10 +136,9 @@ export class Placement {
     const pb = this.byPosition.get(b);
     if (!pa || !pb) return false;
     if (this.keys.every((k) => keyValue(pa, k) === keyValue(pb, k))) return false;
-    const both = new Set([pa.entryId, pb.entryId]);
     const sum = (x: number[], y: number[]): number[] => x.map((v, i) => v + (y[i] ?? 0));
-    const before = sum(this.penalty(pa, a, both), this.penalty(pb, b, both));
-    const after = sum(this.penalty(pa, b, both), this.penalty(pb, a, both));
+    const before = sum(this.penalty(pa, a, [pb]), this.penalty(pb, b, [pa]));
+    const after = sum(this.penalty(pa, b, [pb]), this.penalty(pb, a, [pa]));
     if (compareVectors(after, before) >= 0) return false;
     this.place(pa, b);
     this.place(pb, a);

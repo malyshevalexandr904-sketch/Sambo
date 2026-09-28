@@ -1977,6 +1977,8 @@ model Draw {
   format           CompetitionFormatCode
   algorithmVersion String                @map("algorithm_version")
   randomSeed       String                @map("random_seed")
+  /// seed задан вручную, а не создан сервером: показывается рядом с версией для прозрачности.
+  manualSeed       Boolean               @default(false) @map("manual_seed")
   inputHash        String                @map("input_hash")
   /// Канонический вход (DrawInput): только идентификаторы и номера посева.
   input            Json

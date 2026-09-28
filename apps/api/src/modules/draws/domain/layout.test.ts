@@ -200,6 +200,20 @@ describe('separation', () => {
     expect(regionGroup).toMatchObject({ value: 'region-1', size: 4, idealRound: 2, achievedRound: 2 });
   });
 
+  it('keeps swapping while swaps improve the lower-priority key', () => {
+    // Регрессия ревью 5a: два прохода обменов оставляли двух спортсменов region-1 во втором круге.
+    const list = participants(
+      11,
+      (i) => `club-${i % 4}`,
+      (i) => `region-${Math.floor(i / 4) % 2}`,
+    ).map((p, i) => ({ ...p, entryId: `e${String(i).padStart(3, '0')}` }));
+    const layout = computeDrawLayout(
+      input('ELIMINATION_WITH_REPECHAGE', list),
+      '0123456789abcdef0123456789abcdef',
+    );
+    expect(layout.separation.unmet).toBe(0);
+  });
+
   it('reports separation it cannot achieve instead of failing', () => {
     // Посевы 1 и 4 одного клуба стоят в одной половине сетки на 8.
     const list = participants(8, (i) => (i === 0 || i === 1 ? 'club-x' : `solo-${i}`));

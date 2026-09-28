@@ -32,6 +32,13 @@ describe('match duration snapshot', () => {
     expect(matchDurationSeconds(params, 9, false)).toBeNull();
     expect(matchDurationSeconds(params, null, false)).toBeNull();
   });
+
+  it('never makes a repechage bout longer than the main bout of the youngest age', () => {
+    const long = { ...params, repechageMatchSeconds: 200 };
+    expect(matchDurationSeconds(long, 13, true)).toBe(180);
+    expect(matchDurationSeconds(long, 14, true)).toBe(200);
+    expect(matchDurationSeconds(long, null, true)).toBe(200);
+  });
 });
 
 describe('source records', () => {

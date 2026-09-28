@@ -137,11 +137,14 @@ export function DrawView({
   competition,
   draw,
   categoryName,
+  newerDraft,
   onChanged,
 }: {
   competition: Competition;
   draw: DrawDto;
   categoryName: string;
+  /** В категории есть черновик новее этого: публикуется только последний. */
+  newerDraft: boolean;
   onChanged: () => Promise<void>;
 }) {
   const t = useTranslations('draws');
@@ -160,10 +163,16 @@ export function DrawView({
           <CardTitle className="mb-0">{t('version', { number: draw.number })}</CardTitle>
           <DrawStatusBadge status={draw.status} />
           {draw.stale ? <Badge tone="warning">{t('staleShort')}</Badge> : null}
+          {draw.manualSeed ? <Badge tone="info">{t('manualSeed')}</Badge> : null}
         </div>
         {draw.stale ? (
           <Alert tone="warning" className="mt-3">
             {t('stale')}
+          </Alert>
+        ) : null}
+        {draw.status === 'DRAFT' && newerDraft ? (
+          <Alert tone="info" className="mt-3">
+            {t('notLatest')}
           </Alert>
         ) : null}
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">

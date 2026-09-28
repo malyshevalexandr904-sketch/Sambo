@@ -150,6 +150,8 @@ export interface DrawSummaryDto {
   participants: number;
   /** Вход черновика разошёлся с текущими допущенными участниками: публикация невозможна. */
   stale: boolean;
+  /** seed задан вручную, а не создан сервером. */
+  manualSeed: boolean;
   createdAt: string;
   publishedAt: string | null;
   supersededAt: string | null;

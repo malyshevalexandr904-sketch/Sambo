@@ -136,10 +136,17 @@ describe('draft', () => {
     });
   });
 
-  it('generates a random seed when none is given', async () => {
+  it('generates a random seed when none is given and marks a manual one', async () => {
     const d = await draft(w.staff.manager, cat.categoryId);
     expect(d.randomSeed).toMatch(/^[0-9a-f]{32}$/);
     expect(d.randomSeed).not.toBe(SEED_A);
+    expect(d.manualSeed).toBe(false);
+    const manual = await draft(w.staff.manager, cat.categoryId, { randomSeed: SEED_A });
+    expect(manual.manualSeed).toBe(true);
+    const audit = await t.admin.auditLog.findFirstOrThrow({
+      where: { action: 'draw.created', entityId: manual.id },
+    });
+    expect(audit.after).toMatchObject({ randomSeed: SEED_A, manualSeed: true });
   });
 
   it('validates format, seeding and seed', async () => {
@@ -334,6 +341,46 @@ describe('publication', () => {
   });
 });
 
+describe('which draft can be published', () => {
+  it('publishes only the newest draft of the category', async () => {
+    const cat = await drawCategory(t, w, 6);
+    const older = await draft(w.staff.manager, cat.categoryId, { randomSeed: SEED_A });
+    const newer = await draft(w.staff.manager, cat.categoryId, { randomSeed: SEED_B });
+    const view = (await w.staff.manager.agent.get(`/api/v1/draws/${older.id}`)).body.data as DrawDto;
+    expect(view.allowedActions).toEqual(['draw.verify']);
+    const list = await w.staff.manager.agent.get(`/api/v1/categories/${cat.categoryId}/draws`);
+    const actions = new Map(
+      (list.body.data.draws as DrawDto[]).map((d) => [d.id, d.allowedActions] as const),
+    );
+    expect(actions.get(older.id)).toEqual(['draw.verify']);
+    expect(actions.get(newer.id)).toEqual(['draw.verify', 'draw.publish']);
+    const r = await send(w.staff.manager, 'post', `/api/v1/draws/${older.id}/publish`, {}, older.version);
+    expect(r.status).toBe(422);
+    expect(r.body.error.details.failed).toEqual(['newer_draft_exists']);
+    await publish(w.staff.manager, newer);
+  });
+
+  it('waits until admission is decided for every entry of the category', async () => {
+    const cat = await drawCategory(t, w, 6);
+    const d = await draft(w.staff.manager, cat.categoryId, { randomSeed: SEED_A });
+    // После готовности категории документ вернули на проверку: допуск одного спортсмена снова не решён.
+    await t.admin.admission.update({ where: { entryId: cat.entries[0] }, data: { status: 'PENDING' } });
+    const list = await w.staff.manager.agent.get(`/api/v1/categories/${cat.categoryId}/draws`);
+    expect(list.body.data).toMatchObject({ admissionPending: 1, allowedActions: [] });
+    const view = (await w.staff.manager.agent.get(`/api/v1/draws/${d.id}`)).body.data as DrawDto;
+    expect(view.allowedActions).toEqual(['draw.verify']);
+    for (const r of [
+      await createDraft(w.staff.manager, cat.categoryId, { randomSeed: SEED_B }),
+      await send(w.staff.manager, 'post', `/api/v1/draws/${d.id}/publish`, {}, d.version),
+    ]) {
+      expect(r.status).toBe(422);
+      expect(r.body.error.details.failed).toEqual(['admission_pending']);
+    }
+    await t.admin.admission.update({ where: { entryId: cat.entries[0] }, data: { status: 'ADMITTED' } });
+    await publish(w.staff.manager, d);
+  });
+});
+
 describe('new version of a published draw', () => {
   let cat: CategoryFixture;
   let d: DrawDto;
@@ -473,6 +520,7 @@ describe('progression engine (called by Phase 7 on a confirmed result)', () => {
   });
 
   it('advances winners, fills the repechage after the pool finals and blocks a new draw version', async () => {
+    const numbers = new Map((await nodes()).map((n) => [n.match?.id, n.match?.number ?? null]));
     for (let guard = 0; guard < 20; guard++) {
       const ready = (await nodes()).filter((n) => n.status === 'READY');
       if (ready.length === 0) break;
@@ -481,6 +529,8 @@ describe('progression engine (called by Phase 7 on a confirmed result)', () => {
     }
     const all = await nodes();
     expect(all.every((n) => n.status === 'DECIDED' || n.status === 'WALKOVER')).toBe(true);
+    // Номера, выданные при публикации, не меняются — и у схватки, оставшейся без соперника.
+    for (const n of all) expect(n.match?.number ?? null).toBe(numbers.get(n.match?.id));
     const final = all.find((n) => n.label === 'FINAL');
     expect(final?.match).toMatchObject({ status: 'FINISHED', winnerSide: 'RED' });
     const bronze = all.filter((n) => n.label === 'BRONZE');
@@ -510,5 +560,78 @@ describe('progression engine (called by Phase 7 on a confirmed result)', () => {
     );
     expect(r.status).toBe(422);
     expect(r.body.error.details.failed).toEqual(['matches_started']);
+  });
+});
+
+describe('results confirmed at the same time (Phase 7 hook)', () => {
+  let brackets: BracketsService;
+  let db: PrismaService;
+  beforeAll(() => {
+    brackets = t.app.get(BracketsService);
+    db = t.app.get(PrismaService);
+  });
+
+  async function fourWay(): Promise<{ cat: CategoryFixture; semis: BracketNodeDto[] }> {
+    const cat = await drawCategory(t, w, 4);
+    await publish(
+      w.staff.manager,
+      await draft(w.staff.manager, cat.categoryId, { randomSeed: SEED_A, format: 'SINGLE_ELIMINATION' }),
+    );
+    const all = (await bracketOf(w.staff.manager, cat.categoryId)).bracket?.nodes as BracketNodeDto[];
+    const semis = all.filter((n) => n.label === 'SEMIFINAL');
+    expect(semis.map((n) => n.status)).toEqual(['READY', 'READY']);
+    return { cat, semis };
+  }
+
+  it('advances both semifinal winners when the results are confirmed on two mats at once', async () => {
+    for (let run = 0; run < 3; run++) {
+      const { cat, semis } = await fourWay();
+      await Promise.all(
+        semis.map((n) => db.tx((tx) => brackets.applyConfirmedResult(tx, n.match?.id as string, 'BLUE'))),
+      );
+      const all = (await bracketOf(w.staff.manager, cat.categoryId)).bracket?.nodes as BracketNodeDto[];
+      const final = all.find((n) => n.label === 'FINAL');
+      expect(final?.status).toBe('READY');
+      expect([final?.red.entryId, final?.blue.entryId].sort()).toEqual(
+        semis.map((n) => n.blue.entryId).sort(),
+      );
+      const match = await t.admin.match.findUniqueOrThrow({
+        where: { id: final?.match?.id as string },
+        include: { participants: true },
+      });
+      expect(match.participants.every((p) => p.entryId !== null)).toBe(true);
+    }
+  });
+
+  it('never loses a confirmed result to a new draw version made at the same moment', async () => {
+    for (let run = 0; run < 3; run++) {
+      const { cat, semis } = await fourWay();
+      const published = await t.admin.draw.findFirstOrThrow({
+        where: { categoryId: cat.categoryId, status: 'PUBLISHED' },
+      });
+      const [result, supersede] = await Promise.allSettled([
+        db.tx((tx) => brackets.applyConfirmedResult(tx, semis[0]?.match?.id as string, 'RED')),
+        send(
+          w.staff.chief,
+          'post',
+          `/api/v1/draws/${published.id}/supersede`,
+          { reason: 'Ошибка в посеве' },
+          published.version,
+        ),
+      ]);
+      const superseded = supersede.status === 'fulfilled' && supersede.value.status === 200;
+      expect(result.status === 'fulfilled').toBe(!superseded);
+      if (superseded) {
+        expect(await t.admin.match.count({ where: { categoryId: cat.categoryId } })).toBe(0);
+      } else {
+        expect(supersede.status === 'fulfilled' && supersede.value.body.error.details.failed).toEqual([
+          'matches_started',
+        ]);
+        const played = await t.admin.match.findUniqueOrThrow({
+          where: { id: semis[0]?.match?.id as string },
+        });
+        expect(played).toMatchObject({ status: 'FINISHED', winnerSide: 'RED' });
+      }
+    }
   });
 });

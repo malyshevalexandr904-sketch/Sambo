@@ -32,6 +32,7 @@ CREATE TABLE "draw" (
     "format" "CompetitionFormatCode" NOT NULL,
     "algorithm_version" TEXT NOT NULL,
     "random_seed" TEXT NOT NULL,
+    "manual_seed" BOOLEAN NOT NULL DEFAULT false,
     "input_hash" TEXT NOT NULL,
     "input" JSONB NOT NULL,
     "separation_report" JSONB NOT NULL,
@@ -302,11 +303,11 @@ BEGIN
   END IF;
   IF OLD."status" = 'PUBLISHED' AND NEW."status" = 'SUPERSEDED'
      AND (NEW."id", NEW."competition_id", NEW."category_id", NEW."number", NEW."format", NEW."algorithm_version",
-          NEW."random_seed", NEW."input_hash", NEW."input", NEW."separation_report", NEW."created_by_id",
+          NEW."random_seed", NEW."manual_seed", NEW."input_hash", NEW."input", NEW."separation_report", NEW."created_by_id",
           NEW."created_at", NEW."published_by_id", NEW."published_at")
          IS NOT DISTINCT FROM
          (OLD."id", OLD."competition_id", OLD."category_id", OLD."number", OLD."format", OLD."algorithm_version",
-          OLD."random_seed", OLD."input_hash", OLD."input", OLD."separation_report", OLD."created_by_id",
+          OLD."random_seed", OLD."manual_seed", OLD."input_hash", OLD."input", OLD."separation_report", OLD."created_by_id",
           OLD."created_at", OLD."published_by_id", OLD."published_at") THEN
     RETURN NEW;
   END IF;
@@ -325,9 +326,18 @@ AS $$
 DECLARE
   v_status "DrawStatus";
 BEGIN
-  SELECT "status" INTO v_status FROM "draw" WHERE "id" = OLD."draw_id";
-  IF v_status IS DISTINCT FROM 'DRAFT' THEN
-    RAISE EXCEPTION 'slots of draw % are immutable', OLD."draw_id" USING ERRCODE = 'check_violation';
+  -- Слоты меняются, добавляются и удаляются только у черновика: и у прежней жеребьёвки строки, и у новой.
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN
+    SELECT "status" INTO v_status FROM "draw" WHERE "id" = OLD."draw_id";
+    IF v_status IS DISTINCT FROM 'DRAFT' THEN
+      RAISE EXCEPTION 'slots of draw % are immutable', OLD."draw_id" USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+    SELECT "status" INTO v_status FROM "draw" WHERE "id" = NEW."draw_id";
+    IF v_status IS DISTINCT FROM 'DRAFT' THEN
+      RAISE EXCEPTION 'slots of draw % are immutable', NEW."draw_id" USING ERRCODE = 'check_violation';
+    END IF;
   END IF;
   IF TG_OP = 'DELETE' THEN
     RETURN OLD;
@@ -337,7 +347,7 @@ END;
 $$;
 
 CREATE TRIGGER "draw_slot_immutable"
-  BEFORE UPDATE OR DELETE ON "draw_slot"
+  BEFORE INSERT OR UPDATE OR DELETE ON "draw_slot"
   FOR EACH ROW EXECUTE FUNCTION "forbid_change_published_draw_slot"();
 
 -- ---------- Журнал синхронизации (DATABASE.md, 7) ----------

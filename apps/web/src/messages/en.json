@@ -915,7 +915,8 @@
       "window_has_attempts": "weigh-ins were already recorded in this window",
       "draws_published": "draws are already published in the competition",
       "draw_input_changed": "the participants of the category changed after the draw — draw again",
-      "matches_started": "matches of the category have already started or been played"
+      "matches_started": "matches of the category have already started or been played",
+      "newer_draft_exists": "the category has a newer draft — only the latest one can be published"
     },
     "dates": "Dates",
     "registrationWindow": "Registration",
@@ -1534,7 +1535,7 @@
     },
     "create": {
       "title": "New draft",
-      "hint": "The server draws the admitted participants. A draft can be reviewed and compared with others; only one version gets published.",
+      "hint": "The server draws the admitted entries. Only the latest draft can be published; every attempt stays in the list of versions.",
       "format": "Format",
       "suggested": "By the competition rules: {format}",
       "noSuggestion": "The competition rules set no format for this number of participants — choose one.",
@@ -1594,7 +1595,10 @@
       "met": "best possible",
       "unmet": "could be kept apart until “{round}”",
       "unmetCount": "{count, plural, one {One group} other {# groups}} could not be separated better — check the seeding or draw again."
-    }
+    },
+    "pendingBlocked": "Admission is not decided for every entry of the category. The draw becomes available once the check-in commission decides admission — otherwise an athlete would drop out of the bracket.",
+    "notLatest": "This is not the latest draft of the category. Only the newest draft can be published, so a convenient bracket cannot be picked from several.",
+    "manualSeed": "seed set manually"
   },
   "bracket": {
     "main": "Main bracket",

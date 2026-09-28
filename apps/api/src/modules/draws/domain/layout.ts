@@ -1,6 +1,6 @@
 // Расстановка жеребьёвки (ARCHITECTURE.md, 14.5, шаги 3–4): размер сетки и BYE, посеянные — на места посева,
 // остальные перемешиваются генератором и расставляются жадно с разведением (сначала самые большие команды),
-// затем ограниченный возврат — попарные обмены, уменьшающие штраф. Результат зависит только от входа и seed.
+// затем попарные обмены, пока они уменьшают штраф. Результат зависит только от входа и seed.
 import { drawSize, eliminationRounds, isEliminationFormat, type Pool, poolOfPosition } from '@sde/contracts';
 import type { DrawInput, DrawParticipant } from './draw-input';
 import { createPrng, type Prng, shuffle } from './prng';
@@ -21,8 +21,11 @@ export interface DrawLayout {
   separation: SeparationReport;
 }
 
-/** Проходы попарных обменов после жадной расстановки. */
-const IMPROVEMENT_PASSES = 2;
+/**
+ * Предел проходов попарных обменов. Обмены идут, пока уменьшают штраф: каждый принятый обмен строго уменьшает
+ * вектор неотрицательных целых, поэтому процесс конечен; предел только ограничивает время на крайних входах.
+ */
+const MAX_IMPROVEMENT_PASSES = 64;
 
 export function computeDrawLayout(input: DrawInput, seed: string): DrawLayout {
   const prng = createPrng(seed);
@@ -106,7 +109,7 @@ function eliminationLayout(input: DrawInput, size: number, prng: Prng): DrawLayo
     movable.push(chosen);
   }
   movable.sort((a, b) => a - b);
-  for (let pass = 0; pass < IMPROVEMENT_PASSES; pass++) {
+  for (let pass = 0; pass < MAX_IMPROVEMENT_PASSES; pass++) {
     let changed = false;
     for (let i = 0; i < movable.length; i++)
       for (let j = i + 1; j < movable.length; j++)

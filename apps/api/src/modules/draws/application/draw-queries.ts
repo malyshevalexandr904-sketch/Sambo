@@ -69,12 +69,17 @@ export class DrawQueriesService {
     return drawInputHash(this.participants.currentInput(parseStoredInput(row.input), ctx)) !== row.inputHash;
   }
 
-  private summaryActions(v: Viewer, category: CategoryRow, row: DrawSummaryRow, stale: boolean): string[] {
+  private summaryActions(
+    v: Viewer,
+    category: CategoryRow,
+    row: DrawSummaryRow,
+    state: { stale: boolean; latest: boolean; admissionPending: number },
+  ): string[] {
     return drawActions({
       competitionStatus: v.competitionStatus,
       categoryStatus: category.status,
       status: row.status,
-      stale,
+      ...state,
       canPublish: v.perms.has('draw.publish'),
       canRepublish: v.perms.has('draw.republish'),
     });
@@ -102,7 +107,15 @@ export class DrawQueriesService {
         admissionPending: ctx.admissionPending,
         suggestedFormat: ctx.suggestedFormat,
         published: published
-          ? toDrawSummary(published, false, this.summaryActions(v, c, published, false))
+          ? toDrawSummary(
+              published,
+              false,
+              this.summaryActions(v, c, published, {
+                stale: false,
+                latest: false,
+                admissionPending: ctx.admissionPending,
+              }),
+            )
           : null,
         drafts: draws.filter((d) => d.categoryId === c.id && d.status === 'DRAFT').length,
       });
@@ -137,12 +150,21 @@ export class DrawQueriesService {
       })),
       draws: rows.map((r) => {
         const stale = this.stale(r, ctx);
-        return toDrawSummary(r, stale, this.summaryActions(v, category, r, stale));
+        return toDrawSummary(
+          r,
+          stale,
+          this.summaryActions(v, category, r, {
+            stale,
+            latest: r.number === rows[0]?.number,
+            admissionPending: ctx.admissionPending,
+          }),
+        );
       }),
       allowedActions: categoryDrawActions({
         competitionStatus: v.competitionStatus,
         categoryStatus: category.status,
         admitted: ctx.admitted.length,
+        admissionPending: ctx.admissionPending,
         canCreate: v.perms.has('draw.create'),
       }),
     };
@@ -162,6 +184,11 @@ export class DrawQueriesService {
     const v = await this.viewer(user, row.competitionId);
     const ctx = await this.participants.context(null, category);
     const stale = this.stale(row, ctx);
+    const last = await this.db.draw.aggregate({
+      where: { categoryId: row.categoryId },
+      _max: { number: true },
+    });
+    const state = { stale, latest: row.number === last._max.number, admissionPending: ctx.admissionPending };
     const slots = row.slots.map(toSlotDto);
     const infos = await this.participants.infos(
       null,
@@ -172,7 +199,7 @@ export class DrawQueriesService {
       (row.status === 'PUBLISHED' ? await this.brackets.view(row.id) : null) ??
       this.brackets.preview(row.format, row.slots);
     return {
-      ...toDrawSummary(row, stale, this.summaryActions(v, category, row, stale)),
+      ...toDrawSummary(row, stale, this.summaryActions(v, category, row, state)),
       competitionId: row.competitionId,
       algorithmVersion: row.algorithmVersion,
       randomSeed: row.randomSeed,
@@ -207,7 +234,12 @@ export class DrawQueriesService {
       : null;
     return {
       category: toDrawCategory(category),
-      draw: toDrawSummary(row, false, this.summaryActions(v, category, row, false)),
+      // Опубликованная версия: действия не зависят от допуска и новых черновиков.
+      draw: toDrawSummary(
+        row,
+        false,
+        this.summaryActions(v, category, row, { stale: false, latest: false, admissionPending: 0 }),
+      ),
       bracket,
     };
   }

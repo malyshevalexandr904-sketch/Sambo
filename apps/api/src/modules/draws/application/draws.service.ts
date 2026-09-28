@@ -90,6 +90,7 @@ export class DrawsService {
       const locked = await this.workflow.lockForCommand(tx, categoryId);
       this.assertReady(locked);
       const ctx = await this.participants.context(tx, locked.category);
+      if (ctx.admissionPending > 0) throw blocked('admission_pending');
       if (ctx.admitted.length < MIN_DRAW_PARTICIPANTS)
         throw new DomainError('DRAW_NOT_ENOUGH_PARTICIPANTS', { admitted: ctx.admitted.length });
       const format = this.formatFor(req, ctx);
@@ -101,8 +102,8 @@ export class DrawsService {
         separation: req.separation.by,
         participants: ctx.admitted.map((p) => toDrawParticipant(p, seeds.get(p.entryId) ?? null)),
       });
-      const randomSeed = req.randomSeed ?? newRandomSeed();
-      return this.insertDraft(tx, locked, input, randomSeed, user.id, viaPlatform);
+      const seed = { value: req.randomSeed ?? newRandomSeed(), manual: req.randomSeed !== undefined };
+      return this.insertDraft(tx, locked, input, seed, user.id, viaPlatform);
     });
     return this.queries.get(user, id);
   }
@@ -111,11 +112,12 @@ export class DrawsService {
     tx: Tx,
     locked: LockedCategory,
     input: ReturnType<typeof canonicalDrawInput>,
-    randomSeed: string,
+    seed: { value: string; manual: boolean },
     userId: string,
     viaPlatform: boolean,
   ): Promise<string> {
     const { category } = locked;
+    const randomSeed = seed.value;
     const layout = computeDrawLayout(input, randomSeed);
     const last = await tx.draw.aggregate({ where: { categoryId: category.id }, _max: { number: true } });
     const id = uuidv7();
@@ -129,6 +131,7 @@ export class DrawsService {
         format: input.format,
         algorithmVersion: input.algorithmVersion,
         randomSeed,
+        manualSeed: seed.manual,
         inputHash,
         input: input as unknown as Prisma.InputJsonValue,
         separationReport: layout.separation as unknown as Prisma.InputJsonValue,
@@ -152,6 +155,7 @@ export class DrawsService {
         categoryId: category.id,
         format: input.format,
         randomSeed,
+        manualSeed: seed.manual,
         inputHash,
         participants: input.participants.length,
         unmetSeparation: layout.separation.unmet,
@@ -186,7 +190,14 @@ export class DrawsService {
       if (draw.status !== 'DRAFT')
         throw new DomainError('INVALID_TRANSITION', { from: draw.status, to: 'PUBLISHED', allowed: [] });
       this.assertReady(locked);
+      // Опубликовать можно только самый новый черновик: выбрать «удачный» из нескольких нельзя.
+      const last = await tx.draw.aggregate({
+        where: { categoryId: draw.categoryId },
+        _max: { number: true },
+      });
+      if (draw.number !== last._max.number) throw blocked('newer_draft_exists');
       const ctx = await this.participants.context(tx, locked.category);
+      if (ctx.admissionPending > 0) throw blocked('admission_pending');
       if (drawInputHash(this.participants.currentInput(parseStoredInput(draw.input), ctx)) !== draw.inputHash)
         throw blocked('draw_input_changed');
       const now = new Date();

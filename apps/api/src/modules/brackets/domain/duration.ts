@@ -1,6 +1,6 @@
 // Длительность схватки — снимок из закреплённой версии правил при создании схватки (DATABASE.md, 3.6).
 // Категория с несколькими возрастами получает длительность самого младшего возраста (безопасность детей);
-// утешительные схватки — repechageMatchSeconds, если он задан.
+// утешительные схватки — repechageMatchSeconds, если он задан, но не дольше основной схватки этого возраста.
 import type { AgeCalculationPolicy, RuleSetParametersV1 } from '@sde/contracts';
 
 export interface CategoryAgeSpan {
@@ -21,7 +21,10 @@ export function matchDurationSeconds(
   age: number | null,
   repechage: boolean,
 ): number | null {
-  if (repechage && params.repechageMatchSeconds !== undefined) return params.repechageMatchSeconds;
-  if (age === null) return null;
-  return params.matchDuration.find((r) => age >= r.ageFrom && age <= r.ageTo)?.seconds ?? null;
+  const main =
+    age === null
+      ? null
+      : (params.matchDuration.find((r) => age >= r.ageFrom && age <= r.ageTo)?.seconds ?? null);
+  if (!repechage || params.repechageMatchSeconds === undefined) return main;
+  return main === null ? params.repechageMatchSeconds : Math.min(main, params.repechageMatchSeconds);
 }

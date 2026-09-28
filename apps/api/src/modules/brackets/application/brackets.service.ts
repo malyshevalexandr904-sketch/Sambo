@@ -3,7 +3,7 @@
 // Состояние сетки не хранится отдельно: оно пересчитывается из жеребьёвки и сыгранных схваток, а стороны схваток
 // приводятся к нему — так продвижение, BYE и утешительные схватки не расходятся с графом.
 import { Injectable } from '@nestjs/common';
-import type { BracketNodeDto, BracketStage, CompetitionFormatCode, Side } from '@sde/contracts';
+import type { BracketNodeDto, BracketStage, CompetitionFormatCode, DrawStatus, Side } from '@sde/contracts';
 import { type Tx, uuidv7 } from '@sde/db';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -162,17 +162,35 @@ export class BracketsService {
   }
 
   /**
+   * Жеребьёвка схватки сетки, заблокированная FOR UPDATE; жеребьёвка должна быть опубликована. Блокировка
+   * упорядочивает продвижение по одной сетке (результаты на двух коврах не перезаписывают стороны друг друга)
+   * и не даёт новой версии жеребьёвки удалить только что сыгранную схватку. Порядок блокировок — жеребьёвка,
+   * затем схватка, как у новой версии жеребьёвки. Схватка вне сетки — null.
+   */
+  private async lockDrawOfMatch(tx: Tx, matchId: string): Promise<string | null> {
+    const [row] = await tx.$queryRaw<{ id: string; status: DrawStatus }[]>`
+      SELECT d.id, d.status::text AS status
+        FROM "match" m
+        JOIN "bracket_node" n ON n.id = m.bracket_node_id
+        JOIN "bracket" b ON b.id = n.bracket_id
+        JOIN "draw" d ON d.id = b.draw_id
+       WHERE m.id = ${matchId}::uuid
+         FOR UPDATE OF d`;
+    if (!row) return null;
+    if (row.status !== 'PUBLISHED')
+      throw new DomainError('INVALID_TRANSITION', { from: row.status, to: 'FINISHED', allowed: [] });
+    return row.id;
+  }
+
+  /**
    * Подтверждённый результат схватки сетки (ARCHITECTURE.md, 16.6): победитель и продвижение — в одной транзакции.
-   * Вызывает модуль схваток (Phase 7) после подтверждения результата уполномоченным лицом.
+   * Вызывает модуль схваток (Phase 7) после подтверждения результата уполномоченным лицом. Вызывающий не должен
+   * блокировать схватку до вызова: сначала блокируется жеребьёвка (см. lockDrawOfMatch).
    */
   async applyConfirmedResult(tx: Tx, matchId: string, winnerSide: Side): Promise<number> {
+    const drawId = await this.lockDrawOfMatch(tx, matchId);
     const match = await this.matches.markDecided(tx, matchId, winnerSide);
-    if (!match.bracketNodeId) return 0;
-    const node = await tx.bracketNode.findUniqueOrThrow({
-      where: { id: match.bracketNodeId },
-      select: { bracket: { select: { drawId: true } } },
-    });
-    const changed = await this.propagate(tx, node.bracket.drawId);
+    const changed = drawId ? await this.propagate(tx, drawId) : 0;
     await this.audit.record(tx, {
       action: 'bracket.advanced',
       entityType: 'Match',

@@ -206,6 +206,11 @@ export function CategoryDraws({
             {t('notReady')}
           </Alert>
         ) : null}
+        {data.category.status === 'READY_FOR_DRAW' && data.admissionPending > 0 ? (
+          <Alert tone="warning" className="mt-3">
+            {t('pendingBlocked')}
+          </Alert>
+        ) : null}
       </Card>
       {data.allowedActions.includes('draw.create') ? (
         <CreateDraft
@@ -238,6 +243,7 @@ export function CategoryDraws({
                     {formatLabel(d.format)} · {t('participants', { count: d.participants })}
                   </span>
                   {d.stale ? <Badge tone="warning">{t('staleShort')}</Badge> : null}
+                  {d.manualSeed ? <Badge tone="info">{t('manualSeed')}</Badge> : null}
                 </button>
               </li>
             ))}
@@ -251,6 +257,7 @@ export function CategoryDraws({
               competition={competition}
               draw={draw.data as DrawDto}
               categoryName={categoryName}
+              newerDraft={data.draws[0]?.id !== current}
               onChanged={invalidate}
             />
           )}
