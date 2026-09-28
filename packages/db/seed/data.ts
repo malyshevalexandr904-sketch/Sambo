@@ -10,6 +10,8 @@ export const SEED_IDS = {
   competition: '01920000-0000-7000-8015-000000000001',
   /** Турнир на мандатной комиссии (seed Phase 4b): секретарь — secretary@sambo.local, врач — doctor@sambo.local. */
   competitionCheckIn: '01920000-0000-7000-8015-000000000002',
+  /** Турнир на этапе жеребьёвки (seed Phase 5a): главный судья — referee1@sambo.local. */
+  competitionDraw: '01920000-0000-7000-8015-000000000003',
 } as const;
 
 export interface SeedOrganization {
@@ -167,7 +169,9 @@ export const SEED_USERS: SeedUser[] = [
     displayName: 'Судья 1',
     totp: false,
     person: { lastName: 'Судейкин', firstName: 'Андрей', birthDate: '1980-04-18', gender: 'MALE' },
-    grants: [],
+    grants: [
+      { id: g(15), role: 'CHIEF_REFEREE', organizationId: null, competitionId: SEED_IDS.competitionDraw },
+    ],
   },
   {
     id: u(9),
@@ -200,6 +204,7 @@ export const SEED_USERS: SeedUser[] = [
     grants: [
       { id: g(11), role: 'SECRETARY', organizationId: null, competitionId: SEED_IDS.competition },
       { id: g(13), role: 'SECRETARY', organizationId: null, competitionId: SEED_IDS.competitionCheckIn },
+      { id: g(14), role: 'SECRETARY', organizationId: null, competitionId: SEED_IDS.competitionDraw },
     ],
   },
   {

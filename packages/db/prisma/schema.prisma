@@ -4,6 +4,7 @@
 // Phase 4a: турнир, место, категории турнира и правила допуска (3.4), заявки и участия (3.5),
 // право записи и журнал синхронизации (3.9, 7).
 // Phase 4b: допуск, прибытие, взвешивание, медицинский допуск (3.5), уведомления (3.8).
+// Phase 5a: жеребьёвка, сетки и схватки сеток (3.6).
 // Конструкции, которые Prisma не выражает (partial unique, CHECK, генерируемые колонки, партиции,
 // REVOKE), пишутся SQL-шагами в миграциях (DATABASE.md, 10). Миграции пишутся и ревьюятся вручную.
 
@@ -138,6 +139,9 @@ model User {
   revokedClearances         MedicalClearance[]       @relation("ClearanceRevoker")
   notifications             Notification[]
   notificationPreferences   NotificationPreference[]
+  createdDraws              Draw[]                   @relation("DrawCreator")
+  publishedDraws            Draw[]                   @relation("DrawPublisher")
+  supersededDraws           Draw[]                   @relation("DrawSuperseder")
 
   @@index([status, createdAt])
   @@map("user")
@@ -1294,29 +1298,35 @@ model Competition {
   updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt               DateTime?             @map("deleted_at") @db.Timestamptz(3)
 
-  organizer      Organization             @relation("CompetitionOrganizer", fields: [organizerOrganizationId], references: [id], onDelete: Restrict)
-  venue          Venue?                   @relation(fields: [venueId], references: [id], onDelete: Restrict)
-  discipline     Discipline               @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
-  ruleSetVersion RuleSetVersion?          @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
-  logo           StoredFile?              @relation("CompetitionLogo", fields: [logoFileId], references: [id], onDelete: Restrict)
-  regulation     StoredFile?              @relation("CompetitionRegulation", fields: [regulationFileId], references: [id], onDelete: Restrict)
-  createdBy      User?                    @relation("CompetitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy      User?                    @relation("CompetitionUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
-  staff          CompetitionMembership[]
-  categories     CompetitionCategory[]
-  categoryRules  CategoryRule[]
-  requirements   CompetitionRequirement[]
-  applications   Application[]
-  entries        Entry[]
-  writeLease     CompetitionWriteLease?
-  documents      Document[]
-  consents       Consent[]
-  admissions     Admission[]
-  checkIns       CheckIn[]
-  scales         Scale[]
-  weighInWindows WeighInWindow[]
-  weighInRecords WeighInRecord[]
-  clearances     MedicalClearance[]
+  organizer         Organization             @relation("CompetitionOrganizer", fields: [organizerOrganizationId], references: [id], onDelete: Restrict)
+  venue             Venue?                   @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  discipline        Discipline               @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
+  ruleSetVersion    RuleSetVersion?          @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
+  logo              StoredFile?              @relation("CompetitionLogo", fields: [logoFileId], references: [id], onDelete: Restrict)
+  regulation        StoredFile?              @relation("CompetitionRegulation", fields: [regulationFileId], references: [id], onDelete: Restrict)
+  createdBy         User?                    @relation("CompetitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy         User?                    @relation("CompetitionUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+  staff             CompetitionMembership[]
+  categories        CompetitionCategory[]
+  categoryRules     CategoryRule[]
+  requirements      CompetitionRequirement[]
+  applications      Application[]
+  entries           Entry[]
+  writeLease        CompetitionWriteLease?
+  documents         Document[]
+  consents          Consent[]
+  admissions        Admission[]
+  checkIns          CheckIn[]
+  scales            Scale[]
+  weighInWindows    WeighInWindow[]
+  weighInRecords    WeighInRecord[]
+  clearances        MedicalClearance[]
+  draws             Draw[]
+  drawSlots         DrawSlot[]
+  brackets          Bracket[]
+  bracketNodes      BracketNode[]
+  matches           Match[]
+  matchParticipants MatchParticipant[]
 
   @@index([status, startDate])
   @@index([organizerOrganizationId, startDate])
@@ -1360,6 +1370,9 @@ model CompetitionCategory {
   declaredEntries Entry[]                  @relation("EntryDeclaredCategory")
   weighInWindows  WeighInWindowCategory[]
   weighInAttempts WeighInAttempt[]
+  draws           Draw[]
+  brackets        Bracket[]
+  matches         Match[]
 
   @@unique([competitionId, code])
   @@index([competitionId, status])
@@ -1508,6 +1521,8 @@ model Entry {
   admission            Admission?
   weighInAttempts      WeighInAttempt[]
   weighInRecord        WeighInRecord?
+  drawSlots            DrawSlot[]
+  matchParticipations  MatchParticipant[]
 
   @@index([competitionId, status])
   @@index([applicationId])
@@ -1905,4 +1920,211 @@ model NotificationPreference {
 
   @@id([userId, type, channel])
   @@map("notification_preference")
+}
+
+// ============================================================
+// Жеребьёвка, сетки, схватки сеток (DATABASE.md, 3.6; ARCHITECTURE.md, 14.4–14.5, 16.5; ADR-11; Phase 5a)
+// Операционные таблицы турнира: пишутся в журнал синхронизации триггерами и несут competition_id.
+// Опубликованная жеребьёвка и её слоты неизменяемы (триггеры); меняется только статус на SUPERSEDED.
+// Состояние схватки, события и результат — Phase 7; ковёр и расписание — Phase 6.
+// ============================================================
+
+enum DrawStatus {
+  DRAFT
+  PUBLISHED
+  SUPERSEDED
+}
+
+enum BracketKind {
+  MAIN
+  POOL
+  REPECHAGE
+  FINAL
+  PLAYOFF
+}
+
+enum SlotSource {
+  DRAW_SLOT
+  WINNER_OF
+  LOSER_OF
+  POOL_RANK
+  DYNAMIC
+}
+
+enum Side {
+  RED
+  BLUE
+}
+
+enum MatchStatus {
+  SCHEDULED
+  READY
+  IN_PROGRESS
+  PAUSED
+  FINISHED
+  POSTPONED
+  CANCELLED
+}
+
+/// Версия жеребьёвки категории (ADR-11): вход, seed и версия алгоритма — всё, чтобы повторить результат.
+/// `number` — номер версии в категории; `version` — оптимистическая блокировка (If-Match).
+model Draw {
+  id               String                @id @default(uuid(7)) @db.Uuid
+  competitionId    String                @map("competition_id") @db.Uuid
+  categoryId       String                @map("category_id") @db.Uuid
+  number           Int
+  status           DrawStatus            @default(DRAFT)
+  format           CompetitionFormatCode
+  algorithmVersion String                @map("algorithm_version")
+  randomSeed       String                @map("random_seed")
+  /// seed задан вручную, а не создан сервером: показывается рядом с версией для прозрачности.
+  manualSeed       Boolean               @default(false) @map("manual_seed")
+  inputHash        String                @map("input_hash")
+  /// Канонический вход (DrawInput): только идентификаторы и номера посева.
+  input            Json
+  separationReport Json                  @map("separation_report")
+  version          Int                   @default(1)
+  createdById      String?               @map("created_by_id") @db.Uuid
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  publishedById    String?               @map("published_by_id") @db.Uuid
+  publishedAt      DateTime?             @map("published_at") @db.Timestamptz(3)
+  supersededById   String?               @map("superseded_by_id") @db.Uuid
+  supersededAt     DateTime?             @map("superseded_at") @db.Timestamptz(3)
+  supersedeReason  String?               @map("supersede_reason")
+  updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition  Competition         @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category     CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  createdBy    User?               @relation("DrawCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedBy  User?               @relation("DrawPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
+  supersededBy User?               @relation("DrawSuperseder", fields: [supersededById], references: [id], onDelete: Restrict)
+  slots        DrawSlot[]
+  brackets     Bracket[]
+
+  @@unique([categoryId, number])
+  @@index([competitionId, status])
+  @@map("draw")
+}
+
+/// Позиция жеребьёвки: участие или BYE (entryId пуст).
+model DrawSlot {
+  id            String  @id @default(uuid(7)) @db.Uuid
+  competitionId String  @map("competition_id") @db.Uuid
+  drawId        String  @map("draw_id") @db.Uuid
+  position      Int
+  entryId       String? @map("entry_id") @db.Uuid
+  seedNumber    Int?    @map("seed_number")
+  /// Подгруппа A или B (выбывание с утешительными), иначе пусто.
+  pool          String?
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  draw        Draw        @relation(fields: [drawId], references: [id], onDelete: Restrict)
+  entry       Entry?      @relation(fields: [entryId], references: [id], onDelete: Restrict)
+
+  @@unique([drawId, position])
+  @@map("draw_slot")
+}
+
+/// Этап сетки опубликованной жеребьёвки: основная сетка, утешительные схватки, круговая группа.
+model Bracket {
+  id            String                @id @default(uuid(7)) @db.Uuid
+  competitionId String                @map("competition_id") @db.Uuid
+  categoryId    String                @map("category_id") @db.Uuid
+  drawId        String                @map("draw_id") @db.Uuid
+  kind          BracketKind
+  format        CompetitionFormatCode
+  stageOrder    Int                   @map("stage_order")
+  label         String?
+  createdAt     DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  competition Competition         @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category    CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  draw        Draw                @relation(fields: [drawId], references: [id], onDelete: Restrict)
+  nodes       BracketNode[]
+
+  @@unique([drawId, stageOrder])
+  @@index([categoryId])
+  @@map("bracket")
+}
+
+/// Узел сетки: источники сторон (позиция жеребьёвки, победитель или проигравший узла, правило формата),
+/// статические переходы и места. Играется одной схваткой (Match.bracketNodeId).
+model BracketNode {
+  id             String     @id @default(uuid(7)) @db.Uuid
+  competitionId  String     @map("competition_id") @db.Uuid
+  bracketId      String     @map("bracket_id") @db.Uuid
+  /// Устойчивый ключ узла в сетке: MAIN:2:1, REPECHAGE:A:1, POOL:3:2.
+  key            String
+  round          Int
+  position       Int
+  label          String
+  redSource      SlotSource @map("red_source")
+  redSourceRef   String     @map("red_source_ref")
+  blueSource     SlotSource @map("blue_source")
+  blueSourceRef  String     @map("blue_source_ref")
+  winnerToNodeId String?    @map("winner_to_node_id") @db.Uuid
+  winnerToSide   Side?      @map("winner_to_side")
+  loserToNodeId  String?    @map("loser_to_node_id") @db.Uuid
+  loserToSide    Side?      @map("loser_to_side")
+  placeForWinner Int?       @map("place_for_winner")
+  placeForLoser  Int?       @map("place_for_loser")
+
+  bracket     Bracket       @relation(fields: [bracketId], references: [id], onDelete: Restrict)
+  winnerTo    BracketNode?  @relation("NodeWinnerTo", fields: [winnerToNodeId], references: [id], onDelete: Restrict)
+  winnerFrom  BracketNode[] @relation("NodeWinnerTo")
+  loserTo     BracketNode?  @relation("NodeLoserTo", fields: [loserToNodeId], references: [id], onDelete: Restrict)
+  loserFrom   BracketNode[] @relation("NodeLoserTo")
+  match       Match?
+  competition Competition   @relation(fields: [competitionId], references: [id])
+
+  @@unique([bracketId, round, position])
+  @@unique([bracketId, key])
+  @@map("bracket_node")
+}
+
+/// Схватка сетки. Номер — сквозной в турнире; у схватки без соперника (BYE) номера нет, она завершается
+/// системой при публикации или продвижении. Ковёр, время, состояние и результат — Phase 6–7.
+model Match {
+  id              String      @id @default(uuid(7)) @db.Uuid
+  competitionId   String      @map("competition_id") @db.Uuid
+  categoryId      String      @map("category_id") @db.Uuid
+  bracketNodeId   String?     @unique @map("bracket_node_id") @db.Uuid
+  publicId        String      @unique @map("public_id")
+  matchNumber     Int?        @map("match_number")
+  roundLabel      String      @map("round_label")
+  status          MatchStatus @default(SCHEDULED)
+  durationSeconds Int?        @map("duration_seconds")
+  winnerSide      Side?       @map("winner_side")
+  finishedAt      DateTime?   @map("finished_at") @db.Timestamptz(3)
+  version         Int         @default(1)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition  Competition         @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category     CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  bracketNode  BracketNode?        @relation(fields: [bracketNodeId], references: [id], onDelete: Restrict)
+  participants MatchParticipant[]
+
+  @@unique([competitionId, matchNumber])
+  @@index([competitionId, status])
+  @@index([categoryId, status])
+  @@map("match")
+}
+
+/// Сторона схватки: участие (пусто, пока не известно) или BYE — не одновременно (CHECK).
+model MatchParticipant {
+  id            String  @id @default(uuid(7)) @db.Uuid
+  competitionId String  @map("competition_id") @db.Uuid
+  matchId       String  @map("match_id") @db.Uuid
+  side          Side
+  entryId       String? @map("entry_id") @db.Uuid
+  isBye         Boolean @default(false) @map("is_bye")
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  match       Match       @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  entry       Entry?      @relation(fields: [entryId], references: [id], onDelete: Restrict)
+
+  @@unique([matchId, side])
+  @@index([entryId])
+  @@map("match_participant")
 }

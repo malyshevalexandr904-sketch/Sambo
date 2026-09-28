@@ -28,6 +28,7 @@ import { CompetitionsModule } from './modules/competitions';
 import { ConsentsModule } from './modules/consents';
 import { DictionariesModule } from './modules/dictionaries';
 import { DocumentsModule } from './modules/documents';
+import { DrawsModule } from './modules/draws';
 import { FilesModule } from './modules/files';
 import { HealthModule } from './modules/health';
 import { MedicalModule } from './modules/medical';
@@ -100,6 +101,7 @@ import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
     AdmissionModule,
     CheckInModule,
     WeighInModule,
+    DrawsModule,
     MedicalModule,
     NotificationsModule,
     PublicModule,

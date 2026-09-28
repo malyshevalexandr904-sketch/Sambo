@@ -111,7 +111,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         {t('common.skipToContent')}
       </a>
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 lg:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 lg:hidden print:hidden">
         <Link href="/admin" className="font-bold">
           SAMBO Digital
         </Link>
@@ -130,7 +130,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside
         id="sidebar"
         className={cn(
-          'fixed inset-y-0 left-0 z-40 w-72 border-r border-slate-200 bg-white p-4 transition-transform lg:static lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-40 w-72 border-r border-slate-200 bg-white p-4 transition-transform lg:static lg:translate-x-0 print:hidden',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -178,7 +178,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClick={() => setOpen(false)}
         />
       ) : null}
-      <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10">
+      <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 print:p-0">
         {children}
       </main>
     </div>

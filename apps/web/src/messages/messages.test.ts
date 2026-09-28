@@ -1,6 +1,6 @@
 // Проверка словарей в CI (ARCHITECTURE.md, 19): ключи ru и en совпадают, у каждого кода ошибки,
 // роли, типа и статуса организации, статусов и видов из справочников Phase 3, турниров Phase 4a и допуска,
-// прибытия, взвешивания, медицины и уведомлений Phase 4b есть перевод.
+// прибытия, взвешивания, медицины и уведомлений Phase 4b, жеребьёвки и сеток Phase 5a есть перевод.
 import {
   ADMISSION_CHECK_KINDS,
   ADMISSION_CHECK_STATUSES,
@@ -11,10 +11,12 @@ import {
   CATEGORY_STATUSES,
   CHECK_IN_METHODS,
   CHECK_IN_STATUSES,
+  COMPETITION_FORMAT_CODES,
   COMPETITION_LEVELS,
   COMPETITION_STATUSES,
   CONSENT_KINDS,
   DOCUMENT_STATUSES,
+  DRAW_STATUSES,
   ELIGIBILITY_REASONS,
   ENTRY_STATUSES,
   ERROR_CODES,
@@ -29,7 +31,9 @@ import {
   PROFILE_STATUSES,
   REQUIREMENT_KINDS,
   ROLE_CODES,
+  ROUND_LABELS,
   RULESET_VERSION_STATUSES,
+  SEPARATION_KEYS,
   SYSTEM_SETTING_DEFAULTS,
   USER_STATUSES,
   WEIGH_IN_ATTEMPT_KINDS,
@@ -92,6 +96,10 @@ describe('i18n dictionaries', () => {
       ...WEIGH_IN_WINDOW_KINDS.map((k) => `weighin.windowKinds.${k}`),
       ...WEIGH_IN_FAILURE_OUTCOMES.map((o) => `competitions.outcomes.${o}`),
       ...MEDICAL_STATES.map((s) => `medical.states.${s}`),
+      ...DRAW_STATUSES.map((s) => `draws.statuses.${s}`),
+      ...COMPETITION_FORMAT_CODES.map((f) => `draws.formats.${f}`),
+      ...SEPARATION_KEYS.flatMap((k) => [`draws.create.keys.${k}`, `draws.separation.keys.${k}`]),
+      ...ROUND_LABELS.map((l) => `bracket.rounds.${l}`),
       ...NOTIFICATION_TYPES.flatMap((n) => [
         `notifications.types.${n.replace('.', '_')}.title`,
         `notifications.prefs.${n.replace('.', '_')}`,
