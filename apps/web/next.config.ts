@@ -1,6 +1,7 @@
 import path from 'node:path';
 import type { NextConfig } from 'next';
 import createNextIntlPlugin from 'next-intl/plugin';
+import { SECURITY_HEADERS } from './src/lib/security-headers';
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
@@ -20,17 +21,7 @@ const config: NextConfig = {
     return [{ source: '/api/:path*', destination: `${apiUrl}/api/:path*` }];
   },
   async headers() {
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          { key: 'X-Content-Type-Options', value: 'nosniff' },
-          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
-          { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
-        ],
-      },
-    ];
+    return [{ source: '/:path*', headers: SECURITY_HEADERS }];
   },
 };
 
