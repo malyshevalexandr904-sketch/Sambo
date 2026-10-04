@@ -18,6 +18,7 @@ import { pickName, qk } from '@/lib/queries';
 import { AddEntryCard } from './add-entry';
 import { EntryQr } from '@/features/operations/entry-qr';
 import { AdmissionSummaryView } from '@/features/operations/shared';
+import { timeInZone } from '@/features/scheduling/shared';
 import { EntryActions } from './entry-actions';
 
 /** Переходы, для которых сервер требует комментарий (попадает клубу). */
@@ -212,6 +213,7 @@ function EntriesCard({
               <Th>{t('category')}</Th>
               <Th>{t('declaredWeight')}</Th>
               <Th>{t('status')}</Th>
+              <Th>{t('schedule')}</Th>
               <Th>{t('actions')}</Th>
             </tr>
           </thead>
@@ -240,6 +242,23 @@ function EntriesCard({
                       <AdmissionSummaryView summary={e.admission} />
                     </div>
                   ) : null}
+                </Td>
+                <Td>
+                  {e.scheduledMatches.length === 0 ? (
+                    '—'
+                  ) : (
+                    <ul className="space-y-0.5 text-xs">
+                      {e.scheduledMatches.map((m) => (
+                        <li key={m.matchId} className="whitespace-nowrap">
+                          {t('scheduleItem', {
+                            time: timeInZone(m.plannedAt, a.competition.timezone, locale),
+                            mat: m.matNumber,
+                            match: m.matchNumber ?? '—',
+                          })}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </Td>
                 <Td>
                   <EntryActions entry={e} categories={categories} onChanged={onChanged} />

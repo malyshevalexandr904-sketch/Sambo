@@ -48,6 +48,15 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       action: { label: 'Перейти к документам', param: 'url' },
       required: ['documentType', 'url'],
     },
+    'schedule.changed': {
+      subject: 'Расписание турнира изменилось — SAMBO Digital',
+      lines: [
+        'В расписании турнира «{competitionName}» изменилось время или ковёр у ваших спортсменов.',
+        'Проверьте актуальное расписание в заявке.',
+      ],
+      action: { label: 'Открыть турнир', param: 'url' },
+      required: ['competitionName', 'url'],
+    },
   },
   en: {
     'application.returned': {
@@ -87,6 +96,15 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       ],
       action: { label: 'Open documents', param: 'url' },
       required: ['documentType', 'url'],
+    },
+    'schedule.changed': {
+      subject: 'Tournament schedule changed — SAMBO Digital',
+      lines: [
+        'The schedule of “{competitionName}” has changed: mat or time for your athletes has been updated.',
+        'Check the current schedule in your application.',
+      ],
+      action: { label: 'Open tournament', param: 'url' },
+      required: ['competitionName', 'url'],
     },
   },
 };

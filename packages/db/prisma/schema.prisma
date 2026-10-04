@@ -142,6 +142,8 @@ model User {
   createdDraws              Draw[]                   @relation("DrawCreator")
   publishedDraws            Draw[]                   @relation("DrawPublisher")
   supersededDraws           Draw[]                   @relation("DrawSuperseder")
+  publishedSchedules        Schedule[]               @relation("SchedulePublisher")
+  matAssignments            MatAssignment[]
 
   @@index([status, createdAt])
   @@map("user")
@@ -1327,6 +1329,11 @@ model Competition {
   bracketNodes      BracketNode[]
   matches           Match[]
   matchParticipants MatchParticipant[]
+  mats              Mat[]
+  sessions          Session[]
+  schedule          Schedule?
+  matchSchedules    MatchSchedule[]
+  matAssignments    MatAssignment[]
 
   @@index([status, startDate])
   @@index([organizerOrganizationId, startDate])
@@ -2104,6 +2111,7 @@ model Match {
   category     CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   bracketNode  BracketNode?        @relation(fields: [bracketNodeId], references: [id], onDelete: Restrict)
   participants MatchParticipant[]
+  schedule     MatchSchedule?
 
   @@unique([competitionId, matchNumber])
   @@index([competitionId, status])
@@ -2127,4 +2135,134 @@ model MatchParticipant {
   @@unique([matchId, side])
   @@index([entryId])
   @@map("match_participant")
+}
+
+// ============================================================
+// Расписание (DATABASE.md, 3.7 — Phase 6; ARCHITECTURE.md, 14.6, 16.6): ковры, сессии, автопланировщик и его
+// результат, ручная правка, судейские бригады. Закрепление категорий за коврами — параметр запроса генерации,
+// не хранится отдельно: расстановка видна по мату уже стоящих схваток категории.
+// ============================================================
+
+enum ScheduleStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// Должность в судейской бригаде ковра (D-07).
+enum MatCrewRole {
+  MAT_CHIEF
+  REFEREE
+  SIDE_JUDGE
+  TECHNICAL_SECRETARY
+  SCOREBOARD_OPERATOR
+  TIMEKEEPER
+}
+
+/// Ковёр турнира.
+model Mat {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  competitionId String   @map("competition_id") @db.Uuid
+  number        Int
+  name          String?
+  isActive      Boolean  @default(true) @map("is_active")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition     @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  items       MatchSchedule[]
+  assignments MatAssignment[]
+
+  @@unique([competitionId, number])
+  @@map("mat")
+}
+
+/// Сессия турнирного дня («Утро», «Финалы»): начало и конец во времени турнира. Сессии одного дня не
+/// пересекаются — проверяется в сервисе (без EXCLUDE-ограничения, чтобы не заводить btree_gist).
+model Session {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  competitionId String   @map("competition_id") @db.Uuid
+  name          String
+  startsAt      DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt        DateTime @map("ends_at") @db.Timestamptz(3)
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition     @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  items       MatchSchedule[]
+  assignments MatAssignment[]
+
+  @@index([competitionId, startsAt])
+  @@map("session")
+}
+
+/// Расписание турнира — одна строка на турнир: статус, версия (If-Match), время смены пары между схватками,
+/// кто и когда опубликовал. Создаётся лениво при первом обращении к разделу «Расписание».
+model Schedule {
+  id                   String         @id @default(uuid(7)) @db.Uuid
+  competitionId        String         @unique @map("competition_id") @db.Uuid
+  status               ScheduleStatus @default(DRAFT)
+  matChangeoverSeconds Int            @default(60) @map("mat_changeover_seconds")
+  version              Int            @default(1)
+  publishedById        String?        @map("published_by_id") @db.Uuid
+  publishedAt          DateTime?      @map("published_at") @db.Timestamptz(3)
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  publishedBy User?       @relation("SchedulePublisher", fields: [publishedById], references: [id], onDelete: Restrict)
+
+  @@map("schedule")
+}
+
+/// Место схватки в расписании: сессия, ковёр, порядок на ковре (в пределах сессии), плановое время и признак
+/// «закреплена» (генерация не трогает). Удаляется вместе со схваткой (onDelete: Cascade на match — единственное
+/// исключение из Restrict в этой схеме: раздел 53 требует, чтобы место в расписании не переживало свою схватку).
+/// Порядок на ковре — unique(session, mat, orderInMat) DEFERRABLE (миграция, раздел «Частичные и отложенные
+/// ограничения»): перестановки внутри пакета правки идут одной транзакцией без промежуточного конфликта.
+model MatchSchedule {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  competitionId String   @map("competition_id") @db.Uuid
+  matchId       String   @unique @map("match_id") @db.Uuid
+  sessionId     String   @map("session_id") @db.Uuid
+  matId         String   @map("mat_id") @db.Uuid
+  orderInMat    Int      @map("order_in_mat")
+  plannedAt     DateTime @map("planned_at") @db.Timestamptz(3)
+  locked        Boolean  @default(false)
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  match       Match       @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  session     Session     @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  mat         Mat         @relation(fields: [matId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId, matId, orderInMat])
+  @@index([competitionId])
+  @@map("match_schedule")
+}
+
+/// Назначение персонала турнира на должность в бригаде ковра сессии (D-07). Один человек в одну сессию — на
+/// одном ковре (проверяется в сервисе: не выражается простым unique).
+model MatAssignment {
+  id            String      @id @default(uuid(7)) @db.Uuid
+  competitionId String      @map("competition_id") @db.Uuid
+  sessionId     String      @map("session_id") @db.Uuid
+  matId         String      @map("mat_id") @db.Uuid
+  role          MatCrewRole
+  userId        String      @map("user_id") @db.Uuid
+  version       Int         @default(1)
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  session     Session     @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  mat         Mat         @relation(fields: [matId], references: [id], onDelete: Restrict)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, matId, role])
+  @@index([sessionId, userId])
+  @@map("mat_assignment")
 }

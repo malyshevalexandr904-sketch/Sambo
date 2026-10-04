@@ -145,5 +145,14 @@ export const AUDIT_ACTIONS = [
   'draw.published',
   'draw.superseded',
   'bracket.advanced',
+  'mat.created',
+  'mat.updated',
+  'session.created',
+  'session.updated',
+  'schedule.generated',
+  'schedule.items_moved',
+  'schedule.published',
+  'mat_assignment.updated',
+  'mat_assignment.copied',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

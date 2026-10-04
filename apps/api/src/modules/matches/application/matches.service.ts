@@ -98,6 +98,16 @@ export class MatchesService {
     });
   }
 
+  /** Схватки категории (Phase 6: вход планировщика расписания собирается по категориям опубликованных сеток). */
+  async byCategory(tx: Tx | null, categoryId: string): Promise<MatchRecord[]> {
+    return (tx ?? this.db).match.findMany({ where: { categoryId }, include: MATCH_INCLUDE });
+  }
+
+  /** Одна схватка со сторонами; не найдена — null. */
+  async byId(tx: Tx | null, matchId: string): Promise<MatchRecord | null> {
+    return (tx ?? this.db).match.findUnique({ where: { id: matchId }, include: MATCH_INCLUDE });
+  }
+
   /** Сыгранная схватка: победитель (подтверждённый результат — Phase 7). */
   async markDecided(tx: Tx, matchId: string, winnerSide: Side): Promise<MatchRecord> {
     const [row] = await tx.$queryRaw<{ id: string }[]>`

@@ -56,6 +56,11 @@ export const EVENT_SCHEMAS = {
   // Phase 5a — жеребьёвка. Потребители (публичные страницы, уведомления заявителям) — Phase 8–9.
   'draw.published': z.object({ drawId: Uuid, categoryId: Uuid }),
   'draw.superseded': z.object({ drawId: Uuid, categoryId: Uuid }),
+  // Phase 6 — расписание. 'schedule.changed' — пакет ручной правки после публикации: получатели (клубы
+  // затронутых участников) резолвятся потребителем по matchIds, чтобы не хранить ПДн в payload; события за
+  // 10 минут объединяются в одно уведомление на клуб (apps/worker/src/notifications).
+  'schedule.published': z.object({ competitionId: Uuid }),
+  'schedule.changed': z.object({ competitionId: Uuid, matchIds: z.array(Uuid).min(1).max(500) }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

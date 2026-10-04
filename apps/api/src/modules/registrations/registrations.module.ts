@@ -5,6 +5,7 @@ import { CategoriesModule } from '../categories';
 import { CoachesModule } from '../coaches';
 import { CompetitionsModule } from '../competitions';
 import { OrganizationsModule } from '../organizations';
+import { SchedulingModule } from '../scheduling';
 import {
   ApplicationsController,
   CompetitionRegistrationsController,
@@ -28,6 +29,7 @@ import { RegistrationLifecycle } from './application/registration-lifecycle';
     CoachesModule,
     CompetitionsModule,
     OrganizationsModule,
+    SchedulingModule,
   ],
   controllers: [
     CompetitionRegistrationsController,
