@@ -1,6 +1,6 @@
 // Отправка писем: SMTP (провайдер в РФ; Mailpit локально) или лог (разработка и тесты).
 import type { Env, Logger } from '@sde/server-kit';
-import nodemailer from 'nodemailer';
+import { createTransport, type Transporter } from 'nodemailer';
 import type { RenderedEmail } from './templates';
 
 export interface Mailer {
@@ -8,10 +8,10 @@ export interface Mailer {
 }
 
 class SmtpMailer implements Mailer {
-  private readonly transport: nodemailer.Transporter;
+  private readonly transport: Transporter;
 
   constructor(private readonly env: Env) {
-    this.transport = nodemailer.createTransport({
+    this.transport = createTransport({
       host: env.SMTP_HOST,
       port: env.SMTP_PORT,
       secure: env.SMTP_SECURE,
