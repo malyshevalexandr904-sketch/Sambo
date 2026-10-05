@@ -58,12 +58,19 @@ export class ScheduleService {
       await lockCompetitionShared(tx, competitionId);
       const schedule = await lockOrCreateSchedule(tx, competitionId, null);
 
-      const mats = await tx.mat.findMany({ where: { competitionId, isActive: true }, orderBy: { number: 'asc' } });
-      const allSessions = await tx.session.findMany({ where: { competitionId }, orderBy: { startsAt: 'asc' } });
+      const mats = await tx.mat.findMany({
+        where: { competitionId, isActive: true },
+        orderBy: { number: 'asc' },
+      });
+      const allSessions = await tx.session.findMany({
+        where: { competitionId },
+        orderBy: { startsAt: 'asc' },
+      });
       const sessionScope = req.sessionIds ? new Set(req.sessionIds) : null;
       if (sessionScope) {
         const known = new Set(allSessions.map((s) => s.id));
-        if (req.sessionIds?.some((id) => !known.has(id))) throw new DomainError('NOT_FOUND', { resource: 'session' });
+        if (req.sessionIds?.some((id) => !known.has(id)))
+          throw new DomainError('NOT_FOUND', { resource: 'session' });
       }
       const sessionsForGen = sessionScope ? allSessions.filter((s) => sessionScope.has(s.id)) : allSessions;
 
@@ -71,7 +78,8 @@ export class ScheduleService {
       const minRestSeconds = await loadMinRestSeconds(tx, competitionId);
 
       const matIds = new Set(mats.map((m) => m.id));
-      for (const pin of req.categoryPins) if (!matIds.has(pin.matId)) throw new DomainError('NOT_FOUND', { resource: 'mat' });
+      for (const pin of req.categoryPins)
+        if (!matIds.has(pin.matId)) throw new DomainError('NOT_FOUND', { resource: 'mat' });
       const pinMap = new Map(req.categoryPins.map((p) => [p.categoryId, p.matId]));
       const categories = assembly.categories.map((c) => ({ ...c, pinnedMatId: pinMap.get(c.id) ?? null }));
 
@@ -175,7 +183,8 @@ export class ScheduleService {
         const match = assembly.matchById.get(move.matchId);
         if (!match || !eligibleForScheduling(match))
           throw new DomainError('NOT_FOUND', { resource: 'match' });
-        if (isStartedOrPlayed(match)) throw new DomainError('MATCH_ALREADY_STARTED', { matchId: move.matchId });
+        if (isStartedOrPlayed(match))
+          throw new DomainError('MATCH_ALREADY_STARTED', { matchId: move.matchId });
       }
 
       const matIds = [...new Set(req.moves.map((m) => m.matId))];
@@ -186,7 +195,8 @@ export class ScheduleService {
         tx.session.findMany({ where: { competitionId }, orderBy: { startsAt: 'asc' } }),
       ]);
       if (mats.length !== matIds.length) throw new DomainError('NOT_FOUND', { resource: 'mat' });
-      if (matchedSessions.length !== sessionIds.length) throw new DomainError('NOT_FOUND', { resource: 'session' });
+      if (matchedSessions.length !== sessionIds.length)
+        throw new DomainError('NOT_FOUND', { resource: 'session' });
 
       const existingItems = await tx.matchSchedule.findMany({ where: { competitionId } });
       const beforeById = new Map(existingItems.map((r) => [r.matchId, r]));
@@ -198,7 +208,10 @@ export class ScheduleService {
       const finalSlot = new Map<string, { sessionId: string; matId: string; orderInMat: number }>();
       for (const row of existingItems) {
         const move = moveByMatch.get(row.matchId);
-        finalSlot.set(row.matchId, move ? move : { sessionId: row.sessionId, matId: row.matId, orderInMat: row.orderInMat });
+        finalSlot.set(
+          row.matchId,
+          move ? move : { sessionId: row.sessionId, matId: row.matId, orderInMat: row.orderInMat },
+        );
       }
       for (const move of req.moves) if (!finalSlot.has(move.matchId)) finalSlot.set(move.matchId, move);
       const seenSlots = new Map<string, string>();
@@ -275,7 +288,12 @@ export class ScheduleService {
       for (const move of req.moves) {
         const prior = beforeById.get(move.matchId);
         before[move.matchId] = prior
-          ? { sessionId: prior.sessionId, matId: prior.matId, orderInMat: prior.orderInMat, locked: prior.locked }
+          ? {
+              sessionId: prior.sessionId,
+              matId: prior.matId,
+              orderInMat: prior.orderInMat,
+              locked: prior.locked,
+            }
           : null;
         after[move.matchId] = {
           sessionId: move.sessionId,
@@ -294,7 +312,11 @@ export class ScheduleService {
         platformIntervention: viaPlatform,
       });
 
-      await this.notifyChanged(tx, competitionId, [...finalSlot.keys()].filter((id) => moveByMatch.has(id)));
+      await this.notifyChanged(
+        tx,
+        competitionId,
+        [...finalSlot.keys()].filter((id) => moveByMatch.has(id)),
+      );
     });
 
     return this.queries.build(this.db, competitionId, allowedActions);
@@ -325,11 +347,17 @@ export class ScheduleService {
         ).map((r) => r.matchId),
       );
       const unassignedCount = assembly.matches.filter((m) => !scheduledIds.has(m.id)).length;
-      if (unassignedCount > 0) throw new DomainError('SCHEDULE_HAS_UNASSIGNED_MATCHES', { count: unassignedCount });
+      if (unassignedCount > 0)
+        throw new DomainError('SCHEDULE_HAS_UNASSIGNED_MATCHES', { count: unassignedCount });
 
       await tx.schedule.update({
         where: { id: schedule.id },
-        data: { status: 'PUBLISHED', publishedAt: new Date(), publishedById: user.id, version: { increment: 1 } },
+        data: {
+          status: 'PUBLISHED',
+          publishedAt: new Date(),
+          publishedById: user.id,
+          version: { increment: 1 },
+        },
       });
       await this.audit.record(tx, {
         action: 'schedule.published',
