@@ -71,10 +71,7 @@ export class ScheduleController {
 
   @Get('mats/:id/queue')
   @RequirePermission('competition.view', MAT)
-  async matQueue(
-    @CurrentUser() user: AuthUser,
-    @UuidParam('id') id: string,
-  ): Promise<DataEnvelope<MatQueueDto>> {
+  async matQueue(@CurrentUser() user: AuthUser, @UuidParam('id') id: string): Promise<DataEnvelope<MatQueueDto>> {
     return ok(await this.queries.matQueue(user, id));
   }
 }

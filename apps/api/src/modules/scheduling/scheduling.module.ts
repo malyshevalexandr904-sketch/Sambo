@@ -21,14 +21,7 @@ import { SessionsService } from './application/sessions.service';
 @Module({
   imports: [BracketsModule, CompetitionsModule, MatchesModule],
   controllers: [MatsController, SessionsController, ScheduleController, CrewsController],
-  providers: [
-    MatsService,
-    SessionsService,
-    ScheduleQueriesService,
-    ScheduleService,
-    CrewsService,
-    ScheduleLifecycle,
-  ],
+  providers: [MatsService, SessionsService, ScheduleQueriesService, ScheduleService, CrewsService, ScheduleLifecycle],
   exports: [ScheduleQueriesService],
 })
 export class SchedulingModule {}

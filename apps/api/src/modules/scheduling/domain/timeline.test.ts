@@ -26,14 +26,7 @@ describe('computeTimeline: базовый пересчёт по заданной
     expect(result.orderViolations).toEqual([]);
     expect(result.warnings).toEqual([]);
     expect(result.placements).toEqual([
-      {
-        matchId: 'm1',
-        sessionId: 's1',
-        matId: 'mat1',
-        orderInMat: 1,
-        plannedAt: DAY_START,
-        endsAt: DAY_START + 180,
-      },
+      { matchId: 'm1', sessionId: 's1', matId: 'mat1', orderInMat: 1, plannedAt: DAY_START, endsAt: DAY_START + 180 },
     ]);
   });
 
@@ -57,14 +50,7 @@ describe('computeTimeline: зависимости между коврами', ()
     const result = computeTimeline({
       items: [
         item({ matchId: 'a', sessionId: 's1', matId: 'mat1', orderInMat: 1, durationSeconds: 1_800 }),
-        item({
-          matchId: 'b',
-          sessionId: 's1',
-          matId: 'mat2',
-          orderInMat: 1,
-          durationSeconds: 180,
-          dependsOn: ['a'],
-        }),
+        item({ matchId: 'b', sessionId: 's1', matId: 'mat2', orderInMat: 1, durationSeconds: 180, dependsOn: ['a'] }),
       ],
       sessions: SESSIONS,
       minRestSeconds: 0,
@@ -80,14 +66,7 @@ describe('computeTimeline: зависимости между коврами', ()
     const result = computeTimeline({
       items: [
         // На одном ковре b стоит первой в очереди, хотя зависит от a — a никогда не наступит раньше b.
-        item({
-          matchId: 'b',
-          sessionId: 's1',
-          matId: 'mat1',
-          orderInMat: 1,
-          durationSeconds: 180,
-          dependsOn: ['a'],
-        }),
+        item({ matchId: 'b', sessionId: 's1', matId: 'mat1', orderInMat: 1, durationSeconds: 180, dependsOn: ['a'] }),
         item({ matchId: 'a', sessionId: 's1', matId: 'mat1', orderInMat: 2, durationSeconds: 180 }),
       ],
       sessions: SESSIONS,
@@ -104,14 +83,7 @@ describe('computeTimeline: предупреждения (не блокируют
     const result = computeTimeline({
       items: [
         item({ matchId: 'a', sessionId: 's1', matId: 'mat1', orderInMat: 1, durationSeconds: 180 }),
-        item({
-          matchId: 'b',
-          sessionId: 's1',
-          matId: 'mat2',
-          orderInMat: 1,
-          durationSeconds: 180,
-          dependsOn: ['a'],
-        }),
+        item({ matchId: 'b', sessionId: 's1', matId: 'mat2', orderInMat: 1, durationSeconds: 180, dependsOn: ['a'] }),
       ],
       sessions: SESSIONS,
       minRestSeconds: 900,
@@ -126,22 +98,8 @@ describe('computeTimeline: предупреждения (не блокируют
   it('один спортсмен в двух схватках подряд с недостаточным отдыхом — предупреждение rest_athlete', () => {
     const result = computeTimeline({
       items: [
-        item({
-          matchId: 'a',
-          sessionId: 's1',
-          matId: 'mat1',
-          orderInMat: 1,
-          durationSeconds: 180,
-          athleteIds: ['x'],
-        }),
-        item({
-          matchId: 'b',
-          sessionId: 's1',
-          matId: 'mat2',
-          orderInMat: 1,
-          durationSeconds: 180,
-          athleteIds: ['x'],
-        }),
+        item({ matchId: 'a', sessionId: 's1', matId: 'mat1', orderInMat: 1, durationSeconds: 180, athleteIds: ['x'] }),
+        item({ matchId: 'b', sessionId: 's1', matId: 'mat2', orderInMat: 1, durationSeconds: 180, athleteIds: ['x'] }),
       ],
       sessions: SESSIONS,
       minRestSeconds: 900,
@@ -152,9 +110,7 @@ describe('computeTimeline: предупреждения (не блокируют
 
   it('схватка выходит за конец сессии — предупреждение session_overflow', () => {
     const result = computeTimeline({
-      items: [
-        item({ matchId: 'a', sessionId: 's1', matId: 'mat1', orderInMat: 1, durationSeconds: 9 * HOUR }),
-      ],
+      items: [item({ matchId: 'a', sessionId: 's1', matId: 'mat1', orderInMat: 1, durationSeconds: 9 * HOUR })],
       sessions: SESSIONS,
       minRestSeconds: 0,
       matChangeoverSeconds: 60,
@@ -261,10 +217,7 @@ describe('computeTimeline: согласованность с автогенер�
         fc.integer({ min: 1, max: 3 }),
         fc.array(fc.integer({ min: 60, max: 600 }), { minLength: 1, maxLength: 6 }),
         (categoryCount, chainLength, matCount, durations) => {
-          const input = {
-            ...chainInput(categoryCount, chainLength, matCount, durations),
-            minRestSeconds: 60,
-          };
+          const input = { ...chainInput(categoryCount, chainLength, matCount, durations), minRestSeconds: 60 };
           const generated = generateSchedule(input);
           const matchById = new Map(input.matches.map((m) => [m.id, m]));
           const items: TimelineItem[] = generated.placements.map((p) => {

@@ -73,8 +73,7 @@ function assignCategoriesToMats(
   const totalOf = new Map<string, number>();
   for (const m of matches) totalOf.set(m.categoryId, (totalOf.get(m.categoryId) ?? 0) + m.durationSeconds);
   const load = new Map<string, number>(mats.map((m) => [m.id, 0]));
-  for (const [categoryId, matId] of matOf)
-    load.set(matId, (load.get(matId) ?? 0) + (totalOf.get(categoryId) ?? 0));
+  for (const [categoryId, matId] of matOf) load.set(matId, (load.get(matId) ?? 0) + (totalOf.get(categoryId) ?? 0));
   const unpinned = stableSort(
     categories.filter((c) => !matOf.has(c.id)),
     (c) => [-(totalOf.get(c.id) ?? 0), c.id],
@@ -101,7 +100,9 @@ function queueFor(
 ): MatchInput[] {
   const rows = matches.filter(
     (m) =>
-      !m.pinned && matOf.get(m.categoryId) === matId && (!finalsBlock || m.isFinalsBlock === finalsPhase),
+      !m.pinned &&
+      matOf.get(m.categoryId) === matId &&
+      (!finalsBlock || m.isFinalsBlock === finalsPhase),
   );
   return stableSort(rows, (m) => [
     (categorySort.get(m.categoryId) ?? 0) * 1_000_000 + m.orderInCategory,
@@ -130,8 +131,7 @@ export function generateSchedule(input: GenerateScheduleInput): GenerateSchedule
   const endOf = new Map<string, number>();
   const athleteBusyUntil = new Map<string, number>();
   const takenSlots = new Set<string>();
-  for (const m of input.matches)
-    if (m.pinned) takenSlots.add(`${m.pinned.sessionId}:${m.pinned.matId}:${m.pinned.orderInMat}`);
+  for (const m of input.matches) if (m.pinned) takenSlots.add(`${m.pinned.sessionId}:${m.pinned.matId}:${m.pinned.orderInMat}`);
 
   if (mats.length === 0) {
     for (const m of input.matches)
@@ -158,18 +158,10 @@ export function generateSchedule(input: GenerateScheduleInput): GenerateSchedule
       }
       const order = nextOrder(takenSlots, session.id, mat.id);
       takenSlots.add(`${session.id}:${mat.id}:${order}`);
-      placements.push({
-        matchId: match.id,
-        sessionId: session.id,
-        matId: mat.id,
-        orderInMat: order,
-        plannedAt: start,
-        endsAt: end,
-      });
+      placements.push({ matchId: match.id, sessionId: session.id, matId: mat.id, orderInMat: order, plannedAt: start, endsAt: end });
       endOf.set(match.id, end);
       cursor.freeAt = end + input.matChangeoverSeconds;
-      for (const a of match.athleteIds)
-        athleteBusyUntil.set(a, Math.max(athleteBusyUntil.get(a) ?? 0, end + input.minRestSeconds));
+      for (const a of match.athleteIds) athleteBusyUntil.set(a, Math.max(athleteBusyUntil.get(a) ?? 0, end + input.minRestSeconds));
       return;
     }
   };

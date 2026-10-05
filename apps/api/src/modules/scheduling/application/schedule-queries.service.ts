@@ -79,9 +79,7 @@ export class ScheduleQueriesService {
     const categoryName = new Map(categoryRows.map((c) => [c.id, { ru: c.nameRu, en: c.nameEn }]));
 
     const entryIds = [
-      ...new Set(
-        itemRows.flatMap((r) => r.match.participants.map((p) => p.entryId).filter((x): x is string => !!x)),
-      ),
+      ...new Set(itemRows.flatMap((r) => r.match.participants.map((p) => p.entryId).filter((x): x is string => !!x))),
     ];
     const entries = entryIds.length
       ? await db.entry.findMany({ where: { id: { in: entryIds } }, select: { id: true, publicName: true } })
@@ -120,22 +118,14 @@ export class ScheduleQueriesService {
 
     const warnings = await this.warningsFor(db, competitionId, itemRows);
 
-    const schedule = scheduleRow ?? {
-      status: 'DRAFT' as const,
-      version: 1,
-      matChangeoverSeconds: 60,
-      publishedAt: null,
-      publishedBy: null,
-    };
+    const schedule = scheduleRow ?? { status: 'DRAFT' as const, version: 1, matChangeoverSeconds: 60, publishedAt: null, publishedBy: null };
     return {
       competitionId,
       status: schedule.status,
       matChangeoverSeconds: schedule.matChangeoverSeconds,
       version: schedule.version,
       publishedAt: schedule.publishedAt?.toISOString() ?? null,
-      publishedBy: schedule.publishedBy
-        ? { id: schedule.publishedBy.id, displayName: schedule.publishedBy.displayName }
-        : null,
+      publishedBy: schedule.publishedBy ? { id: schedule.publishedBy.id, displayName: schedule.publishedBy.displayName } : null,
       items,
       unassigned,
       warnings,
@@ -161,16 +151,8 @@ export class ScheduleQueriesService {
       categoryId: match.categoryId,
       categoryName: name,
       roundLabel: match.roundLabel,
-      red: {
-        entryId: red?.entryId ?? null,
-        publicName: red?.entryId ? (publicNameOf.get(red.entryId) ?? null) : null,
-        bye: red?.isBye ?? false,
-      },
-      blue: {
-        entryId: blue?.entryId ?? null,
-        publicName: blue?.entryId ? (publicNameOf.get(blue.entryId) ?? null) : null,
-        bye: blue?.isBye ?? false,
-      },
+      red: { entryId: red?.entryId ?? null, publicName: red?.entryId ? (publicNameOf.get(red.entryId) ?? null) : null, bye: red?.isBye ?? false },
+      blue: { entryId: blue?.entryId ?? null, publicName: blue?.entryId ? (publicNameOf.get(blue.entryId) ?? null) : null, bye: blue?.isBye ?? false },
       status: match.status,
       durationSeconds: duration,
       sessionId: row.sessionId,
@@ -189,11 +171,7 @@ export class ScheduleQueriesService {
    * в очереди ковра и не нуждаются в отдыхе. Зависимость вне текущего набора схваток (не должно происходить —
    * запрет на новую версию жеребьёвки при начатых схватках) тихо не даёт предупреждения для неё.
    */
-  private async warningsFor(
-    db: Tx,
-    competitionId: string,
-    itemRows: readonly ItemRow[],
-  ): Promise<ScheduleDto['warnings']> {
+  private async warningsFor(db: Tx, competitionId: string, itemRows: readonly ItemRow[]): Promise<ScheduleDto['warnings']> {
     const scheduled = itemRows.filter((r) => !isNoMatch(r.match.status, isPlayed(r.match)));
     if (scheduled.length === 0) return [];
     const [assembly, minRestSeconds, sessions] = await Promise.all([
@@ -201,10 +179,7 @@ export class ScheduleQueriesService {
       loadMinRestSeconds(db, competitionId),
       db.session.findMany({ where: { competitionId }, select: { id: true, startsAt: true, endsAt: true } }),
     ]);
-    const scheduleRow = await db.schedule.findUnique({
-      where: { competitionId },
-      select: { matChangeoverSeconds: true },
-    });
+    const scheduleRow = await db.schedule.findUnique({ where: { competitionId }, select: { matChangeoverSeconds: true } });
     const byId = new Map(assembly.matches.map((m) => [m.id, m]));
     const items: TimelineItem[] = [];
     for (const row of scheduled) {
@@ -250,25 +225,17 @@ export class ScheduleQueriesService {
     });
     const categoryName = new Map(categoryRows.map((c) => [c.id, { ru: c.nameRu, en: c.nameEn }]));
     const entryIds = [
-      ...new Set(
-        rows.flatMap((r) => r.match.participants.map((p) => p.entryId).filter((x): x is string => !!x)),
-      ),
+      ...new Set(rows.flatMap((r) => r.match.participants.map((p) => p.entryId).filter((x): x is string => !!x))),
     ];
     const entries = entryIds.length
-      ? await this.db.entry.findMany({
-          where: { id: { in: entryIds } },
-          select: { id: true, publicName: true },
-        })
+      ? await this.db.entry.findMany({ where: { id: { in: entryIds } }, select: { id: true, publicName: true } })
       : [];
     const publicNameOf = new Map(entries.map((e) => [e.id, e.publicName]));
 
     const queue = rows
       .filter((r) => !isNoMatch(r.match.status, isPlayed(r.match)))
-      .map((r) =>
-        this.toMatchDto(r, categoryName.get(r.match.categoryId) ?? { ru: '', en: '' }, publicNameOf),
-      );
-    const current =
-      queue.find((m) => m.status === 'IN_PROGRESS' || m.status === 'PAUSED') ?? queue[0] ?? null;
+      .map((r) => this.toMatchDto(r, categoryName.get(r.match.categoryId) ?? { ru: '', en: '' }, publicNameOf));
+    const current = queue.find((m) => m.status === 'IN_PROGRESS' || m.status === 'PAUSED') ?? queue[0] ?? null;
     const next = queue.filter((m) => m.matchId !== current?.matchId).slice(0, 3);
     return { matId: mat.id, matNumber: mat.number, matName: mat.name, current, next };
   }
@@ -286,10 +253,7 @@ export class ScheduleQueriesService {
   ): Promise<Map<string, EntryScheduleMatch[]>> {
     const byEntry = new Map<string, EntryScheduleMatch[]>();
     if (entryIds.length === 0) return byEntry;
-    const schedule = await this.db.schedule.findUnique({
-      where: { competitionId },
-      select: { status: true },
-    });
+    const schedule = await this.db.schedule.findUnique({ where: { competitionId }, select: { status: true } });
     if (schedule?.status !== 'PUBLISHED') return byEntry;
 
     const rows = await this.db.matchParticipant.findMany({
@@ -303,9 +267,7 @@ export class ScheduleQueriesService {
             roundLabel: true,
             status: true,
             participants: { select: { entryId: true } },
-            schedule: {
-              select: { plannedAt: true, mat: { select: { id: true, number: true, name: true } } },
-            },
+            schedule: { select: { plannedAt: true, mat: { select: { id: true, number: true, name: true } } } },
           },
         },
       },

@@ -96,14 +96,7 @@ async function coach(organizationId: string, email: string): Promise<string> {
   });
   const role = await db.role.findUniqueOrThrow({ where: { code: 'COACH' } });
   await db.organizationMembership.create({
-    data: {
-      id: uuidv7(),
-      organizationId,
-      userId,
-      roleId: role.id,
-      status: 'ACTIVE',
-      validFrom: new Date('2020-01-01'),
-    },
+    data: { id: uuidv7(), organizationId, userId, roleId: role.id, status: 'ACTIVE', validFrom: new Date('2020-01-01') },
   });
   return userId;
 }
@@ -173,13 +166,7 @@ async function entryOnMatch(
 ): Promise<string> {
   const person = uuidv7();
   await db.person.create({
-    data: {
-      id: person,
-      lastName: publicName,
-      firstName: 'Спортсмен',
-      birthDate: new Date('2012-01-01T00:00:00Z'),
-      gender: 'MALE',
-    },
+    data: { id: person, lastName: publicName, firstName: 'Спортсмен', birthDate: new Date('2012-01-01T00:00:00Z'), gender: 'MALE' },
   });
   const athleteId = uuidv7();
   await db.athleteProfile.create({ data: { id: athleteId, personId: person, publicId: nextPublicId() } });
@@ -233,13 +220,7 @@ async function matchOf(competitionId: string, categoryId: string, entryId: strin
 async function scheduleChangedEvent(competitionId: string, matchIds: string[]): Promise<string> {
   const id = uuidv7();
   await db.outboxEvent.create({
-    data: {
-      id,
-      type: 'schedule.changed',
-      aggregateType: 'Schedule',
-      aggregateId: competitionId,
-      payload: { competitionId, matchIds },
-    },
+    data: { id, type: 'schedule.changed', aggregateType: 'Schedule', aggregateId: competitionId, payload: { competitionId, matchIds } },
   });
   return id;
 }
@@ -255,30 +236,12 @@ describe('schedule change digest', () => {
     await coach(clubB, 'coach-b@club.test'); // получатель клуба B — проверяем, что его тоже не забыли, отдельным событием ниже
     const competitionId = await competition('Открытый ковёр', clubA);
     const categoryId = await category(competitionId);
-    const m1 = await matchOf(
-      competitionId,
-      categoryId,
-      await entryOnMatch(competitionId, categoryId, clubA, 'Иванов'),
-    );
-    const m2 = await matchOf(
-      competitionId,
-      categoryId,
-      await entryOnMatch(competitionId, categoryId, clubA, 'Петров'),
-    );
-    const m3 = await matchOf(
-      competitionId,
-      categoryId,
-      await entryOnMatch(competitionId, categoryId, clubB, 'Сидоров'),
-    );
+    const m1 = await matchOf(competitionId, categoryId, await entryOnMatch(competitionId, categoryId, clubA, 'Иванов'));
+    const m2 = await matchOf(competitionId, categoryId, await entryOnMatch(competitionId, categoryId, clubA, 'Петров'));
+    const m3 = await matchOf(competitionId, categoryId, await entryOnMatch(competitionId, categoryId, clubB, 'Сидоров'));
 
     const queue = new FakeQueue();
-    const consumer = new NotificationConsumer(
-      db,
-      new FakeMailer(),
-      queue as unknown as Queue<NotificationJob>,
-      logger,
-      env,
-    );
+    const consumer = new NotificationConsumer(db, new FakeMailer(), queue as unknown as Queue<NotificationJob>, logger, env);
 
     // Два пакета ручной правки турнира за несколько минут: первый трогает только клуб A, второй — клуб A (другую
     // схватку) и клуб B. Правильно: один дайджест на клуб A со слитыми matchIds, один дайджест на клуб B.
@@ -289,9 +252,7 @@ describe('schedule change digest', () => {
 
     // Один дайджест на клуб, несмотря на два пакета правки: у клуба A они слились в одну задачу (matchIds
     // объединились), у клуба B задача появилась только со второго пакета, которым он впервые затронут.
-    const digests = queue.jobs.filter(
-      (j): j is ScheduleDigestJob => 'kind' in j && j.kind === 'schedule-digest',
-    );
+    const digests = queue.jobs.filter((j): j is ScheduleDigestJob => 'kind' in j && j.kind === 'schedule-digest');
     expect(digests).toHaveLength(2);
     const byOrg = new Map(digests.map((d) => [d.organizationId, d]));
     expect(byOrg.get(clubA)?.matchIds).toEqual([m1, m2, m3]);
@@ -301,21 +262,11 @@ describe('schedule change digest', () => {
     // Дайджест клуба A сработал (10 минут прошли, план §4) — одно уведомление его тренеру, не клубу B.
     const digestA = byOrg.get(clubA) as ScheduleDigestJob;
     const mailer = new FakeMailer();
-    const consumer2 = new NotificationConsumer(
-      db,
-      mailer,
-      queue as unknown as Queue<NotificationJob>,
-      logger,
-      env,
-    );
+    const consumer2 = new NotificationConsumer(db, mailer, queue as unknown as Queue<NotificationJob>, logger, env);
     await consumer2.handle(job(digestA));
     const notifications = await db.notification.findMany({ where: { type: 'schedule.changed' } });
     expect(notifications).toHaveLength(1);
-    expect(notifications[0]).toMatchObject({
-      userId: coachA,
-      params: { competitionId },
-      sourceEventId: digestA.digestId,
-    });
+    expect(notifications[0]).toMatchObject({ userId: coachA, params: { competitionId }, sourceEventId: digestA.digestId });
 
     const [deliveryJob] = queue.jobs.filter((j): j is DeliveryJob => 'deliveryId' in j);
     expect(deliveryJob).toBeDefined();

@@ -100,9 +100,7 @@ export function CrewsTab({ competition }: { competition: Competition }) {
   const copyAction = useAction();
   return (
     <QueryState
-      isPending={
-        matsQuery.isPending || sessionsQuery.isPending || crewsQuery.isPending || candidatesQuery.isPending
-      }
+      isPending={matsQuery.isPending || sessionsQuery.isPending || crewsQuery.isPending || candidatesQuery.isPending}
       error={matsQuery.error ?? sessionsQuery.error ?? crewsQuery.error ?? candidatesQuery.error}
     >
       {() => {

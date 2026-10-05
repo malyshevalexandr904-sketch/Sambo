@@ -31,7 +31,10 @@ function required(name: string): string {
 async function login(agent: TestAgent, email: string, password: string): Promise<string> {
   const csrfRes = await agent.get('/api/v1/auth/csrf').expect(200);
   const csrf = (csrfRes.body as { data: { csrfToken: string } }).data.csrfToken;
-  const res = await agent.post('/api/v1/auth/login').set('x-csrf-token', csrf).send({ email, password });
+  const res = await agent
+    .post('/api/v1/auth/login')
+    .set('x-csrf-token', csrf)
+    .send({ email, password });
   if (res.status !== 200) throw new Error(`login failed: ${res.status} ${JSON.stringify(res.body)}`);
   const cookie = (res.headers['set-cookie'] as unknown as string[]).find((c) => c.startsWith('sde_csrf='));
   return cookie ? decodeURIComponent(cookie.split(';')[0]!.slice('sde_csrf='.length)) : csrf;
@@ -67,8 +70,7 @@ async function main(): Promise<void> {
         .post(`/api/v1/categories/${category.id}/draws`)
         .set('x-csrf-token', csrf)
         .send({});
-      if (draft.status !== 201)
-        throw new Error(`draft ${category.nameRu}: ${draft.status} ${JSON.stringify(draft.body)}`);
+      if (draft.status !== 201) throw new Error(`draft ${category.nameRu}: ${draft.status} ${JSON.stringify(draft.body)}`);
       const d = (draft.body as { data: DrawDto }).data;
       const publish = await agent
         .post(`/api/v1/draws/${d.id}/publish`)
