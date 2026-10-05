@@ -89,7 +89,9 @@ export async function assembleSchedule(
 
   const entryIds = [
     ...new Set(
-      [...matchById.values()].flatMap((m) => m.participants.map((p) => p.entryId).filter((x): x is string => !!x)),
+      [...matchById.values()].flatMap((m) =>
+        m.participants.map((p) => p.entryId).filter((x): x is string => !!x),
+      ),
     ),
   ];
   const entries = entryIds.length
@@ -106,7 +108,9 @@ export async function assembleSchedule(
     const dep = dependencyById.get(id);
     if (!dep) continue; // сетка не построена для узла (не должно происходить для OPEN-схватки) — пропускаем
     const athleteIds = dep.participantsKnown
-      ? m.participants.map((p) => (p.entryId ? athleteOf.get(p.entryId) : undefined)).filter((x): x is string => !!x)
+      ? m.participants
+          .map((p) => (p.entryId ? athleteOf.get(p.entryId) : undefined))
+          .filter((x): x is string => !!x)
       : [];
     matches.push({
       id,
@@ -136,13 +140,17 @@ async function loadPinned(tx: Tx, matchIds: string[]): Promise<Map<string, Pinne
     where: { matchId: { in: matchIds }, locked: true },
     select: { matchId: true, sessionId: true, matId: true, orderInMat: true },
   });
-  return new Map(rows.map((r) => [r.matchId, { sessionId: r.sessionId, matId: r.matId, orderInMat: r.orderInMat }]));
+  return new Map(
+    rows.map((r) => [r.matchId, { sessionId: r.sessionId, matId: r.matId, orderInMat: r.orderInMat }]),
+  );
 }
 
 export function toMatInputs(rows: readonly { id: string; number: number }[]): MatInput[] {
   return rows.map((r) => ({ id: r.id, number: r.number }));
 }
 
-export function toSessionInputs(rows: readonly { id: string; startsAt: Date; endsAt: Date }[]): SessionInput[] {
+export function toSessionInputs(
+  rows: readonly { id: string; startsAt: Date; endsAt: Date }[],
+): SessionInput[] {
   return rows.map((r) => ({ id: r.id, startsAt: toEpoch(r.startsAt), endsAt: toEpoch(r.endsAt) }));
 }

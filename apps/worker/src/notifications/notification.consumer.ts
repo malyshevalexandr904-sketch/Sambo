@@ -40,7 +40,8 @@ export interface ScheduleDigestJob {
 export type NotificationJob = OutboxJob | DeliveryJob | ScheduleDigestJob;
 
 /** Задача дайджеста ещё не всплыла в очереди (не активна, не выполнена, не упала) — в неё можно слить событие. */
-const isDigestJob = (j: NotificationJob): j is ScheduleDigestJob => 'kind' in j && j.kind === 'schedule-digest';
+const isDigestJob = (j: NotificationJob): j is ScheduleDigestJob =>
+  'kind' in j && j.kind === 'schedule-digest';
 
 /** Окно объединения изменений расписания в одно уведомление клубу (план Phase 6, §4). */
 export const SCHEDULE_DIGEST_DELAY_MS = 10 * 60 * 1000;
@@ -253,7 +254,11 @@ export class NotificationConsumer {
         });
     });
     this.logger.info(
-      { competitionId: data.competitionId, organizationId: data.organizationId, matches: data.matchIds.length },
+      {
+        competitionId: data.competitionId,
+        organizationId: data.organizationId,
+        matches: data.matchIds.length,
+      },
       'Schedule change digest sent',
     );
     await this.enqueueEmails(data.digestId);

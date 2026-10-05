@@ -24,7 +24,10 @@ export class CrewsController {
 
   @Get('mat-assignments')
   @RequirePermission('competition.view', COMP)
-  async list(@CurrentUser() user: AuthUser, @UuidParam('id') id: string): Promise<DataEnvelope<MatAssignmentDto[]>> {
+  async list(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+  ): Promise<DataEnvelope<MatAssignmentDto[]>> {
     return ok(await this.crews.list(user, id));
   }
 

@@ -63,8 +63,20 @@ describe('generateSchedule: базовая расстановка на одно�
 
   it('один участник не оказывается в двух схватках одновременно: отдых спортсмена соблюдён', () => {
     const matches = [
-      match({ id: 'm1', categoryId: 'c1', orderInCategory: 1, durationSeconds: 180, athleteIds: ['a1', 'a2'] }),
-      match({ id: 'm2', categoryId: 'c2', orderInCategory: 1, durationSeconds: 180, athleteIds: ['a1', 'a3'] }),
+      match({
+        id: 'm1',
+        categoryId: 'c1',
+        orderInCategory: 1,
+        durationSeconds: 180,
+        athleteIds: ['a1', 'a2'],
+      }),
+      match({
+        id: 'm2',
+        categoryId: 'c2',
+        orderInCategory: 1,
+        durationSeconds: 180,
+        athleteIds: ['a1', 'a3'],
+      }),
     ];
     const result = generateSchedule(
       run({ categories: [category('c1', 1), category('c2', 2)], matches, minRestSeconds: 1200 }),
@@ -106,7 +118,9 @@ describe('generateSchedule: закрепление категории за ко�
       }),
       match({ id: 'm2', categoryId: 'c1', orderInCategory: 2, durationSeconds: 180 }),
     ];
-    const result = generateSchedule(run({ mats: [mat('m1-mat', 1)], categories: [category('c1', 1)], matches }));
+    const result = generateSchedule(
+      run({ mats: [mat('m1-mat', 1)], categories: [category('c1', 1)], matches }),
+    );
     // Закреплённая схватка не попадает в результаты генерации (её место уже задано человеком).
     expect(result.placements.find((p) => p.matchId === 'm1')).toBeUndefined();
     const m2 = result.placements.find((p) => p.matchId === 'm2')!;
@@ -118,8 +132,12 @@ describe('generateSchedule: распределение категорий по �
   it('балансирует суммарную загрузку ковров', () => {
     const durations = [500, 400, 300, 200];
     const categories = durations.map((_, i) => category(`c${i}`, i));
-    const matches = durations.map((d, i) => match({ id: `m${i}`, categoryId: `c${i}`, orderInCategory: 1, durationSeconds: d }));
-    const result = generateSchedule(run({ mats: [mat('m-a', 1), mat('m-b', 2)], categories, matches, minRestSeconds: 0 }));
+    const matches = durations.map((d, i) =>
+      match({ id: `m${i}`, categoryId: `c${i}`, orderInCategory: 1, durationSeconds: d }),
+    );
+    const result = generateSchedule(
+      run({ mats: [mat('m-a', 1), mat('m-b', 2)], categories, matches, minRestSeconds: 0 }),
+    );
     const loadA = result.matLoad.find((l) => l.matId === 'm-a')!.totalSeconds;
     const loadB = result.matLoad.find((l) => l.matId === 'm-b')!.totalSeconds;
     // LPT: 500→A(500), 400→B(400), 300→B(700), 200→A(700) — оба ковра равны.
@@ -133,7 +151,14 @@ describe('generateSchedule: блок финалов', () => {
     const matches = [
       match({ id: 'r1', categoryId: 'c1', orderInCategory: 1, durationSeconds: 180 }),
       match({ id: 'r2', categoryId: 'c2', orderInCategory: 1, durationSeconds: 3_000 }), // долгая категория на другом ковре
-      match({ id: 'final', categoryId: 'c1', orderInCategory: 2, durationSeconds: 300, isFinalsBlock: true, dependsOn: ['r1'] }),
+      match({
+        id: 'final',
+        categoryId: 'c1',
+        orderInCategory: 2,
+        durationSeconds: 300,
+        isFinalsBlock: true,
+        dependsOn: ['r1'],
+      }),
     ];
     const result = generateSchedule(
       run({
@@ -153,7 +178,14 @@ describe('generateSchedule: блок финалов', () => {
     const matches = [
       match({ id: 'r1', categoryId: 'c1', orderInCategory: 1, durationSeconds: 180 }),
       match({ id: 'r2', categoryId: 'c2', orderInCategory: 1, durationSeconds: 3_000 }),
-      match({ id: 'final', categoryId: 'c1', orderInCategory: 2, durationSeconds: 300, isFinalsBlock: true, dependsOn: ['r1'] }),
+      match({
+        id: 'final',
+        categoryId: 'c1',
+        orderInCategory: 2,
+        durationSeconds: 300,
+        isFinalsBlock: true,
+        dependsOn: ['r1'],
+      }),
     ];
     const result = generateSchedule(
       run({

@@ -12,10 +12,16 @@ function MatchLine({ item, timezone, big }: { item: ScheduleMatchDto; timezone: 
   const locale = useLocale();
   const t = useTranslations('scheduling.queue');
   return (
-    <div className={big ? 'rounded-lg border border-slate-300 bg-white p-6' : 'rounded-md border border-slate-200 bg-white p-3'}>
+    <div
+      className={
+        big
+          ? 'rounded-lg border border-slate-300 bg-white p-6'
+          : 'rounded-md border border-slate-200 bg-white p-3'
+      }
+    >
       <p className={big ? 'text-lg text-slate-500' : 'text-sm text-slate-500'}>
-        {timeInZone(item.plannedAt, timezone, locale)} · №{item.matchNumber ?? '—'} · {pickName(item.categoryName, locale)}{' '}
-        {item.roundLabel}
+        {timeInZone(item.plannedAt, timezone, locale)} · №{item.matchNumber ?? '—'} ·{' '}
+        {pickName(item.categoryName, locale)} {item.roundLabel}
       </p>
       <p className={big ? 'mt-2 text-4xl font-bold' : 'mt-1 text-xl font-semibold'}>
         {item.red.publicName ?? (item.red.bye ? t('bye') : '—')}
@@ -46,7 +52,9 @@ export function MatQueueView({ matId, timezone }: { matId: string; timezone: str
                 </Badge>
               </div>
               <section>
-                <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-slate-500">{t('current')}</h2>
+                <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-slate-500">
+                  {t('current')}
+                </h2>
                 {data.current ? (
                   <MatchLine item={data.current} timezone={timezone} big />
                 ) : (
@@ -54,7 +62,9 @@ export function MatQueueView({ matId, timezone }: { matId: string; timezone: str
                 )}
               </section>
               <section>
-                <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-slate-500">{t('next')}</h2>
+                <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-slate-500">
+                  {t('next')}
+                </h2>
                 {data.next.length > 0 ? (
                   <div className="space-y-2">
                     {data.next.map((item) => (

@@ -35,7 +35,11 @@ function GenerateAction({ competition, onDone }: { competition: Competition; onD
   const action = useAction();
   if (!open) return <Button onClick={() => setOpen(true)}>{t('action')}</Button>;
   return (
-    <div className="w-full rounded-md border border-blue-200 bg-blue-50 p-3" role="group" aria-label={t('title')}>
+    <div
+      className="w-full rounded-md border border-blue-200 bg-blue-50 p-3"
+      role="group"
+      aria-label={t('title')}
+    >
       <p className="font-medium">{t('title')}</p>
       <p className="mt-1 text-sm text-slate-700">{t('hint')}</p>
       <label className="mt-2 flex items-center gap-2 text-sm">
@@ -76,13 +80,25 @@ function GenerateAction({ competition, onDone }: { competition: Competition; onD
   );
 }
 
-function PublishAction({ schedule, competitionId, onDone }: { schedule: ScheduleDto; competitionId: string; onDone: () => Promise<void> }) {
+function PublishAction({
+  schedule,
+  competitionId,
+  onDone,
+}: {
+  schedule: ScheduleDto;
+  competitionId: string;
+  onDone: () => Promise<void>;
+}) {
   const t = useTranslations('scheduling.publish');
   const [open, setOpen] = useState(false);
   const action = useAction();
   if (!open) return <Button onClick={() => setOpen(true)}>{t('action')}</Button>;
   return (
-    <div className="w-full rounded-md border border-blue-200 bg-blue-50 p-3" role="group" aria-label={t('title')}>
+    <div
+      className="w-full rounded-md border border-blue-200 bg-blue-50 p-3"
+      role="group"
+      aria-label={t('title')}
+    >
       <p className="font-medium">{t('title')}</p>
       <p className="mt-1 text-sm text-slate-700">{t('consequences')}</p>
       {action.error ? (
@@ -145,10 +161,15 @@ function MatchRow({
         <span className="text-slate-600">{pickName(item.categoryName, locale)}</span>
         <span className="text-slate-500">{item.roundLabel}</span>
         <span className="min-w-0 flex-1 truncate font-medium">
-          {item.red.publicName ?? (item.red.bye ? t('bye') : '—')} — {item.blue.publicName ?? (item.blue.bye ? t('bye') : '—')}
+          {item.red.publicName ?? (item.red.bye ? t('bye') : '—')} —{' '}
+          {item.blue.publicName ?? (item.blue.bye ? t('bye') : '—')}
         </span>
         {item.locked ? <Badge tone="info">{t('locked')}</Badge> : null}
-        {item.noMatch ? <Badge tone="neutral">{t('noMatch')}</Badge> : <MatchStatusBadge status={item.status} />}
+        {item.noMatch ? (
+          <Badge tone="neutral">{t('noMatch')}</Badge>
+        ) : (
+          <MatchStatusBadge status={item.status} />
+        )}
         {canManage && !item.noMatch ? (
           <Button size="sm" variant="ghost" onClick={() => setMoving((v) => !v)} className="print:hidden">
             {t('move')}
@@ -246,7 +267,8 @@ function UnassignedPanel({ schedule }: { schedule: ScheduleDto }) {
       <ul className="mt-2 list-inside list-disc text-sm">
         {schedule.unassigned.map((u) => (
           <li key={u.matchId}>
-            №{u.matchNumber ?? '—'} {pickName(u.categoryName, locale)} · {u.roundLabel} — {t(`reasons.${u.reason}`)}
+            №{u.matchNumber ?? '—'} {pickName(u.categoryName, locale)} · {u.roundLabel} —{' '}
+            {t(`reasons.${u.reason}`)}
           </li>
         ))}
       </ul>
@@ -264,7 +286,10 @@ export function ScheduleTab({ competition }: { competition: Competition }) {
   return (
     <div className="space-y-4">
       <MatsSessionsPanel competition={competition} />
-      <QueryState isPending={scheduleQuery.isPending || matsQuery.isPending || sessionsQuery.isPending} error={scheduleQuery.error ?? matsQuery.error ?? sessionsQuery.error}>
+      <QueryState
+        isPending={scheduleQuery.isPending || matsQuery.isPending || sessionsQuery.isPending}
+        error={scheduleQuery.error ?? matsQuery.error ?? sessionsQuery.error}
+      >
         {() => {
           const schedule = scheduleQuery.data as ScheduleDto;
           const mats = matsQuery.data ?? [];
@@ -272,7 +297,9 @@ export function ScheduleTab({ competition }: { competition: Competition }) {
           return (
             <>
               <div className="flex flex-wrap items-start gap-2 print:hidden">
-                {can('schedule.manage') ? <GenerateAction competition={competition} onDone={invalidate} /> : null}
+                {can('schedule.manage') ? (
+                  <GenerateAction competition={competition} onDone={invalidate} />
+                ) : null}
                 {can('schedule.publish') && schedule.status === 'DRAFT' ? (
                   <PublishAction schedule={schedule} competitionId={competition.id} onDone={invalidate} />
                 ) : null}
