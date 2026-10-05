@@ -2,7 +2,7 @@
 // названия и причины берутся из исходных записей при показе (API) и при отправке письма (worker).
 import type { Prisma } from '../generated/client/index.js';
 
-type Reader = Pick<Prisma.TransactionClient, 'application' | 'entry' | 'document'>;
+type Reader = Pick<Prisma.TransactionClient, 'application' | 'entry' | 'document' | 'competition'>;
 
 export interface NotificationSource {
   competitionName?: string;
@@ -73,5 +73,11 @@ export async function notificationSource(
     };
   }
   if (type === 'application.decided') return { ...app, status: params.status ?? app.status };
+  if (type === 'schedule.changed') {
+    const competition = params.competitionId
+      ? await db.competition.findUnique({ where: { id: params.competitionId }, select: { name: true } })
+      : null;
+    return { competitionName: competition?.name };
+  }
   return app;
 }

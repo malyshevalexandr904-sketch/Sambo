@@ -11,6 +11,7 @@ import { seedPhase3 } from './phase3';
 import { seedPhase4 } from './phase4';
 import { seedPhase4b } from './phase4b';
 import { seedPhase5 } from './phase5';
+import { seedPhase6 } from './phase6';
 
 const envFile = path.resolve(__dirname, '..', '..', '..', '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
@@ -162,6 +163,7 @@ async function main(): Promise<void> {
     summary.push(...(await seedPhase4(db)));
     summary.push(...(await seedPhase4b(db)));
     summary.push(...(await seedPhase5(db)));
+    summary.push(...(await seedPhase6(db)));
     await seedCompetitionGrants(db);
     process.stdout.write(
       [

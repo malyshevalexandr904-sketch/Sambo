@@ -9,6 +9,7 @@ import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { AuditService } from '../../audit';
 import { isPlayed, type MatchRecord, MatchesService } from '../../matches';
+import { nodeDependencies, participantsKnownAtPublish } from '../domain/dependencies';
 import type { BracketGraph, BracketState, Outcome } from '../domain/graph';
 import { type FormatStrategy, resolveFormat, strategyFor } from '../domain/strategies';
 import {
@@ -33,6 +34,19 @@ export interface BracketSource {
   format: CompetitionFormatCode;
   slots: SlotRow[];
   durations: MatchDurations;
+}
+
+/** Зависимость и место схватки сетки в очереди категории — вход планировщика расписания (Phase 6, §2). */
+export interface MatchDependency {
+  matchId: string;
+  /** Схватки, чей исход определяет участников этой схватки — id схваток (могут быть неполными, см. метод). */
+  dependsOn: string[];
+  /** Оба участника известны сразу по жеребьёвке (первый круг выбывания, круговая система). */
+  participantsKnown: boolean;
+  /** Порядок схватки внутри категории: круги основной сетки, утешительные схватки, затем финал (numberingOrder). */
+  orderInCategory: number;
+  /** Финал или схватка за 3-е место — переносится в конец дня при включённом блоке финалов. */
+  isFinalsBlock: boolean;
 }
 
 interface LiveBracket {
@@ -145,6 +159,33 @@ export class BracketsService {
   async view(drawId: string): Promise<BracketNodeDto[] | null> {
     const live = await this.live(null, drawId);
     return live ? nodeDtos(live.graph, live.state, (key) => live.matchByKey.get(key)) : null;
+  }
+
+  /**
+   * Зависимости схваток сетки (Phase 6, §2): схватка не может стоять в расписании раньше схваток, от которых
+   * зависят её участники. Узел без схватки (BYE, ещё не создана) в результат не попадает — такой ключ просто
+   * выпадает из чужого dependsOn (nodeDependencies возвращает ключи узлов, которых здесь может не быть).
+   */
+  async matchDependencies(tx: Tx | null, drawId: string): Promise<Map<string, MatchDependency>> {
+    const live = await this.live(tx, drawId);
+    const result = new Map<string, MatchDependency>();
+    if (!live) return result;
+    const order = new Map(numberingOrder(live.graph).map((n, i) => [n.key, i]));
+    for (const node of live.graph.nodes) {
+      const match = live.matchByKey.get(node.key);
+      if (!match) continue;
+      const dependsOn = nodeDependencies(node, live.graph)
+        .map((key) => live.matchByKey.get(key)?.id)
+        .filter((id): id is string => id !== undefined);
+      result.set(match.id, {
+        matchId: match.id,
+        dependsOn,
+        participantsKnown: participantsKnownAtPublish(node),
+        orderInCategory: order.get(node.key) ?? 0,
+        isFinalsBlock: node.label === 'FINAL' || node.label === 'BRONZE',
+      });
+    }
+    return result;
   }
 
   /** Движок продвижения: стороны и статусы схваток приводятся к состоянию сетки. Возвращает число изменений. */

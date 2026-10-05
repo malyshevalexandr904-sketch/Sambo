@@ -1,6 +1,11 @@
 // Публичный интерфейс модуля brackets.
 export { BracketsModule } from './brackets.module';
-export { BracketsService, type BracketSource, type SlotRow } from './application/brackets.service';
+export {
+  BracketsService,
+  type BracketSource,
+  type MatchDependency,
+  type SlotRow,
+} from './application/brackets.service';
 export type { MatchDurations } from './application/bracket-mapping';
 export { matchDurationSeconds, youngestAge, type CategoryAgeSpan } from './domain/duration';
 export {
@@ -9,3 +14,6 @@ export {
   MAX_DRAW_PARTICIPANTS,
   strategyFor,
 } from './domain/strategies';
+export type { BracketGraph, GraphNode } from './domain/graph';
+export { nodeDependencies, participantsKnownAtPublish } from './domain/dependencies';
+export { numberingOrder } from './application/bracket-mapping';

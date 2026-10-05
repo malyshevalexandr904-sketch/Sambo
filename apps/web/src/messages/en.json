@@ -421,7 +421,15 @@
     "DRAW_ALREADY_PUBLISHED": "A draw is already published in this category. It can only be replaced by a new version (chief referee).",
     "DRAW_NOT_ENOUGH_PARTICIPANTS": "A draw needs at least two admitted participants: cancel the category or merge it with another one.",
     "MATCH_PARTICIPANTS_INCOMPLETE": "The participants of the match are not known yet.",
-    "DEPENDENT_MATCHES_STARTED": "Matches that depend on this result have already started."
+    "DEPENDENT_MATCHES_STARTED": "Matches that depend on this result have already started.",
+    "MAT_NUMBER_TAKEN": "This mat number is already taken.",
+    "SCHEDULE_ALREADY_PUBLISHED": "The schedule is already published.",
+    "SESSION_OVERLAP": "Sessions on the same day must not overlap.",
+    "MATCH_ALREADY_STARTED": "The match has already started or finished — it can't be moved.",
+    "SCHEDULE_ORDER_VIOLATION": "Order violated: a match can't come before the ones it depends on.",
+    "SCHEDULE_CONFIRM_REQUIRED": "There are warnings — confirm to save anyway.",
+    "SCHEDULE_HAS_UNASSIGNED_MATCHES": "Not all matches are placed on mats — the schedule can't be published.",
+    "MAT_ASSIGNMENT_CONFLICT": "This person is already assigned to another mat's crew at the same time."
   },
   "people": {
     "lastName": "Last name",
@@ -845,7 +853,9 @@
       "checkin": "Check-in",
       "weighin": "Weigh-in",
       "medical": "Medical",
-      "draws": "Draw"
+      "draws": "Draw",
+      "schedule": "Schedule",
+      "crews": "Crews"
     },
     "statuses": {
       "DRAFT": "Draft",
@@ -1137,6 +1147,8 @@
     "exportCsv": "Export CSV",
     "noEntries": "No entries",
     "athlete": "Athlete",
+    "schedule": "Schedule",
+    "scheduleItem": "{time} · mat #{mat} · match #{match}",
     "actions": "Actions",
     "declaredCategory": "Entered in: {name}",
     "notFound": "Application not found",
@@ -1482,6 +1494,10 @@
       "document_rejected": {
         "title": "Document rejected: {documentType}",
         "body": "Reason: {reason}. Please upload a corrected document."
+      },
+      "schedule_changed": {
+        "title": "Schedule changed",
+        "body": "Tournament \"{competitionName}\": the match schedule has changed — check your athletes' times."
       }
     },
     "preferencesTitle": "Email",
@@ -1490,7 +1506,8 @@
       "application_returned": "Application returned",
       "application_decided": "Application decision",
       "entry_rejected": "Entry rejected",
-      "document_rejected": "Document rejected"
+      "document_rejected": "Document rejected",
+      "schedule_changed": "Schedule changes"
     },
     "saved": "Saved",
     "noValue": "—"
@@ -1636,5 +1653,108 @@
     "winner": "winner",
     "seed": "seed {seed}",
     "withdrawn": "withdrawn"
+  },
+  "scheduling": {
+    "published": "Published",
+    "print": "Print",
+    "mats": {
+      "title": "Mats",
+      "number": "Number",
+      "name": "Name",
+      "add": "Add",
+      "active": "Active",
+      "inactive": "Inactive",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "none": "No mats yet."
+    },
+    "sessions": {
+      "title": "Sessions",
+      "name": "Name",
+      "startsAt": "Starts",
+      "endsAt": "Ends",
+      "add": "Add",
+      "save": "Save",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "none": "No sessions yet."
+    },
+    "generate": {
+      "action": "Generate schedule",
+      "title": "Automatic scheduling",
+      "hint": "Places matches on mats and into sessions automatically: a whole category stays on one mat, and round order follows dependencies and rest floors. Locked matches are left untouched.",
+      "finalsBlock": "Finals as a separate block at the end of the day",
+      "confirm": "Generate",
+      "cancel": "Cancel"
+    },
+    "publish": {
+      "action": "Publish",
+      "title": "Publish the schedule?",
+      "consequences": "The mat, number and time become visible to clubs in their applications; any change after publishing sends clubs a notification. Publishing is blocked while categories with a published draw still have unplaced matches.",
+      "confirm": "Publish",
+      "cancel": "Cancel"
+    },
+    "move": {
+      "title": "Move match",
+      "session": "Session",
+      "mat": "Mat",
+      "order": "Order on mat",
+      "locked": "Lock",
+      "saveAnyway": "Save anyway",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "warnings": {
+      "rest_dependency": "{seconds}s short of rest between dependent matches.",
+      "rest_athlete": "Athlete is {seconds}s short of rest between matches.",
+      "session_overflow": "The mat's schedule overruns the session by {seconds}s."
+    },
+    "board": {
+      "bye": "Bye",
+      "locked": "Locked",
+      "noMatch": "No match",
+      "move": "Move",
+      "empty": "The schedule is empty."
+    },
+    "unassigned": {
+      "title": "{count, plural, one {# match not placed} other {# matches not placed}}",
+      "reasons": {
+        "no_active_mats": "no active mats",
+        "no_session_capacity": "not enough room in the sessions"
+      }
+    },
+    "matchStatuses": {
+      "SCHEDULED": "Scheduled",
+      "READY": "Ready",
+      "IN_PROGRESS": "In progress",
+      "PAUSED": "Paused",
+      "FINISHED": "Finished",
+      "POSTPONED": "Postponed",
+      "CANCELLED": "Cancelled"
+    },
+    "crews": {
+      "empty": "Add mats and sessions first.",
+      "unassigned": "Unassigned",
+      "save": "Save",
+      "copyFromPrevious": "Copy from previous session",
+      "roles": {
+        "MAT_CHIEF": "Mat chief referee",
+        "REFEREE": "Referee",
+        "SIDE_JUDGE": "Side judge",
+        "TECHNICAL_SECRETARY": "Technical secretary",
+        "SCOREBOARD_OPERATOR": "Scoreboard operator",
+        "TIMEKEEPER": "Timekeeper"
+      }
+    },
+    "queue": {
+      "screenTitle": "Mat screen",
+      "matTitle": "Mat #{number}",
+      "autoRefresh": "Auto-refreshing",
+      "current": "Now on the mat",
+      "noCurrent": "Nothing on the mat right now",
+      "next": "Up next",
+      "noNext": "No upcoming matches",
+      "bye": "Bye"
+    }
   }
 }

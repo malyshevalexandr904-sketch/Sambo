@@ -23,7 +23,27 @@ export interface DeliveryJob {
   deliveryId: string;
 }
 
-export type NotificationJob = OutboxJob | DeliveryJob;
+/**
+ * Отложенный дайджест изменений расписания одного клуба (ARCHITECTURE.md, 14.6; план Phase 6, §4): пакеты
+ * ручной правки за 10 минут копятся в одной задаче (см. `scheduleDigest`) и уходят одним уведомлением.
+ * `digestId` — стабильный UUID дайджеста, использованный как sourceEventId всех его уведомлений (идемпотентность
+ * повтора задачи — как у store() ниже). `matchIds` растёт при слиянии повторных событий в ту же задачу.
+ */
+export interface ScheduleDigestJob {
+  kind: 'schedule-digest';
+  digestId: string;
+  competitionId: string;
+  organizationId: string;
+  matchIds: string[];
+}
+
+export type NotificationJob = OutboxJob | DeliveryJob | ScheduleDigestJob;
+
+/** Задача дайджеста ещё не всплыла в очереди (не активна, не выполнена, не упала) — в неё можно слить событие. */
+const isDigestJob = (j: NotificationJob): j is ScheduleDigestJob => 'kind' in j && j.kind === 'schedule-digest';
+
+/** Окно объединения изменений расписания в одно уведомление клубу (план Phase 6, §4). */
+export const SCHEDULE_DIGEST_DELAY_MS = 10 * 60 * 1000;
 
 export interface PlannedNotification {
   userId: string;
@@ -32,12 +52,40 @@ export interface PlannedNotification {
   competitionId: string | null;
 }
 
-type Reader = Pick<PrismaClient, 'application' | 'entry' | 'document' | 'user' | 'organizationMembership'>;
+type Reader = Pick<
+  PrismaClient,
+  'application' | 'entry' | 'document' | 'user' | 'organizationMembership' | 'matchParticipant'
+>;
 
 /** Организационные роли с правом подавать заявки: получатели уведомлений о заявке — только они. */
 const APPLICANT_ROLES = ROLE_CODES.filter(
   (r) => ROLE_PERMISSIONS[r]['registration.create'] !== undefined && r !== 'SUPER_ADMIN',
 );
+
+/** Действующие пользователи клуба с правом подавать заявки — получатели дайджеста изменений расписания. */
+async function organizationRecipients(db: Reader, organizationId: string): Promise<string[]> {
+  const today = new Date(new Date().toISOString().slice(0, 10));
+  const members = await db.organizationMembership.findMany({
+    where: {
+      organizationId,
+      status: 'ACTIVE',
+      role: { code: { in: APPLICANT_ROLES } },
+      OR: [{ validTo: null }, { validTo: { gte: today } }],
+      user: { status: 'ACTIVE', deletedAt: null },
+    },
+    select: { userId: true },
+  });
+  return [...new Set(members.map((m) => m.userId).filter((x): x is string => !!x))];
+}
+
+/** Клубы (организации заявок), чьи участники затронуты этими схватками. */
+async function affectedOrganizations(db: Reader, matchIds: string[]): Promise<string[]> {
+  const rows = await db.matchParticipant.findMany({
+    where: { matchId: { in: matchIds }, entryId: { not: null } },
+    select: { entry: { select: { application: { select: { organizationId: true } } } } },
+  });
+  return [...new Set(rows.map((r) => r.entry?.application.organizationId).filter((x): x is string => !!x))];
+}
 
 /**
  * Получатели по заявке: подавший и создавший её — если они по-прежнему действующие пользователи с правом подавать
@@ -134,6 +182,7 @@ export class NotificationConsumer {
 
   async handle(job: Job<NotificationJob>): Promise<void> {
     if ('deliveryId' in job.data) return this.deliver(job as Job<DeliveryJob>);
+    if (isDigestJob(job.data)) return this.sendDigest(job.data);
     return this.create(job.data);
   }
 
@@ -144,6 +193,13 @@ export class NotificationConsumer {
     if (!done) {
       const event = await this.db.outboxEvent.findUnique({ where: { id: eventId } });
       if (!event) return;
+      // Изменения расписания не создают уведомление сразу — они копятся в дайджесте клуба (10 минут, план §4)
+      // и не проходят через ProcessedEvent/store: у дайджеста нет единого исходного события.
+      if (event.type === 'schedule.changed') {
+        await this.scheduleDigest(event.payload);
+        await this.db.processedEvent.create({ data: { consumer: NOTIFICATIONS_CONSUMER, eventId } });
+        return;
+      }
       const plan = await planNotifications(this.db, event.type, event.payload);
       await this.db.$transaction(async (tx) => {
         for (const p of plan) await this.store(tx, eventId, p);
@@ -152,6 +208,55 @@ export class NotificationConsumer {
       this.logger.info({ eventId, traceId, notifications: plan.length }, 'Notifications created');
     }
     await this.enqueueEmails(eventId);
+  }
+
+  /**
+   * Копит событие в отложенной задаче дайджеста клуба (jobId — ключ (турнир, клуб), см. ScheduleDigestJob):
+   * задача ещё не всплыла — событие сливается в неё (matchIds объединяются), иначе заводится новая на 10 минут.
+   */
+  private async scheduleDigest(payload: unknown): Promise<void> {
+    const p = EVENT_SCHEMAS['schedule.changed'].parse(payload);
+    const organizationIds = await affectedOrganizations(this.db, p.matchIds);
+    for (const organizationId of organizationIds) {
+      const jobId = `schedule-digest:${p.competitionId}:${organizationId}`;
+      const existing = await this.queue.getJob(jobId);
+      if (existing && isDigestJob(existing.data) && (await existing.isDelayed())) {
+        // Тип задачи сужен явно: Job<NotificationJob>.updateData принимает объединение параметром
+        // контравариантно (TS требует пересечение), а isDigestJob сузил только existing.data, не сам Job.
+        const digest = existing as Job<ScheduleDigestJob>;
+        const matchIds = [...new Set([...digest.data.matchIds, ...p.matchIds])];
+        await digest.updateData({ ...digest.data, matchIds });
+        continue;
+      }
+      const data: ScheduleDigestJob = {
+        kind: 'schedule-digest',
+        digestId: uuidv7(),
+        competitionId: p.competitionId,
+        organizationId,
+        matchIds: [...p.matchIds],
+      };
+      await this.queue.add('schedule-digest', data, { jobId, delay: SCHEDULE_DIGEST_DELAY_MS });
+    }
+  }
+
+  /** Дайджест сработал: одно уведомление на каждого действующего получателя клуба. */
+  private async sendDigest(data: ScheduleDigestJob): Promise<void> {
+    const userIds = await organizationRecipients(this.db, data.organizationId);
+    if (userIds.length === 0) return;
+    await this.db.$transaction(async (tx) => {
+      for (const userId of userIds)
+        await this.store(tx, data.digestId, {
+          userId,
+          type: 'schedule.changed',
+          params: { competitionId: data.competitionId },
+          competitionId: data.competitionId,
+        });
+    });
+    this.logger.info(
+      { competitionId: data.competitionId, organizationId: data.organizationId, matches: data.matchIds.length },
+      'Schedule change digest sent',
+    );
+    await this.enqueueEmails(data.digestId);
   }
 
   /**

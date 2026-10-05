@@ -1,6 +1,6 @@
 {
   "name": "@sde/api",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Backend: модульный монолит NestJS (REST)",
   "type": "commonjs",
@@ -9,7 +9,8 @@
     "build": "tsc -p tsconfig.build.json",
     "dev": "node --env-file-if-exists=../../.env --watch -r @swc-node/register src/main.ts",
     "start": "node dist/main.js",
-    "lint": "eslint src test",
+    "seed:schedule": "node --env-file-if-exists=../../.env -r @swc-node/register scripts/seed-schedule.ts",
+    "lint": "eslint src test scripts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",

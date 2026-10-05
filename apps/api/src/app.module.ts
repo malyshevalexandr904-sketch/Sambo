@@ -40,6 +40,7 @@ import { PublicModule } from './modules/public';
 import { RegistrationsModule } from './modules/registrations';
 import { RefereesModule } from './modules/referees';
 import { RuleSetsModule } from './modules/rulesets';
+import { SchedulingModule } from './modules/scheduling';
 import { SettingsModule } from './modules/settings';
 import { UsersModule } from './modules/users';
 import { VenuesModule } from './modules/venues';
@@ -102,6 +103,7 @@ import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
     CheckInModule,
     WeighInModule,
     DrawsModule,
+    SchedulingModule,
     MedicalModule,
     NotificationsModule,
     PublicModule,

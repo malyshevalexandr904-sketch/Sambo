@@ -92,7 +92,7 @@ describe('notifications', () => {
   it('email can be switched off per type; the in-app feed is not configurable', async () => {
     const s = await login(t, (await createUser(t)).email);
     const defaults = await s.agent.get('/api/v1/me/notification-preferences').expect(200);
-    expect(defaults.body.data).toHaveLength(4);
+    expect(defaults.body.data).toHaveLength(5);
     expect(
       defaults.body.data.every(
         (p: { channel: string; enabled: boolean }) => p.channel === 'EMAIL' && p.enabled,

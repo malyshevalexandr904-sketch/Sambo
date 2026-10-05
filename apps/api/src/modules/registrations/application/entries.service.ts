@@ -22,6 +22,7 @@ import { AuditService } from '../../audit';
 import { CompetitionCategoriesService, isActiveCategory, MERGEABLE } from '../../categories';
 import { type CompetitionBasics, CompetitionScopeService, registrationWindow } from '../../competitions';
 import { OutboxService } from '../../outbox';
+import { ScheduleQueriesService } from '../../scheduling';
 import { WriteLeaseService } from '../../venue-sync';
 import { isEditableByOwner, isUnderStaffReview } from '../domain/application-machine';
 import { decisionAllowed, isActiveEntry } from '../domain/entry-rules';
@@ -62,6 +63,7 @@ export class EntriesService {
     private readonly leases: WriteLeaseService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly scheduleQueries: ScheduleQueriesService,
   ) {}
 
   // ---------- Чтение ----------
@@ -112,7 +114,17 @@ export class EntriesService {
       },
     });
     const actions = await this.actionsFactory(user, ctx.competition);
-    return rows.map((r) => toEntryDto(r, actions(r, ctx.application.status, role.owner, r.category.status)));
+    const scheduled = await this.scheduleQueries.scheduledMatchesForEntries(
+      ctx.competition.id,
+      rows.map((r) => r.id),
+    );
+    return rows.map((r) =>
+      toEntryDto(
+        r,
+        actions(r, ctx.application.status, role.owner, r.category.status),
+        scheduled.get(r.id) ?? [],
+      ),
+    );
   }
 
   /** Участники турнира: персоналу — все, владельцу — участники заявок его организаций. */

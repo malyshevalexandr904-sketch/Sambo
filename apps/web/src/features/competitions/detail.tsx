@@ -14,6 +14,8 @@ import { CheckInTab } from '@/features/operations/checkin-tab';
 import { MedicalTab } from '@/features/operations/medical-tab';
 import { WeighInTab } from '@/features/operations/weighin-tab';
 import { DrawsTab } from '@/features/draws/draws-tab';
+import { CrewsTab } from '@/features/scheduling/crews-tab';
+import { ScheduleTab } from '@/features/scheduling/schedule-tab';
 import { ApplicationsTab, EntriesTab } from './registrations-tabs';
 import { CategoriesTab } from './categories';
 import { OverviewTab } from './overview';
@@ -33,6 +35,8 @@ const TABS = [
   'weighin',
   'medical',
   'draws',
+  'schedule',
+  'crews',
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -49,6 +53,8 @@ function visibleTabs(c: Competition): Tab[] {
     if (tab === 'weighin') return can('weighin.view') && c.status !== 'DRAFT';
     if (tab === 'medical') return can('medical.view') && c.status !== 'DRAFT';
     if (tab === 'draws') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
+    if (tab === 'schedule') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
+    if (tab === 'crews') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
     return true;
   });
 }
@@ -135,6 +141,8 @@ export function CompetitionPage({ id }: { id: string }) {
             {tab === 'weighin' ? <WeighInTab competition={c} /> : null}
             {tab === 'medical' ? <MedicalTab competition={c} /> : null}
             {tab === 'draws' ? <DrawsTab competition={c} /> : null}
+            {tab === 'schedule' ? <ScheduleTab competition={c} /> : null}
+            {tab === 'crews' ? <CrewsTab competition={c} /> : null}
           </>
         );
       }}

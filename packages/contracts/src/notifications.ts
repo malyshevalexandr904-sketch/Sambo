@@ -9,6 +9,7 @@ export const NOTIFICATION_TYPES = [
   'application.decided',
   'entry.rejected',
   'document.rejected',
+  'schedule.changed',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -76,5 +77,7 @@ export interface NotificationPreferenceDto {
 /** Ссылка из уведомления: заявка или раздел документов. */
 export function notificationLink(type: NotificationType, params: Record<string, string>): string | null {
   if (type === 'document.rejected') return '/documents';
+  if (type === 'schedule.changed')
+    return params.competitionId ? `/competitions/${params.competitionId}` : null;
   return params.applicationId ? `/applications/${params.applicationId}` : null;
 }

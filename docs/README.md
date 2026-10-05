@@ -19,10 +19,56 @@
 | 3 Athletes | Выполнена (версия 0.3.1) |
 | 4a Competitions: турнир, категории, заявки | Выполнена (версия 0.4.0) |
 | 4b Допуск, check-in, взвешивание, медицина, уведомления | Выполнена (версия 0.5.1) |
-| **5a Draw & Brackets: жеребьёвка, круговая, олимпийская, выбывание с утешительными** | **Выполнена** (версия 0.6.0) |
+| 5a Draw & Brackets: жеребьёвка, круговая, олимпийская, выбывание с утешительными | Выполнена (версия 0.6.0) |
 | 5b Остальные форматы: двойное выбывание, штрафные очки, группы, группы + плей-офф | До Phase 12, порядок — по потребностям пилота |
-| 6 Scheduling | Следующая |
-| 6 Scheduling → 12 Hardening | Впереди (IMPLEMENTATION_PLAN.md) |
+| **6 Scheduling: ковры, сессии, автопланировщик, ручная правка, бригады** | **Выполнена** (версия 0.7.0) |
+| 7 Matches & Scoring → 12 Hardening | Впереди (IMPLEMENTATION_PLAN.md) |
+
+## Изменения Phase 6
+
+Ковры и сессии турнира, автопланировщик (чистая функция, тест property-based), ручная правка пакетом с `If-Match`, публикация расписания и переход `DRAWING → SCHEDULED`, уведомление клубов об изменениях после публикации (объединение за 10 минут), судейские бригады ковра (D-07), экран «Ковры» для зала, печать A4, схватки участника в заявке клуба после публикации. Ниже — уточнения, найденные при реализации; согласованную архитектуру они не меняют.
+
+### DATABASE.md
+
+| Сущность | Изменение | Причина |
+|---|---|---|
+| `Mat` | Ковёр турнира: `number`, `name?`, `isActive`, `version`; unique `(competitionId, number)`, CHECK `number >= 1` | План §1; деактивация вместо удаления — на ковре могут быть места в расписании (`Restrict`) |
+| `Session` | Сессия турнирного дня: `name`, `startsAt`, `endsAt`, `version`; CHECK `startsAt < endsAt`. Непересечение сессий одного местного дня и обе даты в пределах дат турнира — проверка в сервисе, не EXCLUDE (ради одной таблицы не заводили `btree_gist`) | План §1 |
+| `Schedule` | Одна строка на турнир: `status` (`DRAFT`/`PUBLISHED`), `matChangeoverSeconds` (по умолчанию 60), `version`, `publishedById`, `publishedAt`; unique `competitionId`; CHECK `matChangeoverSeconds >= 0`, `status = DRAFT OR publishedAt IS NOT NULL`. Создаётся лениво при первом обращении к разделу | План §1, §4 |
+| `MatchSchedule` | Место схватки: `sessionId`, `matId`, `orderInMat`, `plannedAt`, `locked`, `version`; unique `matchId`; unique `(sessionId, matId, orderInMat)` **`DEFERRABLE INITIALLY DEFERRED`** — пакет перестановок внутри одной транзакции не падает на промежуточном конфликте; CHECK `orderInMat >= 1`; `onDelete: Cascade` на `matchId` — единственное исключение из `Restrict` в схеме (раздел 53: место в расписании не переживает свою схватку) | План §2, §3, §7 |
+| `MatAssignment` | Назначение бригады: `sessionId`, `matId`, `role` (`MatCrewRole`), `userId`, `version`; unique `(sessionId, matId, role)`. «Один человек — один ковёр в сессии» — проверка в сервисе (`assertNoDoubleBooking`, под advisory-блокировкой по сессии — не выражается простым unique, т. к. ограничение не по одному столбцу) | План §5 (D-07) |
+| Все пять таблиц | Триггеры `*_sync_log`; права роли приложения — DML | ADR-21: расписание — операционные данные турнира |
+
+### API.md, 6.2 — спецификация
+
+Команды — операционные (**[L]**): пока право записи у площадочного узла, облако отвечает `409 WRITE_AUTHORITY_ELSEWHERE`.
+
+| Метод | Путь | Авторизация | Назначение |
+|---|---|---|---|
+| GET · POST · PATCH | `/api/v1/competitions/{id}/mats` · `/{matId}` | `competition.view` (чтение) · `mat.manage`; **[L]** | Ковры турнира |
+| GET · POST · PATCH | `/api/v1/competitions/{id}/sessions` · `/{sessionId}` | `competition.view` (чтение) · `schedule.manage`; **[L]** | Сессии турнирного дня |
+| GET | `/api/v1/competitions/{id}/schedule` | `competition.view` | Расписание: места, не распределены, предупреждения, загрузка ковров |
+| POST | `/api/v1/competitions/{id}/schedule/generate` | `schedule.manage`; **[L]** | Автопланировщик (черновик настроек: сессии, закрепление категорий, блок финалов) |
+| PATCH | `/api/v1/competitions/{id}/schedule/items` | `schedule.manage`; If-Match; **[L]** | Пакет ручной правки; `confirm: true` — принять предупреждения |
+| POST | `/api/v1/competitions/{id}/schedule/publish` | `schedule.publish`; If-Match; **[L]** | Публикация; событие `schedule.published`, переход `DRAWING → SCHEDULED` |
+| GET | `/api/v1/mats/{id}/queue` | `competition.view` | Экран «Ковры»: текущая и до трёх следующих схваток |
+| GET · PUT · POST | `/api/v1/competitions/{id}/mat-assignments` · `/crew-candidates` · `/mat-assignments/copy` | `competition.view` (чтение) · `mat_assignment.manage`; **[L]** | Бригады ковра: список, кандидаты, назначение (полная замена), копирование из другой сессии |
+
+- Коды ошибок: `MAT_NUMBER_TAKEN`, `SESSION_OVERLAP`, `SCHEDULE_ALREADY_PUBLISHED`, `SCHEDULE_ORDER_VIOLATION` (запрет — схватка раньше зависимости или тупик пакета), `SCHEDULE_CONFIRM_REQUIRED` (предупреждения — отдых, выход за сессию; повтор с `confirm: true`), `SCHEDULE_HAS_UNASSIGNED_MATCHES`, `MATCH_ALREADY_STARTED`, `MAT_ASSIGNMENT_CONFLICT`.
+- События: `schedule.published` (`{competitionId}`), `schedule.changed` (`{competitionId, matchIds}` — пакет правки после публикации; получателей по клубам резолвит потребитель, в payload — только ID, без ПДн; события за 10 минут объединяются в одно письмо/уведомление клубу, worker — `notification.consumer.ts`).
+- Действия аудита: `mat.created/updated`, `session.created/updated`, `schedule.generated`, `schedule.items_moved`, `schedule.published`, `mat_assignment.updated/copied`.
+- **В заявке клуба** (`GET /api/v1/applications/{id}`, уже существующий маршрут Phase 4a): `EntryDto.scheduledMatches` — ковёр, номер и плановое время схваток участника, только когда расписание турнира опубликовано; схватки «без схватки» (решённые без игры) не показываются. Отдельного маршрута не заводили — поле добавлено к уже читаемому владельцем заявки ресурсу (план §6/§8).
+
+### PERMISSIONS.md
+
+- Новых прав нет: `mat.manage`, `schedule.manage`, `schedule.publish`, `mat_assignment.manage` были в матрице с Phase 1 (руководитель турнира — все четыре; секретарь — `schedule.manage`; главный судья — `mat_assignment.manage`; весь персонал турнира — `competition.view` на чтение).
+- `allowedActions` турнира (`GET /competitions/{id}`) должны были отдавать эти четыре права персоналу — при реализации обнаружилось, что список `ACTION_CANDIDATES` (`competition-mapper.ts`) их не включал: веб-кабинет ни у одной роли не показывал управление коврами, сессиями, генерацию, публикацию и бригады. Исправлено до сдачи (см. отчёт).
+
+### ARCHITECTURE.md
+
+- Модуль `scheduling`: `mats`, `sessions`, `schedule` (генератор, ручная правка, публикация, запросы — включая экран «Ковры»), `crews`. Зависимости: `scheduling → brackets, matches, competitions` (зависимости схваток и их длительности, площадка и часовой пояс турнира); `registrations → scheduling` (расписание участника заявки — `ScheduleQueriesService.scheduledMatchesForEntries`, экспортирован через `index.ts`, без цикла).
+- Автопланировщик (`domain/generator.ts`) и пересчёт времени и предупреждений (`domain/timeline.ts`) — чистые функции без БД, граница с БД — `application/schedule-assembly.ts` (вход генератора и `computeTimeline` из опубликованных сеток и уже стоящих мест). `computeTimeline` не закладывает минимальный отдых заранее (только предупреждает постфактум), в отличие от генератора — любой `PATCH .../schedule/items`, даже независимой от остальных схватки, пересчитывает и может показать предупреждения, уже существовавшие до этого пакета. Сознательный компромисс (простота одной функции пересчёта для всего расписания против точечного пересчёта только задетых схваток); не должно удивлять при следующей фазе.
+- Блокировки: турнир `FOR SHARE` → строка расписания `FOR UPDATE` (`schedule-locks.ts`, как в `draws`/`categories`); бригады ковра — отдельная advisory-блокировка по сессии (`crews.service.ts`, `pg_advisory_xact_lock`, тот же приём, что у `matches.service.ts` для номеров схваток), т. к. инвариант «один человек — один ковёр сессии» не выражается простым unique и не защищён блокировкой турнира.
 
 ## Изменения Phase 5a
 

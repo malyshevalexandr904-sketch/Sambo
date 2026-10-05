@@ -1,5 +1,5 @@
 // Представления заявки и участия в ответах API.
-import type { ApplicationSummary, EntryDto } from '@sde/contracts';
+import type { ApplicationSummary, EntryDto, EntryScheduleMatch } from '@sde/contracts';
 import type { Prisma } from '@sde/db';
 
 export const ENTRY_INCLUDE = {
@@ -32,7 +32,11 @@ const cat = (c: { id: string; code: string; nameRu: string; nameEn: string }) =>
   name: { ru: c.nameRu, en: c.nameEn },
 });
 
-export function toEntryDto(e: EntryRow, allowedActions: string[]): EntryDto {
+export function toEntryDto(
+  e: EntryRow,
+  allowedActions: string[],
+  scheduledMatches: EntryScheduleMatch[] = [],
+): EntryDto {
   return {
     id: e.id,
     competitionId: e.competitionId,
@@ -77,6 +81,7 @@ export function toEntryDto(e: EntryRow, allowedActions: string[]): EntryDto {
             pending: e.admission.checks.filter((c) => c.status === 'PENDING').map((c) => c.kind),
           }
         : null,
+    scheduledMatches,
     allowedActions,
   };
 }

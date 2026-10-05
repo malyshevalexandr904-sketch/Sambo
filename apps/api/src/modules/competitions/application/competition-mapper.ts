@@ -113,4 +113,8 @@ export const ACTION_CANDIDATES: readonly PermissionCode[] = [
   'draw.create',
   'draw.publish',
   'draw.republish',
+  'mat.manage',
+  'schedule.manage',
+  'schedule.publish',
+  'mat_assignment.manage',
 ];

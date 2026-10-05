@@ -128,6 +128,17 @@ export interface EntrySnapshot {
   rankCode: string | null;
 }
 
+/** Место схватки спортсмена в опубликованном расписании (Phase 6, §6/§8) — ковёр, номер и плановое время. */
+export interface EntryScheduleMatch {
+  matchId: string;
+  matchNumber: number | null;
+  roundLabel: string;
+  matId: string;
+  matNumber: number;
+  matName: string | null;
+  plannedAt: string;
+}
+
 export interface EntryDto {
   id: string;
   competitionId: string;
@@ -151,6 +162,9 @@ export interface EntryDto {
   createdAt: string;
   /** Допуск одобренного участия (Phase 4b): статус и непройденные проверки; null — допуска ещё нет. */
   admission: AdmissionSummary | null;
+  /** Схватки спортсмена в опубликованном расписании (Phase 6, §6/§8); пусто — расписание не опубликовано или
+   *  схваток пока нет. Заполняется для заявки клуба (GET /applications/{id}); в других местах — пустой массив. */
+  scheduledMatches: EntryScheduleMatch[];
   allowedActions: string[];
 }
 

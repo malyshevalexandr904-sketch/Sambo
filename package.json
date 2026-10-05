@@ -1,7 +1,7 @@
 {
   "name": "sambo-digital-ecosystem",
   "private": true,
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "SAMBO DIGITAL ECOSYSTEM — цифровая экосистема детско-юношеских турниров по самбо",
   "packageManager": "pnpm@10.28.0",
   "engines": {
@@ -21,8 +21,8 @@
     "db:generate": "pnpm --filter @sde/db run generate",
     "db:migrate": "pnpm --filter @sde/db run migrate:deploy",
     "db:migrate:dev": "pnpm --filter @sde/db run migrate:dev",
-    "db:seed": "pnpm --filter @sde/db run seed",
-    "db:reset": "pnpm --filter @sde/db run reset"
+    "db:seed": "pnpm --filter @sde/db run seed && pnpm --filter api run seed:schedule",
+    "db:reset": "pnpm --filter @sde/db run reset && pnpm --filter api run seed:schedule"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
