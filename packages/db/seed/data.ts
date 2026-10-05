@@ -185,9 +185,7 @@ export const SEED_USERS: SeedUser[] = [
     displayName: 'Судья 2',
     totp: false,
     person: { lastName: 'Арбитрова', firstName: 'Ольга', birthDate: '1986-12-03', gender: 'FEMALE' },
-    grants: [
-      { id: g(17), role: 'REFEREE', organizationId: null, competitionId: SEED_IDS.competitionSchedule },
-    ],
+    grants: [{ id: g(17), role: 'REFEREE', organizationId: null, competitionId: SEED_IDS.competitionSchedule }],
   },
   {
     id: u(10),

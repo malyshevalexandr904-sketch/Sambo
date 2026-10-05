@@ -3,12 +3,7 @@
 // пересекаются, и обе даты — в пределах дат турнира; ограничение — на уровне сервиса (EXCLUDE потребовал бы
 // btree_gist ради одной таблицы — см. миграцию).
 import { Injectable } from '@nestjs/common';
-import {
-  localDateIn,
-  type ScheduleSessionDto,
-  type ScheduleSessionInput,
-  type ScheduleSessionPatch,
-} from '@sde/contracts';
+import { localDateIn, type ScheduleSessionDto, type ScheduleSessionInput, type ScheduleSessionPatch } from '@sde/contracts';
 import { type Session, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
@@ -65,16 +60,11 @@ export class SessionsService {
     });
     for (const o of others) {
       if (localDateIn(o.startsAt, competition.timezone) !== startDate) continue;
-      if (startsAt < o.endsAt && endsAt > o.startsAt)
-        throw new DomainError('SESSION_OVERLAP', { sessionId: o.id });
+      if (startsAt < o.endsAt && endsAt > o.startsAt) throw new DomainError('SESSION_OVERLAP', { sessionId: o.id });
     }
   }
 
-  async create(
-    user: AuthUser,
-    competitionId: string,
-    input: ScheduleSessionInput,
-  ): Promise<ScheduleSessionDto> {
+  async create(user: AuthUser, competitionId: string, input: ScheduleSessionInput): Promise<ScheduleSessionDto> {
     await this.policy.assert(user, 'schedule.manage', await this.competitions.scopeOf(competitionId));
     const startsAt = new Date(input.startsAt);
     const endsAt = new Date(input.endsAt);
@@ -124,16 +114,8 @@ export class SessionsService {
         entityType: 'Session',
         entityId: sessionId,
         competitionId,
-        before: {
-          name: current.name,
-          startsAt: current.startsAt.toISOString(),
-          endsAt: current.endsAt.toISOString(),
-        },
-        after: {
-          name: patch.name ?? current.name,
-          startsAt: startsAt.toISOString(),
-          endsAt: endsAt.toISOString(),
-        },
+        before: { name: current.name, startsAt: current.startsAt.toISOString(), endsAt: current.endsAt.toISOString() },
+        after: { name: patch.name ?? current.name, startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() },
       });
       return tx.session.findUniqueOrThrow({ where: { id: sessionId } });
     });

@@ -56,22 +56,13 @@ export class CrewsService {
     const scope = await this.competitions.scopeOf(competitionId);
     await this.policy.assert(user, 'competition.view', scope);
     const rows = await this.db.competitionMembership.findMany({
-      where: {
-        competitionId,
-        status: 'ACTIVE',
-        userId: { not: null },
-        role: { code: { in: [...CREW_CANDIDATE_ROLES] } },
-      },
+      where: { competitionId, status: 'ACTIVE', userId: { not: null }, role: { code: { in: [...CREW_CANDIDATE_ROLES] } } },
       include: { role: { select: { code: true } }, user: { select: { id: true, displayName: true } } },
     });
     const result: CrewCandidateDto[] = [];
     for (const r of rows) {
       if (!r.user) continue;
-      result.push({
-        id: r.user.id,
-        displayName: r.user.displayName,
-        roleCode: r.role.code as CrewCandidateDto['roleCode'],
-      });
+      result.push({ id: r.user.id, displayName: r.user.displayName, roleCode: r.role.code as CrewCandidateDto['roleCode'] });
     }
     return result;
   }
@@ -79,20 +70,13 @@ export class CrewsService {
   private async assertCandidates(tx: Tx, competitionId: string, userIds: readonly string[]): Promise<void> {
     if (userIds.length === 0) return;
     const rows = await tx.competitionMembership.findMany({
-      where: {
-        competitionId,
-        status: 'ACTIVE',
-        userId: { in: [...userIds] },
-        role: { code: { in: [...CREW_CANDIDATE_ROLES] } },
-      },
+      where: { competitionId, status: 'ACTIVE', userId: { in: [...userIds] }, role: { code: { in: [...CREW_CANDIDATE_ROLES] } } },
       select: { userId: true },
     });
     const valid = new Set(rows.map((r) => r.userId));
     for (const id of userIds)
       if (!valid.has(id))
-        throw new DomainError('VALIDATION_FAILED', {
-          fields: [{ path: 'assignments', code: 'not_tournament_staff' }],
-        });
+        throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'assignments', code: 'not_tournament_staff' }] });
   }
 
   /**
@@ -119,8 +103,7 @@ export class CrewsService {
     const conflict = await tx.matAssignment.findFirst({
       where: { sessionId, matId: { notIn: [...except] }, userId: { in: [...userIds] } },
     });
-    if (conflict)
-      throw new DomainError('MAT_ASSIGNMENT_CONFLICT', { userId: conflict.userId, matId: conflict.matId });
+    if (conflict) throw new DomainError('MAT_ASSIGNMENT_CONFLICT', { userId: conflict.userId, matId: conflict.matId });
   }
 
   /** Полная замена бригады ковра в сессии (без версии — последняя запись побеждает, как и вся расстановка ролей). */
@@ -139,15 +122,12 @@ export class CrewsService {
       if (!mat) throw new DomainError('NOT_FOUND', { resource: 'mat' });
 
       const toCreate: { role: MatCrewRole; userId: string }[] = [];
-      for (const a of req.assignments)
-        if (a.userId !== null) toCreate.push({ role: a.role, userId: a.userId });
+      for (const a of req.assignments) if (a.userId !== null) toCreate.push({ role: a.role, userId: a.userId });
       const userIds = [...new Set(toCreate.map((a) => a.userId))];
       await this.assertCandidates(tx, competitionId, userIds);
       await this.assertNoDoubleBooking(tx, req.sessionId, userIds, [req.matId]);
 
-      const before = await tx.matAssignment.findMany({
-        where: { sessionId: req.sessionId, matId: req.matId },
-      });
+      const before = await tx.matAssignment.findMany({ where: { sessionId: req.sessionId, matId: req.matId } });
       await tx.matAssignment.deleteMany({ where: { sessionId: req.sessionId, matId: req.matId } });
       if (toCreate.length > 0)
         await tx.matAssignment.createMany({
@@ -166,11 +146,7 @@ export class CrewsService {
         entityType: 'MatAssignment',
         entityId: mat.id,
         competitionId,
-        before: {
-          sessionId: req.sessionId,
-          matId: req.matId,
-          roles: before.map((b) => ({ role: b.role, userId: b.userId })),
-        },
+        before: { sessionId: req.sessionId, matId: req.matId, roles: before.map((b) => ({ role: b.role, userId: b.userId })) },
         after: { sessionId: req.sessionId, matId: req.matId, roles: toCreate },
         platformIntervention: viaPlatform,
       });
@@ -209,16 +185,12 @@ export class CrewsService {
         if (!mat) throw new DomainError('NOT_FOUND', { resource: 'mat' });
       }
 
-      const source = await tx.matAssignment.findMany({
-        where: { sessionId: req.fromSessionId, matId: req.matId },
-      });
+      const source = await tx.matAssignment.findMany({ where: { sessionId: req.fromSessionId, matId: req.matId } });
       const matIds = [...new Set(source.map((r) => r.matId))];
       const userIds = [...new Set(source.map((r) => r.userId))];
       await this.assertNoDoubleBooking(tx, req.toSessionId, userIds, matIds);
 
-      const before = await tx.matAssignment.findMany({
-        where: { sessionId: req.toSessionId, matId: req.matId },
-      });
+      const before = await tx.matAssignment.findMany({ where: { sessionId: req.toSessionId, matId: req.matId } });
       await tx.matAssignment.deleteMany({ where: { sessionId: req.toSessionId, matId: req.matId } });
       if (source.length > 0)
         await tx.matAssignment.createMany({

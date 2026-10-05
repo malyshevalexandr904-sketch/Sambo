@@ -1,13 +1,7 @@
 'use client';
 // Ковры и сессии турнирного дня (план Phase 6, §1): список + добавление; правка номера/названия/активности
 // ковра и времени сессии — точечно на строке. Право — mat.manage (ковры), schedule.manage (сессии).
-import {
-  type Competition,
-  localDateTimeIn,
-  type MatDto,
-  type ScheduleSessionDto,
-  zonedToInstant,
-} from '@sde/contracts';
+import { type Competition, localDateTimeIn, type MatDto, type ScheduleSessionDto, zonedToInstant } from '@sde/contracts';
 import { Alert, Badge, Button, Card, CardTitle, Field, Input } from '@sde/ui';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -60,15 +54,7 @@ function AddMatForm({ competitionId, onDone }: { competitionId: string; onDone: 
   );
 }
 
-function MatRow({
-  mat,
-  canManage,
-  onDone,
-}: {
-  mat: MatDto;
-  canManage: boolean;
-  onDone: () => Promise<void>;
-}) {
+function MatRow({ mat, canManage, onDone }: { mat: MatDto; canManage: boolean; onDone: () => Promise<void> }) {
   const t = useTranslations('scheduling.mats');
   const action = useAction();
   return (

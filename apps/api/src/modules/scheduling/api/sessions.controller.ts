@@ -1,12 +1,7 @@
 // Сессии турнирного дня (API.md, 6.2; план Phase 6, §1). Чтение — весь персонал турнира (competition.view),
 // правка — schedule.manage (TOURNAMENT_MANAGER, SECRETARY).
 import { Controller, Get, Patch, Post } from '@nestjs/common';
-import {
-  type DataEnvelope,
-  ScheduleSessionInput,
-  ScheduleSessionPatch,
-  type ScheduleSessionDto,
-} from '@sde/contracts';
+import { type DataEnvelope, ScheduleSessionInput, ScheduleSessionPatch, type ScheduleSessionDto } from '@sde/contracts';
 import { CurrentUser } from '../../../common/context/current-user';
 import type { AuthUser } from '../../../common/context/request-context';
 import { IfMatchVersion, ok } from '../../../common/http/http';

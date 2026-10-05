@@ -35,9 +35,9 @@ export function MoveMatchForm({
     orderInMat: item.orderInMat,
     locked: item.locked,
   });
-  const [warnings, setWarnings] = useState<
-    { matchId: string; kind: string; shortfallSeconds: number }[] | null
-  >(null);
+  const [warnings, setWarnings] = useState<{ matchId: string; kind: string; shortfallSeconds: number }[] | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -73,11 +73,7 @@ export function MoveMatchForm({
   };
 
   return (
-    <div
-      className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3"
-      role="group"
-      aria-label={t('title')}
-    >
+    <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 p-3" role="group" aria-label={t('title')}>
       <div className="grid gap-2 sm:grid-cols-4">
         <Field id={`move-session-${item.matchId}`} label={t('session')}>
           <Select

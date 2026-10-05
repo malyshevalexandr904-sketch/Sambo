@@ -106,9 +106,7 @@ export class MatsService implements OnModuleInit {
         entityType: 'Mat',
         entityId: matId,
         competitionId,
-        before: Object.fromEntries(
-          Object.keys(patch).map((k) => [k, (current as Record<string, unknown>)[k]]),
-        ),
+        before: Object.fromEntries(Object.keys(patch).map((k) => [k, (current as Record<string, unknown>)[k]])),
         after: patch,
       });
       return tx.mat.findUniqueOrThrow({ where: { id: matId } });

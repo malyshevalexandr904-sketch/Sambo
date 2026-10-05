@@ -18,14 +18,7 @@ import { BracketsService } from '../src/modules/brackets';
 import { createTestApp, createUser, login, resetData, type Session, type TestApp } from './helpers/app';
 import { isoDate } from './helpers/phase4';
 import { send } from './helpers/phase3';
-import {
-  type CategoryFixture,
-  drawCategory,
-  drawWorld,
-  type DrawWorld,
-  SEED_A,
-  SEED_B,
-} from './helpers/phase5';
+import { type CategoryFixture, drawCategory, drawWorld, type DrawWorld, SEED_A, SEED_B } from './helpers/phase5';
 
 let t: TestApp;
 
@@ -66,14 +59,8 @@ async function publishedDrawId(categoryId: string): Promise<string> {
 async function dependencyPair(
   categoryId: string,
   schedule: ScheduleDto,
-): Promise<{
-  matId: string;
-  later: { matchId: string; orderInMat: number };
-  earlier: { matchId: string; orderInMat: number };
-}> {
-  const scheduledIds = new Set(
-    schedule.items.filter((i) => i.categoryId === categoryId).map((i) => i.matchId),
-  );
+): Promise<{ matId: string; later: { matchId: string; orderInMat: number }; earlier: { matchId: string; orderInMat: number } }> {
+  const scheduledIds = new Set(schedule.items.filter((i) => i.categoryId === categoryId).map((i) => i.matchId));
   const itemById = new Map(schedule.items.map((i) => [i.matchId, i]));
   const drawId = await publishedDrawId(categoryId);
   const deps = await t.app.get(BracketsService).matchDependencies(null, drawId);
@@ -106,11 +93,7 @@ async function createSession(
   startsAt: string,
   endsAt: string,
 ): Promise<ScheduleSessionDto> {
-  const r = await send(s, 'post', `/api/v1/competitions/${competitionId}/sessions`, {
-    name,
-    startsAt,
-    endsAt,
-  });
+  const r = await send(s, 'post', `/api/v1/competitions/${competitionId}/sessions`, { name, startsAt, endsAt });
   expect(r.status, JSON.stringify(r.body)).toBe(201);
   return r.body.data as ScheduleSessionDto;
 }
@@ -169,27 +152,14 @@ describe('mats', () => {
   it('creates, lists and updates mats; blocks duplicate numbers, stale versions and staff without mat.manage', async () => {
     const w = await drawWorld(t);
     const created = await createMat(w.staff.manager, w.competitionId, 1);
-    expect(created).toMatchObject({
-      number: 1,
-      name: null,
-      isActive: true,
-      version: 1,
-      allowedActions: ['mat.manage'],
-    });
+    expect(created).toMatchObject({ number: 1, name: null, isActive: true, version: 1, allowedActions: ['mat.manage'] });
 
-    const dup = await send(w.staff.manager, 'post', `/api/v1/competitions/${w.competitionId}/mats`, {
-      number: 1,
-    });
+    const dup = await send(w.staff.manager, 'post', `/api/v1/competitions/${w.competitionId}/mats`, { number: 1 });
     expect(dup.status).toBe(409);
     expect(dup.body.error.code).toBe('MAT_NUMBER_TAKEN');
 
     // schedule.manage (секретарь) не включает mat.manage.
-    const bySecretary = await send(
-      w.staff.secretary,
-      'post',
-      `/api/v1/competitions/${w.competitionId}/mats`,
-      { number: 2 },
-    );
+    const bySecretary = await send(w.staff.secretary, 'post', `/api/v1/competitions/${w.competitionId}/mats`, { number: 2 });
     expect(bySecretary.status).toBe(403);
 
     const list = await w.staff.secretary.agent.get(`/api/v1/competitions/${w.competitionId}/mats`);
@@ -224,13 +194,7 @@ describe('sessions', () => {
     const competition = await t.admin.competition.findUniqueOrThrow({ where: { id: w.competitionId } });
     const day = isoDate(competition.startDate);
 
-    const morning = await createSession(
-      w.staff.secretary,
-      w.competitionId,
-      'Утро',
-      `${day}T06:00:00.000Z`,
-      `${day}T10:00:00.000Z`,
-    );
+    const morning = await createSession(w.staff.secretary, w.competitionId, 'Утро', `${day}T06:00:00.000Z`, `${day}T10:00:00.000Z`);
     expect(morning).toMatchObject({ name: 'Утро', version: 1, allowedActions: ['schedule.manage'] });
 
     // главный судья не входит в schedule.manage.
@@ -318,20 +282,11 @@ describe('generation', () => {
 
     const noCapacity = await generate(w.staff.manager, w.competitionId, {});
     expect(noCapacity.unassigned.length).toBeGreaterThan(0);
-    expect(noCapacity.unassigned[0]).toMatchObject({
-      categoryId: cat.categoryId,
-      reason: 'no_session_capacity',
-    });
+    expect(noCapacity.unassigned[0]).toMatchObject({ categoryId: cat.categoryId, reason: 'no_session_capacity' });
 
     const competition = await t.admin.competition.findUniqueOrThrow({ where: { id: w.competitionId } });
     const day = isoDate(competition.startDate);
-    await createSession(
-      w.staff.manager,
-      w.competitionId,
-      'Утро',
-      `${day}T06:00:00.000Z`,
-      `${day}T16:00:00.000Z`,
-    );
+    await createSession(w.staff.manager, w.competitionId, 'Утро', `${day}T06:00:00.000Z`, `${day}T16:00:00.000Z`);
     // Без закрепления единственная категория встала бы на ковёр №1 (меньший номер при равной загрузке).
     const pinned = await generate(w.staff.manager, w.competitionId, {
       categoryPins: [{ categoryId: cat.categoryId, matId: mats[1]!.id }],
@@ -344,13 +299,7 @@ describe('generation', () => {
     const w = await drawWorld(t, { clubs: 2 });
     const competition = await t.admin.competition.findUniqueOrThrow({ where: { id: w.competitionId } });
     const day = isoDate(competition.startDate);
-    await createSession(
-      w.staff.manager,
-      w.competitionId,
-      'Утро',
-      `${day}T06:00:00.000Z`,
-      `${day}T16:00:00.000Z`,
-    );
+    await createSession(w.staff.manager, w.competitionId, 'Утро', `${day}T06:00:00.000Z`, `${day}T16:00:00.000Z`);
     const cat = await drawCategory(t, w, 4);
     await publish(w.staff.manager, await draft(w.staff.manager, cat.categoryId, { randomSeed: SEED_A }));
     const noMats = await generate(w.staff.manager, w.competitionId, {});
@@ -363,9 +312,7 @@ describe('manual editing — moving matches', () => {
     const { w, session, cat2 } = await readyWorld();
     await generate(w.staff.manager, w.competitionId, {});
     const schedule = await getSchedule(w.staff.manager, w.competitionId);
-    const cat2Items = schedule.items
-      .filter((i) => i.categoryId === cat2.categoryId)
-      .sort((a, b) => a.orderInMat - b.orderInMat);
+    const cat2Items = schedule.items.filter((i) => i.categoryId === cat2.categoryId).sort((a, b) => a.orderInMat - b.orderInMat);
     const [a, b] = cat2Items;
 
     const duplicate = await send(
@@ -411,13 +358,7 @@ describe('manual editing — moving matches', () => {
       `/api/v1/competitions/${w.competitionId}/schedule/items`,
       {
         moves: [
-          {
-            matchId: a!.matchId,
-            sessionId: session.id,
-            matId: a!.matId,
-            orderInMat: b!.orderInMat,
-            locked: true,
-          },
+          { matchId: a!.matchId, sessionId: session.id, matId: a!.matId, orderInMat: b!.orderInMat, locked: true },
           { matchId: b!.matchId, sessionId: session.id, matId: a!.matId, orderInMat: a!.orderInMat },
         ],
         confirm: true,
@@ -481,9 +422,7 @@ describe('manual editing — forbidden and warned moves', () => {
     const { w, session, cat2 } = await readyWorld();
     await generate(w.staff.manager, w.competitionId, {});
     const schedule = await getSchedule(w.staff.manager, w.competitionId);
-    const cat2Items = schedule.items
-      .filter((i) => i.categoryId === cat2.categoryId)
-      .sort((a, b) => a.orderInMat - b.orderInMat);
+    const cat2Items = schedule.items.filter((i) => i.categoryId === cat2.categoryId).sort((a, b) => a.orderInMat - b.orderInMat);
     const [started, other] = cat2Items;
     await t.admin.match.update({ where: { id: started!.matchId }, data: { status: 'IN_PROGRESS' } });
 
@@ -495,10 +434,7 @@ describe('manual editing — forbidden and warned moves', () => {
       schedule.version,
     );
     expect(r.status).toBe(422);
-    expect(r.body.error).toMatchObject({
-      code: 'MATCH_ALREADY_STARTED',
-      details: { matchId: started!.matchId },
-    });
+    expect(r.body.error).toMatchObject({ code: 'MATCH_ALREADY_STARTED', details: { matchId: started!.matchId } });
   });
 
   it('requires confirm when a move leaves too little rest, then accepts it with confirm: true', async () => {
@@ -511,9 +447,7 @@ describe('manual editing — forbidden and warned moves', () => {
     const { w, session, cat2 } = await readyWorld();
     await generate(w.staff.manager, w.competitionId, {});
     const schedule = await getSchedule(w.staff.manager, w.competitionId);
-    const cat2Items = schedule.items
-      .filter((i) => i.categoryId === cat2.categoryId)
-      .sort((a, b) => a.orderInMat - b.orderInMat);
+    const cat2Items = schedule.items.filter((i) => i.categoryId === cat2.categoryId).sort((a, b) => a.orderInMat - b.orderInMat);
     const [a, b] = cat2Items;
     const moves = [
       { matchId: a!.matchId, sessionId: session.id, matId: a!.matId, orderInMat: b!.orderInMat },
@@ -531,10 +465,7 @@ describe('manual editing — forbidden and warned moves', () => {
     expect(refused.body.error.code).toBe('SCHEDULE_CONFIRM_REQUIRED');
     const warnings = refused.body.error.details.warnings as { matchId: string; kind: string }[];
     expect(warnings.length).toBeGreaterThan(0);
-    expect(warnings[0]).toMatchObject({
-      matchId: expect.any(String),
-      kind: expect.stringMatching(/^(rest_dependency|rest_athlete|session_overflow)$/),
-    });
+    expect(warnings[0]).toMatchObject({ matchId: expect.any(String), kind: expect.stringMatching(/^(rest_dependency|rest_athlete|session_overflow)$/) });
 
     const confirmed = await send(
       w.staff.manager,
@@ -553,13 +484,7 @@ describe('publication and the DRAWING → SCHEDULED transition', () => {
   it('refuses to publish while matches are unassigned, and blocks publication by staff without schedule.publish', async () => {
     const { w } = await readyWorld();
     const empty = await getSchedule(w.staff.manager, w.competitionId);
-    const r = await send(
-      w.staff.manager,
-      'post',
-      `/api/v1/competitions/${w.competitionId}/schedule/publish`,
-      {},
-      empty.version,
-    );
+    const r = await send(w.staff.manager, 'post', `/api/v1/competitions/${w.competitionId}/schedule/publish`, {}, empty.version);
     expect(r.status).toBe(422);
     expect(r.body.error.code).toBe('SCHEDULE_HAS_UNASSIGNED_MATCHES');
 
@@ -590,13 +515,7 @@ describe('publication and the DRAWING → SCHEDULED transition', () => {
 
     await generate(w.staff.manager, w.competitionId, {});
     const ready = await getSchedule(w.staff.manager, w.competitionId);
-    const r = await send(
-      w.staff.manager,
-      'post',
-      `/api/v1/competitions/${w.competitionId}/schedule/publish`,
-      {},
-      ready.version,
-    );
+    const r = await send(w.staff.manager, 'post', `/api/v1/competitions/${w.competitionId}/schedule/publish`, {}, ready.version);
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     expect(r.body.data).toMatchObject({ status: 'PUBLISHED' });
     expect(r.body.data.publishedBy?.displayName).toBeTruthy();
@@ -605,9 +524,7 @@ describe('publication and the DRAWING → SCHEDULED transition', () => {
       where: { competitionId: w.competitionId, type: 'schedule.published' },
     });
     expect(events).toHaveLength(1);
-    const audit = await t.admin.auditLog.findFirst({
-      where: { action: 'schedule.published', competitionId: w.competitionId },
-    });
+    const audit = await t.admin.auditLog.findFirst({ where: { action: 'schedule.published', competitionId: w.competitionId } });
     expect(audit).not.toBeNull();
 
     const again = await send(
@@ -638,13 +555,7 @@ describe('changing the schedule after publication', () => {
     const { w, session, cat2 } = await readyWorld();
     await generate(w.staff.manager, w.competitionId, {});
     const before = await getSchedule(w.staff.manager, w.competitionId);
-    await send(
-      w.staff.manager,
-      'post',
-      `/api/v1/competitions/${w.competitionId}/schedule/publish`,
-      {},
-      before.version,
-    );
+    await send(w.staff.manager, 'post', `/api/v1/competitions/${w.competitionId}/schedule/publish`, {}, before.version);
 
     const published = await getSchedule(w.staff.manager, w.competitionId);
     const cat2Items = published.items
@@ -682,15 +593,13 @@ describe('a new draw version removes its matches from the schedule', () => {
     await generate(w.staff.manager, w.competitionId, {});
     const before = await getSchedule(w.staff.manager, w.competitionId);
     expect(before.unassigned).toEqual([]);
-    const cat2MatchIds = (
-      await t.admin.match.findMany({ where: { categoryId: cat2.categoryId }, select: { id: true } })
-    ).map((m) => m.id);
+    const cat2MatchIds = (await t.admin.match.findMany({ where: { categoryId: cat2.categoryId }, select: { id: true } })).map(
+      (m) => m.id,
+    );
     expect(cat2MatchIds.length).toBeGreaterThan(0);
     expect(cat2MatchIds.every((id) => before.items.some((i) => i.matchId === id))).toBe(true);
 
-    const publishedDraw = await t.admin.draw.findFirstOrThrow({
-      where: { categoryId: cat2.categoryId, status: 'PUBLISHED' },
-    });
+    const publishedDraw = await t.admin.draw.findFirstOrThrow({ where: { categoryId: cat2.categoryId, status: 'PUBLISHED' } });
     const supersede = await send(
       w.staff.chief,
       'post',
@@ -709,89 +618,55 @@ describe('a new draw version removes its matches from the schedule', () => {
 describe('mat crews', () => {
   it('lists tournament staff as candidates, assigns a crew, blocks double-booking on another mat, and copies to a new session', async () => {
     const { w, mats, session } = await readyWorld();
-    const candidates = await w.staff.manager.agent.get(
-      `/api/v1/competitions/${w.competitionId}/crew-candidates`,
-    );
+    const candidates = await w.staff.manager.agent.get(`/api/v1/competitions/${w.competitionId}/crew-candidates`);
     expect(candidates.status).toBe(200);
     const rows = candidates.body.data as CrewCandidateDto[];
     expect(new Set(rows.map((c) => c.roleCode))).toEqual(new Set(['SECRETARY', 'CHIEF_REFEREE']));
     const secretaryCandidate = rows.find((c) => c.roleCode === 'SECRETARY')!;
 
-    const put = await send(
-      w.staff.manager,
-      'put',
-      `/api/v1/competitions/${w.competitionId}/mat-assignments`,
-      {
-        sessionId: session.id,
-        matId: mats[0]!.id,
-        assignments: [{ role: 'MAT_CHIEF', userId: secretaryCandidate.id }],
-      },
-    );
+    const put = await send(w.staff.manager, 'put', `/api/v1/competitions/${w.competitionId}/mat-assignments`, {
+      sessionId: session.id,
+      matId: mats[0]!.id,
+      assignments: [{ role: 'MAT_CHIEF', userId: secretaryCandidate.id }],
+    });
     expect(put.status, JSON.stringify(put.body)).toBe(200);
     expect(put.body.data).toHaveLength(1);
     expect(put.body.data[0]).toMatchObject({ role: 'MAT_CHIEF', user: { id: secretaryCandidate.id } });
 
     // Один человек не может стоять на двух коврах одной сессии одновременно.
-    const conflict = await send(
-      w.staff.chief,
-      'put',
-      `/api/v1/competitions/${w.competitionId}/mat-assignments`,
-      {
-        sessionId: session.id,
-        matId: mats[1]!.id,
-        assignments: [{ role: 'MAT_CHIEF', userId: secretaryCandidate.id }],
-      },
-    );
+    const conflict = await send(w.staff.chief, 'put', `/api/v1/competitions/${w.competitionId}/mat-assignments`, {
+      sessionId: session.id,
+      matId: mats[1]!.id,
+      assignments: [{ role: 'MAT_CHIEF', userId: secretaryCandidate.id }],
+    });
     expect(conflict.status).toBe(422);
     expect(conflict.body.error.code).toBe('MAT_ASSIGNMENT_CONFLICT');
 
     // schedule.manage (секретарь) не включает mat_assignment.manage.
-    const bySecretary = await send(
-      w.staff.secretary,
-      'put',
-      `/api/v1/competitions/${w.competitionId}/mat-assignments`,
-      {
-        sessionId: session.id,
-        matId: mats[1]!.id,
-        assignments: [],
-      },
-    );
+    const bySecretary = await send(w.staff.secretary, 'put', `/api/v1/competitions/${w.competitionId}/mat-assignments`, {
+      sessionId: session.id,
+      matId: mats[1]!.id,
+      assignments: [],
+    });
     expect(bySecretary.status).toBe(403);
 
     const competition = await t.admin.competition.findUniqueOrThrow({ where: { id: w.competitionId } });
     const day = isoDate(competition.startDate);
-    const afternoon = await createSession(
-      w.staff.manager,
-      w.competitionId,
-      'День',
-      `${day}T16:30:00.000Z`,
-      `${day}T20:00:00.000Z`,
-    );
-    const copy = await send(
-      w.staff.chief,
-      'post',
-      `/api/v1/competitions/${w.competitionId}/mat-assignments/copy`,
-      {
-        fromSessionId: session.id,
-        toSessionId: afternoon.id,
-      },
-    );
+    const afternoon = await createSession(w.staff.manager, w.competitionId, 'День', `${day}T16:30:00.000Z`, `${day}T20:00:00.000Z`);
+    const copy = await send(w.staff.chief, 'post', `/api/v1/competitions/${w.competitionId}/mat-assignments/copy`, {
+      fromSessionId: session.id,
+      toSessionId: afternoon.id,
+    });
     expect(copy.status, JSON.stringify(copy.body)).toBe(201);
 
     const list = await w.staff.chief.agent.get(`/api/v1/competitions/${w.competitionId}/mat-assignments`);
-    expect((list.body.data as MatAssignmentDto[]).filter((a) => a.sessionId === afternoon.id)).toHaveLength(
-      1,
-    );
+    expect((list.body.data as MatAssignmentDto[]).filter((a) => a.sessionId === afternoon.id)).toHaveLength(1);
   });
 
   it('keeps exactly one assignment under concurrent PUTs to the same session (advisory lock, crews.service.ts)', async () => {
     const { w, mats, session } = await readyWorld();
-    const candidates = await w.staff.manager.agent.get(
-      `/api/v1/competitions/${w.competitionId}/crew-candidates`,
-    );
-    const secretaryCandidate = (candidates.body.data as CrewCandidateDto[]).find(
-      (c) => c.roleCode === 'SECRETARY',
-    )!;
+    const candidates = await w.staff.manager.agent.get(`/api/v1/competitions/${w.competitionId}/crew-candidates`);
+    const secretaryCandidate = (candidates.body.data as CrewCandidateDto[]).find((c) => c.roleCode === 'SECRETARY')!;
 
     // Один и тот же человек — двумя параллельными PUT на разные ковры одной сессии (план §5: один человек — на
     // одном ковре сессии). `assertNoDoubleBooking` сама по себе — обычный SELECT (не атомарна с последующей
@@ -828,9 +703,7 @@ describe('mat queue screen', () => {
     const { w, cat2 } = await readyWorld();
     await generate(w.staff.manager, w.competitionId, {});
     const schedule = await getSchedule(w.staff.manager, w.competitionId);
-    const cat2Items = schedule.items
-      .filter((i) => i.categoryId === cat2.categoryId)
-      .sort((a, b) => a.orderInMat - b.orderInMat);
+    const cat2Items = schedule.items.filter((i) => i.categoryId === cat2.categoryId).sort((a, b) => a.orderInMat - b.orderInMat);
     const matId = cat2Items[0]!.matId;
 
     const queue = await w.staff.manager.agent.get(`/api/v1/mats/${matId}/queue`);
@@ -887,9 +760,7 @@ describe('club application view (план §6/§8)', () => {
     );
     expect(scheduleItem).toBeDefined();
     expect(scheduledMatch.plannedAt).toBe(scheduleItem!.plannedAt);
-    expect(scheduledMatch.matNumber).toBe(
-      (await t.admin.mat.findUniqueOrThrow({ where: { id: scheduleItem!.matId } })).number,
-    );
+    expect(scheduledMatch.matNumber).toBe((await t.admin.mat.findUniqueOrThrow({ where: { id: scheduleItem!.matId } })).number);
 
     // Другой клуб заявки не видит — изоляция по заявке, как и у остальных полей EntryDto.
     const otherClubId = w.clubs.find((c) => c !== entryRow.snapClubId) as string;
@@ -903,7 +774,6 @@ describe('sync log', () => {
   it('registers every scheduling table for change data capture', async () => {
     const rows = await t.admin.syncLog.groupBy({ by: ['tableName'], _count: true });
     const tables = new Set(rows.map((r) => r.tableName));
-    for (const table of ['mat', 'session', 'schedule', 'match_schedule', 'mat_assignment'])
-      expect(tables).toContain(table);
+    for (const table of ['mat', 'session', 'schedule', 'match_schedule', 'mat_assignment']) expect(tables).toContain(table);
   });
 });

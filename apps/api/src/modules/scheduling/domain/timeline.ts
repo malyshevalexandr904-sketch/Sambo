@@ -87,46 +87,27 @@ export function computeTimeline(input: ComputeTimelineInput): ComputeTimelineRes
     freeAt.set(bestMat, end + input.matChangeoverSeconds);
     ptr.set(bestMat, (ptr.get(bestMat) as number) + 1);
     remaining -= 1;
-    placements.push({
-      matchId: item.matchId,
-      sessionId: item.sessionId,
-      matId: item.matId,
-      orderInMat: item.orderInMat,
-      plannedAt: start,
-      endsAt: end,
-    });
+    placements.push({ matchId: item.matchId, sessionId: item.sessionId, matId: item.matId, orderInMat: item.orderInMat, plannedAt: start, endsAt: end });
 
     for (const dep of item.dependsOn) {
       const depEnd = scheduledEnd.get(dep);
       if (depEnd === undefined) continue;
       const gap = start - depEnd;
       if (gap < input.minRestSeconds)
-        warnings.push({
-          matchId: item.matchId,
-          kind: 'rest_dependency',
-          shortfallSeconds: input.minRestSeconds - gap,
-        });
+        warnings.push({ matchId: item.matchId, kind: 'rest_dependency', shortfallSeconds: input.minRestSeconds - gap });
     }
     for (const athleteId of item.athleteIds) {
       const prevEnd = athleteLastEnd.get(athleteId);
       if (prevEnd !== undefined) {
         const gap = start - prevEnd;
         if (gap < input.minRestSeconds)
-          warnings.push({
-            matchId: item.matchId,
-            kind: 'rest_athlete',
-            shortfallSeconds: input.minRestSeconds - gap,
-          });
+          warnings.push({ matchId: item.matchId, kind: 'rest_athlete', shortfallSeconds: input.minRestSeconds - gap });
       }
       athleteLastEnd.set(athleteId, Math.max(prevEnd ?? -Infinity, end));
     }
     const session = sessionById.get(item.sessionId);
     if (session && end > session.endsAt)
-      warnings.push({
-        matchId: item.matchId,
-        kind: 'session_overflow',
-        shortfallSeconds: end - session.endsAt,
-      });
+      warnings.push({ matchId: item.matchId, kind: 'session_overflow', shortfallSeconds: end - session.endsAt });
   }
 
   return { placements, warnings, orderViolations: [] };
