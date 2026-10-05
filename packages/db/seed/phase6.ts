@@ -132,7 +132,10 @@ async function seedCategories(db: PrismaClient): Promise<void> {
     };
     const existing = await db.competitionCategory.findUnique({ where: { id: P6.category(c.n) } });
     if (existing) await db.competitionCategory.update({ where: { id: existing.id }, data: row });
-    else await db.competitionCategory.create({ data: { id: P6.category(c.n), ...row, status: 'READY_FOR_DRAW' } });
+    else
+      await db.competitionCategory.create({
+        data: { id: P6.category(c.n), ...row, status: 'READY_FOR_DRAW' },
+      });
   }
 }
 

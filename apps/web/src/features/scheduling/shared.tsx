@@ -39,7 +39,8 @@ export function useSessions(competitionId: string) {
 export function useSchedule(competitionId: string) {
   return useQuery({
     queryKey: schedulingKeys.schedule(competitionId),
-    queryFn: async () => (await api<DataEnvelope<ScheduleDto>>(`/competitions/${competitionId}/schedule`)).data,
+    queryFn: async () =>
+      (await api<DataEnvelope<ScheduleDto>>(`/competitions/${competitionId}/schedule`)).data,
   });
 }
 
@@ -87,8 +88,12 @@ export function timeInZone(iso: string, timeZone: string, locale: string): strin
 }
 
 /** Предупреждения пакета правки (savable с confirm: true) и запреты — разные типы ошибок команды. */
-export function scheduleWarnings(error: unknown): { matchId: string; kind: string; shortfallSeconds: number }[] {
+export function scheduleWarnings(
+  error: unknown,
+): { matchId: string; kind: string; shortfallSeconds: number }[] {
   if (!(error instanceof ApiError) || error.code !== 'SCHEDULE_CONFIRM_REQUIRED') return [];
   const warnings = error.details?.warnings;
-  return Array.isArray(warnings) ? (warnings as { matchId: string; kind: string; shortfallSeconds: number }[]) : [];
+  return Array.isArray(warnings)
+    ? (warnings as { matchId: string; kind: string; shortfallSeconds: number }[])
+    : [];
 }
