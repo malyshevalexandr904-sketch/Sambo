@@ -50,6 +50,7 @@
     ],
     "overrides": {
       "postcss@<8.5.18": ">=8.5.18",
+      "source-map-js@<1.2.2": ">=1.2.2",
       "deepmerge-ts@<8.0.0": "^8.0.0"
     }
   }
