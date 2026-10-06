@@ -10,6 +10,7 @@ import {
   type ScheduleSessionDto,
 } from '@sde/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslations } from 'next-intl';
 import { api, ApiError } from '@/lib/api';
 
 export const schedulingKeys = {
@@ -85,6 +86,15 @@ export function useInvalidateScheduling(competitionId: string): () => Promise<vo
 /** Время матча/сессии в часовом поясе турнира, только часы:минуты. */
 export function timeInZone(iso: string, timeZone: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone }).format(new Date(iso));
+}
+
+/**
+ * Название круга схватки для интерфейса (`bracket.rounds.*`: «Четвертьфинал», «За 3-е место»…). `roundLabel`
+ * приходит с сервера кодом (FINAL, QUARTERFINAL, REPECHAGE…); незнакомый код показываем как есть, а не ключом.
+ */
+export function useRoundLabel(): (label: string) => string {
+  const t = useTranslations('bracket.rounds');
+  return (label) => (t.has(label) ? t(label) : label);
 }
 
 /** Предупреждения пакета правки (savable с confirm: true) и запреты — разные типы ошибок команды. */

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from '@/i18n/navigation';
+import { Brand } from '@/components/brand';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
@@ -7,7 +8,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen flex-col">
       <header className="flex items-center justify-between px-4 py-3">
         <Link href="/" className="text-lg font-bold text-slate-900">
-          SAMBO Digital
+          <Brand />
         </Link>
         <LocaleSwitcher />
       </header>

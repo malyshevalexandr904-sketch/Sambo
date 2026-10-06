@@ -11,7 +11,14 @@ import { pickName } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 import { MatsSessionsPanel } from './mats-sessions';
 import { MoveMatchForm } from './move-match-form';
-import { timeInZone, useInvalidateScheduling, useMats, useSchedule, useSessions } from './shared';
+import {
+  timeInZone,
+  useInvalidateScheduling,
+  useMats,
+  useRoundLabel,
+  useSchedule,
+  useSessions,
+} from './shared';
 
 const STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
   SCHEDULED: 'info',
@@ -151,6 +158,7 @@ function MatchRow({
   onDone: () => Promise<void>;
 }) {
   const locale = useLocale();
+  const roundLabel = useRoundLabel();
   const t = useTranslations('scheduling.board');
   const [moving, setMoving] = useState(false);
   return (
@@ -159,7 +167,7 @@ function MatchRow({
         <span className="w-14 shrink-0 font-mono">{timeInZone(item.plannedAt, timezone, locale)}</span>
         <span className="w-10 shrink-0 text-slate-500">№{item.matchNumber ?? '—'}</span>
         <span className="text-slate-600">{pickName(item.categoryName, locale)}</span>
-        <span className="text-slate-500">{item.roundLabel}</span>
+        <span className="text-slate-500">{roundLabel(item.roundLabel)}</span>
         <span className="min-w-0 flex-1 truncate font-medium">
           {item.red.publicName ?? (item.red.bye ? t('bye') : '—')} —{' '}
           {item.blue.publicName ?? (item.blue.bye ? t('bye') : '—')}
@@ -260,6 +268,7 @@ function ScheduleBoard({
 function UnassignedPanel({ schedule }: { schedule: ScheduleDto }) {
   const t = useTranslations('scheduling.unassigned');
   const locale = useLocale();
+  const roundLabel = useRoundLabel();
   if (schedule.unassigned.length === 0) return null;
   return (
     <Alert tone="warning" className="print:hidden">
@@ -267,7 +276,7 @@ function UnassignedPanel({ schedule }: { schedule: ScheduleDto }) {
       <ul className="mt-2 list-inside list-disc text-sm">
         {schedule.unassigned.map((u) => (
           <li key={u.matchId}>
-            №{u.matchNumber ?? '—'} {pickName(u.categoryName, locale)} · {u.roundLabel} —{' '}
+            №{u.matchNumber ?? '—'} {pickName(u.categoryName, locale)} · {roundLabel(u.roundLabel)} —{' '}
             {t(`reasons.${u.reason}`)}
           </li>
         ))}
