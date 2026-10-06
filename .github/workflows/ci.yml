@@ -1,6 +1,8 @@
 # Гейты качества (IMPLEMENTATION_PLAN, 0.3): lint → typecheck → unit → integration → build,
 # границы модулей (dependency-cruiser), поиск секретов (gitleaks), сборка Docker-образов.
 # Упавшая проверка чинится, а не отключается.
+# Аудит зависимостей (pnpm audit) вынесен в audit.yml: новый advisory на транзитивной зависимости не должен
+# блокировать несвязанные PR и main.
 name: CI
 
 on:
@@ -54,8 +56,6 @@ jobs:
         run: pnpm test:unit
       - name: Build
         run: pnpm build
-      - name: Dependency audit
-        run: pnpm audit --prod --audit-level high
 
   integration:
     name: Integration tests (PostgreSQL, Redis)

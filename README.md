@@ -70,7 +70,7 @@ pnpm dev                          # api :4000, worker, web :3000
 | `pnpm build` | Сборка всех пакетов |
 | `pnpm format:check` | Prettier |
 
-CI (`.github/workflows/ci.yml`) запускает всё это, плюс gitleaks, `pnpm audit` и сборку Docker-образов.
+CI (`.github/workflows/ci.yml`) запускает всё это, плюс gitleaks и сборку Docker-образов. Аудит зависимостей (`pnpm audit --prod --audit-level high`) вынесен в `.github/workflows/audit.yml`: раз в сутки, вручную и в PR, меняющих зависимости.
 
 ## Документация
 
