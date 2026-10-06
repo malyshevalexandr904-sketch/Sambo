@@ -322,7 +322,7 @@ DrawCreate = { format?: "ROUND_ROBIN" | "SINGLE_ELIMINATION" | "ELIMINATION_WITH
 | Файлы: presigned POST с условиями, проверка размера, SHA-256 и сигнатуры, SVG запрещён, публичные медиа через карантин | Сделано. ClamAV — Phase 12 |
 | Логи: pino redaction, тест на отсутствие секретов и ПДн | Сделано |
 | Заголовки: HSTS, `nosniff`, Referrer-Policy, Permissions-Policy; CSP с nonce для скриптов | Сделано. `style-src` допускает `'unsafe-inline'`: nonce не покрывает атрибуты `style`. Permissions-Policy: камера — только своему origin (`camera=(self)`, сканер QR на прибытии, 0.5.1), микрофон и геолокация запрещены |
-| gitleaks, `pnpm audit` в CI | Сделано |
+| gitleaks в CI; `pnpm audit` — отдельным плановым workflow (раз в сутки, вручную, в PR с изменением зависимостей) | Сделано |
 | Фиксация базовых образов по digest, подпись образов | Phase 12 |
 
 ### ARCHITECTURE.md
