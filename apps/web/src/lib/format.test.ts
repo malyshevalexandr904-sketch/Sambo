@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeUserAgent } from './format';
+import { describeUserAgent, formatSessionRange } from './format';
 
 describe('describeUserAgent', () => {
   it.each([
@@ -28,5 +28,29 @@ describe('describeUserAgent', () => {
     [null, '—'],
   ])('%s → %s', (ua, expected) => {
     expect(describeUserAgent(ua)).toBe(expected);
+  });
+});
+
+describe('formatSessionRange', () => {
+  it('shows the date once for a same-day session, in the tournament time zone', () => {
+    // 06:00–16:00 UTC = 09:00–19:00 по Москве (UTC+3), та же дата.
+    expect(formatSessionRange('2026-10-04T06:00:00Z', '2026-10-04T16:00:00Z', 'Europe/Moscow', 'ru')).toBe(
+      '4 окт. 2026 г., 09:00 – 19:00',
+    );
+  });
+
+  it('shows both dates when the session crosses midnight in the tournament time zone', () => {
+    // 20:00 UTC = 23:00 МСК 4 октября; 03:00 UTC = 06:00 МСК 5 октября.
+    const text = formatSessionRange('2026-10-04T20:00:00Z', '2026-10-05T03:00:00Z', 'Europe/Moscow', 'ru');
+    expect(text).toContain('4 окт. 2026 г.');
+    expect(text).toContain('5 окт. 2026 г.');
+    expect(text).toContain('23:00');
+    expect(text).toContain('06:00');
+  });
+
+  it('uses the tournament zone for the day, not the viewer zone', () => {
+    // 21:30 UTC уже 5 октября по Москве, а в UTC ещё 4-е.
+    const text = formatSessionRange('2026-10-04T21:30:00Z', '2026-10-04T22:30:00Z', 'Europe/Moscow', 'ru');
+    expect(text.startsWith('5 окт. 2026 г.')).toBe(true);
   });
 });

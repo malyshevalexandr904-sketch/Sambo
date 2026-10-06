@@ -9,10 +9,11 @@ import {
   zonedToInstant,
 } from '@sde/contracts';
 import { Alert, Badge, Button, Card, CardTitle, Field, Input } from '@sde/ui';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { api } from '@/lib/api';
 import { useErrorMessage } from '@/lib/errors';
+import { formatSessionRange } from '@/lib/format';
 import { useAction } from '@/lib/use-action';
 import { useInvalidateScheduling, useMats, useSessions } from './shared';
 
@@ -196,6 +197,7 @@ function SessionRow({
   onDone: () => Promise<void>;
 }) {
   const t = useTranslations('scheduling.sessions');
+  const locale = useLocale();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     name: session.name,
@@ -259,8 +261,7 @@ function SessionRow({
     <li className="flex items-center gap-3 py-2 text-sm">
       <span className="font-medium">{session.name}</span>
       <span className="flex-1 text-slate-600">
-        {localDateTimeIn(session.startsAt, timezone).replace('T', ' ')} –{' '}
-        {localDateTimeIn(session.endsAt, timezone).slice(11)}
+        {formatSessionRange(session.startsAt, session.endsAt, timezone, locale)}
       </span>
       {canManage ? (
         <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>

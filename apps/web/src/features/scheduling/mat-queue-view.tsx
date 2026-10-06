@@ -6,11 +6,12 @@ import { useLocale, useTranslations } from 'next-intl';
 import { QueryState } from '@/components/common';
 import { useCompetition } from '@/features/competitions/shared';
 import { pickName } from '@/lib/queries';
-import { timeInZone, useMatQueue } from './shared';
+import { timeInZone, useMatQueue, useRoundLabel } from './shared';
 
 function MatchLine({ item, timezone, big }: { item: ScheduleMatchDto; timezone: string; big?: boolean }) {
   const locale = useLocale();
   const t = useTranslations('scheduling.queue');
+  const roundLabel = useRoundLabel();
   return (
     <div
       className={
@@ -21,7 +22,7 @@ function MatchLine({ item, timezone, big }: { item: ScheduleMatchDto; timezone: 
     >
       <p className={big ? 'text-lg text-slate-500' : 'text-sm text-slate-500'}>
         {timeInZone(item.plannedAt, timezone, locale)} · №{item.matchNumber ?? '—'} ·{' '}
-        {pickName(item.categoryName, locale)} {item.roundLabel}
+        {pickName(item.categoryName, locale)} {roundLabel(item.roundLabel)}
       </p>
       <p className={big ? 'mt-2 text-4xl font-bold' : 'mt-1 text-xl font-semibold'}>
         {item.red.publicName ?? (item.red.bye ? t('bye') : '—')}

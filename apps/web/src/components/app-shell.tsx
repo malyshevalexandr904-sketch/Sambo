@@ -11,6 +11,7 @@ import { api, ApiError } from '@/lib/api';
 import { hasAnywhere, platformHas } from '@/lib/access';
 import { useMe, useMyAthletes } from '@/lib/queries';
 import { NotificationBell } from '@/features/notifications/bell';
+import { Brand } from './brand';
 import { LocaleSwitcher } from './locale-switcher';
 
 export function hasPlatformPermission(me: Me | undefined, permission: PermissionCode): boolean {
@@ -113,7 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </a>
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 lg:hidden print:hidden">
         <Link href="/admin" className="font-bold">
-          SAMBO Digital
+          <Brand />
         </Link>
         <span className="ml-auto mr-1">
           <NotificationBell />
@@ -136,7 +137,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       >
         <div className="mb-6 hidden items-center justify-between lg:flex">
           <Link href="/admin" className="text-lg font-bold">
-            SAMBO Digital
+            <Brand />
           </Link>
           <NotificationBell />
         </div>

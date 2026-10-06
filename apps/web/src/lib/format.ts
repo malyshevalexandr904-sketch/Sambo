@@ -9,6 +9,26 @@ export function formatDate(iso: string | null | undefined, locale: string): stri
   return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(new Date(iso));
 }
 
+/**
+ * Диапазон сессии в часовом поясе турнира в привычном для локали формате: «4 окт. 2026 г., 09:00 – 19:00»;
+ * если сессия переходит на другой день — дата указывается у обоих концов.
+ */
+export function formatSessionRange(
+  startIso: string,
+  endIso: string,
+  timeZone: string,
+  locale: string,
+): string {
+  const day = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone });
+  const time = new Intl.DateTimeFormat(locale, { timeStyle: 'short', timeZone });
+  const withTime = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone });
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  if (day.format(start) === day.format(end))
+    return `${day.format(start)}, ${time.format(start)} – ${time.format(end)}`;
+  return `${withTime.format(start)} – ${withTime.format(end)}`;
+}
+
 const BROWSERS: [RegExp, string][] = [
   [/YaBrowser\/(\d+)/, 'Yandex Browser'],
   [/Edg(?:e|A|iOS)?\/(\d+)/, 'Edge'],
