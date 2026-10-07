@@ -45,46 +45,63 @@ services:
       interval: 5s
       retries: 20
 
-  # Образы MinIO берутся с quay.io: публикация community-образов в Docker Hub прекращена.
+  # MinIO прекратил публикацию образов: с осени 2025 репозитории quay.io/minio и minio/* в Docker Hub закрыты
+  # (pull отвечает 401). Для разработки — замороженный образ Bitnami с сервером MinIO и клиентом mc.
+  # Только локальная разработка; production — S3 облачного провайдера (решение Q-07).
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
-    command: server /data --console-address :9001
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5@sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20
     environment:
       MINIO_ROOT_USER: sde-dev
       MINIO_ROOT_PASSWORD: sde-dev-secret
-    volumes: [miniodata:/data]
+      MINIO_CONSOLE_PORT_NUMBER: '9001'
+      # Браузер загружает файлы напрямую по presigned POST: CORS для origin сайта задаётся на сервере (CORS
+      # отдельного bucket в бесплатном MinIO не поддерживается).
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:3000
+    volumes: [miniodata:/bitnami/minio/data]
     ports: ['9000:9000', '9001:9001']
     healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:9000/minio/health/live']
       interval: 5s
       retries: 20
 
   # Buckets: публичные медиа читаются анонимно, документы — только по presigned URL (ARCHITECTURE.md, 18).
   minio-init:
-    image: quay.io/minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5@sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20
     depends_on:
       minio: { condition: service_healthy }
+    environment:
+      HOME: /tmp
+    # Образ Bitnami при первом запуске поднимает MinIO на время настройки и перезапускает его: подключение — с
+    # повтором, пока сервер не начнёт принимать запросы (до минуты).
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 sde-dev sde-dev-secret &&
+      n=0; until mc alias set local http://minio:9000 sde-dev sde-dev-secret; do
+      n=$$((n+1)); [ $$n -ge 60 ] && exit 1; sleep 1; done &&
       mc mb --ignore-existing local/sde-public-media local/sde-private-documents local/sde-generated &&
       mc anonymous set download local/sde-public-media &&
       mc anonymous set none local/sde-private-documents &&
-      mc anonymous set none local/sde-generated &&
-      mc cors set local/sde-private-documents --allowed-origins http://localhost:3000 --allowed-methods POST,GET || true
+      mc anonymous set none local/sde-generated
       "
 
   mailpit:
     image: axllent/mailpit:latest
     ports: ['8025:8025', '1025:1025']
 
+  # Миграции, учебные данные и подготовка демонстрационных турниров (жеребьёвки, расписание, бригады —
+  # через код API, apps/api/scripts/seed-schedule.ts; ему нужен Redis). Повторный запуск ничего не дублирует.
   migrate:
     build: { context: ., dockerfile: infra/docker/Dockerfile.api, target: migrate }
     <<: *app-env
     command:
-      ['sh', '-c', './node_modules/.bin/prisma migrate deploy && ./node_modules/.bin/tsx seed/index.ts']
+      - sh
+      - -c
+      - >-
+        ./node_modules/.bin/prisma migrate deploy &&
+        ./node_modules/.bin/tsx seed/index.ts &&
+        cd /repo/apps/api && node -r @swc-node/register scripts/seed-schedule.ts
     depends_on:
       postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
 
   api:
     build: { context: ., dockerfile: infra/docker/Dockerfile.api, target: api }

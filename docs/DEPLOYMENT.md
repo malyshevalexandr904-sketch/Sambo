@@ -71,11 +71,11 @@ SELECT conname FROM pg_constraint WHERE NOT convalidated AND conname IN (
 
 - `STORAGE_PUBLIC_ENDPOINT` — адрес хранилища, доступный браузеру (подпись ссылок);
 - `STORAGE_UPLOAD_ORIGIN` (web) — тот же origin для CSP `connect-src`;
-- на bucket приватных документов нужен CORS для origin сайта (метод `POST`).
+- на bucket приватных документов нужен CORS для origin сайта (метод `POST`); локальный MinIO задаёт его для всего сервера переменной `MINIO_API_CORS_ALLOW_ORIGIN` (CORS отдельного bucket в бесплатном MinIO не поддерживается).
 
 Публичные медиа сначала попадают в приватный bucket (`incoming/{fileId}`) и копируются в публичный только после проверки размера, SHA-256 и сигнатуры.
 
-MinIO берётся с `quay.io` (публикация community-образов в Docker Hub прекращена) и используется только для разработки; production — S3 российского облачного провайдера (решение Q-07).
+MinIO используется только для разработки; production — S3 российского облачного провайдера (решение Q-07). С осени 2025 MinIO не публикует образы (репозитории `quay.io/minio` и `minio/*` в Docker Hub закрыты, pull отвечает 401), поэтому `docker-compose.yml` берёт замороженный образ Bitnami `bitnamilegacy/minio` (сервер MinIO и клиент `mc`), закреплённый по digest. Обновлений у него не будет — для разработки этого достаточно; если образ перестанет скачиваться, MinIO заменяется любым S3-совместимым сервером с presigned POST.
 
 ## Сеть и прокси
 
