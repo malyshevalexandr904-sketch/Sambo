@@ -1,6 +1,6 @@
 {
   "name": "@sde/worker",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "description": "Фоновые задачи: диспетчер outbox, доставка писем, обслуживание БД",
   "type": "commonjs",

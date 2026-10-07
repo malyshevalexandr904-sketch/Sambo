@@ -71,7 +71,7 @@ SELECT conname FROM pg_constraint WHERE NOT convalidated AND conname IN (
 
 - `STORAGE_PUBLIC_ENDPOINT` — адрес хранилища, доступный браузеру (подпись ссылок);
 - `STORAGE_UPLOAD_ORIGIN` (web) — тот же origin для CSP `connect-src`;
-- на bucket приватных документов нужен CORS для origin сайта (метод `POST`).
+- на bucket приватных документов нужен CORS для origin сайта (метод `POST`); локальный MinIO задаёт его для всего сервера переменной `MINIO_API_CORS_ALLOW_ORIGIN` (CORS отдельного bucket в бесплатном MinIO не поддерживается).
 
 Публичные медиа сначала попадают в приватный bucket (`incoming/{fileId}`) и копируются в публичный только после проверки размера, SHA-256 и сигнатуры.
 

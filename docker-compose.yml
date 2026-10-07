@@ -54,6 +54,9 @@ services:
       MINIO_ROOT_USER: sde-dev
       MINIO_ROOT_PASSWORD: sde-dev-secret
       MINIO_CONSOLE_PORT_NUMBER: '9001'
+      # Браузер загружает файлы напрямую по presigned POST: CORS для origin сайта задаётся на сервере (CORS
+      # отдельного bucket в бесплатном MinIO не поддерживается).
+      MINIO_API_CORS_ALLOW_ORIGIN: http://localhost:3000
     volumes: [miniodata:/bitnami/minio/data]
     ports: ['9000:9000', '9001:9001']
     healthcheck:
@@ -68,14 +71,16 @@ services:
       minio: { condition: service_healthy }
     environment:
       HOME: /tmp
+    # Образ Bitnami при первом запуске поднимает MinIO на время настройки и перезапускает его: подключение — с
+    # повтором, пока сервер не начнёт принимать запросы (до минуты).
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio:9000 sde-dev sde-dev-secret &&
+      n=0; until mc alias set local http://minio:9000 sde-dev sde-dev-secret; do
+      n=$$((n+1)); [ $$n -ge 60 ] && exit 1; sleep 1; done &&
       mc mb --ignore-existing local/sde-public-media local/sde-private-documents local/sde-generated &&
       mc anonymous set download local/sde-public-media &&
       mc anonymous set none local/sde-private-documents &&
-      mc anonymous set none local/sde-generated &&
-      (mc cors set local/sde-private-documents --allowed-origins http://localhost:3000 --allowed-methods POST,GET || true)
+      mc anonymous set none local/sde-generated
       "
 
   mailpit:
