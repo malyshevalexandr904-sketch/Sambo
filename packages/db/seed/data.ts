@@ -15,6 +15,10 @@ export const SEED_IDS = {
   /** Турнир с уже опубликованными сетками для расписания (seed Phase 6): секретарь — secretary@sambo.local,
    *  главный судья — referee1@sambo.local, судья — referee2@sambo.local. Расписание не построено. */
   competitionSchedule: '01920000-0000-7000-8015-000000000004',
+  /** Турнир «Расписание готово» с бригадами на коврах (seed Phase 7a): судить и подтверждать — сразу. Главный
+   *  судья — referee1, судьи ковра 1 — referee2 (планшет) и referee3 (руководитель ковра), ковра 2 — referee4
+   *  (планшет и руководитель), секретарь — secretary. */
+  competitionReferee: '01920000-0000-7000-8015-000000000005',
 } as const;
 
 export interface SeedOrganization {
@@ -175,6 +179,7 @@ export const SEED_USERS: SeedUser[] = [
     grants: [
       { id: g(15), role: 'CHIEF_REFEREE', organizationId: null, competitionId: SEED_IDS.competitionDraw },
       { id: g(16), role: 'CHIEF_REFEREE', organizationId: null, competitionId: SEED_IDS.competitionSchedule },
+      { id: g(19), role: 'CHIEF_REFEREE', organizationId: null, competitionId: SEED_IDS.competitionReferee },
     ],
   },
   {
@@ -187,6 +192,7 @@ export const SEED_USERS: SeedUser[] = [
     person: { lastName: 'Арбитрова', firstName: 'Ольга', birthDate: '1986-12-03', gender: 'FEMALE' },
     grants: [
       { id: g(17), role: 'REFEREE', organizationId: null, competitionId: SEED_IDS.competitionSchedule },
+      { id: g(20), role: 'REFEREE', organizationId: null, competitionId: SEED_IDS.competitionReferee },
     ],
   },
   {
@@ -212,6 +218,7 @@ export const SEED_USERS: SeedUser[] = [
       { id: g(13), role: 'SECRETARY', organizationId: null, competitionId: SEED_IDS.competitionCheckIn },
       { id: g(14), role: 'SECRETARY', organizationId: null, competitionId: SEED_IDS.competitionDraw },
       { id: g(18), role: 'SECRETARY', organizationId: null, competitionId: SEED_IDS.competitionSchedule },
+      { id: g(21), role: 'SECRETARY', organizationId: null, competitionId: SEED_IDS.competitionReferee },
     ],
   },
   {
@@ -224,6 +231,30 @@ export const SEED_USERS: SeedUser[] = [
     person: { lastName: 'Здравова', firstName: 'Инна', birthDate: '1983-05-11', gender: 'FEMALE' },
     grants: [
       { id: g(12), role: 'MEDICAL_STAFF', organizationId: null, competitionId: SEED_IDS.competitionCheckIn },
+    ],
+  },
+  {
+    id: u(13),
+    identityId: i(13),
+    personId: p(13),
+    email: 'referee3@sambo.local',
+    displayName: 'Судья 3',
+    totp: false,
+    person: { lastName: 'Ковров', firstName: 'Игорь', birthDate: '1978-09-14', gender: 'MALE' },
+    grants: [
+      { id: g(22), role: 'REFEREE', organizationId: null, competitionId: SEED_IDS.competitionReferee },
+    ],
+  },
+  {
+    id: u(14),
+    identityId: i(14),
+    personId: p(14),
+    email: 'referee4@sambo.local',
+    displayName: 'Судья 4',
+    totp: false,
+    person: { lastName: 'Бойцова', firstName: 'Марина', birthDate: '1989-03-30', gender: 'FEMALE' },
+    grants: [
+      { id: g(23), role: 'REFEREE', organizationId: null, competitionId: SEED_IDS.competitionReferee },
     ],
   },
 ];

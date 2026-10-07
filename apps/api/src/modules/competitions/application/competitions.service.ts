@@ -328,6 +328,43 @@ export class CompetitionsService {
   }
 
   /**
+   * Первая схватка турнира (ARCHITECTURE.md, 16.1; план Phase 7a, §1): «Расписание готово → Идут соревнования»
+   * без команды пользователя, в транзакции старта схватки. Турнир блокируется FOR UPDATE — вызывающий берёт эту
+   * блокировку первой (порядок «турнир → категория → схватка → участие»). Турнир уже идёт — ничего не делает.
+   */
+  async startOnFirstMatch(tx: Tx, competitionId: string, userId: string): Promise<boolean> {
+    const [row] = await tx.$queryRaw<{ status: CompetitionStatus }[]>`
+      SELECT status FROM competition WHERE id = ${competitionId}::uuid AND deleted_at IS NULL FOR UPDATE`;
+    if (!row) throw new DomainError('NOT_FOUND', { resource: 'competition' });
+    if (row.status !== 'SCHEDULED') return false;
+    const competition = (await this.scopes.basics(competitionId)) as CompetitionBasics;
+    await tx.competition.update({
+      where: { id: competitionId },
+      data: { status: 'IN_PROGRESS', version: { increment: 1 }, updatedById: userId },
+    });
+    await this.extensions.apply({
+      tx,
+      competition,
+      from: 'SCHEDULED',
+      to: 'IN_PROGRESS',
+      reason: null,
+      userId,
+      now: new Date(),
+    });
+    await this.audit.record(tx, {
+      action: 'competition.status_changed',
+      entityType: 'Competition',
+      entityId: competitionId,
+      competitionId,
+      organizationId: competition.organizerOrganizationId,
+      before: { status: 'SCHEDULED' },
+      after: { status: 'IN_PROGRESS', trigger: 'first_match_started' },
+    });
+    await this.transitionEvents(tx, competitionId, 'SCHEDULED', 'IN_PROGRESS');
+    return true;
+  }
+
+  /**
    * Условия модулей-расширений: блокирующие — отказ; предупреждения — отказ с `confirmable`, пока пользователь
    * не подтвердит переход (`confirm: true`). Возвращает подтверждённые предупреждения.
    */

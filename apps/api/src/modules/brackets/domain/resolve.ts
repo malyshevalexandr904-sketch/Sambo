@@ -7,7 +7,7 @@ import {
   type BracketState,
   entry,
   type GraphNode,
-  loserOf,
+  losersOf,
   type NodeState,
   type Outcome,
   PENDING,
@@ -63,7 +63,7 @@ function sideFrom(
         return source.type === 'WINNER_OF' && w ? entry(w) : BYE;
       }
       if (prev.status !== 'DECIDED') return PENDING;
-      const id = source.type === 'WINNER_OF' ? winnerOf(prev) : loserOf(prev);
+      const id = source.type === 'WINNER_OF' ? winnerOf(prev) : (losersOf(prev)[0] ?? null);
       return id ? entry(id) : BYE;
     }
     case 'DYNAMIC':
@@ -119,7 +119,7 @@ export function winLoss(state: BracketState): Map<string, { wins: number; losses
   for (const s of state.values()) {
     if (s.status !== 'DECIDED') continue;
     bump(winnerOf(s), 'wins');
-    bump(loserOf(s), 'losses');
+    for (const loser of losersOf(s)) bump(loser, 'losses');
   }
   return out;
 }

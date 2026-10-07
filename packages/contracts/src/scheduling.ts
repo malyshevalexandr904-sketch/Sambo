@@ -2,7 +2,13 @@
 // Автопланировщик — чистая функция (apps/api scheduling/domain); здесь — вход и результат команд по сети.
 import { z } from 'zod';
 import { Instant, type LocalizedText, Uuid } from './common.js';
-import { type MatchStatus, type UserRef } from './draws.js';
+import {
+  type MatchResultStatus,
+  type MatchStatus,
+  type Side,
+  type UserRef,
+  type WinMethod,
+} from './draws.js';
 
 // ---------- Ковры ----------
 
@@ -169,13 +175,30 @@ export interface ScheduleDto {
   allowedActions: string[];
 }
 
-/** Экран ковра (кворум «Ковры»): текущая и до трёх следующих схваток. */
+/**
+ * Схватка в очереди ковра с фактическим состоянием (Phase 7a): ожидаемое время начала с учётом опоздания ковра
+ * (плановое время в расписании не переписывается), счёт идущей схватки и статус результата.
+ */
+export interface MatQueueItemDto extends ScheduleMatchDto {
+  /** Ожидаемое начало: не раньше планового и не раньше окончания предыдущей схватки ковра со сменой пары. */
+  expectedAt: string;
+  resultStatus: MatchResultStatus | null;
+  score: { red: number; blue: number } | null;
+  winnerSide: Side | null;
+  method: WinMethod | null;
+}
+
+/** Экран ковра (кворум «Ковры»): текущая и до трёх следующих схваток, ждущие подтверждения, опоздание ковра. */
 export interface MatQueueDto {
   matId: string;
   matNumber: number;
   matName: string | null;
-  current: ScheduleMatchDto | null;
-  next: ScheduleMatchDto[];
+  current: MatQueueItemDto | null;
+  next: MatQueueItemDto[];
+  /** Сыграны, результат ждёт подтверждения руководителем ковра. */
+  awaitingConfirmation: MatQueueItemDto[];
+  /** Опоздание ковра относительно расписания, с (0 — по плану или раньше). */
+  delaySeconds: number;
 }
 
 // ---------- Судейские бригады ----------

@@ -2,9 +2,12 @@
 // (весь персонал турнира); allowedActions — schedule.manage/schedule.publish, доступные этому пользователю.
 import { Injectable } from '@nestjs/common';
 import {
+  clockNowMs,
   type EntryScheduleMatch,
+  type MatchState,
   type MatchStatus,
   type MatQueueDto,
+  type MatQueueItemDto,
   type PermissionCode,
   type ScheduleDto,
   type ScheduleMatchDto,
@@ -18,6 +21,7 @@ import { PolicyService } from '../../access';
 import { BracketsService } from '../../brackets';
 import { isPlayed, MatchesService, sideOf } from '../../matches';
 import { CompetitionScopeService } from '../../competitions';
+import { projectQueue } from '../domain/queue';
 import { computeTimeline, type TimelineItem } from '../domain/timeline';
 import { assembleSchedule, loadMinRestSeconds } from './schedule-assembly';
 
@@ -30,6 +34,29 @@ const ITEM_INCLUDE = {
 } satisfies Prisma.MatchScheduleInclude;
 
 type ItemRow = Prisma.MatchScheduleGetPayload<{ include: typeof ITEM_INCLUDE }>;
+
+const QUEUE_INCLUDE = {
+  match: { include: { participants: true, result: true } },
+} satisfies Prisma.MatchScheduleInclude;
+
+type QueueRow = Prisma.MatchScheduleGetPayload<{ include: typeof QUEUE_INCLUDE }>;
+
+/** Проекция счёта схватки (MatchState из packages/contracts), записанная модулем судейства, или null. */
+function stateOf(value: Prisma.JsonValue | null): MatchState | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as unknown as MatchState)
+    : null;
+}
+
+function scoreOf(value: Prisma.JsonValue | null): { red: number; blue: number } | null {
+  const state = stateOf(value);
+  return state ? { red: state.red.points, blue: state.blue.points } : null;
+}
+
+function elapsedOf(value: Prisma.JsonValue | null, nowMs: number): number {
+  const state = stateOf(value);
+  return state ? clockNowMs(state.clock, nowMs, state.durationMs) : 0;
+}
 
 /** Схватка решена без игры (см. schedule-assembly.noMatch) — здесь дублируется, чтобы не тянуть весь модуль matches
  *  ради одной функции с иным набором полей участника. */
@@ -145,7 +172,7 @@ export class ScheduleQueriesService {
   }
 
   private toMatchDto(
-    row: ItemRow,
+    row: ItemRow | QueueRow,
     name: { ru: string; en: string },
     publicNameOf: ReadonlyMap<string, string>,
   ): ScheduleMatchDto {
@@ -230,8 +257,11 @@ export class ScheduleQueriesService {
     return result.warnings;
   }
 
-  /** Экран ковра (кворум «Ковры», D-…): текущая (началась/играется — Phase 7 знает статус, здесь — ближайшая
-   *  непрошедшая по времени) и до трёх следующих схваток; «без схватки» пропускаются. */
+  /**
+   * Экран «Ковры» (план Phase 6, §6; Phase 7a, §1): текущая схватка (идёт или на паузе, иначе вызванная, иначе
+   * первая в очереди) и до трёх следующих с ожидаемым временем начала по фактическому ходу ковра; сыгранные
+   * схватки, ждущие подтверждения результата. «Без схватки» пропускаются.
+   */
   async matQueue(user: AuthUser, matId: string): Promise<MatQueueDto> {
     const mat = await this.db.mat.findUnique({ where: { id: matId } });
     if (!mat) throw new DomainError('NOT_FOUND', { resource: 'mat' });
@@ -239,11 +269,23 @@ export class ScheduleQueriesService {
     const scope = await this.competitions.scopeFor(competition);
     await this.policy.assert(user, 'competition.view', scope);
 
-    const rows = await this.db.matchSchedule.findMany({
-      where: { matId, match: { status: { in: ['SCHEDULED', 'IN_PROGRESS', 'PAUSED'] } } },
-      include: ITEM_INCLUDE,
-      orderBy: { plannedAt: 'asc' },
-    });
+    const [rows, schedule] = await Promise.all([
+      this.db.matchSchedule.findMany({
+        where: {
+          matId,
+          OR: [
+            { match: { status: { in: ['SCHEDULED', 'READY', 'IN_PROGRESS', 'PAUSED'] } } },
+            { match: { status: 'FINISHED', result: { status: 'PROVISIONAL' } } },
+          ],
+        },
+        include: QUEUE_INCLUDE,
+        orderBy: { plannedAt: 'asc' },
+      }),
+      this.db.schedule.findUnique({
+        where: { competitionId: mat.competitionId },
+        select: { matChangeoverSeconds: true },
+      }),
+    ]);
     const categoryRows = await this.db.competitionCategory.findMany({
       where: { id: { in: [...new Set(rows.map((r) => r.match.categoryId))] } },
       select: { id: true, nameRu: true, nameEn: true },
@@ -262,15 +304,57 @@ export class ScheduleQueriesService {
       : [];
     const publicNameOf = new Map(entries.map((e) => [e.id, e.publicName]));
 
-    const queue = rows
-      .filter((r) => !isNoMatch(r.match.status, isPlayed(r.match)))
-      .map((r) =>
-        this.toMatchDto(r, categoryName.get(r.match.categoryId) ?? { ru: '', en: '' }, publicNameOf),
+    const live = rows.filter(
+      (r) => r.match.status !== 'FINISHED' && !isNoMatch(r.match.status, isPlayed(r.match)),
+    );
+    const projection = projectQueue(
+      live.map((r) => ({
+        matchId: r.matchId,
+        plannedAt: r.plannedAt.getTime(),
+        durationSeconds: r.match.durationSeconds ?? 0,
+        status: r.match.status,
+        startedAt: r.match.startedAt?.getTime() ?? null,
+        elapsedMs: elapsedOf(r.match.state, Date.now()),
+      })),
+      Date.now(),
+      schedule?.matChangeoverSeconds ?? 60,
+    );
+    const toItem = (r: QueueRow): MatQueueItemDto => {
+      const base = this.toMatchDto(
+        r,
+        categoryName.get(r.match.categoryId) ?? { ru: '', en: '' },
+        publicNameOf,
       );
+      const result = r.match.result;
+      const score = result
+        ? { red: result.redScore ?? 0, blue: result.blueScore ?? 0 }
+        : scoreOf(r.match.state);
+      return {
+        ...base,
+        expectedAt: new Date(projection.expectedAt.get(r.matchId) ?? r.plannedAt.getTime()).toISOString(),
+        resultStatus: result?.status ?? null,
+        score,
+        winnerSide: result?.winnerSide ?? null,
+        method: result?.method ?? null,
+      };
+    };
+    const queue = live.map(toItem);
     const current =
-      queue.find((m) => m.status === 'IN_PROGRESS' || m.status === 'PAUSED') ?? queue[0] ?? null;
+      queue.find((m) => m.status === 'IN_PROGRESS' || m.status === 'PAUSED') ??
+      queue.find((m) => m.status === 'READY') ??
+      queue[0] ??
+      null;
     const next = queue.filter((m) => m.matchId !== current?.matchId).slice(0, 3);
-    return { matId: mat.id, matNumber: mat.number, matName: mat.name, current, next };
+    const awaitingConfirmation = rows.filter((r) => r.match.status === 'FINISHED').map(toItem);
+    return {
+      matId: mat.id,
+      matNumber: mat.number,
+      matName: mat.name,
+      current,
+      next,
+      awaitingConfirmation,
+      delaySeconds: projection.delaySeconds,
+    };
   }
 
   /**

@@ -6,6 +6,7 @@ import { CrewsController } from './api/crews.controller';
 import { MatsController } from './api/mats.controller';
 import { ScheduleController } from './api/schedule.controller';
 import { SessionsController } from './api/sessions.controller';
+import { CrewAccessService } from './application/crew-access.service';
 import { CrewsService } from './application/crews.service';
 import { MatsService } from './application/mats.service';
 import { ScheduleLifecycle } from './application/schedule-lifecycle';
@@ -27,8 +28,9 @@ import { SessionsService } from './application/sessions.service';
     ScheduleQueriesService,
     ScheduleService,
     CrewsService,
+    CrewAccessService,
     ScheduleLifecycle,
   ],
-  exports: [ScheduleQueriesService],
+  exports: [ScheduleQueriesService, CrewAccessService],
 })
 export class SchedulingModule {}

@@ -9,10 +9,10 @@ import type {
 } from '@sde/contracts';
 import type { Tx } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
-import { DomainError } from '../../../common/errors/domain-error';
+import { DomainError, versionConflict } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { AuditService } from '../../audit';
-import { CompetitionCategoriesService, isActiveCategory } from '../../categories';
+import { CategoryWorkflowService, CompetitionCategoriesService, isActiveCategory } from '../../categories';
 import { CompetitionScopeService, registrationWindow } from '../../competitions';
 import { OutboxService } from '../../outbox';
 import { WriteLeaseService } from '../../venue-sync';
@@ -44,6 +44,7 @@ export class EntryDecisionsService {
     private readonly access: RegistrationAccessService,
     private readonly competitions: CompetitionScopeService,
     private readonly categories: CompetitionCategoriesService,
+    private readonly categoryWorkflow: CategoryWorkflowService,
     private readonly eligibility: EligibilityService,
     private readonly leases: WriteLeaseService,
     private readonly audit: AuditService,
@@ -117,7 +118,10 @@ export class EntryDecisionsService {
 
   /**
    * Снятие участника: владелец заявки — до окончания регистрации, персонал — с `entry.withdraw`.
-   * Снятие после жеребьёвки (поражения неявкой в незавершённых схватках) подключат Phase 5–7.
+   * После жеребьёвки снятый проигрывает оставшиеся схватки неявкой автоматически (Phase 7a: подписчик события
+   * `registration.entry_withdrawn` в модуле судейства, в той же транзакции). Порядок блокировок — категория, затем
+   * участие (как у старта схватки: категория → схватка → участие); спортсмена на ковре снять нельзя — исход идущей
+   * схватки вносит бригада (снятие во время схватки).
    */
   async withdraw(
     user: AuthUser,
@@ -140,11 +144,15 @@ export class EntryDecisionsService {
         });
     }
     await this.db.tx(async (tx) => {
-      await this.leases.assertWritable(tx, ctx.application.competitionId);
+      const current = await tx.entry.findUnique({ where: { id: entryId }, select: { categoryId: true } });
+      if (current) await this.categoryWorkflow.lockForCommand(tx, current.categoryId);
+      else await this.leases.assertWritable(tx, ctx.application.competitionId);
       await lockApplication(tx, ctx.application.id);
       const entry = await lockEntry(tx, entryId, version);
       if (!isActiveEntry(entry.status))
         throw new DomainError('INVALID_TRANSITION', { from: entry.status, to: 'WITHDRAWN', allowed: [] });
+      if (entry.categoryId !== current?.categoryId) throw versionConflict(entry.version);
+      if (entry.activeMatchId) throw blocked('athlete_in_active_match');
       await tx.entry.update({
         where: { id: entryId },
         data: {

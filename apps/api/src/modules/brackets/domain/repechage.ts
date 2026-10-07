@@ -12,6 +12,7 @@ import {
   entry,
   type GraphNode,
   loserOf,
+  losersOf,
   PENDING,
   type Placement,
   type SideState,
@@ -95,20 +96,18 @@ export function repechagePlacements(graph: BracketGraph, state: BracketState): P
   const ranks = eliminationRanks(graph, state);
   const final = state.get(mainKey(rounds, 1));
   const champion = winnerOf(final);
-  const runnerUp = loserOf(final);
   if (champion) ranks.set(champion, 1000);
-  if (runnerUp) ranks.set(runnerUp, 999);
+  for (const runnerUp of losersOf(final)) ranks.set(runnerUp, 999);
   // Сетка на двоих — только финал: подгрупп и утешительных схваток нет.
   for (const pool of rounds >= 2 ? POOLS : []) {
     if (steps < 1) {
-      const semiLoser = loserOf(state.get(mainKey(1, pool === 'A' ? 1 : 2)));
-      if (semiLoser) ranks.set(semiLoser, 998);
+      for (const semiLoser of losersOf(state.get(mainKey(1, pool === 'A' ? 1 : 2))))
+        ranks.set(semiLoser, 998);
       continue;
     }
     for (let step = 1; step <= steps; step++) {
       const s = state.get(repechageKey(pool, step));
-      const loser = loserOf(s);
-      if (loser) ranks.set(loser, 500 + step);
+      for (const loser of losersOf(s)) ranks.set(loser, 500 + step);
       const bronze = step === steps ? winnerOf(s) : null;
       if (bronze) ranks.set(bronze, 998);
     }

@@ -144,6 +144,9 @@ model User {
   supersededDraws           Draw[]                   @relation("DrawSuperseder")
   publishedSchedules        Schedule[]               @relation("SchedulePublisher")
   matAssignments            MatAssignment[]
+  recordedMatchEvents       MatchEvent[]             @relation("MatchEventRecorder")
+  proposedMatchResults      MatchResult[]            @relation("MatchResultProposer")
+  confirmedMatchResults     MatchResult[]            @relation("MatchResultConfirmer")
 
   @@index([status, createdAt])
   @@map("user")
@@ -1334,6 +1337,8 @@ model Competition {
   schedule          Schedule?
   matchSchedules    MatchSchedule[]
   matAssignments    MatAssignment[]
+  matchEvents       MatchEvent[]
+  matchResults      MatchResult[]
 
   @@index([status, startDate])
   @@index([organizerOrganizationId, startDate])
@@ -1502,6 +1507,9 @@ model Entry {
   representationRegionId       String?     @map("representation_region_id") @db.Uuid
   publicName                   String      @map("public_name")
   declaredWeightGrams          Int?        @map("declared_weight_grams")
+  /// Спортсмен на ковре (Phase 7a): идущая схватка. Ставится условным обновлением при старте (ATHLETE_IN_ACTIVE_MATCH),
+  /// снимается при предварительном результате — второй ковёр не стартует схватку с тем же спортсменом.
+  activeMatchId                String?     @map("active_match_id") @db.Uuid
   decidedAt                    DateTime?   @map("decided_at") @db.Timestamptz(3)
   decidedById                  String?     @map("decided_by_id") @db.Uuid
   decisionReason               String?     @map("decision_reason")
@@ -1530,9 +1538,11 @@ model Entry {
   weighInRecord        WeighInRecord?
   drawSlots            DrawSlot[]
   matchParticipations  MatchParticipant[]
+  activeMatch          Match?              @relation("EntryActiveMatch", fields: [activeMatchId], references: [id], onDelete: Restrict)
 
   @@index([competitionId, status])
   @@index([applicationId])
+  @@index([activeMatchId])
   @@index([athleteId])
   @@index([categoryId, status])
   @@map("entry")
@@ -1973,6 +1983,38 @@ enum MatchStatus {
   CANCELLED
 }
 
+/// Тип события журнала схватки (ARCHITECTURE.md, 14.6). Отмена — компенсирующее событие EVENT_VOIDED.
+enum MatchEventType {
+  CLOCK_STARTED
+  CLOCK_STOPPED
+  SCORE
+  HOLD_STARTED
+  HOLD_ENDED
+  PENALTY
+  EVENT_VOIDED
+}
+
+/// Результат схватки: предварительный (бригада) → подтверждённый (руководитель ковра, главный судья);
+/// PUBLISHED и AMENDED — Phase 7b.
+enum MatchResultStatus {
+  PROVISIONAL
+  CONFIRMED
+  PUBLISHED
+  AMENDED
+}
+
+enum WinMethod {
+  TOTAL_VICTORY
+  SUPERIORITY
+  POINTS
+  DECISION
+  NO_SHOW
+  WITHDRAWAL
+  INJURY
+  DISQUALIFICATION
+  BYE
+}
+
 /// Версия жеребьёвки категории (ADR-11): вход, seed и версия алгоритма — всё, чтобы повторить результат.
 /// `number` — номер версии в категории; `version` — оптимистическая блокировка (If-Match).
 model Draw {
@@ -2101,22 +2143,105 @@ model Match {
   roundLabel      String      @map("round_label")
   status          MatchStatus @default(SCHEDULED)
   durationSeconds Int?        @map("duration_seconds")
+  /// Победитель подтверждённого результата (или без схватки — BYE); у предварительного — пусто.
   winnerSide      Side?       @map("winner_side")
+  /// Фактический ковёр (Phase 7a): ковёр расписания на момент старта.
+  matId           String?     @map("mat_id") @db.Uuid
+  /// Проекция счёта по журналу (MatchState из packages/contracts): пересчитывается с каждым событием.
+  state           Json?
+  /// Номер последнего события журнала; команда со старым expectedSeq получает конфликт.
+  stateSeq        Int         @default(0) @map("state_seq")
+  readyAt         DateTime?   @map("ready_at") @db.Timestamptz(3)
+  startedAt       DateTime?   @map("started_at") @db.Timestamptz(3)
   finishedAt      DateTime?   @map("finished_at") @db.Timestamptz(3)
   version         Int         @default(1)
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  competition  Competition         @relation(fields: [competitionId], references: [id], onDelete: Restrict)
-  category     CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  bracketNode  BracketNode?        @relation(fields: [bracketNodeId], references: [id], onDelete: Restrict)
-  participants MatchParticipant[]
-  schedule     MatchSchedule?
+  competition   Competition         @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category      CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  bracketNode   BracketNode?        @relation(fields: [bracketNodeId], references: [id], onDelete: Restrict)
+  mat           Mat?                @relation(fields: [matId], references: [id], onDelete: Restrict)
+  participants  MatchParticipant[]
+  schedule      MatchSchedule?
+  events        MatchEvent[]
+  result        MatchResult?
+  activeEntries Entry[]             @relation("EntryActiveMatch")
 
   @@unique([competitionId, matchNumber])
   @@index([competitionId, status])
   @@index([categoryId, status])
+  @@index([matId, status])
   @@map("match")
+}
+
+/// Журнал событий схватки (ARCHITECTURE.md, 14.6; ADR-06): только дополняется — у роли приложения нет UPDATE и
+/// DELETE. Порядок — unique (matchId, seq), повтор команды — unique (matchId, idempotencyKey).
+model MatchEvent {
+  id             String         @id @default(uuid(7)) @db.Uuid
+  competitionId  String         @map("competition_id") @db.Uuid
+  matchId        String         @map("match_id") @db.Uuid
+  seq            Int
+  type           MatchEventType
+  side           Side?
+  /// Код действия или наказания из правил турнира.
+  actionCode     String?        @map("action_code")
+  /// HOLD_ENDED — длительность удержания, мс.
+  value          Int?
+  /// Показание основного секундомера на устройстве (R-09), мс.
+  matchClockMs   Int            @map("match_clock_ms")
+  deviceTime     DateTime       @map("device_time") @db.Timestamptz(3)
+  serverTime     DateTime       @default(now()) @map("server_time") @db.Timestamptz(3)
+  voidsEventId   String?        @map("voids_event_id") @db.Uuid
+  idempotencyKey String         @map("idempotency_key") @db.Uuid
+  recordedById   String?        @map("recorded_by_id") @db.Uuid
+  deviceId       String?        @map("device_id")
+  /// Причина отмены и т. п.; без ПДн.
+  payload        Json?
+
+  competition Competition  @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  match       Match        @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  voids       MatchEvent?  @relation("MatchEventVoids", fields: [voidsEventId], references: [id], onDelete: Restrict)
+  voidedBy    MatchEvent[] @relation("MatchEventVoids")
+  recordedBy  User?        @relation("MatchEventRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+
+  @@unique([matchId, seq])
+  @@unique([matchId, idempotencyKey])
+  @@map("match_event")
+}
+
+/// Результат схватки (ARCHITECTURE.md, 16.6): предварительный вносит бригада ковра, подтверждает руководитель
+/// ковра или главный судья. Исходы без судьи (BYE, неявка снятого участника) подтверждает система.
+model MatchResult {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  competitionId String            @map("competition_id") @db.Uuid
+  matchId       String            @unique @map("match_id") @db.Uuid
+  status        MatchResultStatus @default(PROVISIONAL)
+  /// Пусто — неявка обоих: оба проигравшие.
+  winnerSide    Side?             @map("winner_side")
+  method        WinMethod
+  methodDetail  String?           @map("method_detail")
+  redScore      Int?              @map("red_score")
+  blueScore     Int?              @map("blue_score")
+  durationMs    Int?              @map("duration_ms")
+  basedOnSeq    Int?              @map("based_on_seq")
+  reason        String?
+  proposedById  String?           @map("proposed_by_id") @db.Uuid
+  proposedAt    DateTime?         @map("proposed_at") @db.Timestamptz(3)
+  confirmedById String?           @map("confirmed_by_id") @db.Uuid
+  confirmedAt   DateTime?         @map("confirmed_at") @db.Timestamptz(3)
+  revision      Int               @default(1)
+  version       Int               @default(1)
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  match       Match       @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  proposedBy  User?       @relation("MatchResultProposer", fields: [proposedById], references: [id], onDelete: Restrict)
+  confirmedBy User?       @relation("MatchResultConfirmer", fields: [confirmedById], references: [id], onDelete: Restrict)
+
+  @@index([competitionId, status])
+  @@map("match_result")
 }
 
 /// Сторона схватки: участие (пусто, пока не известно) или BYE — не одновременно (CHECK).
@@ -2172,6 +2297,7 @@ model Mat {
   competition Competition     @relation(fields: [competitionId], references: [id], onDelete: Restrict)
   items       MatchSchedule[]
   assignments MatAssignment[]
+  matches     Match[]
 
   @@unique([competitionId, number])
   @@map("mat")

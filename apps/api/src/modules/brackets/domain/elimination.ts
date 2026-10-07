@@ -3,7 +3,7 @@
 // Места: 1 — победитель финала, 2 — проигравший финала, 3 — оба проигравших полуфинала, далее — по кругу выбывания.
 import { eliminationRoundLabel, eliminationRounds } from '@sde/contracts';
 import type { BracketGraph, BracketState, GraphNode, Placement } from './graph';
-import { loserOf, winnerOf } from './graph';
+import { losersOf, winnerOf } from './graph';
 import { isComplete, placesByRank, winLoss } from './resolve';
 
 export const mainKey = (round: number, position: number): string => `MAIN:${round}:${position}`;
@@ -59,8 +59,7 @@ export function eliminationRanks(graph: BracketGraph, state: BracketState): Map<
   for (const node of graph.nodes) {
     if (node.stage !== 'MAIN') continue;
     const s = state.get(node.key);
-    const loser = loserOf(s);
-    if (loser) ranks.set(loser, node.round);
+    for (const loser of losersOf(s)) ranks.set(loser, node.round);
     if (node.round === rounds) {
       const champion = winnerOf(s);
       if (champion) ranks.set(champion, rounds + 1);

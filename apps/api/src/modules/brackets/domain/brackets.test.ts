@@ -332,3 +332,29 @@ describe('round robin places', () => {
     expect(loserOf(state.get(graph.nodes[0]!.key))).toBeNull();
   });
 });
+
+describe('both participants lost (Phase 7a: both withdrawn after the draw)', () => {
+  it('decides the node without a winner: nobody advances, both get a loss and a place by the round', () => {
+    const strategy = strategyFor('SINGLE_ELIMINATION')!;
+    const graph = strategy.build(4);
+    const slots: SlotMap = new Map([
+      [1, e(1)],
+      [2, e(2)],
+      [3, e(3)],
+      [4, e(4)],
+    ]);
+    const outcomes = new Map<string, Outcome>([
+      [mainKey(1, 1), { winner: null, method: 'NO_SHOW' }],
+      [mainKey(1, 2), { winner: 'RED', method: 'POINTS' }],
+    ]);
+    const state = resolveFormat(strategy, graph, slots, outcomes);
+    expect(state.get(mainKey(1, 1))).toMatchObject({ status: 'DECIDED', winner: null });
+    // В финале у победителя второго полуфинала соперника нет — он проходит без схватки.
+    expect(state.get(mainKey(2, 1))).toMatchObject({ status: 'WALKOVER', winner: 'BLUE' });
+    const places = strategy.placements(graph, state, outcomes);
+    expect(places?.find((p) => p.entryId === e(3))?.place).toBe(1);
+    const semiLosers = places?.filter((p) => [e(1), e(2), e(4)].includes(p.entryId)) ?? [];
+    expect(semiLosers.map((p) => p.losses)).toEqual([1, 1, 1]);
+    expect(semiLosers.every((p) => p.place === 2)).toBe(true);
+  });
+});
