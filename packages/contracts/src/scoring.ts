@@ -198,6 +198,87 @@ function addTechnical(s: MatchState, side: Side, points: number): void {
 
 const fail = (reason: ScoringRejection): ApplyResult => ({ ok: false, reason });
 
+type Apply = (s: MatchState, e: ScoringEvent, rules: ScoringRules, strict: boolean) => ApplyResult;
+const done = (s: MatchState): ApplyResult => ({ ok: true, state: s });
+
+function applyClock(s: MatchState, e: ScoringEvent, start: boolean): ApplyResult {
+  if (s.clock.running === start) return fail(start ? 'clock_running' : 'clock_not_running');
+  if (e.matchClockMs < s.clock.elapsedMs) return fail('clock_not_monotonic');
+  if (start && s.clock.elapsedMs >= s.durationMs) return fail('time_expired');
+  s.clock = { running: start, elapsedMs: Math.min(e.matchClockMs, s.durationMs), at: e.deviceTime };
+  return done(s);
+}
+
+const applyScore: Apply = (s, e, rules) => {
+  if (!e.side) return fail('side_required');
+  const action = rules.actions.find((a) => a.code === e.actionCode);
+  if (!action) return fail('unknown_action');
+  if (s.decision) return fail('match_decided');
+  if (action.kind === 'TOTAL_VICTORY') {
+    s.decision = { kind: 'TOTAL_VICTORY', winner: e.side, detail: action.code };
+    s.lastTechnical = e.side;
+  } else {
+    addTechnical(s, e.side, action.points ?? 0);
+    checkSuperiority(s, rules);
+  }
+  return done(s);
+};
+
+const applyPenalty: Apply = (s, e, rules, strict) => {
+  if (!e.side) return fail('side_required');
+  if (s.decision) return fail('match_decided');
+  const own = sideScore(s, e.side);
+  const next = rules.penalties[own.penalties.length];
+  if (!next) return fail('penalties_exhausted');
+  if (strict && e.actionCode && e.actionCode !== next.code)
+    return fail(
+      rules.penalties.some((p) => p.code === e.actionCode) ? 'penalty_out_of_order' : 'unknown_penalty',
+    );
+  own.penalties.push(next.code);
+  if (next.kind === 'DISQUALIFICATION') {
+    s.decision = { kind: 'DISQUALIFICATION', winner: other(e.side), detail: next.code };
+  } else {
+    sideScore(s, other(e.side)).points += next.opponentPoints ?? 0;
+    checkSuperiority(s, rules);
+  }
+  return done(s);
+};
+
+const applyHoldStart: Apply = (s, e, rules) => {
+  if (!e.side) return fail('side_required');
+  if (s.decision) return fail('match_decided');
+  if (s.hold) return fail('hold_active');
+  if (!s.clock.running) return fail('clock_not_running');
+  if (sideScore(s, e.side).holds >= rules.hold.maxPerMatch) return fail('hold_limit_reached');
+  s.hold = { side: e.side, startedAt: e.deviceTime, clockMs: e.matchClockMs, eventId: e.id };
+  return done(s);
+};
+
+const applyHoldEnd: Apply = (s, e, rules) => {
+  if (!e.side) return fail('side_required');
+  if (!s.hold || s.hold.side !== e.side) return fail('hold_not_active');
+  if (e.value === null || e.value < 0) return fail('value_required');
+  s.hold = null;
+  const points = holdPoints(rules, e.value);
+  if (points > 0) {
+    addTechnical(s, e.side, points);
+    sideScore(s, e.side).holds += 1;
+    checkSuperiority(s, rules);
+  }
+  return done(s);
+};
+
+const APPLY: Record<MatchEventType, Apply> = {
+  CLOCK_STARTED: (s, e) => applyClock(s, e, true),
+  CLOCK_STOPPED: (s, e) => applyClock(s, e, false),
+  SCORE: applyScore,
+  PENALTY: applyPenalty,
+  HOLD_STARTED: applyHoldStart,
+  HOLD_ENDED: applyHoldEnd,
+  // Отмена учитывается повтором журнала (replayEvents): само событие счёт не меняет.
+  EVENT_VOIDED: (s) => done(s),
+};
+
 /**
  * Применение одного события к состоянию. `strict` — проверка новой команды (код наказания должен совпадать со
  * следующим по порядку); при повторе журнала (`strict: false`) наказание берётся следующим по порядку, а
@@ -211,79 +292,7 @@ export function applyEvent(
 ): ApplyResult {
   const s = cloneState(state);
   s.seq = Math.max(s.seq, e.seq);
-  switch (e.type) {
-    case 'CLOCK_STARTED': {
-      if (s.clock.running) return fail('clock_running');
-      if (e.matchClockMs < s.clock.elapsedMs) return fail('clock_not_monotonic');
-      if (s.clock.elapsedMs >= s.durationMs) return fail('time_expired');
-      s.clock = { running: true, elapsedMs: Math.min(e.matchClockMs, s.durationMs), at: e.deviceTime };
-      return { ok: true, state: s };
-    }
-    case 'CLOCK_STOPPED': {
-      if (!s.clock.running) return fail('clock_not_running');
-      if (e.matchClockMs < s.clock.elapsedMs) return fail('clock_not_monotonic');
-      s.clock = { running: false, elapsedMs: Math.min(e.matchClockMs, s.durationMs), at: e.deviceTime };
-      return { ok: true, state: s };
-    }
-    case 'SCORE': {
-      if (!e.side) return fail('side_required');
-      const action = rules.actions.find((a) => a.code === e.actionCode);
-      if (!action) return fail('unknown_action');
-      if (s.decision) return fail('match_decided');
-      if (action.kind === 'TOTAL_VICTORY') {
-        s.decision = { kind: 'TOTAL_VICTORY', winner: e.side, detail: action.code };
-        s.lastTechnical = e.side;
-      } else {
-        addTechnical(s, e.side, action.points ?? 0);
-        checkSuperiority(s, rules);
-      }
-      return { ok: true, state: s };
-    }
-    case 'PENALTY': {
-      if (!e.side) return fail('side_required');
-      if (s.decision) return fail('match_decided');
-      const own = sideScore(s, e.side);
-      const next = rules.penalties[own.penalties.length];
-      if (!next) return fail('penalties_exhausted');
-      if (strict && e.actionCode && e.actionCode !== next.code)
-        return fail(
-          rules.penalties.some((p) => p.code === e.actionCode) ? 'penalty_out_of_order' : 'unknown_penalty',
-        );
-      own.penalties.push(next.code);
-      if (next.kind === 'DISQUALIFICATION') {
-        s.decision = { kind: 'DISQUALIFICATION', winner: other(e.side), detail: next.code };
-      } else {
-        sideScore(s, other(e.side)).points += next.opponentPoints ?? 0;
-        checkSuperiority(s, rules);
-      }
-      return { ok: true, state: s };
-    }
-    case 'HOLD_STARTED': {
-      if (!e.side) return fail('side_required');
-      if (s.decision) return fail('match_decided');
-      if (s.hold) return fail('hold_active');
-      if (!s.clock.running) return fail('clock_not_running');
-      if (sideScore(s, e.side).holds >= rules.hold.maxPerMatch) return fail('hold_limit_reached');
-      s.hold = { side: e.side, startedAt: e.deviceTime, clockMs: e.matchClockMs, eventId: e.id };
-      return { ok: true, state: s };
-    }
-    case 'HOLD_ENDED': {
-      if (!e.side) return fail('side_required');
-      if (!s.hold || s.hold.side !== e.side) return fail('hold_not_active');
-      if (e.value === null || e.value < 0) return fail('value_required');
-      s.hold = null;
-      const points = holdPoints(rules, e.value);
-      if (points > 0) {
-        addTechnical(s, e.side, points);
-        sideScore(s, e.side).holds += 1;
-        checkSuperiority(s, rules);
-      }
-      return { ok: true, state: s };
-    }
-    case 'EVENT_VOIDED':
-      // Отмена учитывается повтором журнала (replayEvents): само событие счёт не меняет.
-      return { ok: true, state: s };
-  }
+  return APPLY[e.type](s, e, rules, strict);
 }
 
 /**

@@ -286,23 +286,7 @@ export class ScheduleQueriesService {
         select: { matChangeoverSeconds: true },
       }),
     ]);
-    const categoryRows = await this.db.competitionCategory.findMany({
-      where: { id: { in: [...new Set(rows.map((r) => r.match.categoryId))] } },
-      select: { id: true, nameRu: true, nameEn: true },
-    });
-    const categoryName = new Map(categoryRows.map((c) => [c.id, { ru: c.nameRu, en: c.nameEn }]));
-    const entryIds = [
-      ...new Set(
-        rows.flatMap((r) => r.match.participants.map((p) => p.entryId).filter((x): x is string => !!x)),
-      ),
-    ];
-    const entries = entryIds.length
-      ? await this.db.entry.findMany({
-          where: { id: { in: entryIds } },
-          select: { id: true, publicName: true },
-        })
-      : [];
-    const publicNameOf = new Map(entries.map((e) => [e.id, e.publicName]));
+    const { categoryName, publicNameOf } = await this.queueLabels(rows);
 
     const live = rows.filter(
       (r) => r.match.status !== 'FINISHED' && !isNoMatch(r.match.status, isPlayed(r.match)),
@@ -319,25 +303,8 @@ export class ScheduleQueriesService {
       Date.now(),
       schedule?.matChangeoverSeconds ?? 60,
     );
-    const toItem = (r: QueueRow): MatQueueItemDto => {
-      const base = this.toMatchDto(
-        r,
-        categoryName.get(r.match.categoryId) ?? { ru: '', en: '' },
-        publicNameOf,
-      );
-      const result = r.match.result;
-      const score = result
-        ? { red: result.redScore ?? 0, blue: result.blueScore ?? 0 }
-        : scoreOf(r.match.state);
-      return {
-        ...base,
-        expectedAt: new Date(projection.expectedAt.get(r.matchId) ?? r.plannedAt.getTime()).toISOString(),
-        resultStatus: result?.status ?? null,
-        score,
-        winnerSide: result?.winnerSide ?? null,
-        method: result?.method ?? null,
-      };
-    };
+    const toItem = (r: QueueRow): MatQueueItemDto =>
+      this.queueItem(r, categoryName, publicNameOf, projection.expectedAt.get(r.matchId));
     const queue = live.map(toItem);
     const current =
       queue.find((m) => m.status === 'IN_PROGRESS' || m.status === 'PAUSED') ??
@@ -354,6 +321,50 @@ export class ScheduleQueriesService {
       next,
       awaitingConfirmation,
       delaySeconds: projection.delaySeconds,
+    };
+  }
+
+  /** Строка очереди ковра: схватка, ожидаемое начало, счёт (по журналу или результату) и исход. */
+  private queueItem(
+    r: QueueRow,
+    categoryName: ReadonlyMap<string, { ru: string; en: string }>,
+    publicNameOf: ReadonlyMap<string, string>,
+    expectedAt: number | undefined,
+  ): MatQueueItemDto {
+    const result = r.match.result;
+    return {
+      ...this.toMatchDto(r, categoryName.get(r.match.categoryId) ?? { ru: '', en: '' }, publicNameOf),
+      expectedAt: new Date(expectedAt ?? r.plannedAt.getTime()).toISOString(),
+      resultStatus: result?.status ?? null,
+      score: result ? { red: result.redScore ?? 0, blue: result.blueScore ?? 0 } : scoreOf(r.match.state),
+      winnerSide: result?.winnerSide ?? null,
+      method: result?.method ?? null,
+    };
+  }
+
+  /** Названия категорий и «Фамилия И.» участников строк очереди ковра. */
+  private async queueLabels(rows: QueueRow[]): Promise<{
+    categoryName: Map<string, { ru: string; en: string }>;
+    publicNameOf: Map<string, string>;
+  }> {
+    const categoryRows = await this.db.competitionCategory.findMany({
+      where: { id: { in: [...new Set(rows.map((r) => r.match.categoryId))] } },
+      select: { id: true, nameRu: true, nameEn: true },
+    });
+    const entryIds = [
+      ...new Set(
+        rows.flatMap((r) => r.match.participants.map((p) => p.entryId).filter((x): x is string => !!x)),
+      ),
+    ];
+    const entries = entryIds.length
+      ? await this.db.entry.findMany({
+          where: { id: { in: entryIds } },
+          select: { id: true, publicName: true },
+        })
+      : [];
+    return {
+      categoryName: new Map(categoryRows.map((c) => [c.id, { ru: c.nameRu, en: c.nameEn }])),
+      publicNameOf: new Map(entries.map((e) => [e.id, e.publicName])),
     };
   }
 

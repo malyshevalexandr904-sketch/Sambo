@@ -284,7 +284,7 @@ export async function playToResult(
 }
 
 export async function confirm(s: Session, m: { id: string; version: number }): Promise<ApiResponse> {
-  return (await send(s, 'post', `/api/v1/matches/${m.id}/result/confirm`, {}, m.version)) as ApiResponse;
+  return send(s, 'post', `/api/v1/matches/${m.id}/result/confirm`, {}, m.version);
 }
 
 /** Ответ API в тестах: статус и тело (тип supertest не переносим между пакетами). */

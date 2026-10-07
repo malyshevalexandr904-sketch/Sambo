@@ -4,12 +4,15 @@
 // (result.confirm) — победитель уходит дальше по сетке, снятые участники проигрывают неявкой. Блокировки при
 // подтверждении: категория → жеребьёвка → схватка (порядок BracketsService.lockDrawOfMatch).
 import { Injectable } from '@nestjs/common';
+import type { Tx } from '@sde/db';
 import {
   determineOutcome,
   type MatchDetailDto,
   type MatchResultInput,
+  type MatchState,
   type ProposedOutcome,
   replayEvents,
+  type ScoringRules,
 } from '@sde/contracts';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
@@ -17,7 +20,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { AuditService } from '../../audit';
 import { BracketsService } from '../../brackets';
 import { CategoryWorkflowService } from '../../categories';
-import { entryOn, MatchStoreService } from '../../matches';
+import { entryOn, type MatchRecord, MatchStoreService } from '../../matches';
 import { OutboxService } from '../../outbox';
 import { ActiveMatchService } from '../../registrations';
 import { WriteLeaseService } from '../../venue-sync';
@@ -31,6 +34,27 @@ function agrees(proposal: ProposedOutcome | null, input: MatchResultInput): bool
   if (!proposal) return false;
   if (proposal.winnerSide === null) return input.method === 'DECISION';
   return proposal.winnerSide === input.winnerSide && proposal.method === input.method;
+}
+
+/**
+ * Результат можно записать: схватка идёт или ждёт подтверждения (повторный ввод), пара полная, бригада видела
+ * последнее событие журнала. Возвращает признак повторного ввода.
+ */
+function assertRecordable(m: MatchRecord, expectedSeq: number): boolean {
+  const reentry = m.status === 'FINISHED' && m.result?.status === 'PROVISIONAL';
+  if (!reentry && !isLive(m.status))
+    throw m.status === 'FINISHED'
+      ? new DomainError('INVALID_TRANSITION', {
+          from: m.result?.status ?? m.status,
+          to: 'PROVISIONAL',
+          allowed: [],
+        })
+      : new DomainError('MATCH_NOT_IN_PROGRESS', { status: m.status });
+  if (entryOn(m, 'RED') === null || entryOn(m, 'BLUE') === null)
+    throw new DomainError('MATCH_PARTICIPANTS_INCOMPLETE', { matchId: m.id });
+  if (expectedSeq !== m.stateSeq)
+    throw new DomainError('EXPECTED_SEQ_MISMATCH', { expectedSeq, currentSeq: m.stateSeq });
+  return reentry;
 }
 
 @Injectable()
@@ -63,33 +87,8 @@ export class ResultsService {
     await this.db.tx(async (tx) => {
       await this.leases.assertWritable(tx, head.competitionId);
       const m = await this.store.lock(tx, matchId, version);
-      const reentry = m.status === 'FINISHED' && m.result?.status === 'PROVISIONAL';
-      if (!reentry && !isLive(m.status))
-        throw m.status === 'FINISHED'
-          ? new DomainError('INVALID_TRANSITION', {
-              from: m.result?.status ?? m.status,
-              to: 'PROVISIONAL',
-              allowed: [],
-            })
-          : new DomainError('MATCH_NOT_IN_PROGRESS', { status: m.status });
-      if (entryOn(m, 'RED') === null || entryOn(m, 'BLUE') === null)
-        throw new DomainError('MATCH_PARTICIPANTS_INCOMPLETE', { matchId });
-      if (input.expectedSeq !== m.stateSeq)
-        throw new DomainError('EXPECTED_SEQ_MISMATCH', {
-          expectedSeq: input.expectedSeq,
-          currentSeq: m.stateSeq,
-        });
-      const rules = await this.context.rules(tx, m.competitionId);
-      const state = replayEvents(
-        toScoringEvents(await this.store.events(tx, matchId)),
-        rules,
-        (m.durationSeconds ?? 0) * 1000,
-      );
-      // Итоговый счёт и время — при остановленном секундомере и законченном удержании.
-      if (state.clock.running || state.hold)
-        throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', {
-          failed: [state.clock.running ? 'clock_running' : 'hold_active'],
-        });
+      const reentry = assertRecordable(m, input.expectedSeq);
+      const { state, rules } = await this.finalState(tx, m);
       const proposal = determineOutcome(state, rules);
       const accepted = agrees(proposal, input);
       if (!accepted && !input.reason) throw new DomainError('REASON_REQUIRED', { proposed: proposal });
@@ -125,6 +124,18 @@ export class ResultsService {
       });
     });
     return this.queries.detail(user, matchId);
+  }
+
+  /** Итоговый счёт по журналу — при остановленном секундомере и законченном удержании. */
+  private async finalState(tx: Tx, m: MatchRecord): Promise<{ state: MatchState; rules: ScoringRules }> {
+    const rules = await this.context.rules(tx, m.competitionId);
+    const events = toScoringEvents(await this.store.events(tx, m.id));
+    const state = replayEvents(events, rules, (m.durationSeconds ?? 0) * 1000);
+    if (state.clock.running || state.hold)
+      throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', {
+        failed: [state.clock.running ? 'clock_running' : 'hold_active'],
+      });
+    return { state, rules };
   }
 
   /** Подтверждение (руководитель ковра этой сессии или главный судья): продвижение по сетке и утешительным. */

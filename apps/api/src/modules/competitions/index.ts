@@ -11,6 +11,7 @@ export {
   type TransitionContext,
   type TransitionEffect,
 } from './application/competition-extensions';
+export { CompetitionStatusWriter } from './application/competition-status.writer';
 export { CompetitionsService } from './application/competitions.service';
 export {
   isBeforeCompetition,

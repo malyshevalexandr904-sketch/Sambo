@@ -19,7 +19,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { PolicyService } from '../../access';
 import { AuditService } from '../../audit';
 import { CategoryWorkflowService } from '../../categories';
-import { CompetitionsService } from '../../competitions';
+import { CompetitionStatusWriter } from '../../competitions';
 import { entryOn, type MatchRecord, MatchStoreService } from '../../matches';
 import { OutboxService } from '../../outbox';
 import { ActiveMatchService } from '../../registrations';
@@ -51,7 +51,7 @@ export class MatchCommandsService {
     private readonly context: MatchContextService,
     private readonly queries: MatchQueriesService,
     private readonly store: MatchStoreService,
-    private readonly competitions: CompetitionsService,
+    private readonly competitionStatus: CompetitionStatusWriter,
     private readonly categories: CategoryWorkflowService,
     private readonly activeMatch: ActiveMatchService,
     private readonly leases: WriteLeaseService,
@@ -90,7 +90,7 @@ export class MatchCommandsService {
           select: { status: true },
         });
         if (status?.status === 'SCHEDULED')
-          await this.competitions.startOnFirstMatch(tx, head.competitionId, user.id);
+          await this.competitionStatus.startOnFirstMatch(tx, head.competitionId, user.id);
       }
       const locked = starting ? await this.categories.lockForCommand(tx, head.categoryId) : null;
       const m = await this.store.lock(tx, matchId, version);

@@ -24,7 +24,10 @@ interface NavItem {
   visible: boolean;
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+/**
+ * `bare` — экран без меню (планшет ковра во весь экран): та же проверка входа, без бокового меню.
+ */
+export function AppShell({ children, bare = false }: { children: ReactNode; bare?: boolean }) {
   const t = useTranslations();
   const me = useMe();
   const myAthletes = useMyAthletes(!!me.data?.personId);
@@ -61,9 +64,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const user = me.data;
+  if (bare) {
+    return (
+      <main id="main" className="min-h-screen bg-slate-100">
+        {children}
+      </main>
+    );
+  }
   const nav: NavItem[] = [
     { href: '/admin', label: t('nav.dashboard'), visible: true },
     { href: '/competitions', label: t('nav.competitions'), visible: true },
+    {
+      href: '/referee',
+      label: t('nav.referee'),
+      visible: user.grants.competitions.length > 0 || hasAnywhere(user, 'result.confirm'),
+    },
     {
       href: '/applications',
       label: t('nav.applications'),

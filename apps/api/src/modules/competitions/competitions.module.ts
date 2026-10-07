@@ -8,6 +8,7 @@ import { RuleSetsModule } from '../rulesets';
 import { CompetitionInvitesController, CompetitionsController } from './api/competitions.controller';
 import { CompetitionExtensions } from './application/competition-extensions';
 import { CompetitionScopeService } from './application/competition-scope.service';
+import { CompetitionStatusWriter } from './application/competition-status.writer';
 import { CompetitionReferences } from './application/competition-references';
 import { CompetitionsService } from './application/competitions.service';
 import { RegulationService } from './application/regulation.service';
@@ -24,11 +25,12 @@ import { StaffService } from './application/staff.service';
     CompetitionScopeService,
     CompetitionExtensions,
     CompetitionReferences,
+    CompetitionStatusWriter,
     CompetitionsService,
     RegulationService,
     StaffService,
   ],
-  exports: [CompetitionScopeService, CompetitionExtensions, CompetitionsService],
+  exports: [CompetitionScopeService, CompetitionExtensions, CompetitionStatusWriter, CompetitionsService],
 })
 export class CompetitionsModule implements OnModuleInit {
   constructor(
