@@ -485,7 +485,11 @@ describe('manual editing — forbidden and warned moves', () => {
       .filter((i) => i.categoryId === cat2.categoryId)
       .sort((a, b) => a.orderInMat - b.orderInMat);
     const [started, other] = cat2Items;
-    await t.admin.match.update({ where: { id: started!.matchId }, data: { status: 'IN_PROGRESS' } });
+    // Идущая схватка — на фактическом ковре и со временем старта (CHECK match_started_ck, Phase 7a).
+    await t.admin.match.update({
+      where: { id: started!.matchId },
+      data: { status: 'IN_PROGRESS', startedAt: new Date(), matId: started!.matId },
+    });
 
     const r = await send(
       w.staff.manager,

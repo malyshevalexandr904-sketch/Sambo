@@ -1,6 +1,6 @@
 // Проверка словарей в CI (ARCHITECTURE.md, 19): ключи ru и en совпадают, у каждого кода ошибки,
 // роли, типа и статуса организации, статусов и видов из справочников Phase 3, турниров Phase 4a и допуска,
-// прибытия, взвешивания, медицины и уведомлений Phase 4b, жеребьёвки и сеток Phase 5a есть перевод.
+// прибытия, взвешивания, медицины и уведомлений Phase 4b, жеребьёвки и сеток Phase 5a, судейства Phase 7a есть перевод.
 import {
   ADMISSION_CHECK_KINDS,
   ADMISSION_CHECK_STATUSES,
@@ -18,6 +18,9 @@ import {
   DOCUMENT_STATUSES,
   DRAW_STATUSES,
   ELIGIBILITY_REASONS,
+  MATCH_EVENT_TYPES,
+  MATCH_RESULT_STATUSES,
+  MATCH_STATUSES,
   ENTRY_STATUSES,
   ERROR_CODES,
   GUARDIAN_RELATIONS,
@@ -33,14 +36,18 @@ import {
   ROLE_CODES,
   ROUND_LABELS,
   RULESET_VERSION_STATUSES,
+  SAMPLE_RULESET_PARAMETERS,
+  SCORING_REJECTIONS,
   SEPARATION_KEYS,
   SYSTEM_SETTING_DEFAULTS,
+  TIE_BREAKERS,
   USER_STATUSES,
   WEIGH_IN_ATTEMPT_KINDS,
   WEIGH_IN_FAILURE_OUTCOMES,
   WEIGH_IN_RESULTS,
   WEIGH_IN_STATUSES,
   WEIGH_IN_WINDOW_KINDS,
+  WIN_METHODS,
 } from '@sde/contracts';
 import { describe, expect, it } from 'vitest';
 import en from './en.json';
@@ -100,6 +107,15 @@ describe('i18n dictionaries', () => {
       ...COMPETITION_FORMAT_CODES.map((f) => `draws.formats.${f}`),
       ...SEPARATION_KEYS.flatMap((k) => [`draws.create.keys.${k}`, `draws.separation.keys.${k}`]),
       ...ROUND_LABELS.map((l) => `bracket.rounds.${l}`),
+      ...MATCH_STATUSES.map((s) => `referee.matchStatuses.${s}`),
+      ...MATCH_RESULT_STATUSES.map((s) => `referee.resultStatuses.${s}`),
+      ...MATCH_EVENT_TYPES.map((s) => `referee.eventTypes.${s}`),
+      ...WIN_METHODS.map((m) => `referee.methods.${m}`),
+      ...TIE_BREAKERS.map((b) => `referee.tieBreakers.${b}`),
+      ...SCORING_REJECTIONS.map((r) => `referee.rejections.${r}`),
+      ...[...SAMPLE_RULESET_PARAMETERS.actions, ...SAMPLE_RULESET_PARAMETERS.penalties].map(
+        (a) => `referee.codes.${a.code}`,
+      ),
       ...NOTIFICATION_TYPES.flatMap((n) => [
         `notifications.types.${n.replace('.', '_')}.title`,
         `notifications.prefs.${n.replace('.', '_')}`,

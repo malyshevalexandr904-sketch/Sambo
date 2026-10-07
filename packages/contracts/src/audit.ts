@@ -154,5 +154,16 @@ export const AUDIT_ACTIONS = [
   'schedule.published',
   'mat_assignment.updated',
   'mat_assignment.copied',
+  // Phase 7a — схватки: переходы, результат, подтверждение, неявки (события счёта — в журнале схватки, не в аудите).
+  'match.called',
+  'match.call_cancelled',
+  'match.started',
+  'match.paused',
+  'match.resumed',
+  'match.result_recorded',
+  'match.result_corrected',
+  'match.result_confirmed',
+  'match.no_show',
+  'match.no_show_auto',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

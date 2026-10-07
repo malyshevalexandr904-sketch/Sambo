@@ -45,6 +45,10 @@ export const WIN_METHODS = [
 ] as const;
 export type WinMethod = (typeof WIN_METHODS)[number];
 
+/** PROVISIONAL — внесла бригада ковра; CONFIRMED — подтвердил руководитель ковра или главный судья (7b: PUBLISHED, AMENDED). */
+export const MATCH_RESULT_STATUSES = ['PROVISIONAL', 'CONFIRMED', 'PUBLISHED', 'AMENDED'] as const;
+export type MatchResultStatus = (typeof MATCH_RESULT_STATUSES)[number];
+
 export const BRACKET_STAGES = ['MAIN', 'REPECHAGE', 'POOL'] as const;
 export type BracketStage = (typeof BRACKET_STAGES)[number];
 
@@ -173,6 +177,14 @@ export interface BracketMatchDto {
   status: MatchStatus;
   winnerSide: Side | null;
   durationSeconds: number | null;
+  /** Результат схватки (Phase 7a): способ, счёт, предварительный или подтверждённый. */
+  result: {
+    status: MatchResultStatus;
+    winnerSide: Side | null;
+    method: WinMethod;
+    redScore: number | null;
+    blueScore: number | null;
+  } | null;
 }
 
 export interface BracketNodeDto {

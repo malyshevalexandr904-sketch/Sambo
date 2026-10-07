@@ -1,11 +1,13 @@
-// Схватки сеток (DATABASE.md, 3.6): модуль — владелец таблиц match и match_participant. Phase 5a создаёт схватки
-// при публикации жеребьёвки, заполняет стороны при продвижении по сетке и удаляет несыгранные схватки при новой
-// версии жеребьёвки. Машина состояний схватки, счёт и результат — Phase 7.
+// Схватки сеток (DATABASE.md, 3.6): модуль — владелец таблиц match, match_participant, match_event и match_result.
+// Phase 5a создаёт схватки при публикации жеребьёвки, заполняет стороны при продвижении по сетке и удаляет
+// несыгранные схватки при новой версии жеребьёвки. Phase 7a: схватка, решённая без соперника, получает результат
+// «без соперника» (BYE), подтверждённый системой; состояние, журнал и результат схватки — MatchStoreService.
 import { Injectable } from '@nestjs/common';
-import type { MatchStatus, Side } from '@sde/contracts';
+import type { MatchStatus, Side, WinMethod } from '@sde/contracts';
 import { type Prisma, publicId, type Tx, uuidv7 } from '@sde/db';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { isStartedOrPlayed, isSystemDecided, MATCH_INCLUDE, type MatchRecord, sideOf } from './match-record';
 
 export interface SideInit {
   entryId: string | null;
@@ -23,22 +25,34 @@ export interface MatchSpec {
   winnerSide: Side | null;
 }
 
-const MATCH_INCLUDE = { participants: true } satisfies Prisma.MatchInclude;
-export type MatchRecord = Prisma.MatchGetPayload<{ include: typeof MATCH_INCLUDE }>;
-
-/** Схватка началась или сыграна: её стороны больше не меняются продвижением по сетке. */
-const STARTED: readonly MatchStatus[] = ['IN_PROGRESS', 'PAUSED'];
-
-export const sideOf = (m: MatchRecord, side: Side) => m.participants.find((p) => p.side === side);
-
-/** Сыграна (а не завершена системой без соперника). */
-export const isPlayed = (m: MatchRecord): boolean =>
-  m.status === 'FINISHED' && m.participants.length === 2 && m.participants.every((p) => p.entryId !== null);
-
-export const isStartedOrPlayed = (m: MatchRecord): boolean => STARTED.includes(m.status) || isPlayed(m);
+/** Подтверждённый исход схватки сетки (движок продвижения: BracketsService.applyConfirmedResult). */
+export interface ConfirmedOutcome {
+  /** Пусто — неявка обоих: оба проигравшие. */
+  winnerSide: Side | null;
+  method: WinMethod;
+  methodDetail?: string | null;
+  redScore?: number | null;
+  blueScore?: number | null;
+}
 
 const statusFor = (spec: MatchSpec): MatchStatus =>
   spec.resolution === 'WALKOVER' ? 'FINISHED' : spec.resolution === 'EMPTY' ? 'CANCELLED' : 'SCHEDULED';
+
+/** Результат «без соперника» (BYE), подтверждённый системой. */
+const byeResult = (
+  competitionId: string,
+  matchId: string,
+  winnerSide: Side | null,
+  at: Date,
+): Prisma.MatchResultCreateManyInput => ({
+  id: uuidv7(),
+  competitionId,
+  matchId,
+  status: 'CONFIRMED',
+  winnerSide,
+  method: 'BYE',
+  confirmedAt: at,
+});
 
 @Injectable()
 export class MatchesService {
@@ -65,6 +79,7 @@ export class MatchesService {
     const now = new Date();
     const matches: Prisma.MatchCreateManyInput[] = [];
     const sides: Prisma.MatchParticipantCreateManyInput[] = [];
+    const results: Prisma.MatchResultCreateManyInput[] = [];
     for (const spec of specs) {
       const id = uuidv7();
       const status = statusFor(spec);
@@ -81,6 +96,7 @@ export class MatchesService {
         winnerSide: spec.resolution === 'WALKOVER' ? spec.winnerSide : null,
         finishedAt: status === 'FINISHED' ? now : null,
       });
+      if (spec.resolution === 'WALKOVER') results.push(byeResult(competitionId, id, spec.winnerSide, now));
       for (const side of ['RED', 'BLUE'] as const) {
         const s = side === 'RED' ? spec.red : spec.blue;
         sides.push({ id: uuidv7(), competitionId, matchId: id, side, entryId: s.entryId, isBye: s.bye });
@@ -88,6 +104,7 @@ export class MatchesService {
     }
     await tx.match.createMany({ data: matches });
     await tx.matchParticipant.createMany({ data: sides });
+    if (results.length > 0) await tx.matchResult.createMany({ data: results });
   }
 
   async byNodes(tx: Tx | null, bracketNodeIds: string[]): Promise<MatchRecord[]> {
@@ -108,8 +125,16 @@ export class MatchesService {
     return (tx ?? this.db).match.findUnique({ where: { id: matchId }, include: MATCH_INCLUDE });
   }
 
-  /** Сыгранная схватка: победитель (подтверждённый результат — Phase 7). */
-  async markDecided(tx: Tx, matchId: string, winnerSide: Side): Promise<MatchRecord> {
+  /**
+   * Подтверждённый исход, записанный без бригады ковра (движок продвижения и его тесты; система): схватка
+   * завершается, результат — подтверждённый. Вызывается под блокировкой жеребьёвки (BracketsService).
+   */
+  async recordConfirmedOutcome(
+    tx: Tx,
+    matchId: string,
+    outcome: ConfirmedOutcome,
+    confirmedById: string | null,
+  ): Promise<MatchRecord> {
     const [row] = await tx.$queryRaw<{ id: string }[]>`
       SELECT id FROM "match" WHERE id = ${matchId}::uuid FOR UPDATE`;
     if (!row) throw new DomainError('NOT_FOUND', { resource: 'match' });
@@ -118,16 +143,39 @@ export class MatchesService {
       throw new DomainError('MATCH_PARTICIPANTS_INCOMPLETE', { matchId });
     if (match.status === 'FINISHED' || match.status === 'CANCELLED')
       throw new DomainError('INVALID_TRANSITION', { from: match.status, to: 'FINISHED', allowed: [] });
+    const now = new Date();
+    await tx.matchResult.create({
+      data: {
+        id: uuidv7(),
+        competitionId: match.competitionId,
+        matchId,
+        status: 'CONFIRMED',
+        winnerSide: outcome.winnerSide,
+        method: outcome.method,
+        methodDetail: outcome.methodDetail ?? null,
+        redScore: outcome.redScore ?? null,
+        blueScore: outcome.blueScore ?? null,
+        proposedById: confirmedById,
+        proposedAt: now,
+        confirmedById,
+        confirmedAt: now,
+      },
+    });
     return tx.match.update({
       where: { id: matchId },
-      data: { status: 'FINISHED', winnerSide, finishedAt: new Date(), version: { increment: 1 } },
+      data: {
+        status: 'FINISHED',
+        winnerSide: outcome.winnerSide,
+        finishedAt: now,
+        version: { increment: 1 },
+      },
       include: MATCH_INCLUDE,
     });
   }
 
   /**
    * Приведение сторон и статуса схваток к состоянию сетки после продвижения. Схватку, которая уже идёт или сыграна,
-   * менять нельзя: DEPENDENT_MATCHES_STARTED (изменение результата, от которого она зависит, — Phase 7).
+   * менять нельзя: DEPENDENT_MATCHES_STARTED (изменение результата, от которого она зависит, — Phase 7b).
    */
   async sync(tx: Tx, competitionId: string, specs: MatchSpec[]): Promise<number> {
     const current = new Map(
@@ -158,14 +206,14 @@ export class MatchesService {
       const p = sideOf(m, side);
       return (p?.entryId ?? null) === s.entryId && (p?.isBye ?? false) === s.bye;
     };
+    if (!same('RED', spec.red) || !same('BLUE', spec.blue)) return true;
+    // Идущая или сыгранная схватка с теми же сторонами состоянию сетки соответствует.
+    if (isStartedOrPlayed(m)) return false;
+    // Вызванная схватка (READY) — та же несыгранная схватка, продвижение её не сбрасывает.
+    const have = m.status === 'READY' ? 'SCHEDULED' : m.status;
+    if (have !== statusFor(spec)) return true;
     const winner = spec.resolution === 'WALKOVER' ? spec.winnerSide : null;
-    if (m.status === 'FINISHED' && isPlayed(m)) return !same('RED', spec.red) || !same('BLUE', spec.blue);
-    return (
-      !same('RED', spec.red) ||
-      !same('BLUE', spec.blue) ||
-      m.status !== statusFor(spec) ||
-      (m.status === 'FINISHED' && m.winnerSide !== winner)
-    );
+    return m.status === 'FINISHED' && m.winnerSide !== winner;
   }
 
   private async apply(tx: Tx, competitionId: string, m: MatchRecord, spec: MatchSpec): Promise<void> {
@@ -182,12 +230,20 @@ export class MatchesService {
     // которая была без соперника с публикации и стала настоящей.
     const matchNumber =
       m.matchNumber ?? (status === 'SCHEDULED' ? await this.nextNumber(tx, competitionId) : null);
+    const winnerSide = spec.resolution === 'WALKOVER' ? spec.winnerSide : null;
+    const now = new Date();
+    // Результат «без соперника» следует за состоянием узла: появился у решённой без соперника схватки, исчез — если
+    // она снова ждёт соперника (изменение результата раньше по сетке, Phase 7b).
+    if (m.result?.method === 'BYE') await tx.matchResult.delete({ where: { matchId: m.id } });
+    if (status === 'FINISHED')
+      await tx.matchResult.create({ data: byeResult(competitionId, m.id, winnerSide, now) });
     await tx.match.update({
       where: { id: m.id },
       data: {
         status,
-        winnerSide: spec.resolution === 'WALKOVER' ? spec.winnerSide : null,
-        finishedAt: status === 'FINISHED' ? new Date() : null,
+        winnerSide,
+        finishedAt: status === 'FINISHED' ? now : null,
+        readyAt: null,
         matchNumber,
         version: { increment: 1 },
       },
@@ -195,14 +251,25 @@ export class MatchesService {
   }
 
   /** Схватки узлов, которые начались или сыграны: при них новая версия жеребьёвки запрещена. */
+  /**
+   * Начатые и сыгранные схватки узлов — они запрещают новую версию жеребьёвки. Автоматическая неявка снятого
+   * участника (исход системы, никто не боролся) не мешает: новая сетка строится без снятых.
+   */
   async startedAmong(tx: Tx, bracketNodeIds: string[]): Promise<MatchRecord[]> {
-    return (await this.byNodes(tx, bracketNodeIds)).filter(isStartedOrPlayed);
+    return (await this.byNodes(tx, bracketNodeIds)).filter(
+      (m) => isStartedOrPlayed(m) && !isSystemDecided(m),
+    );
   }
 
-  /** Удаление схваток узлов (новая версия жеребьёвки): только несыгранные — проверяет вызывающий. */
+  /**
+   * Удаление схваток узлов (новая версия жеребьёвки): только несыгранные — проверяет вызывающий. Результаты
+   * «без соперника» удаляются вместе со схватками; журнала событий у несыгранной схватки нет.
+   */
   async removeForNodes(tx: Tx, bracketNodeIds: string[]): Promise<void> {
     if (bracketNodeIds.length === 0) return;
-    await tx.matchParticipant.deleteMany({ where: { match: { bracketNodeId: { in: bracketNodeIds } } } });
+    const where = { match: { bracketNodeId: { in: bracketNodeIds } } };
+    await tx.matchResult.deleteMany({ where });
+    await tx.matchParticipant.deleteMany({ where });
     await tx.match.deleteMany({ where: { bracketNodeId: { in: bracketNodeIds } } });
   }
 }

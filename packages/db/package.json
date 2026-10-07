@@ -1,6 +1,6 @@
 {
   "name": "@sde/db",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": true,
   "description": "Схема Prisma, миграции, клиент БД и seed",
   "type": "commonjs",

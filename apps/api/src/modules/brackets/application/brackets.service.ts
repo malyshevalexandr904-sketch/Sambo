@@ -3,12 +3,18 @@
 // Состояние сетки не хранится отдельно: оно пересчитывается из жеребьёвки и сыгранных схваток, а стороны схваток
 // приводятся к нему — так продвижение, BYE и утешительные схватки не расходятся с графом.
 import { Injectable } from '@nestjs/common';
-import type { BracketNodeDto, BracketStage, CompetitionFormatCode, DrawStatus, Side } from '@sde/contracts';
+import type { BracketNodeDto, BracketStage, CompetitionFormatCode, DrawStatus } from '@sde/contracts';
 import { type Tx, uuidv7 } from '@sde/db';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { AuditService } from '../../audit';
-import { isPlayed, type MatchRecord, MatchesService } from '../../matches';
+import {
+  type ConfirmedOutcome,
+  isConfirmed,
+  isPlayed,
+  type MatchRecord,
+  MatchesService,
+} from '../../matches';
 import { nodeDependencies, participantsKnownAtPublish } from '../domain/dependencies';
 import type { BracketGraph, BracketState, Outcome } from '../domain/graph';
 import { type FormatStrategy, resolveFormat, strategyFor } from '../domain/strategies';
@@ -141,8 +147,15 @@ export class BracketsService {
       const m = byNode.get(id);
       if (!m) continue;
       matchByKey.set(key, m);
-      // Способ победы хранит результат схватки (Phase 7); для продвижения достаточно победителя.
-      if (isPlayed(m) && m.winnerSide) outcomes.set(key, { winner: m.winnerSide, method: 'POINTS' });
+      // Сетку продвигает только подтверждённый результат сыгранной схватки (Phase 7a): победитель (или никто —
+      // неявка обоих), способ и счёт — для мест в круговой системе.
+      if (isPlayed(m) && isConfirmed(m) && m.result)
+        outcomes.set(key, {
+          winner: m.result.winnerSide,
+          method: m.result.method,
+          redScore: m.result.redScore ?? undefined,
+          blueScore: m.result.blueScore ?? undefined,
+        });
     }
     const state = resolveFormat(strategy, graph, slotMap(draw.slots), outcomes);
     return {
@@ -206,9 +219,10 @@ export class BracketsService {
    * Жеребьёвка схватки сетки, заблокированная FOR UPDATE; жеребьёвка должна быть опубликована. Блокировка
    * упорядочивает продвижение по одной сетке (результаты на двух коврах не перезаписывают стороны друг друга)
    * и не даёт новой версии жеребьёвки удалить только что сыгранную схватку. Порядок блокировок — жеребьёвка,
-   * затем схватка, как у новой версии жеребьёвки. Схватка вне сетки — null.
+   * затем схватка, как у новой версии жеребьёвки: вызывающий блокирует схватку только после этого вызова.
+   * Схватка вне сетки — null.
    */
-  private async lockDrawOfMatch(tx: Tx, matchId: string): Promise<string | null> {
+  async lockDrawOfMatch(tx: Tx, matchId: string): Promise<string | null> {
     const [row] = await tx.$queryRaw<{ id: string; status: DrawStatus }[]>`
       SELECT d.id, d.status::text AS status
         FROM "match" m
@@ -223,23 +237,61 @@ export class BracketsService {
     return row.id;
   }
 
+  /** Опубликованная жеребьёвка FOR UPDATE (снятие участника: неявки по сетке под той же блокировкой). */
+  async lockDraw(tx: Tx, drawId: string): Promise<boolean> {
+    const [row] = await tx.$queryRaw<{ status: DrawStatus }[]>`
+      SELECT status::text AS status FROM "draw" WHERE id = ${drawId}::uuid FOR UPDATE`;
+    return row?.status === 'PUBLISHED';
+  }
+
   /**
-   * Подтверждённый результат схватки сетки (ARCHITECTURE.md, 16.6): победитель и продвижение — в одной транзакции.
-   * Вызывает модуль схваток (Phase 7) после подтверждения результата уполномоченным лицом. Вызывающий не должен
-   * блокировать схватку до вызова: сначала блокируется жеребьёвка (см. lockDrawOfMatch).
+   * Продвижение после подтверждённого результата схватки `matchId` (ARCHITECTURE.md, 16.6): стороны зависимых
+   * схваток приводятся к состоянию сетки, аудит `bracket.advanced`. Вызывается под блокировкой lockDrawOfMatch.
    */
-  async applyConfirmedResult(tx: Tx, matchId: string, winnerSide: Side): Promise<number> {
-    const drawId = await this.lockDrawOfMatch(tx, matchId);
-    const match = await this.matches.markDecided(tx, matchId, winnerSide);
-    const changed = drawId ? await this.propagate(tx, drawId) : 0;
+  async advance(tx: Tx, drawId: string, matchId: string, competitionId: string): Promise<number> {
+    const changed = await this.propagate(tx, drawId);
     await this.audit.record(tx, {
       action: 'bracket.advanced',
       entityType: 'Match',
       entityId: matchId,
-      competitionId: match.competitionId,
-      after: { winnerSide, changedMatches: changed },
+      competitionId,
+      after: { changedMatches: changed },
     });
     return changed;
+  }
+
+  /** Узлы опубликованной сетки жеребьёвки (id) — для поиска схваток сетки. */
+  async nodeIdsOfDraw(tx: Tx | null, drawId: string): Promise<string[]> {
+    const rows = await (tx ?? this.db).bracketNode.findMany({
+      where: { bracket: { drawId } },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  }
+
+  /** Опубликованная жеребьёвка категории (id) или null — сетки нет. */
+  async publishedDrawOfCategory(tx: Tx | null, categoryId: string): Promise<string | null> {
+    const row = await (tx ?? this.db).draw.findFirst({
+      where: { categoryId, status: 'PUBLISHED' },
+      select: { id: true },
+    });
+    return row?.id ?? null;
+  }
+
+  /**
+   * Подтверждённый исход без бригады ковра (система и тесты движка): победитель и продвижение — в одной транзакции.
+   * Судейство (Phase 7a) подтверждает предварительный результат своей командой: lockDrawOfMatch → схватка →
+   * advance — в том же порядке блокировок.
+   */
+  async applyConfirmedResult(
+    tx: Tx,
+    matchId: string,
+    outcome: ConfirmedOutcome,
+    confirmedById: string | null = null,
+  ): Promise<number> {
+    const drawId = await this.lockDrawOfMatch(tx, matchId);
+    const match = await this.matches.recordConfirmedOutcome(tx, matchId, outcome, confirmedById);
+    return drawId ? this.advance(tx, drawId, matchId, match.competitionId) : 0;
   }
 
   /** Сетка жеребьёвки удаляется при новой версии, если ни одна схватка не начата и не сыграна. */

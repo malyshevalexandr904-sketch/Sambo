@@ -4,7 +4,7 @@
 
 Архитектурные документы Phase 1 (согласованы заказчиком 2026-09-23) ведутся в проекте Claude «sambo-online.ru»:
 `ARCHITECTURE.md`, `DATABASE.md`, `API.md`, `PERMISSIONS.md`, `SECURITY.md`, `ADR.md`, `PROJECT_ANALYSIS.md`, `IMPLEMENTATION_PLAN.md`.
-Каждая фаза дополняет их; ниже — изменения, внесённые Phase 2, 3, 4a, 4b и 5a. В репозитории — эксплуатационные документы:
+Каждая фаза дополняет их; ниже — изменения, внесённые Phase 2, 3, 4a, 4b, 5a, 6 и 7a. В репозитории — эксплуатационные документы:
 
 - [DEPLOYMENT.md](DEPLOYMENT.md) — окружения, переменные, роли БД, миграции, хранилище.
 - [../CONTRIBUTING.md](../CONTRIBUTING.md) — правила работы с кодом.
@@ -21,8 +21,65 @@
 | 4b Допуск, check-in, взвешивание, медицина, уведомления | Выполнена (версия 0.5.1) |
 | 5a Draw & Brackets: жеребьёвка, круговая, олимпийская, выбывание с утешительными | Выполнена (версия 0.6.0) |
 | 5b Остальные форматы: двойное выбывание, штрафные очки, группы, группы + плей-офф | До Phase 12, порядок — по потребностям пилота |
-| **6 Scheduling: ковры, сессии, автопланировщик, ручная правка, бригады** | **Выполнена** (версия 0.7.0) |
-| 7 Matches & Scoring → 12 Hardening | Впереди (IMPLEMENTATION_PLAN.md) |
+| 6 Scheduling: ковры, сессии, автопланировщик, ручная правка, бригады | Выполнена (версия 0.7.0) |
+| **7a Matches «Ковёр»: схватка на планшете, счёт, результат, подтверждение, продвижение сетки** | **Выполнена** (версия 0.8.0) |
+| 7b «Итоги»: места и медали, публикация результатов, изменение подтверждённого результата, врач, протоколы | Следующая (claude/docs/PHASE7_PLAN.md) |
+| 8 Live → 12 Hardening | Впереди (IMPLEMENTATION_PLAN.md) |
+
+## Изменения Phase 7a
+
+Схватка на планшете ковра от вызова до подтверждённого результата: состояния схватки, журнал событий только на дополнение, счёт — чистая функция журнала и правил турнира (общий редьюсер сервера и планшета, тесты property-based), предварительный результат бригады и подтверждение руководителем ковра или главным судьёй с продвижением сетки, автоматические неявки снятых участников, результат «без соперника» системой, реальные статусы на экране «Ковры» и в сетке, раздел «Судейство». Ниже — уточнения, найденные при реализации; согласованную архитектуру они не меняют.
+
+### DATABASE.md
+
+| Сущность | Изменение | Причина |
+|---|---|---|
+| `Match` | + `matId` (фактический ковёр, записывается при старте), `state` (JSON — проекция счёта, `MatchState` из `packages/contracts/scoring.ts`), `stateSeq` (номер последнего события журнала), `readyAt`, `startedAt`; индекс `(matId, status)`. CHECK: `stateSeq >= 0`; `READY` — с `readyAt`; `IN_PROGRESS`/`PAUSED` — с `startedAt` и `matId` | План §1, §6; проекция — чтобы экраны не пересчитывали журнал |
+| `Entry` | + `activeMatchId` («спортсмен на ковре», FK на `Match`, индекс) — ставится и снимается **условным обновлением** `status = 'APPROVED' AND (active_match_id IS NULL OR = :match)` под advisory-блокировкой спортсмена в турнире (тот же спортсмен может быть заявлен в две категории — занятость проверяется по спортсмену, а не по участию) | План §1 (`ATHLETE_IN_ACTIVE_MATCH`) |
+| `MatchEvent` | Журнал: `seq`, `type` (`MatchEventType`: `CLOCK_STARTED`, `CLOCK_STOPPED`, `SCORE`, `HOLD_STARTED`, `HOLD_ENDED`, `PENALTY`, `EVENT_VOIDED`), `side?`, `actionCode?` (код из правил турнира), `value?` (длительность удержания, мс), `matchClockMs`, `deviceTime`, `serverTime`, `voidsEventId?`, `idempotencyKey`, `recordedById`, `deviceId`, `payload?` (без ПДн). unique `(matchId, seq)` и `(matchId, idempotencyKey)`; CHECK: `seq >= 1`, `matchClockMs >= 0`, отмена — только с `voidsEventId`, сторона обязательна для оценок, наказаний и удержаний, `actionCode` — для оценок и наказаний. **У роли приложения — только `SELECT, INSERT`** (`REVOKE UPDATE, DELETE, TRUNCATE`, как у `weigh_in_attempt`) | План §2, §6 |
+| `MatchResult` | Один на схватку (unique `matchId`): `status` (`PROVISIONAL`, `CONFIRMED`; `PUBLISHED`, `AMENDED` и `revision` — Phase 7b), `winnerSide?`, `method` (`WinMethod`: `TOTAL_VICTORY`, `SUPERIORITY`, `POINTS`, `DECISION`, `NO_SHOW`, `WITHDRAWAL`, `INJURY`, `DISQUALIFICATION`, `BYE`), `methodDetail?` (код действия, наказания или тай-брейка), `redScore`, `blueScore`, `durationMs`, `basedOnSeq`, `reason?`, `proposedBy/At`, `confirmedBy/At`, `version`; индекс `(competitionId, status)`. CHECK: подтверждённый — с `confirmedAt` и тем, кто подтвердил, **кроме исходов системы `BYE` и `NO_SHOW`** (автоматическая неявка снятого участника); победитель обязателен, кроме неявки обоих (`NO_SHOW`); счёт и длительность неотрицательны | План §3, §6 |
+| Миграция данных | Схваткам, решённым без соперника при жеребьёвке (`FINISHED` с пустой стороной), — подтверждённый результат `BYE`. Схваток `FINISHED` с обоими участниками без результата до 7a быть не могло (команды результата не было); если они есть в чужой базе — продвижение сетки их не учтёт (исход берётся только из подтверждённого результата) | План §6 |
+| `match_event`, `match_result` | Триггеры `*_sync_log` (у журнала — только `INSERT`) | ADR-21 |
+
+### API.md, 6.3 — спецификация
+
+Все команды — операционные (**[L]**): пока право записи у площадочного узла, облако отвечает `409 WRITE_AUTHORITY_ELSEWHERE`; в транзакции команды — повторная проверка права записи (`FOR SHARE`).
+
+| Метод | Путь | Авторизация | Назначение |
+|---|---|---|---|
+| GET | `/api/v1/matches/{id}` | `competition.view` | Схватка: стороны, правила для кнопок, проекция счёта, `seq`, результат, предложенный исход, `allowedActions` |
+| GET | `/api/v1/matches/{id}/events?afterSeq` | `competition.view` | Журнал (с отметкой отменённых и устройством, записавшим событие) |
+| POST | `/api/v1/matches/{id}/transitions` | право перехода: `match.update` (вызов, отмена вызова, пауза), `match.start` (старт, продолжение); If-Match; **[L]** | `SCHEDULED ↔ READY`, `READY → IN_PROGRESS`, `IN_PROGRESS ↔ PAUSED`; `FINISHED` — только командой результата (`MATCH_RESULT_INCOMPLETE`) |
+| POST | `/api/v1/matches/{id}/events` | `scoring.create`; `Idempotency-Key`; `expectedSeq`; **[L]** | Событие счёта; ответ — событие, новый `seq`, счёт и предложенный исход. Повтор с тем же ключом возвращает сохранённый ответ |
+| POST | `/api/v1/matches/{id}/events/{eventId}/void` | `scoring.update`; `Idempotency-Key`; `expectedSeq`; **[L]** | Отмена события компенсирующим событием (отмена половины удержания отменяет его целиком) |
+| POST | `/api/v1/matches/{id}/result` | `match.finish`; If-Match; `expectedSeq`; **[L]** | Предварительный результат и завершение; исход не по предложению — с причиной (`REASON_REQUIRED`); до подтверждения можно ввести заново |
+| POST | `/api/v1/matches/{id}/result/confirm` | `result.confirm`; If-Match; **[L]** | Подтверждение: продвижение сетки, неявки снятых участников по цепочке |
+| POST | `/api/v1/matches/{id}/no-show` | `match.finish`; If-Match; **[L]** | Неявка по вызову (`RED`, `BLUE`, `BOTH`) — предварительный результат `NO_SHOW` |
+| GET | `/api/v1/competitions/{id}/officiating` | `competition.view` | Раздел «Судейство»: ковры текущей сессии (свои сверху), текущая схватка ковра, сколько ждёт подтверждения |
+| GET | `/api/v1/competitions/{id}/pending-confirmations` | `competition.view` | Схватки, ждущие подтверждения; `canConfirm` — может ли пользователь подтвердить |
+| GET | `/api/v1/mats/{id}/console` | `competition.view` | Планшет ковра: текущая схватка целиком (с `allowedActions`), следующая, ждущие подтверждения, время сервера |
+
+- Коды ошибок: `ATHLETE_IN_ACTIVE_MATCH`, `MATCH_NOT_IN_PROGRESS`, `EVENT_NOT_ALLOWED_BY_RULESET` (в `details.reason` — причина редьюсера: `unknown_action`, `penalty_out_of_order`, `hold_limit_reached`, `clock_running`, `match_decided` и др.), `MATCH_RESULT_INCOMPLETE`; уже существующие — `EXPECTED_SEQ_MISMATCH`, `MATCH_PARTICIPANTS_INCOMPLETE`, `TRANSITION_PRECONDITIONS_NOT_MET` (`details.failed`: `participant_withdrawn`, `not_admitted`, `not_scheduled`, `competition_status`, `duration_unknown`, `clock_running`, `hold_active`), `REASON_REQUIRED`, `VERSION_CONFLICT`.
+- Отдельный эндпоинт для перехода `→ FINISHED` не нужен: завершение без результата запрещено, поэтому завершает схватку `POST .../result` (в плане фазы завершение было перечислено среди переходов `transitions`).
+- Подтверждённые исходы продвигают сетку; предварительный — нет. `BracketMatchDto.result` (статус, победитель, способ, счёт) — в сетке категории; `MatQueueDto` экрана «Ковры» — `+ awaitingConfirmation`, `delaySeconds`, у схватки `expectedAt`, `resultStatus`, `score`, `winnerSide`, `method`.
+- События: `match.started` (`{matchId, categoryId}`), `match.result_confirmed` (`{matchId, categoryId, winnerSide, method}`; `winnerSide = null` — неявка обоих).
+- Действия аудита: `match.called`, `match.call_cancelled`, `match.started`, `match.paused`, `match.resumed`, `match.result_recorded`, `match.result_corrected`, `match.result_confirmed`, `match.no_show`, `match.no_show_auto` (и уже существующее `bracket.advanced` при продвижении). События счёта в аудит не пишутся — журнал схватки сам является журналом (неизменяемым).
+
+### PERMISSIONS.md
+
+- Новых прав нет: `match.*`, `scoring.*`, `result.confirm` и политики `MAT_ASSIGNED`, `MAT_CHIEF` — в матрице с Phase 1. Политики реализованы в `scheduling/application/crew-access.service.ts` (модуль расписания — владелец бригад): судья действует только на ковре схватки (фактическом после старта, иначе по расписанию) в сессии её места в расписании; `MAT_CHIEF` — должность «руководитель ковра» в этой сессии. Главный судья и руководитель турнира — по прямым правам матрицы. Судья без назначения — 403.
+- Ресурс политик — схватка: резолвер `match` (`refereeing/application/match-context.service.ts`) отдаёт область турнира и `{ matchId }`.
+- `allowedActions` схватки учитывают права, назначение и состояние (`transition:READY` … `result.confirm`, `no_show`) — планшет показывает только доступные кнопки.
+
+### ARCHITECTURE.md
+
+- Модуль `refereeing` (команды и запросы судейства, домен — машина состояний схватки) над `matches` (хранение агрегата схватки: схватка, стороны, журнал, результат — `MatchStoreService`), `brackets`, `scheduling`, `registrations`, `competitions`, `categories`. Редьюсер счёта — в `packages/contracts/src/scoring.ts`: тот же код на сервере (строгая проверка новой команды) и на планшете (предпросмотр до подтверждения).
+- **Порядок блокировок:** право записи `FOR SHARE` → турнир `FOR UPDATE` (только когда первая схватка или первый подтверждённый результат переводит турнир `SCHEDULED → IN_PROGRESS`, `CompetitionStatusWriter.startOnFirstMatch`) → категория (`CategoryWorkflowService.lockForCommand`) → жеребьёвка (`BracketsService.lockDrawOfMatch`) → схватка `FOR UPDATE` → advisory-блокировка спортсмена в турнире → участие (условное обновление). Снятие участника берёт категорию до участия, а участие — до жеребьёвки: ни одна команда не держит схватку, ожидая участие той же категории, поэтому цикла нет (проверено независимой проверкой и гонками в e2e).
+- Снятие участника → в той же транзакции подписчик события `registration.entry_withdrawn` (outbox) решает неявкой оставшиеся схватки, где соперник известен, по цепочке до неподвижной точки (≤ 64 проходов), включая утешительные; то же — после каждого подтверждения. Снятие спортсмена, который на ковре, запрещено (`athlete_in_active_match`) — исход фиксирует бригада.
+- Автоматическая неявка (исход системы) не мешает новой версии жеребьёвки: «начатыми и сыгранными» для замены жеребьёвки считаются только схватки, где боролись или исход внесла бригада.
+- Первая схватка категории переводит её `DRAWN → IN_PROGRESS`; то же — первый подтверждённый результат без старта (неявка по вызову). Автоматическая неявка статусы турнира и категории не меняет (снятие до соревнований не начинает их) — завершение категории, где все схватки решены автоматически, учитывается в 7b.
+- Сущности, которые 7a трогает, но меняет 7b: изменение подтверждённого результата (`AMENDED`, ревизии), публикация (`PUBLISHED`), места и медали.
+- Планшет: очередь команд с ключом идемпотентности и `expectedSeq` (фиксируется при первой отправке), повтор с тем же ключом при обрыве связи (пауза до 10 с), неотправленные команды переживают перезагрузку страницы (хранилище вкладки), конфликт со вторым планшетом — сброс очереди и перезагрузка журнала. Время чужого планшета сводится к своим часам по времени сервера; автоматический «Стоп» на длительности и конец удержания на верхнем пороге шлёт планшет, запустивший время (остальные — с запасом 3 с). Опрос: планшет — 5 с, раздел «Судейство» и подтверждения — 10 с, экран «Ковры» — 15 с (мгновенное обновление — Phase 8).
 
 ## Изменения Phase 6
 

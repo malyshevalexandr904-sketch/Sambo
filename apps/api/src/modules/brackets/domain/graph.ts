@@ -62,9 +62,12 @@ export interface NodeState {
 
 export type BracketState = Map<string, NodeState>;
 
-/** Подтверждённый исход схватки узла. Счёт и способ нужны для мест в круговой системе. */
+/**
+ * Подтверждённый исход схватки узла. Счёт и способ нужны для мест в круговой системе. `winner: null` — неявка обоих
+ * (оба сняты после жеребьёвки): схватка не проводится, оба проигравшие (план Phase 7a, §3).
+ */
 export interface Outcome {
-  winner: Side;
+  winner: Side | null;
   method: WinMethod;
   redScore?: number;
   blueScore?: number;
@@ -99,6 +102,16 @@ export function winnerOf(state: NodeState | undefined): string | null {
 export function loserOf(state: NodeState | undefined): string | null {
   if (!state?.winner || state.status !== 'DECIDED') return null;
   return entryOf(sideOf(state, otherSide(state.winner)));
+}
+
+/** Все проигравшие в схватке узла: один — или оба, если победителя нет (неявка обоих). */
+export function losersOf(state: NodeState | undefined): string[] {
+  if (!state || state.status !== 'DECIDED') return [];
+  if (state.winner) {
+    const loser = loserOf(state);
+    return loser ? [loser] : [];
+  }
+  return [entryOf(state.red), entryOf(state.blue)].filter((x): x is string => x !== null);
 }
 
 // ---------- Хранение источников в БД: тип + строковая ссылка ----------

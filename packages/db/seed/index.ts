@@ -1,7 +1,8 @@
 // Seed для разработки (раздел 47 ТЗ; DATABASE.md, 11). Все данные вымышленные. Идемпотентен: повторный запуск
 // обновляет те же записи. Phase 3: спортсмены, тренеры, судьи, представители, согласия, правила, категории.
 // Phase 4a: учебный турнир с открытой регистрацией, категориями и заявками; роли в турнире — после турнира.
-// Phase 4b: турнир на мандатной комиссии. Phase 5a: турнир на этапе жеребьёвки.
+// Phase 4b: турнир на мандатной комиссии. Phase 5a: турнир на этапе жеребьёвки. Phase 6: турнир с опубликованными
+// сетками для расписания. Phase 7a: турнир с расписанием и бригадами — судейство на планшете.
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { hashPassword, sealTotpSecret, totpKey } from '@sde/server-kit';
@@ -12,6 +13,7 @@ import { seedPhase4 } from './phase4';
 import { seedPhase4b } from './phase4b';
 import { seedPhase5 } from './phase5';
 import { seedPhase6 } from './phase6';
+import { seedPhase7 } from './phase7';
 
 const envFile = path.resolve(__dirname, '..', '..', '..', '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
@@ -164,6 +166,7 @@ async function main(): Promise<void> {
     summary.push(...(await seedPhase4b(db)));
     summary.push(...(await seedPhase5(db)));
     summary.push(...(await seedPhase6(db)));
+    summary.push(...(await seedPhase7(db)));
     await seedCompetitionGrants(db);
     process.stdout.write(
       [

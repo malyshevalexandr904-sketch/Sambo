@@ -3,7 +3,7 @@
 import { RequestMethod } from '@nestjs/common';
 import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 import { ModulesContainer } from '@nestjs/core';
-import { uuidv7 } from '@sde/db';
+import { publicId, uuidv7 } from '@sde/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ROUTE_ACCESS, type RouteAccess, type ScopeRef } from '../src/modules/access';
 import { WRITE_AUTHORITY } from '../src/modules/venue-sync';
@@ -171,6 +171,7 @@ describe('route security autotest', () => {
         entry: ids.entryId,
         competitionCategory: ids.categoryId,
         draw: ids.drawId,
+        match: ids.matchId,
       };
       const url = r.path.replace(/:(\w+)/g, (_, p: string) =>
         p === 'id' ? (byResolver[r.writeAuthority?.resolver ?? ''] ?? ids.competitionId) : ids.categoryId,
@@ -201,7 +202,7 @@ describe('route security autotest', () => {
 /** Турнир с категорией, заявкой, участием и черновиком жеребьёвки, право записи которого у площадочного узла. */
 async function leasedCompetition(
   t: TestApp,
-): Promise<{ competitionId: string; categoryId: string; entryId: string; drawId: string }> {
+): Promise<{ competitionId: string; categoryId: string; entryId: string; drawId: string; matchId: string }> {
   const competitionId = uuidv7();
   await ensureCompetition(t, competitionId);
   const categoryId = uuidv7();
@@ -255,9 +256,22 @@ async function leasedCompetition(
       separationReport: {},
     },
   });
+  // Схватка вне сетки — для команд судейства (резолвер «match»).
+  const matchId = uuidv7();
+  await t.admin.match.create({
+    data: {
+      id: matchId,
+      competitionId,
+      categoryId,
+      publicId: publicId(),
+      matchNumber: 1,
+      roundLabel: 'FINAL',
+      durationSeconds: 180,
+    },
+  });
   await t.admin.competitionWriteLease.update({
     where: { competitionId },
     data: { holderType: 'NODE', holderNodeId: uuidv7(), epoch: 2 },
   });
-  return { competitionId, categoryId, entryId, drawId };
+  return { competitionId, categoryId, entryId, drawId, matchId };
 }

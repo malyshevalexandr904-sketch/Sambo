@@ -28,7 +28,7 @@ export const toDate = (epoch: number): Date => new Date(epoch * 1000);
  */
 export function noMatch(m: Pick<MatchRecord, 'status' | 'participants'>): boolean {
   if (m.status === 'CANCELLED') return true;
-  return m.status === 'FINISHED' && !isPlayed(m as MatchRecord);
+  return m.status === 'FINISHED' && !isPlayed(m);
 }
 
 /** Схватка может участвовать в расписании: у нёе есть номер (создана открытой) и она не решена без игры. */

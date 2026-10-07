@@ -43,6 +43,7 @@ import { CompetitionExtensions, type TransitionContext } from './competition-ext
 import { listWhere, staffFilter } from './competition-queries';
 import { CompetitionReferences } from './competition-references';
 import { type CompetitionBasics, CompetitionScopeService } from './competition-scope.service';
+import { CompetitionStatusWriter } from './competition-status.writer';
 import {
   ACTION_CANDIDATES,
   COMPETITION_INCLUDE,
@@ -61,6 +62,7 @@ export class CompetitionsService {
     private readonly scopes: CompetitionScopeService,
     private readonly orgScopes: OrganizationScopeService,
     private readonly extensions: CompetitionExtensions,
+    private readonly status: CompetitionStatusWriter,
     private readonly leases: WriteLeaseService,
     private readonly rulesets: RuleSetsService,
     private readonly files: FilesService,
@@ -305,24 +307,15 @@ export class CompetitionsService {
       };
       const warnings = await this.checkExtensions(ctx, req.confirm === true);
       const data = transitionData(basics.status, req, user.id, now);
-      await tx.competition.update({ where: { id }, data });
-      await this.extensions.apply(ctx);
-      await this.audit.record(tx, {
-        action: 'competition.status_changed',
-        entityType: 'Competition',
-        entityId: id,
-        competitionId: id,
-        organizationId: basics.organizerOrganizationId,
-        before: { status: basics.status },
-        after: {
-          status: req.to,
+      await this.status.commit(
+        ctx,
+        data,
+        {
           ...(data.registrationEndsAt ? { registrationEndsAt: req.registrationEndsAt } : {}),
           ...(warnings.length > 0 ? { confirmedWarnings: warnings } : {}),
         },
-        reason: req.reason ?? null,
-        platformIntervention: access.viaPlatform,
-      });
-      await this.transitionEvents(tx, id, basics.status, req.to);
+        access.viaPlatform,
+      );
     });
     return this.toDto(user, await this.loadRow(id));
   }
@@ -345,28 +338,6 @@ export class CompetitionsService {
         confirmable: true,
       });
     return checks.warnings;
-  }
-
-  private async transitionEvents(
-    tx: Tx,
-    id: string,
-    from: CompetitionStatus,
-    to: CompetitionStatus,
-  ): Promise<void> {
-    const aggregate = { type: 'Competition', id };
-    await this.outbox.enqueue(tx, {
-      type: 'competition.status_changed',
-      aggregate,
-      competitionId: id,
-      payload: { competitionId: id, from, to },
-    });
-    if (to === 'REGISTRATION_OPEN' && from === 'DRAFT')
-      await this.outbox.enqueue(tx, {
-        type: 'competition.published',
-        aggregate,
-        competitionId: id,
-        payload: { competitionId: id },
-      });
   }
 
   /** Создатель турнира — его руководитель; права пересчитываются по новой версии пользователя. */

@@ -5,7 +5,7 @@ import type { BracketNodeDto, CategoryBracketDto, DrawDto } from '@sde/contracts
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BracketsService } from '../src/modules/brackets';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
-import { createTestApp, resetData, type Session, type TestApp } from './helpers/app';
+import { createTestApp, createUser, resetData, type Session, type TestApp } from './helpers/app';
 import { send } from './helpers/phase3';
 import {
   type CategoryFixture,
@@ -502,7 +502,9 @@ describe('progression engine (called by Phase 7 on a confirmed result)', () => {
   let cat: CategoryFixture;
   let brackets: BracketsService;
   let db: PrismaService;
+  let judge: string;
   beforeAll(async () => {
+    judge = (await createUser(t)).id;
     cat = await drawCategory(t, w, 7);
     await publish(w.staff.manager, await draft(w.staff.manager, cat.categoryId, { randomSeed: SEED_B }));
     brackets = t.app.get(BracketsService);
@@ -515,7 +517,14 @@ describe('progression engine (called by Phase 7 on a confirmed result)', () => {
   it('refuses a result for a match whose opponent is not known yet', async () => {
     const pending = (await nodes()).find((n) => n.label === 'FINAL');
     await expect(
-      db.tx((tx) => brackets.applyConfirmedResult(tx, pending?.match?.id as string, 'RED')),
+      db.tx((tx) =>
+        brackets.applyConfirmedResult(
+          tx,
+          pending?.match?.id as string,
+          { winnerSide: 'RED', method: 'POINTS' },
+          judge,
+        ),
+      ),
     ).rejects.toMatchObject({ code: 'MATCH_PARTICIPANTS_INCOMPLETE' });
   });
 
@@ -525,7 +534,14 @@ describe('progression engine (called by Phase 7 on a confirmed result)', () => {
       const ready = (await nodes()).filter((n) => n.status === 'READY');
       if (ready.length === 0) break;
       for (const n of ready)
-        await db.tx((tx) => brackets.applyConfirmedResult(tx, n.match?.id as string, 'RED'));
+        await db.tx((tx) =>
+          brackets.applyConfirmedResult(
+            tx,
+            n.match?.id as string,
+            { winnerSide: 'RED', method: 'POINTS' },
+            judge,
+          ),
+        );
     }
     const all = await nodes();
     expect(all.every((n) => n.status === 'DECIDED' || n.status === 'WALKOVER')).toBe(true);
@@ -566,9 +582,11 @@ describe('progression engine (called by Phase 7 on a confirmed result)', () => {
 describe('results confirmed at the same time (Phase 7 hook)', () => {
   let brackets: BracketsService;
   let db: PrismaService;
-  beforeAll(() => {
+  let judge: string;
+  beforeAll(async () => {
     brackets = t.app.get(BracketsService);
     db = t.app.get(PrismaService);
+    judge = (await createUser(t)).id;
   });
 
   async function fourWay(): Promise<{ cat: CategoryFixture; semis: BracketNodeDto[] }> {
@@ -587,7 +605,16 @@ describe('results confirmed at the same time (Phase 7 hook)', () => {
     for (let run = 0; run < 3; run++) {
       const { cat, semis } = await fourWay();
       await Promise.all(
-        semis.map((n) => db.tx((tx) => brackets.applyConfirmedResult(tx, n.match?.id as string, 'BLUE'))),
+        semis.map((n) =>
+          db.tx((tx) =>
+            brackets.applyConfirmedResult(
+              tx,
+              n.match?.id as string,
+              { winnerSide: 'BLUE', method: 'POINTS' },
+              judge,
+            ),
+          ),
+        ),
       );
       const all = (await bracketOf(w.staff.manager, cat.categoryId)).bracket?.nodes as BracketNodeDto[];
       const final = all.find((n) => n.label === 'FINAL');
@@ -610,7 +637,14 @@ describe('results confirmed at the same time (Phase 7 hook)', () => {
         where: { categoryId: cat.categoryId, status: 'PUBLISHED' },
       });
       const [result, supersede] = await Promise.allSettled([
-        db.tx((tx) => brackets.applyConfirmedResult(tx, semis[0]?.match?.id as string, 'RED')),
+        db.tx((tx) =>
+          brackets.applyConfirmedResult(
+            tx,
+            semis[0]?.match?.id as string,
+            { winnerSide: 'RED', method: 'POINTS' },
+            judge,
+          ),
+        ),
         send(
           w.staff.chief,
           'post',

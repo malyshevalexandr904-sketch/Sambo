@@ -129,6 +129,15 @@ export function nodeDtos(
             status: m.status,
             winnerSide: m.winnerSide,
             durationSeconds: m.durationSeconds,
+            result: m.result
+              ? {
+                  status: m.result.status,
+                  winnerSide: m.result.winnerSide,
+                  method: m.result.method,
+                  redScore: m.result.redScore,
+                  blueScore: m.result.blueScore,
+                }
+              : null,
           }
         : null,
     };

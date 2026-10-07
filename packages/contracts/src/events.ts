@@ -61,6 +61,14 @@ export const EVENT_SCHEMAS = {
   // 10 минут объединяются в одно уведомление на клуб (apps/worker/src/notifications).
   'schedule.published': z.object({ competitionId: Uuid }),
   'schedule.changed': z.object({ competitionId: Uuid, matchIds: z.array(Uuid).min(1).max(500) }),
+  // Phase 7a — схватки. Потребители (уведомления тренерам и представителям, табло, публичные страницы) — Phase 8–9.
+  'match.started': z.object({ matchId: Uuid, categoryId: Uuid }),
+  'match.result_confirmed': z.object({
+    matchId: Uuid,
+    categoryId: Uuid,
+    winnerSide: z.enum(['RED', 'BLUE']).nullable(),
+    method: z.string(),
+  }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

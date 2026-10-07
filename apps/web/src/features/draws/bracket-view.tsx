@@ -51,6 +51,9 @@ function SideRow({ node, side, ctx }: { node: BracketNodeDto; side: Side; ctx: C
   const s = side === 'RED' ? node.red : node.blue;
   const p = s.entryId ? ctx.participants.get(s.entryId) : undefined;
   const won = node.winnerSide === side && node.status === 'DECIDED';
+  const r = node.match?.result;
+  const score =
+    r && r.method !== 'BYE' && r.method !== 'NO_SHOW' ? (side === 'RED' ? r.redScore : r.blueScore) : null;
   const lost = node.status === 'DECIDED' && node.winnerSide !== null && node.winnerSide !== side;
   return (
     <div
@@ -76,8 +79,24 @@ function SideRow({ node, side, ctx }: { node: BracketNodeDto; side: Side; ctx: C
         <span className="flex-1 text-xs italic text-slate-500 print:text-[9px]">{describe(s)}</span>
       )}
       {p?.entryStatus === 'WITHDRAWN' ? <Badge tone="warning">{t('withdrawn')}</Badge> : null}
+      {score !== null ? (
+        <span className={cn('font-mono tabular-nums', won && 'font-bold')}>{score}</span>
+      ) : null}
     </div>
   );
+}
+
+/** Ход схватки в сетке (Phase 7a): идёт, пауза, вызвана, ждёт подтверждения; после подтверждения — способ победы. */
+function MatchProgress({ node }: { node: BracketNodeDto }) {
+  const t = useTranslations('referee');
+  const m = node.match;
+  if (!m) return null;
+  if (m.result?.status === 'PROVISIONAL') return <Badge tone="warning">{t('awaitingConfirmation')}</Badge>;
+  if (m.status === 'IN_PROGRESS') return <Badge tone="success">{t('matchStatuses.IN_PROGRESS')}</Badge>;
+  if (m.status === 'PAUSED') return <Badge tone="warning">{t('matchStatuses.PAUSED')}</Badge>;
+  if (m.status === 'READY') return <Badge tone="info">{t('matchStatuses.READY')}</Badge>;
+  if (m.result && m.result.method !== 'BYE') return <span>{t(`methods.${m.result.method}`)}</span>;
+  return null;
 }
 
 function MatchCard({ node, ctx }: { node: BracketNodeDto; ctx: Ctx }) {
@@ -91,7 +110,10 @@ function MatchCard({ node, ctx }: { node: BracketNodeDto; ctx: Ctx }) {
     >
       <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-2 py-0.5 text-xs text-slate-600 print:py-0 print:text-[9px]">
         <span className="font-medium">{title}</span>
-        {node.placeForWinner === 3 ? <span>{t('forThird')}</span> : null}
+        <span className="flex items-center gap-1">
+          {node.placeForWinner === 3 ? <span>{t('forThird')}</span> : null}
+          <MatchProgress node={node} />
+        </span>
       </header>
       <SideRow node={node} side="RED" ctx={ctx} />
       <SideRow node={node} side="BLUE" ctx={ctx} />

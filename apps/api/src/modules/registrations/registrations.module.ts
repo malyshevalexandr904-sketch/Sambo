@@ -12,6 +12,7 @@ import {
   EntriesController,
   MyRegistrationsController,
 } from './api/registrations.controller';
+import { ActiveMatchService } from './application/active-match.service';
 import { ApplicationsService } from './application/applications.service';
 import { EligibilityService } from './application/eligibility.service';
 import { EntriesService } from './application/entries.service';
@@ -45,7 +46,8 @@ import { RegistrationLifecycle } from './application/registration-lifecycle';
     ApplicationsService,
     EntriesExportService,
     RegistrationLifecycle,
+    ActiveMatchService,
   ],
-  exports: [RegistrationAccessService],
+  exports: [RegistrationAccessService, ActiveMatchService],
 })
 export class RegistrationsModule {}

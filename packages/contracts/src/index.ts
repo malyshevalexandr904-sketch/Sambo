@@ -26,3 +26,5 @@ export * from './notifications.js';
 export * from './formats.js';
 export * from './draws.js';
 export * from './scheduling.js';
+export * from './scoring.js';
+export * from './matches.js';

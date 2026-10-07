@@ -163,6 +163,8 @@ function CreateDraft({
   );
 }
 
+/** До «Готова к жеребьёвке»: подсказка, что сначала нужны мандатная комиссия и взвешивание. */
+const BEFORE_READY: readonly string[] = ['REGISTRATION', 'CLOSED', 'WEIGH_IN'];
 export function CategoryDraws({
   competition,
   data,
@@ -201,7 +203,7 @@ export function CategoryDraws({
             ? t('suggestedShort', { format: formatLabel(data.suggestedFormat) })
             : t('noFormat')}
         </p>
-        {data.category.status !== 'READY_FOR_DRAW' && data.category.status !== 'DRAWN' ? (
+        {BEFORE_READY.includes(data.category.status) ? (
           <Alert tone="info" className="mt-3">
             {t('notReady')}
           </Alert>
