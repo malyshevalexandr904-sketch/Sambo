@@ -110,7 +110,9 @@ export function MatQueueView({ matId, timezone }: { matId: string; timezone: str
               ) : null}
               <section>
                 <h2 className="mb-2 text-sm font-medium uppercase tracking-wide text-slate-500">
-                  {t('current')}
+                  {data.current && data.current.status !== 'IN_PROGRESS' && data.current.status !== 'PAUSED'
+                    ? t('upNext')
+                    : t('current')}
                 </h2>
                 {data.current ? (
                   <MatchLine item={data.current} timezone={timezone} big />

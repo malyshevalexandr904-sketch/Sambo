@@ -278,7 +278,7 @@ export function NextAndAwaiting({
 }: {
   data: MatConsoleDto;
   onChanged: () => void;
-  /** Схватка, чей результат уже показан выше (записан с этого планшета). */
+  /** Схватка, чей результат уже показан выше (записан с этого планшета): следующая тогда — текущая в очереди. */
   hide?: string;
 }) {
   const t = useTranslations('referee');
@@ -288,26 +288,26 @@ export function NextAndAwaiting({
   const describe = useDescribe();
   const [error, setError] = useState<string | null>(null);
   const awaiting = data.awaitingConfirmation.filter((m) => m.id !== hide);
+  const next = hide && data.current && data.current.id !== hide ? data.current : data.next;
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
           {t('nextMatch')}
         </h2>
-        {data.next ? (
+        {next ? (
           <p className="text-lg">
             <span className="font-semibold">
-              {data.next.number !== null ? t('match', { number: data.next.number }) : ''}{' '}
-              {round(data.next.roundLabel)}
+              {next.number !== null ? t('match', { number: next.number }) : ''} {round(next.roundLabel)}
             </span>{' '}
-            · {pickName(data.next.categoryName, locale)}
+            · {pickName(next.categoryName, locale)}
             <br />
-            <span className="text-red-800">{data.next.red.publicName ?? t('waitingParticipants')}</span>
+            <span className="text-red-800">{next.red.publicName ?? t('waitingParticipants')}</span>
             {' — '}
-            <span className="text-blue-800">{data.next.blue.publicName ?? t('waitingParticipants')}</span>
-            {data.next.plannedAt ? (
+            <span className="text-blue-800">{next.blue.publicName ?? t('waitingParticipants')}</span>
+            {next.plannedAt ? (
               <span className="ml-2 text-sm text-slate-500">
-                {timeInZone(data.next.plannedAt, data.competition.timezone, locale)}
+                {timeInZone(next.plannedAt, data.competition.timezone, locale)}
               </span>
             ) : null}
           </p>

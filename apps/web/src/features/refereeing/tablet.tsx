@@ -12,7 +12,7 @@ import { QueryState } from '@/components/common';
 import { Link } from '@/i18n/navigation';
 import { timeInZone } from '@/features/scheduling/shared';
 import { refereeKeys, transitionMatch, useMatConsole } from './api';
-import { toScoringRules, useRefereeLabels } from './labels';
+import { actionPoints, toScoringRules, useRefereeLabels } from './labels';
 import { ResultPanel } from './result-panel';
 import { holdElapsedMs, maxHoldMs, Scoreboard } from './scoreboard';
 import {
@@ -98,11 +98,13 @@ function LiveControls({
   const can = (a: string): boolean => match.allowedActions.includes(a as never);
   const state = scoring.state;
   const target = scoring.undoTarget;
+  const points =
+    target?.type === 'SCORE' && target.actionCode ? actionPoints(match.rules, target.actionCode) : null;
   const undoWhat = target
     ? [
         t(`eventTypes.${target.type}`),
         target.side ? label.side(target.side) : '',
-        label.code(target.actionCode),
+        `${points ? `+${points} ` : ''}${label.code(target.actionCode)}`.trim(),
       ]
         .filter(Boolean)
         .join(' · ')
