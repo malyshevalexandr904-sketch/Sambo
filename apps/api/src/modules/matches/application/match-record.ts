@@ -17,6 +17,12 @@ export const isPlayed = (m: Pick<MatchRecord, 'status' | 'participants'>): boole
 
 export const isStartedOrPlayed = (m: MatchRecord): boolean => STARTED.includes(m.status) || isPlayed(m);
 
+/** Исход записан системой без судьи: «без соперника» или автоматическая неявка снятого участника. */
+export const isSystemDecided = (m: Pick<MatchRecord, 'result'>): boolean =>
+  !!m.result &&
+  m.result.confirmedById === null &&
+  (m.result.method === 'BYE' || m.result.method === 'NO_SHOW');
+
 /** Результат подтверждён (продвигает сетку): подтверждён, опубликован или изменён после подтверждения. */
 export const isConfirmed = (m: Pick<MatchRecord, 'result'>): boolean =>
   !!m.result && CONFIRMED_RESULT_STATUSES.includes(m.result.status);

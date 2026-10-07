@@ -3,10 +3,10 @@
 // ключ идемпотентности, повтор после обрыва связи — с тем же ключом и тем же телом (сервер не создаст дубль).
 // expectedSeq фиксируется при первой отправке: это номер последнего подтверждённого события. Пока команды не
 // отправлены, счёт на экране — предпросмотр тем же редьюсером, что на сервере (packages/contracts/scoring.ts).
-// Отказ по правилам или чужое изменение (второй планшет) — очередь сбрасывается, экран обновляется с сервера.
+// Отказ по правилам или чужое изменение (второй планшет) — очередь сбрасывается, журнал загружается заново.
+// Неотправленные команды переживают перезагрузку страницы (хранилище вкладки).
 import {
   type DataEnvelope,
-  excludedEventIds,
   lastVoidableEvent,
   type MatchDetailDto,
   type MatchEventResultDto,
@@ -17,32 +17,29 @@ import {
 } from '@sde/contracts';
 import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
-import { fetchEvents, toScoring } from './api';
+import { fetchEvents } from './api';
+import {
+  commandRequest,
+  DEVICE_ID,
+  type EventInput,
+  fromServer,
+  isTemp,
+  isTransient,
+  loadQueue,
+  localizeTimes,
+  type LogEvent,
+  maxSeq,
+  mergeLog,
+  type Pending,
+  planUndo,
+  relink,
+  saveQueue,
+  TEMP,
+  uuid,
+} from './scoring-queue';
 
-/** UUID v4 и без безопасного контекста (планшет в локальной сети узла по http). */
-export function uuid(): string {
-  // randomUUID есть только в безопасном контексте (https или localhost); getRandomValues — везде.
-  const c: Crypto = globalThis.crypto;
-  if (typeof c.randomUUID === 'function' && globalThis.isSecureContext) return c.randomUUID();
-  const b = new Uint8Array(16);
-  c.getRandomValues(b);
-  b[6] = ((b[6] ?? 0) & 0x0f) | 0x40;
-  b[8] = ((b[8] ?? 0) & 0x3f) | 0x80;
-  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-}
-
-/** Устройство — вкладка планшета: для журнала (кто записал с какого устройства). */
-const DEVICE_ID = typeof window === 'undefined' ? 'server' : `tablet-${uuid().slice(0, 8)}`;
-
-export type EventInput = Pick<ScoringEvent, 'type' | 'side' | 'actionCode' | 'value' | 'matchClockMs'>;
-
-export interface Pending {
-  key: string;
-  preview: ScoringEvent;
-  /** Номер последнего события, на котором основана команда; задаётся при первой отправке и не меняется. */
-  sentSeq: number | null;
-}
+export type { EventInput, Pending } from './scoring-queue';
+export { commandRequest, isTransient, planUndo, relink, uuid } from './scoring-queue';
 
 export interface ScoringNotice {
   kind: 'reset' | 'rejected';
@@ -51,135 +48,105 @@ export interface ScoringNotice {
   error?: unknown;
 }
 
-const TEMP = 'local:';
-export const isTemp = (id: string): boolean => id.startsWith(TEMP);
-const maxSeq = (events: readonly ScoringEvent[], floor = 0): number =>
-  events.reduce((m, e) => Math.max(m, e.seq), floor);
-
-/** Сеть недоступна или сервер не ответил: команду повторяем с тем же ключом. */
-export function isTransient(e: unknown): boolean {
-  if (!(e instanceof ApiError)) return true;
-  if (e.code === 'NETWORK' || e.status >= 500 || e.code === 'RATE_LIMITED') return true;
-  return e.code === 'IDEMPOTENCY_KEY_REUSED' && e.details?.inProgress === true;
-}
-
-/** Запрос команды: путь и тело. Тело одинаково при каждом повторе — так сервер узнаёт повтор по ключу. */
-export function commandRequest(
-  matchId: string,
-  p: ScoringEvent,
-  expectedSeq: number,
-  deviceId: string,
-): { path: string; body: Record<string, unknown> } {
-  const meta = { expectedSeq, matchClockMs: p.matchClockMs, deviceTime: p.deviceTime, deviceId };
-  if (p.type === 'EVENT_VOIDED') {
-    return { path: `/matches/${matchId}/events/${p.voidsEventId as string}/void`, body: meta };
-  }
-  return {
-    path: `/matches/${matchId}/events`,
-    body: {
-      ...meta,
-      type: p.type,
-      ...(p.side ? { side: p.side } : {}),
-      ...(p.actionCode ? { actionCode: p.actionCode } : {}),
-      ...(p.value !== null ? { value: p.value } : {}),
-    },
-  };
-}
+/** Есть отправленная, но не подтверждённая команда: журнал сейчас не перезагружаем (её номер уже зафиксирован). */
+const inFlight = (queue: readonly Pending[]): boolean => queue.some((p) => p.sentSeq !== null);
 
 /**
- * «Отменить последнее»: что убрать из очереди на месте и что отменить на сервере. Ещё не отправленное событие
- * убирается из очереди; отправленное (или отправляемое сейчас, в том числе без связи) — отменяется компенсирующим
- * событием, ссылка с временного номера на серверный заменяется, когда событие подтвердится. Конец удержания
- * отменяется вместе с началом (как на сервере: отмена половины удержания отменяет его целиком).
+ * Журнал схватки: целиком при смене схватки и после сброса очереди, дальше — догрузка после последнего известного
+ * события. Пока команда в пути, загрузка откладывается и выполняется, когда очередь опустеет.
  */
-export function planUndo(
-  confirmed: readonly ScoringEvent[],
-  queue: readonly Pending[],
-): { drop: string[]; voidId: string | null } | null {
-  const all = [...confirmed, ...queue.map((p) => p.preview)];
-  const target = lastVoidableEvent(all);
-  if (!target) return null;
-  const unsent = (id: string): boolean => queue.some((p) => p.preview.id === id && p.sentSeq === null);
-  if (!unsent(target.id)) return { drop: [], voidId: target.id };
-  if (target.type !== 'HOLD_ENDED') return { drop: [target.id], voidId: null };
-  const excluded = excludedEventIds(all);
-  const start = all
-    .filter(
-      (e) => e.type === 'HOLD_STARTED' && e.side === target.side && e.seq < target.seq && !excluded.has(e.id),
-    )
-    .at(-1);
-  if (!start) return { drop: [target.id], voidId: null };
-  return unsent(start.id)
-    ? { drop: [target.id, start.id], voidId: null }
-    : { drop: [target.id], voidId: start.id };
-}
-
-/** Событие подтверждено сервером: ссылки отмен в очереди — с временного номера на серверный. */
-export function relink(queue: readonly Pending[], tempId: string, serverId: string): Pending[] {
-  return queue.map((p) =>
-    p.preview.voidsEventId === tempId ? { ...p, preview: { ...p.preview, voidsEventId: serverId } } : p,
-  );
-}
-
-/** Журнал схватки: целиком при смене схватки, дальше — догрузка после последнего известного события. */
 function useEventLog(match: MatchDetailDto | null, pendingRef: MutableRefObject<Pending[]>) {
   const matchId = match?.id ?? null;
   const serverSeq = match?.seq ?? 0;
-  const [log, setLog] = useState<ScoringEvent[]>([]);
-  const logRef = useRef<ScoringEvent[]>([]);
+  const [log, setLog] = useState<LogEvent[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [tick, setTick] = useState(0);
+  const logRef = useRef<LogEvent[]>([]);
   const loadedFor = useRef<string | null>(null);
-  const setConfirmed = useCallback((next: ScoringEvent[]) => {
+  const shownFor = useRef<string | null>(null);
+  const skipped = useRef(false);
+  const setConfirmed = useCallback((next: LogEvent[]) => {
     logRef.current = next;
     setLog(next);
   }, []);
   const sync = useCallback(
     async (id: string, seq: number) => {
-      if (pendingRef.current.length > 0) return;
-      const fresh = loadedFor.current !== id;
-      const after = fresh ? 0 : maxSeq(logRef.current);
-      if (!fresh && seq <= after) return;
+      if (inFlight(pendingRef.current)) {
+        skipped.current = true;
+        return;
+      }
+      const full = loadedFor.current !== id;
+      const after = full ? 0 : maxSeq(logRef.current);
+      if (!full && seq <= after) return;
       const data = await fetchEvents(id, after);
-      if (pendingRef.current.length > 0) return;
+      if (shownFor.current !== id) return;
+      // События неизменны: слияние по id не теряет подтверждённое, пока шёл запрос.
+      setConfirmed(mergeLog(logRef.current, data.events.map(fromServer)));
       loadedFor.current = id;
-      const base = fresh ? [] : logRef.current;
-      const known = new Set(base.map((e) => e.id));
-      setConfirmed([...base, ...data.events.map(toScoring).filter((e) => !known.has(e.id))]);
+      setLoaded(true);
     },
     [pendingRef, setConfirmed],
   );
   useEffect(() => {
     if (!matchId) return;
-    if (loadedFor.current !== matchId) setConfirmed([]);
+    if (shownFor.current !== matchId) {
+      shownFor.current = matchId;
+      loadedFor.current = null;
+      setLoaded(false);
+      setConfirmed([]);
+    }
     void sync(matchId, serverSeq).catch(() => undefined);
-  }, [matchId, serverSeq, sync, setConfirmed]);
-  const reload = useCallback(() => {
-    loadedFor.current = null;
-  }, []);
-  return { log, logRef, setConfirmed, reload };
+  }, [matchId, serverSeq, tick, sync, setConfirmed]);
+  const control = useMemo(
+    () => ({
+      /** Журнал заново (после сброса очереди: чужое изменение или отказ). */
+      reload: () => {
+        loadedFor.current = null;
+        setLoaded(false);
+        setTick((t) => t + 1);
+      },
+      /** Очередь опустела: выполнить отложенную загрузку. */
+      afterDrain: () => {
+        if (!skipped.current) return;
+        skipped.current = false;
+        setTick((t) => t + 1);
+      },
+      /** Повторить загрузку (команда ждёт журнал). */
+      nudge: () => setTick((t) => t + 1),
+      ready: () => loadedFor.current !== null && loadedFor.current === shownFor.current,
+    }),
+    [],
+  );
+  return { log, logRef, loaded, setConfirmed, ...control };
 }
+
+type EventLog = ReturnType<typeof useEventLog>;
 
 interface QueueDeps {
   matchId: string | null;
   pendingRef: MutableRefObject<Pending[]>;
-  logRef: MutableRefObject<ScoringEvent[]>;
-  setConfirmed: (next: ScoringEvent[]) => void;
-  reload: () => void;
+  events: EventLog;
   onChanged: () => void;
 }
 
 /** Отправка одной команды; итог — продолжать ли очередь. */
 function useSendHead(
-  deps: QueueDeps & {
-    setQueue: (next: Pending[]) => void;
-    setOffline: (v: boolean) => void;
-    drop: (n: ScoringNotice) => void;
-    scheduleRetry: () => void;
-  },
+  { matchId, pendingRef, events }: QueueDeps,
+  setQueue: (next: Pending[]) => void,
+  setOffline: (v: boolean) => void,
+  drop: (n: ScoringNotice) => void,
+  scheduleRetry: () => void,
 ) {
-  const { matchId, pendingRef, logRef, setConfirmed, setQueue, setOffline, drop, scheduleRetry } = deps;
+  const { logRef, setConfirmed, ready, nudge } = events;
   return useCallback(
     async (head: Pending): Promise<boolean> => {
       if (!matchId) return false;
+      if (head.sentSeq === null && !ready()) {
+        // Номер команды — по загруженному журналу: ждём его (после сброса или при открытии планшета).
+        nudge();
+        scheduleRetry();
+        return false;
+      }
       if (head.preview.voidsEventId && isTemp(head.preview.voidsEventId)) {
         drop({ kind: 'rejected', reason: 'event_not_found' });
         return false;
@@ -196,8 +163,8 @@ function useSendHead(
           idempotencyKey: head.key,
         });
         setOffline(false);
-        const event = toScoring(res.data.event);
-        if (!logRef.current.some((e) => e.id === event.id)) setConfirmed([...logRef.current, event]);
+        const event = fromServer(res.data.event);
+        setConfirmed(mergeLog(logRef.current, [event]));
         setQueue(relink(pendingRef.current.slice(1), head.preview.id, event.id));
         return true;
       } catch (e) {
@@ -211,13 +178,14 @@ function useSendHead(
         return false;
       }
     },
-    [matchId, pendingRef, logRef, setConfirmed, setQueue, setOffline, drop, scheduleRetry],
+    [matchId, pendingRef, logRef, setConfirmed, ready, nudge, setQueue, setOffline, drop, scheduleRetry],
   );
 }
 
 /** Последовательная отправка очереди с повтором при обрыве связи (пауза растёт до 10 с). */
 function useCommandQueue(deps: QueueDeps) {
-  const { pendingRef, reload, onChanged } = deps;
+  const { matchId, pendingRef, events, onChanged } = deps;
+  const { reload, afterDrain } = events;
   const [pending, setPending] = useState<Pending[]>([]);
   const [offline, setOffline] = useState(false);
   const [sending, setSending] = useState(false);
@@ -230,8 +198,9 @@ function useCommandQueue(deps: QueueDeps) {
     (next: Pending[]) => {
       pendingRef.current = next;
       setPending(next);
+      if (matchId) saveQueue(matchId, next);
     },
-    [pendingRef],
+    [matchId, pendingRef],
   );
   const drop = useCallback(
     (n: ScoringNotice) => {
@@ -243,10 +212,11 @@ function useCommandQueue(deps: QueueDeps) {
     [onChanged, reload, setQueue],
   );
   const scheduleRetry = useCallback(() => {
+    if (retry.current) clearTimeout(retry.current);
     retry.current = setTimeout(() => void pumpRef.current(), backoff.current);
     backoff.current = Math.min(10_000, backoff.current * 2);
   }, []);
-  const sendHead = useSendHead({ ...deps, setQueue, setOffline, drop, scheduleRetry });
+  const sendHead = useSendHead(deps, setQueue, setOffline, drop, scheduleRetry);
   const pump = useCallback(async () => {
     if (busy.current) return;
     busy.current = true;
@@ -256,13 +226,15 @@ function useCommandQueue(deps: QueueDeps) {
         if (!(await sendHead(head))) return;
         backoff.current = 1000;
       }
+      afterDrain();
       onChanged();
     } finally {
       busy.current = false;
       setSending(false);
     }
-  }, [onChanged, pendingRef, sendHead]);
+  }, [afterDrain, onChanged, pendingRef, sendHead]);
   pumpRef.current = pump;
+  useRestoreQueue(matchId, pendingRef, setQueue, pumpRef);
   useEffect(
     () => () => {
       if (retry.current) clearTimeout(retry.current);
@@ -272,18 +244,30 @@ function useCommandQueue(deps: QueueDeps) {
   return { pending, setQueue, offline, sending, notice, setNotice, pump };
 }
 
-export function useScoring(match: MatchDetailDto | null, rules: ScoringRules | null, onChanged: () => void) {
-  const durationMs = (match?.durationSeconds ?? 0) * 1000;
-  const pendingRef = useRef<Pending[]>([]);
-  const events = useEventLog(match, pendingRef);
-  const { logRef } = events;
-  const q = useCommandQueue({ matchId: match?.id ?? null, pendingRef, ...events, onChanged });
+/** Команды, не отправленные до перезагрузки страницы, — снова в очередь с теми же ключами. */
+function useRestoreQueue(
+  matchId: string | null,
+  pendingRef: MutableRefObject<Pending[]>,
+  setQueue: (next: Pending[]) => void,
+  pumpRef: MutableRefObject<() => Promise<void>>,
+): void {
+  useEffect(() => {
+    if (!matchId) return;
+    const saved = loadQueue(matchId);
+    if (saved.length > 0 && pendingRef.current.length === 0) {
+      setQueue(saved);
+      void pumpRef.current();
+    }
+  }, [matchId, pendingRef, setQueue, pumpRef]);
+}
+
+/** Новая команда (в очередь и на отправку) и «Отменить последнее». */
+function useQueueActions(
+  logRef: MutableRefObject<LogEvent[]>,
+  pendingRef: MutableRefObject<Pending[]>,
+  q: Pick<ReturnType<typeof useCommandQueue>, 'setQueue' | 'setNotice' | 'pump'>,
+) {
   const { setQueue, setNotice, pump } = q;
-  const all = useMemo(() => [...events.log, ...q.pending.map((p) => p.preview)], [events.log, q.pending]);
-  const state: MatchState | null = useMemo(
-    () => (rules && match?.state ? replayEvents(all, rules, durationMs) : (match?.state ?? null)),
-    [all, rules, durationMs, match?.state],
-  );
   const enqueue = useCallback(
     (input: EventInput | { voidsEventId: string; matchClockMs: number }) => {
       const isVoid = 'voidsEventId' in input;
@@ -302,7 +286,7 @@ export function useScoring(match: MatchDetailDto | null, rules: ScoringRules | n
       setQueue([...pendingRef.current, { key: uuid(), preview, sentSeq: null }]);
       void pump();
     },
-    [logRef, pump, setNotice, setQueue],
+    [logRef, pendingRef, pump, setNotice, setQueue],
   );
   const undo = useCallback(
     (matchClockMs: number) => {
@@ -311,11 +295,58 @@ export function useScoring(match: MatchDetailDto | null, rules: ScoringRules | n
       if (plan.drop.length > 0) setQueue(pendingRef.current.filter((p) => !plan.drop.includes(p.preview.id)));
       if (plan.voidId) enqueue({ voidsEventId: plan.voidId, matchClockMs });
     },
-    [enqueue, logRef, setQueue],
+    [enqueue, logRef, pendingRef, setQueue],
+  );
+  return { enqueue, undo };
+}
+
+/** Не уйти со страницы с неотправленными командами незаметно (закрытие вкладки — команды пропадут). */
+function useLeaveGuard(active: boolean): void {
+  useEffect(() => {
+    if (!active) return;
+    const warn = (e: BeforeUnloadEvent): void => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [active]);
+}
+
+/**
+ * @param serverOffsetMs сдвиг часов сервера относительно планшета (сервер − планшет): время чужих устройств
+ *   сводится к часам этого планшета, чтобы секундомер и удержание шли одинаково на всех планшетах.
+ */
+export function useScoring(
+  match: MatchDetailDto | null,
+  rules: ScoringRules | null,
+  onChanged: () => void,
+  serverOffsetMs = 0,
+) {
+  const durationMs = (match?.durationSeconds ?? 0) * 1000;
+  const pendingRef = useRef<Pending[]>([]);
+  const events = useEventLog(match, pendingRef);
+  const { logRef } = events;
+  const q = useCommandQueue({ matchId: match?.id ?? null, pendingRef, events, onChanged });
+  const { setNotice } = q;
+  useLeaveGuard(q.pending.length > 0);
+  const all = useMemo<ScoringEvent[]>(
+    () => [...localizeTimes(events.log, DEVICE_ID, serverOffsetMs), ...q.pending.map((p) => p.preview)],
+    [events.log, q.pending, serverOffsetMs],
+  );
+  const state: MatchState | null = useMemo(
+    () => (rules && match?.state ? replayEvents(all, rules, durationMs) : (match?.state ?? null)),
+    [all, rules, durationMs, match?.state],
+  );
+  const { enqueue, undo } = useQueueActions(logRef, pendingRef, q);
+  /** Событие записано этим планшетом (или ещё в очереди): автоматические события шлёт тот, кто запустил время. */
+  const isOwn = useCallback(
+    (id: string): boolean =>
+      isTemp(id) || logRef.current.some((e) => e.id === id && e.deviceId === DEVICE_ID),
+    [logRef],
   );
   return {
     state,
     log: all,
+    /** Журнал загружен: номер команд и результата — по нему. */
+    loaded: events.loaded,
     pendingCount: q.pending.length,
     inFlight: q.sending,
     offline: q.offline,
@@ -323,9 +354,10 @@ export function useScoring(match: MatchDetailDto | null, rules: ScoringRules | n
     clearNotice: () => setNotice(null),
     enqueue,
     undo,
+    isOwn,
     /** Что отменит «Отменить последнее». */
     undoTarget: lastVoidableEvent(all),
-    /** Последнее подтверждённое событие — expectedSeq для результата. */
-    serverSeq: maxSeq(events.log, match?.seq ?? 0),
+    /** Последнее событие журнала, который видит бригада, — expectedSeq для результата. */
+    serverSeq: maxSeq(events.log),
   };
 }

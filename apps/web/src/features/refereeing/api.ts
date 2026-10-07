@@ -4,12 +4,10 @@
 import type {
   DataEnvelope,
   MatchDetailDto,
-  MatchEventDto,
   MatchEventsDto,
   MatConsoleDto,
   OfficiatingDto,
   PendingConfirmationDto,
-  ScoringEvent,
 } from '@sde/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -55,21 +53,6 @@ export function useMatConsole(matId: string, paused: boolean) {
 export async function fetchEvents(matchId: string, afterSeq = 0): Promise<MatchEventsDto> {
   return (await api<DataEnvelope<MatchEventsDto>>(`/matches/${matchId}/events`, { query: { afterSeq } }))
     .data;
-}
-
-/** Событие журнала с сервера → событие счёта (общий редьюсер packages/contracts). */
-export function toScoring(e: MatchEventDto): ScoringEvent {
-  return {
-    id: e.id,
-    seq: e.seq,
-    type: e.type,
-    side: e.side,
-    actionCode: e.actionCode,
-    value: e.value,
-    matchClockMs: e.matchClockMs,
-    deviceTime: e.deviceTime,
-    voidsEventId: e.voidsEventId,
-  };
 }
 
 export function transitionMatch(m: Pick<MatchDetailDto, 'id' | 'version'>, to: string, reason?: string) {

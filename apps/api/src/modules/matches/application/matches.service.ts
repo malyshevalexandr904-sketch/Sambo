@@ -7,7 +7,7 @@ import type { MatchStatus, Side, WinMethod } from '@sde/contracts';
 import { type Prisma, publicId, type Tx, uuidv7 } from '@sde/db';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { isStartedOrPlayed, MATCH_INCLUDE, type MatchRecord, sideOf } from './match-record';
+import { isStartedOrPlayed, isSystemDecided, MATCH_INCLUDE, type MatchRecord, sideOf } from './match-record';
 
 export interface SideInit {
   entryId: string | null;
@@ -251,8 +251,14 @@ export class MatchesService {
   }
 
   /** Схватки узлов, которые начались или сыграны: при них новая версия жеребьёвки запрещена. */
+  /**
+   * Начатые и сыгранные схватки узлов — они запрещают новую версию жеребьёвки. Автоматическая неявка снятого
+   * участника (исход системы, никто не боролся) не мешает: новая сетка строится без снятых.
+   */
   async startedAmong(tx: Tx, bracketNodeIds: string[]): Promise<MatchRecord[]> {
-    return (await this.byNodes(tx, bracketNodeIds)).filter(isStartedOrPlayed);
+    return (await this.byNodes(tx, bracketNodeIds)).filter(
+      (m) => isStartedOrPlayed(m) && !isSystemDecided(m),
+    );
   }
 
   /**

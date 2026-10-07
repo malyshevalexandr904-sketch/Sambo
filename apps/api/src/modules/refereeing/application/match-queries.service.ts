@@ -69,10 +69,15 @@ const isNoMatch = (m: MatchRecord): boolean =>
   m.status === 'CANCELLED' || (m.status === 'FINISHED' && m.participants.some((p) => p.entryId === null));
 
 /** Текущая схватка ковра: идёт или на паузе, иначе вызванная, иначе первая в плановом порядке. */
+/**
+ * Текущая схватка ковра: идёт или на паузе, иначе вызванная, иначе первая по плану с известной парой (схватка,
+ * ждущая победителя с другого ковра, не держит ковёр), иначе первая по плану.
+ */
 function currentOf<T extends MatchRecord>(queue: readonly T[]): T | null {
   return (
     queue.find((m) => m.status === 'IN_PROGRESS' || m.status === 'PAUSED') ??
     queue.find((m) => m.status === 'READY') ??
+    queue.find((m) => entryOn(m, 'RED') !== null && entryOn(m, 'BLUE') !== null) ??
     queue[0] ??
     null
   );

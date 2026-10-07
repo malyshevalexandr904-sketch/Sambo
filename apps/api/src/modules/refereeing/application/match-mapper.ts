@@ -141,6 +141,7 @@ export function eventDto(e: MatchEvent, excluded: ReadonlySet<string>, names: Us
     deviceTime: e.deviceTime.toISOString(),
     serverTime: e.serverTime.toISOString(),
     voidsEventId: e.voidsEventId,
+    deviceId: e.deviceId,
     voided: excluded.has(e.id),
     reason,
     recordedBy: userRef(e.recordedById, names),

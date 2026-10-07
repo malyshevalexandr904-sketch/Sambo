@@ -195,8 +195,19 @@ export class MatchCommandsService {
       const m = await this.store.lock(tx, matchId, version);
       if (!noShowAllowed(m.status)) throw this.invalid(m.status, 'FINISHED');
       await this.assertOperating(tx, m.competitionId);
-      if (entryOn(m, 'RED') === null || entryOn(m, 'BLUE') === null)
-        throw new DomainError('MATCH_PARTICIPANTS_INCOMPLETE', { matchId });
+      const red = entryOn(m, 'RED');
+      const blue = entryOn(m, 'BLUE');
+      if (red === null || blue === null) throw new DomainError('MATCH_PARTICIPANTS_INCOMPLETE', { matchId });
+      // Не явился тот, кто сейчас борется на другом ковре, — не неявка: схватку ждут.
+      const absent = req.side === 'BOTH' ? [red, blue] : [req.side === 'RED' ? red : blue];
+      const busy = (await this.activeMatch.readiness(tx, absent)).find(
+        (r) => r.activeMatchId !== null && r.activeMatchId !== m.id,
+      );
+      if (busy)
+        throw new DomainError('ATHLETE_IN_ACTIVE_MATCH', {
+          entryId: busy.entryId,
+          matchId: busy.activeMatchId,
+        });
       const winnerSide: Side | null = req.side === 'BOTH' ? null : req.side === 'RED' ? 'BLUE' : 'RED';
       await this.store.finishProvisional(tx, m, {
         winnerSide,

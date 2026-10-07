@@ -3,7 +3,7 @@
 // наказания, «Отменить последнее», предложенный исход и двухшаговое подтверждение; индикатор связи и
 // неотправленных команд; следующая схватка ковра и результаты, ждущие подтверждения (руководитель ковра,
 // работающий за планшетом, подтверждает здесь же вторым шагом).
-import { clockNowMs, type MatchDetailDto, type MatConsoleDto, type MatchState } from '@sde/contracts';
+import { clockNowMs, type MatchDetailDto, type MatConsoleDto } from '@sde/contracts';
 import { Alert, Badge, Button, EmptyState, Input } from '@sde/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
@@ -109,7 +109,8 @@ function LiveControls({
         .filter(Boolean)
         .join(' · ')
     : null;
-  const blocked = !state || state.clock.running || state.hold !== null || scoring.pendingCount > 0;
+  const blocked =
+    !state || !scoring.loaded || state.clock.running || state.hold !== null || scoring.pendingCount > 0;
   return (
     <div className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-3">
       {can('event.void') ? (
@@ -146,66 +147,69 @@ function LiveControls({
   );
 }
 
+/** Запас, после которого автоматическое событие шлёт и планшет, не запускавший время (тот мог пропасть). */
+const AUTO_GRACE_MS = 3000;
+
 /**
  * Секундомер устройства (R-09): время вышло — «Стоп» на длительности схватки; удержание досчитывается и
- * заканчивается на верхнем пороге правил. Каждое автоматическое событие — один раз (по отметке запуска).
+ * заканчивается на верхнем пороге правил. Событие шлёт планшет, запустивший время (удержание), остальные — с
+ * запасом в 3 с; каждое — один раз на запуск (по номеру события запуска).
  */
 function useAutoEvents(
   match: MatchDetailDto,
-  state: MatchState | null,
-  enqueue: ReturnType<typeof useScoring>['enqueue'],
+  scoring: ReturnType<typeof useScoring>,
   now: number,
   active: boolean,
 ) {
+  const { state, log, enqueue, isOwn } = scoring;
   const autoStop = useRef<string | null>(null);
   const autoHold = useRef<string | null>(null);
   useEffect(() => {
     if (!state || !active) return;
-    const elapsed = clockNowMs(state.clock, now, state.durationMs);
-    if (state.clock.running && elapsed >= state.durationMs && autoStop.current !== state.clock.at) {
-      autoStop.current = state.clock.at;
-      enqueue({
-        type: 'CLOCK_STOPPED',
-        side: null,
-        actionCode: null,
-        value: null,
-        matchClockMs: state.durationMs,
-      });
+    const start = [...log].reverse().find((e) => e.type === 'CLOCK_STARTED');
+    if (state.clock.running && start && autoStop.current !== start.id) {
+      const raw = state.clock.elapsedMs + (state.clock.at ? now - Date.parse(state.clock.at) : 0);
+      if (raw >= state.durationMs + (isOwn(start.id) ? 0 : AUTO_GRACE_MS)) {
+        autoStop.current = start.id;
+        enqueue({
+          type: 'CLOCK_STOPPED',
+          side: null,
+          actionCode: null,
+          value: null,
+          matchClockMs: state.durationMs,
+        });
+      }
     }
     const top = maxHoldMs(match.rules);
-    if (
-      state.hold &&
-      top > 0 &&
-      holdElapsedMs(state, now) >= top &&
-      autoHold.current !== state.hold.eventId
-    ) {
-      autoHold.current = state.hold.eventId;
-      enqueue({
-        type: 'HOLD_ENDED',
-        side: state.hold.side,
-        actionCode: null,
-        value: top,
-        matchClockMs: elapsed,
-      });
+    const hold = state.hold;
+    if (hold && top > 0 && autoHold.current !== hold.eventId) {
+      if (holdElapsedMs(state, now) >= top + (isOwn(hold.eventId) ? 0 : AUTO_GRACE_MS)) {
+        autoHold.current = hold.eventId;
+        const matchClockMs = clockNowMs(state.clock, now, state.durationMs);
+        enqueue({ type: 'HOLD_ENDED', side: hold.side, actionCode: null, value: top, matchClockMs });
+      }
     }
-  }, [state, now, active, match.rules, enqueue]);
+  }, [state, log, now, active, match.rules, enqueue, isOwn]);
 }
 
 function MatchPanel({
   data,
   onChanged,
   onRecorded,
+  serverOffsetMs,
 }: {
   data: MatConsoleDto;
   onChanged: () => void;
   onRecorded: (m: MatchDetailDto) => void;
+  /** Сервер − планшет, мс (по времени сервера в ответе). */
+  serverOffsetMs: number;
 }) {
   const t = useTranslations('referee');
   const label = useRefereeLabels();
   const describe = useDescribe();
   const match = data.current as MatchDetailDto;
   const rules = useMemo(() => toScoringRules(match.rules), [match.rules]);
-  const scoring = useScoring(match, rules, onChanged);
+  const scoring = useScoring(match, rules, onChanged, serverOffsetMs);
   const live = match.status === 'IN_PROGRESS' || match.status === 'PAUSED';
   const now = useNow(live);
   const [error, setError] = useState<string | null>(null);
@@ -214,7 +218,7 @@ function MatchPanel({
   const state = scoring.state;
   const canScore = match.status === 'IN_PROGRESS' && match.allowedActions.includes('event.create');
   const elapsed = state ? clockNowMs(state.clock, now, state.durationMs) : 0;
-  useAutoEvents(match, state, scoring.enqueue, now, canScore);
+  useAutoEvents(match, scoring, now, canScore);
 
   const run: Run = useCallback(
     async (fn) => {
@@ -364,7 +368,13 @@ export function MatTablet({ matId }: { matId: string }) {
                   }}
                 />
               ) : data.current ? (
-                <MatchPanel key={data.current.id} data={data} onChanged={onChanged} onRecorded={keep} />
+                <MatchPanel
+                  key={data.current.id}
+                  data={data}
+                  onChanged={onChanged}
+                  onRecorded={keep}
+                  serverOffsetMs={Date.parse(data.serverTime) - query.dataUpdatedAt}
+                />
               ) : (
                 <EmptyState title={t('noCurrent')} />
               )}

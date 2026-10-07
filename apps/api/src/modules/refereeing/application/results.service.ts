@@ -20,6 +20,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { AuditService } from '../../audit';
 import { BracketsService } from '../../brackets';
 import { CategoryWorkflowService } from '../../categories';
+import { CompetitionStatusWriter } from '../../competitions';
 import { entryOn, type MatchRecord, MatchStoreService } from '../../matches';
 import { OutboxService } from '../../outbox';
 import { ActiveMatchService } from '../../registrations';
@@ -66,6 +67,7 @@ export class ResultsService {
     private readonly store: MatchStoreService,
     private readonly brackets: BracketsService,
     private readonly categories: CategoryWorkflowService,
+    private readonly competitionStatus: CompetitionStatusWriter,
     private readonly activeMatch: ActiveMatchService,
     private readonly withdrawals: WithdrawalsService,
     private readonly leases: WriteLeaseService,
@@ -142,13 +144,24 @@ export class ResultsService {
   async confirm(user: AuthUser, matchId: string, version: number): Promise<MatchDetailDto> {
     const head = await this.context.head(matchId);
     await this.db.tx(async (tx) => {
-      await this.categories.lockForCommand(tx, head.categoryId);
+      await this.leases.assertWritable(tx, head.competitionId);
+      // Первый подтверждённый результат (например, неявка без старта схватки) тоже открывает соревнования и
+      // категорию — как старт схватки; порядок блокировок тот же: турнир → категория → жеребьёвка → схватка.
+      const competition = await tx.competition.findUnique({
+        where: { id: head.competitionId },
+        select: { status: true },
+      });
+      if (competition?.status === 'SCHEDULED')
+        await this.competitionStatus.startOnFirstMatch(tx, head.competitionId, user.id);
+      const locked = await this.categories.lockForCommand(tx, head.categoryId);
       const drawId = await this.brackets.lockDrawOfMatch(tx, matchId);
       const m = await this.store.lock(tx, matchId, version);
       if (!m.result) throw new DomainError('MATCH_RESULT_INCOMPLETE', { matchId });
       if (m.status !== 'FINISHED' || m.result.status !== 'PROVISIONAL')
         throw new DomainError('INVALID_TRANSITION', { from: m.result.status, to: 'CONFIRMED', allowed: [] });
       const confirmed = await this.store.confirm(tx, m, user.id);
+      if (locked.category.status === 'DRAWN')
+        await this.categories.systemTransition(tx, locked, 'IN_PROGRESS');
       if (drawId) {
         await this.brackets.advance(tx, drawId, matchId, m.competitionId);
         await this.withdrawals.resolve(tx, drawId);

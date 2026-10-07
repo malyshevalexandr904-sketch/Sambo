@@ -309,6 +309,7 @@ export class ScheduleQueriesService {
     const current =
       queue.find((m) => m.status === 'IN_PROGRESS' || m.status === 'PAUSED') ??
       queue.find((m) => m.status === 'READY') ??
+      queue.find((m) => m.red.entryId !== null && m.blue.entryId !== null) ??
       queue[0] ??
       null;
     const next = queue.filter((m) => m.matchId !== current?.matchId).slice(0, 3);

@@ -319,30 +319,35 @@ describe('a match on the mat: call, start, score, result, confirmation, bracket'
   });
 });
 
+/** Две круговые категории на двоих: первый спортсмен первой категории заявлен и во вторую (entries[0] обеих). */
+async function sharedAthleteWorld(): Promise<RefereeWorld> {
+  return refereeWorld(t, [{ admitted: 2 }, { admitted: 2 }], async (world, cats) => {
+    const [a, b] = cats as [(typeof cats)[number], (typeof cats)[number]];
+    const shared = await t.admin.entry.findUniqueOrThrow({ where: { id: a.entries[0]! } });
+    const replaced = b.entries[0]!;
+    await t.admin.admission.deleteMany({ where: { entryId: replaced } });
+    await t.admin.entry.delete({ where: { id: replaced } });
+    const entryId = uuidv7();
+    await t.admin.entry.create({
+      data: { ...shared, id: entryId, categoryId: b.categoryId, declaredCategoryId: b.categoryId },
+    });
+    await t.admin.admission.create({
+      data: {
+        id: uuidv7(),
+        competitionId: world.competitionId,
+        entryId,
+        status: 'ADMITTED',
+        decidedAt: new Date(),
+      },
+    });
+    b.entries[0] = entryId;
+  });
+}
+
 describe('the same athlete in two matches', () => {
   it('two mats start at the same moment: one wins, the other gets ATHLETE_IN_ACTIVE_MATCH', async () => {
     // Две категории (круговая на двоих): спортсмен первой категории заявлен и во вторую.
-    const w = await refereeWorld(t, [{ admitted: 2 }, { admitted: 2 }], async (world, cats) => {
-      const [a, b] = cats as [(typeof cats)[number], (typeof cats)[number]];
-      const shared = await t.admin.entry.findUniqueOrThrow({ where: { id: a.entries[0]! } });
-      const replaced = b.entries[0]!;
-      await t.admin.admission.deleteMany({ where: { entryId: replaced } });
-      await t.admin.entry.delete({ where: { id: replaced } });
-      const entryId = uuidv7();
-      await t.admin.entry.create({
-        data: { ...shared, id: entryId, categoryId: b.categoryId, declaredCategoryId: b.categoryId },
-      });
-      await t.admin.admission.create({
-        data: {
-          id: uuidv7(),
-          competitionId: world.competitionId,
-          entryId,
-          status: 'ADMITTED',
-          decidedAt: new Date(),
-        },
-      });
-      b.entries[0] = entryId;
-    });
+    const w = await sharedAthleteWorld();
     // Турнир уже идёт: старты не ждут друг друга на блокировке турнира (первая схватка переводит его статус).
     await t.admin.competition.update({ where: { id: w.competitionId }, data: { status: 'IN_PROGRESS' } });
     for (let run = 0; run < 1; run++) {
@@ -363,6 +368,26 @@ describe('the same athlete in two matches', () => {
       const loser = results.find((r) => r.status === 422);
       expect(loser?.body.error.code).toBe('ATHLETE_IN_ACTIVE_MATCH');
     }
+  });
+
+  it('no no-show for an athlete who is fighting on another mat right now', async () => {
+    const w = await sharedAthleteWorld();
+    const shared = w.categories[1]!.entries[0]!;
+    const [m1] = await scheduledMatches(t, w.categories[0]!.categoryId);
+    const [m2] = await scheduledMatches(t, w.categories[1]!.categoryId);
+    const chief = w.staff.chief;
+    let d1 = (await transition(chief, m1!, 'READY')).body.data as MatchDetailDto;
+    d1 = (await transition(chief, d1, 'IN_PROGRESS')).body.data as MatchDetailDto;
+    expect(d1.status).toBe('IN_PROGRESS');
+    const d2 = await getMatch(chief, m2!.id);
+    const absent = d2.red.entryId === shared ? 'RED' : 'BLUE';
+    const r = await send(chief, 'post', `/api/v1/matches/${d2.id}/no-show`, { side: absent }, d2.version);
+    expect(r.status, JSON.stringify(r.body)).toBe(422);
+    expect(r.body.error.code).toBe('ATHLETE_IN_ACTIVE_MATCH');
+    // Соперник, который не занят, — неявка записывается.
+    const other = absent === 'RED' ? 'BLUE' : 'RED';
+    const ok = await send(chief, 'post', `/api/v1/matches/${d2.id}/no-show`, { side: other }, d2.version);
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
   });
 });
 
@@ -481,8 +506,14 @@ describe('results on two mats of one bracket', () => {
 describe('no-show on call, pause and BYE results', () => {
   it('records a no-show as a provisional result that the chief confirms', async () => {
     const w = await refereeWorld(t, [{ admitted: 2 }]);
-    const [m] = await scheduledMatches(t, w.categories[0]!.categoryId);
+    const categoryId = w.categories[0]!.categoryId;
+    const [m] = await scheduledMatches(t, categoryId);
     const chief = w.staff.chief;
+    const status = async () => ({
+      competition: (await t.admin.competition.findUniqueOrThrow({ where: { id: w.competitionId } })).status,
+      category: (await t.admin.competitionCategory.findUniqueOrThrow({ where: { id: categoryId } })).status,
+    });
+    expect(await status()).toEqual({ competition: 'SCHEDULED', category: 'DRAWN' });
     const d = await getMatch(chief, m!.id);
     const r = await send(chief, 'post', `/api/v1/matches/${d.id}/no-show`, { side: 'BLUE' }, d.version);
     expect(r.status, JSON.stringify(r.body)).toBe(200);
@@ -492,6 +523,35 @@ describe('no-show on call, pause and BYE results', () => {
       result: { status: 'PROVISIONAL', method: 'NO_SHOW', winnerSide: 'RED' },
     });
     expect((await confirm(chief, after)).status).toBe(200);
+    // Первый подтверждённый результат без старта схватки тоже открывает соревнования и категорию.
+    expect(await status()).toEqual({ competition: 'IN_PROGRESS', category: 'IN_PROGRESS' });
+  });
+
+  it('an automatic no-show of a withdrawn athlete does not block a new draw version', async () => {
+    const w = await refereeWorld(t, [{ admitted: 4, format: 'SINGLE_ELIMINATION' }]);
+    const categoryId = w.categories[0]!.categoryId;
+    const semi = (await bracketNodes(w.staff.manager, categoryId)).find((x) => x.key === 'MAIN:1:1')!;
+    const entry = await t.admin.entry.findUniqueOrThrow({ where: { id: semi.red.entryId! } });
+    const wd = await send(
+      w.staff.manager,
+      'post',
+      `/api/v1/entries/${entry.id}/withdraw`,
+      { reason: 'Не прошёл взвешивание' },
+      entry.version,
+    );
+    expect(wd.status, JSON.stringify(wd.body)).toBe(200);
+    const decided = (await bracketNodes(w.staff.manager, categoryId)).find((x) => x.key === 'MAIN:1:1')!;
+    expect(decided.match?.result).toMatchObject({ status: 'CONFIRMED', method: 'NO_SHOW' });
+    const draw = await t.admin.draw.findFirstOrThrow({ where: { categoryId, status: 'PUBLISHED' } });
+    const r = await send(
+      w.staff.chief,
+      'post',
+      `/api/v1/draws/${draw.id}/supersede`,
+      { reason: 'Снят участник до начала схваток' },
+      draw.version,
+    );
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(await t.admin.match.count({ where: { categoryId } })).toBe(0);
   });
 
   it('pauses only with the clock stopped and resumes', async () => {
@@ -528,6 +588,33 @@ describe('no-show on call, pause and BYE results', () => {
 });
 
 describe('screens: mat console, officiating section, mats screen', () => {
+  it('a match waiting for a winner from another mat does not hold the tablet: the next callable one is current', async () => {
+    const w = await refereeWorld(t, [{ admitted: 3, format: 'SINGLE_ELIMINATION' }]);
+    const categoryId = w.categories[0]!.categoryId;
+    const all = await scheduledMatches(t, categoryId);
+    const known = all.find(
+      (m) => m.status === 'SCHEDULED' && m.participants.every((p) => p.entryId !== null),
+    )!;
+    const waiting = all.find(
+      (m) => m.status === 'SCHEDULED' && m.participants.some((p) => p.entryId === null),
+    )!;
+    // Финал (ждёт победителя полуфинала) по плану раньше полуфинала, оба на одном ковре.
+    await t.admin.matchSchedule.update({
+      where: { matchId: waiting.id },
+      data: {
+        plannedAt: new Date(known.schedule!.plannedAt.getTime() - 60_000),
+        matId: known.schedule!.matId,
+      },
+    });
+    const con = await w.staff.chief.agent.get(`/api/v1/mats/${known.schedule!.matId}/console`);
+    expect(con.status, JSON.stringify(con.body)).toBe(200);
+    const c = con.body.data as MatConsoleDto;
+    expect(c.current?.id).toBe(known.id);
+    expect(c.current?.allowedActions).toContain('transition:READY');
+    const q = await w.staff.chief.agent.get(`/api/v1/mats/${known.schedule!.matId}/queue`);
+    expect((q.body.data as MatQueueDto).current?.matchId).toBe(known.id);
+  });
+
   it('shows my mats first, the current match with its actions and the expected time of the next ones', async () => {
     const w = await refereeWorld(t, [{ admitted: 4 }]);
     const categoryId = w.categories[0]!.categoryId;

@@ -222,6 +222,8 @@ export interface MatchEventDto {
   deviceTime: string;
   serverTime: string;
   voidsEventId: string | null;
+  /** Устройство (вкладка планшета), записавшее событие: по нему планшет сводит время чужого устройства к своему. */
+  deviceId: string | null;
   /** Событие отменено (компенсирующим событием или вместе со своей половиной удержания). */
   voided: boolean;
   reason: string | null;
