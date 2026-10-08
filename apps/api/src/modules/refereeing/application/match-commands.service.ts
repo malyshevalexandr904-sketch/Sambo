@@ -32,11 +32,13 @@ import { stateOf } from './match-mapper';
 const blocked = (...failed: string[]): DomainError =>
   new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed });
 
-/** Действие аудита перехода: вызов, отмена вызова, старт, пауза, продолжение. */
+/** Действие аудита перехода: вызов, отмена вызова, старт, пауза, продолжение, перенос, отмена схватки. */
 function auditAction(from: MatchRecord['status'], to: MatchTransitionRequest['to']): AuditAction {
   if (to === 'READY') return 'match.called';
-  if (to === 'SCHEDULED') return 'match.call_cancelled';
+  if (to === 'SCHEDULED') return from === 'POSTPONED' ? 'match.unpostponed' : 'match.call_cancelled';
   if (to === 'PAUSED') return 'match.paused';
+  if (to === 'POSTPONED') return 'match.postponed';
+  if (to === 'CANCELLED') return 'match.cancelled';
   return from === 'PAUSED' ? 'match.resumed' : 'match.started';
 }
 
@@ -98,7 +100,10 @@ export class MatchCommandsService {
         throw this.invalid(m.status, req.to);
       const before = m.status;
       if (req.to === 'READY') await this.call(tx, m);
+      else if (req.to === 'SCHEDULED' && before === 'POSTPONED') await this.store.setPostponed(tx, m, false);
       else if (req.to === 'SCHEDULED') await this.store.cancelReady(tx, m);
+      else if (req.to === 'POSTPONED') await this.store.setPostponed(tx, m, true);
+      else if (req.to === 'CANCELLED') await this.cancel(tx, m);
       else if (req.to === 'PAUSED') await this.pause(tx, m);
       else if (before === 'PAUSED') await this.store.setPaused(tx, m, false);
       else if (locked) {
@@ -169,6 +174,14 @@ export class MatchCommandsService {
       competitionId: m.competitionId,
       payload: { matchId: m.id, categoryId: m.categoryId },
     });
+  }
+
+  /**
+   * Отмена — только схватки вне сетки: исход схватки сетки нужен для продвижения (для неё — неявка или снятие).
+   */
+  private async cancel(tx: Tx, m: MatchRecord): Promise<void> {
+    if (m.bracketNodeId !== null) throw blocked('bracket_match');
+    await this.store.cancel(tx, m);
   }
 
   /** Длинная остановка — при остановленном секундомере и без идущего удержания. */

@@ -7,6 +7,7 @@ import { MatsController } from './api/mats.controller';
 import { ScheduleController } from './api/schedule.controller';
 import { SessionsController } from './api/sessions.controller';
 import { CrewAccessService } from './application/crew-access.service';
+import { ScheduleAppendService } from './application/schedule-append.service';
 import { CrewsService } from './application/crews.service';
 import { MatsService } from './application/mats.service';
 import { ScheduleLifecycle } from './application/schedule-lifecycle';
@@ -29,8 +30,9 @@ import { SessionsService } from './application/sessions.service';
     ScheduleService,
     CrewsService,
     CrewAccessService,
+    ScheduleAppendService,
     ScheduleLifecycle,
   ],
-  exports: [ScheduleQueriesService, CrewAccessService],
+  exports: [ScheduleQueriesService, CrewAccessService, ScheduleAppendService],
 })
 export class SchedulingModule {}

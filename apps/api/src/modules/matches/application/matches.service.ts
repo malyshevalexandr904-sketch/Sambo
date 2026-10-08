@@ -120,6 +120,48 @@ export class MatchesService {
     return (tx ?? this.db).match.findMany({ where: { categoryId }, include: MATCH_INCLUDE });
   }
 
+  /**
+   * Ручная схватка вне сетки (Phase 7b, `match.create`): номер — следующий в турнире; на места не влияет.
+   */
+  async createManual(
+    tx: Tx,
+    input: {
+      competitionId: string;
+      categoryId: string;
+      label: string;
+      durationSeconds: number;
+      redEntryId: string;
+      blueEntryId: string;
+    },
+  ): Promise<MatchRecord> {
+    const id = uuidv7();
+    const matchNumber = await this.nextNumber(tx, input.competitionId);
+    await tx.match.create({
+      data: {
+        id,
+        competitionId: input.competitionId,
+        categoryId: input.categoryId,
+        bracketNodeId: null,
+        publicId: publicId(),
+        matchNumber,
+        roundLabel: input.label,
+        status: 'SCHEDULED',
+        durationSeconds: input.durationSeconds,
+      },
+    });
+    await tx.matchParticipant.createMany({
+      data: (['RED', 'BLUE'] as const).map((side) => ({
+        id: uuidv7(),
+        competitionId: input.competitionId,
+        matchId: id,
+        side,
+        entryId: side === 'RED' ? input.redEntryId : input.blueEntryId,
+        isBye: false,
+      })),
+    });
+    return tx.match.findUniqueOrThrow({ where: { id }, include: MATCH_INCLUDE });
+  }
+
   /** Одна схватка со сторонами; не найдена — null. */
   async byId(tx: Tx | null, matchId: string): Promise<MatchRecord | null> {
     return (tx ?? this.db).match.findUnique({ where: { id: matchId }, include: MATCH_INCLUDE });
@@ -174,6 +216,48 @@ export class MatchesService {
   }
 
   /**
+   * План приведения схваток к состоянию сетки (изменение результата, Phase 7b): схватки, которые нужно изменить,
+   * но их уже провели люди (идут, сыграны, ждут подтверждения), — `conflicts`; решённые системой (автоматическая
+   * неявка снятого участника) со сменой сторон — `resets`: их исход пересчитывается заново.
+   */
+  async planSync(tx: Tx, specs: MatchSpec[]): Promise<{ conflicts: MatchRecord[]; resets: MatchRecord[] }> {
+    const current = await this.byNodes(
+      tx,
+      specs.map((s) => s.bracketNodeId),
+    );
+    const byNode = new Map(current.map((m) => [m.bracketNodeId, m]));
+    const conflicts: MatchRecord[] = [];
+    const resets: MatchRecord[] = [];
+    for (const spec of specs) {
+      const m = byNode.get(spec.bracketNodeId);
+      if (!m || !this.differs(m, spec) || !isStartedOrPlayed(m)) continue;
+      if (isSystemDecided(m)) resets.push(m);
+      else conflicts.push(m);
+    }
+    return { conflicts, resets };
+  }
+
+  /**
+   * Исход системы снимается (автоматическая неявка): схватка снова ждёт пару, стороны приведёт sync, неявку —
+   * заново пересчёт снятых участников.
+   */
+  async resetSystemDecided(tx: Tx, matches: readonly MatchRecord[]): Promise<void> {
+    for (const m of matches) {
+      await tx.matchResult.delete({ where: { matchId: m.id } });
+      await tx.match.update({
+        where: { id: m.id },
+        data: {
+          status: 'SCHEDULED',
+          winnerSide: null,
+          finishedAt: null,
+          readyAt: null,
+          version: { increment: 1 },
+        },
+      });
+    }
+  }
+
+  /**
    * Приведение сторон и статуса схваток к состоянию сетки после продвижения. Схватку, которая уже идёт или сыграна,
    * менять нельзя: DEPENDENT_MATCHES_STARTED (изменение результата, от которого она зависит, — Phase 7b).
    */
@@ -209,8 +293,8 @@ export class MatchesService {
     if (!same('RED', spec.red) || !same('BLUE', spec.blue)) return true;
     // Идущая или сыгранная схватка с теми же сторонами состоянию сетки соответствует.
     if (isStartedOrPlayed(m)) return false;
-    // Вызванная схватка (READY) — та же несыгранная схватка, продвижение её не сбрасывает.
-    const have = m.status === 'READY' ? 'SCHEDULED' : m.status;
+    // Вызванная (READY) и перенесённая (POSTPONED) — та же несыгранная схватка, продвижение её не сбрасывает.
+    const have = m.status === 'READY' || m.status === 'POSTPONED' ? 'SCHEDULED' : m.status;
     if (have !== statusFor(spec)) return true;
     const winner = spec.resolution === 'WALKOVER' ? spec.winnerSide : null;
     return m.status === 'FINISHED' && m.winnerSide !== winner;
@@ -250,7 +334,6 @@ export class MatchesService {
     });
   }
 
-  /** Схватки узлов, которые начались или сыграны: при них новая версия жеребьёвки запрещена. */
   /**
    * Начатые и сыгранные схватки узлов — они запрещают новую версию жеребьёвки. Автоматическая неявка снятого
    * участника (исход системы, никто не боролся) не мешает: новая сетка строится без снятых.

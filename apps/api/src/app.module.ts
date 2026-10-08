@@ -41,6 +41,7 @@ import { RegistrationsModule } from './modules/registrations';
 import { RefereesModule } from './modules/referees';
 import { RuleSetsModule } from './modules/rulesets';
 import { RefereeingModule } from './modules/refereeing';
+import { ResultsModule } from './modules/results';
 import { SchedulingModule } from './modules/scheduling';
 import { SettingsModule } from './modules/settings';
 import { UsersModule } from './modules/users';
@@ -105,6 +106,7 @@ import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
     WeighInModule,
     DrawsModule,
     SchedulingModule,
+    ResultsModule,
     RefereeingModule,
     MedicalModule,
     NotificationsModule,

@@ -17,13 +17,13 @@ import {
   type PendingConfirmationDto,
   type PermissionCode,
 } from '@sde/contracts';
-import type { Session, Tx } from '@sde/db';
+import type { MatchResultRevision, MedicalIncident, Session, Tx } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { PolicyService, type ResourceScope } from '../../access';
 import { CompetitionScopeService } from '../../competitions';
-import { entryOn, MATCH_INCLUDE, type MatchRecord, MatchStoreService } from '../../matches';
+import { entryOn, isConfirmed, MATCH_INCLUDE, type MatchRecord, MatchStoreService } from '../../matches';
 import { CrewAccessService } from '../../scheduling';
 import { isLive, noShowAllowed } from '../domain/match-machine';
 import { MatchContextService, toScoringEvents } from './match-context.service';
@@ -32,7 +32,9 @@ import {
   EMPTY_TEXT,
   type EntryView,
   eventDto,
+  incidentDto,
   resultDto,
+  revisionDto,
   resultUserIds,
   rulesDto,
   sideDto,
@@ -43,9 +45,13 @@ const CANDIDATES: readonly PermissionCode[] = [
   'match.update',
   'match.start',
   'match.finish',
+  'match.cancel',
   'scoring.create',
   'scoring.update',
   'result.confirm',
+  'result.amend',
+  'medical.record',
+  'export.create',
 ];
 
 const UPCOMING = ['SCHEDULED', 'READY', 'IN_PROGRESS', 'PAUSED'] as const;
@@ -62,7 +68,15 @@ interface ViewContext {
   names: Map<string, string>;
   slots: Map<string, Slot>;
   mats: Map<string, MatchMatRef>;
+  revisions: Map<string, MatchResultRevision[]>;
+  incidents: Map<string, MedicalIncident[]>;
 }
+
+const groupBy = <T extends { matchId: string }>(rows: readonly T[]): Map<string, T[]> => {
+  const out = new Map<string, T[]>();
+  for (const r of rows) out.set(r.matchId, [...(out.get(r.matchId) ?? []), r]);
+  return out;
+};
 
 /** Решена без игры: без соперника (BYE) или пустая — в очереди ковра не показывается. */
 const isNoMatch = (m: MatchRecord): boolean =>
@@ -94,6 +108,21 @@ export class MatchQueriesService {
     private readonly crews: CrewAccessService,
   ) {}
 
+  /** Прежние варианты результатов, записи врача и пользователи, упомянутые в них и в результатах. */
+  private async loadHistory(db: Tx, matches: readonly MatchRecord[]) {
+    const ids = matches.map((m) => m.id);
+    const [revisions, incidents] = await Promise.all([
+      this.store.revisions(db, ids),
+      this.store.incidents(db, ids),
+    ]);
+    const userIds = [
+      ...resultUserIds(matches),
+      ...revisions.map((r) => r.changedById),
+      ...incidents.map((i) => i.recordedById),
+    ];
+    return { revisions, incidents, userIds };
+  }
+
   private async loadContext(db: Tx, matches: readonly MatchRecord[]): Promise<ViewContext> {
     const ids = matches.map((m) => m.id);
     const entryIds = [
@@ -101,6 +130,7 @@ export class MatchQueriesService {
         matches.flatMap((m) => m.participants.map((p) => p.entryId)).filter((x): x is string => !!x),
       ),
     ];
+    const { revisions, incidents, userIds } = await this.loadHistory(db, matches);
     const [categories, entries, users, slots] = await Promise.all([
       db.competitionCategory.findMany({
         where: { id: { in: [...new Set(matches.map((m) => m.categoryId))] } },
@@ -113,7 +143,7 @@ export class MatchQueriesService {
           })
         : Promise.resolve([]),
       db.user.findMany({
-        where: { id: { in: resultUserIds(matches) } },
+        where: { id: { in: [...new Set(userIds)] } },
         select: { id: true, displayName: true },
       }),
       db.matchSchedule.findMany({
@@ -121,17 +151,7 @@ export class MatchQueriesService {
         select: { matchId: true, sessionId: true, matId: true, plannedAt: true },
       }),
     ]);
-    const matIds = [
-      ...new Set(
-        [...slots.map((s) => s.matId), ...matches.map((m) => m.matId)].filter((x): x is string => !!x),
-      ),
-    ];
-    const mats = matIds.length
-      ? await db.mat.findMany({
-          where: { id: { in: matIds } },
-          select: { id: true, number: true, name: true },
-        })
-      : [];
+    const mats = await this.loadMats(db, [...slots.map((s) => s.matId), ...matches.map((m) => m.matId)]);
     return {
       categories: new Map(categories.map((c) => [c.id, { ru: c.nameRu, en: c.nameEn }])),
       entries: new Map(
@@ -149,7 +169,16 @@ export class MatchQueriesService {
       names: new Map(users.map((u) => [u.id, u.displayName])),
       slots: new Map(slots.map((s) => [s.matchId, s])),
       mats: new Map(mats.map((m) => [m.id, m])),
+      revisions: groupBy(revisions),
+      incidents: groupBy(incidents),
     };
+  }
+
+  private async loadMats(db: Tx, ids: readonly (string | null)[]): Promise<MatchMatRef[]> {
+    const matIds = [...new Set(ids.filter((x): x is string => !!x))];
+    return matIds.length
+      ? db.mat.findMany({ where: { id: { in: matIds } }, select: { id: true, number: true, name: true } })
+      : [];
   }
 
   private matOf(m: MatchRecord, ctx: ViewContext): MatchMatRef | null {
@@ -172,6 +201,7 @@ export class MatchQueriesService {
     const perms = new Set(await this.policy.allowedActionsAny(user, [scope], CANDIDATES, { matchId: m.id }));
     const both = entryOn(m, 'RED') !== null && entryOn(m, 'BLUE') !== null;
     const provisional = m.status === 'FINISHED' && m.result?.status === 'PROVISIONAL';
+    const confirmed = m.status === 'FINISHED' && isConfirmed(m);
     const a: MatchAction[] = [];
     const add = (ok: boolean, action: MatchAction): void => {
       if (ok) a.push(action);
@@ -188,6 +218,17 @@ export class MatchQueriesService {
     add((isLive(m.status) || provisional) && perms.has('match.finish'), 'result.record');
     add(provisional && perms.has('result.confirm'), 'result.confirm');
     add(noShowAllowed(m.status) && both && perms.has('match.finish'), 'no_show');
+    // Phase 7b: перенос, отмена (вне сетки), изменение подтверждённого результата, врач, протокол.
+    const waiting = m.status === 'SCHEDULED' || m.status === 'READY';
+    add(waiting && perms.has('match.update'), 'transition:POSTPONED');
+    add(m.status === 'POSTPONED' && perms.has('match.update'), 'transition:SCHEDULED');
+    add(
+      (waiting || m.status === 'POSTPONED') && m.bracketNodeId === null && perms.has('match.cancel'),
+      'transition:CANCELLED',
+    );
+    add(confirmed && both && perms.has('result.amend'), 'result.amend');
+    add(isLive(m.status) && both && perms.has('medical.record'), 'medical.record');
+    add(both && perms.has('export.create'), 'protocol');
     return a;
   }
 
@@ -218,6 +259,9 @@ export class MatchQueriesService {
       result: resultDto(m, ctx.names),
       proposedOutcome: state ? determineOutcome(state, rules) : null,
       rules: rulesDto(rules),
+      manual: m.bracketNodeId === null,
+      revisions: (ctx.revisions.get(m.id) ?? []).map((r) => revisionDto(r, ctx.names)),
+      incidents: (ctx.incidents.get(m.id) ?? []).map((i) => incidentDto(i, ctx.names)),
       version: m.version,
       allowedActions: await this.actions(user, scope, m),
     };

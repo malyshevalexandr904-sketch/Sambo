@@ -69,6 +69,17 @@ export const EVENT_SCHEMAS = {
     winnerSide: z.enum(['RED', 'BLUE']).nullable(),
     method: z.string(),
   }),
+  // Phase 7b — итоги. Потребители (уведомления, публичные страницы, рейтинги) — Phase 8–9.
+  'match.result_amended': z.object({
+    matchId: Uuid,
+    categoryId: Uuid,
+    revision: z.number().int().min(2),
+    winnerChanged: z.boolean(),
+  }),
+  'category.completed': z.object({ categoryId: Uuid, competitionId: Uuid }),
+  'category.results_published': z.object({ categoryId: Uuid, competitionId: Uuid }),
+  'category.results_amended': z.object({ categoryId: Uuid, competitionId: Uuid }),
+  'medical.incident_recorded': z.object({ matchId: Uuid, entryId: Uuid, withdrawn: z.boolean() }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

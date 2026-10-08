@@ -126,17 +126,19 @@ export function winLoss(state: BracketState): Map<string, { wins: number; losses
 
 /**
  * Места по рангам: rank — чем больше, тем лучше; место = 1 + число участников со строго большим рангом.
- * Так делятся места: два третьих, два пятых.
+ * Так делятся места: два третьих, два пятых. `floorOf` — наименьшее место ранга по правилу формата (Phase 7b):
+ * если выше никого нет (оба финалиста сняты — чемпиона нет), финалист всё равно второй, а не первый.
  */
 export function placesByRank(
   ranks: ReadonlyMap<string, number>,
   stats: ReadonlyMap<string, { wins: number; losses: number }>,
+  floorOf: (rank: number) => number = () => 1,
 ): { entryId: string; place: number; wins: number; losses: number }[] {
   const values = [...ranks.values()];
   return [...ranks.entries()]
     .map(([entryId, rank]) => ({
       entryId,
-      place: 1 + values.filter((v) => v > rank).length,
+      place: Math.max(floorOf(rank), 1 + values.filter((v) => v > rank).length),
       wins: stats.get(entryId)?.wins ?? 0,
       losses: stats.get(entryId)?.losses ?? 0,
     }))

@@ -12,6 +12,7 @@ export {
   isConfirmed,
   isPlayed,
   isStartedOrPlayed,
+  isSystemDecided,
   MATCH_INCLUDE,
   type MatchRecord,
   sideOf,

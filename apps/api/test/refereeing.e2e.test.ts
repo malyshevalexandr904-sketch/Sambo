@@ -523,8 +523,9 @@ describe('no-show on call, pause and BYE results', () => {
       result: { status: 'PROVISIONAL', method: 'NO_SHOW', winnerSide: 'RED' },
     });
     expect((await confirm(chief, after)).status).toBe(200);
-    // Первый подтверждённый результат без старта схватки тоже открывает соревнования и категорию.
-    expect(await status()).toEqual({ competition: 'IN_PROGRESS', category: 'IN_PROGRESS' });
+    // Первый подтверждённый результат без старта схватки тоже открывает соревнования; это единственная схватка
+    // категории — она сразу завершена (Phase 7b: DRAWN → IN_PROGRESS → COMPLETED).
+    expect(await status()).toEqual({ competition: 'IN_PROGRESS', category: 'COMPLETED' });
   });
 
   it('an automatic no-show of a withdrawn athlete does not block a new draw version', async () => {

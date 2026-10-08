@@ -165,5 +165,15 @@ export const AUDIT_ACTIONS = [
   'match.result_confirmed',
   'match.no_show',
   'match.no_show_auto',
+  // Phase 7b — итоги: изменение результата, перенос и отмена, ручная схватка, врач, итоги категории.
+  'match.result_amended',
+  'match.postponed',
+  'match.unpostponed',
+  'match.cancelled',
+  'match.created',
+  'medical.incident_recorded',
+  'category.results_computed',
+  'category.results_published',
+  'category.results_amended',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

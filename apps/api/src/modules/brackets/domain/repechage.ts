@@ -73,8 +73,10 @@ export function lostToPoolWinner(
 ): SideState {
   const rounds = eliminationRounds(graph.size);
   const poolFinal = state.get(mainKey(rounds - 1, source.pool === 'A' ? 1 : 2));
+  if (!poolFinal || poolFinal.status === 'PENDING' || poolFinal.status === 'READY') return PENDING;
+  // Финал подгруппы решён без победителя (сняты оба): проигравших победителю подгруппы нет — утешительных нет.
   const champion = winnerOf(poolFinal);
-  if (!poolFinal || !champion) return PENDING;
+  if (!champion) return BYE;
   const count = graph.size / 2 ** source.round;
   const from = source.pool === 'A' ? 1 : count / 2 + 1;
   for (let position = from; position < from + count / 2; position++) {
@@ -112,5 +114,18 @@ export function repechagePlacements(graph: BracketGraph, state: BracketState): P
       if (bronze) ranks.set(bronze, 998);
     }
   }
-  return placesByRank(ranks, winLoss(state));
+  return placesByRank(ranks, winLoss(state), repechagePlaceFloor());
 }
+
+/**
+ * Наименьшее место ранга по правилу Q-13: чемпион — 1, финалист — 2, бронза — 3. Ниже — места по числу участников
+ * выше (утешительные с пропусками без соперника дают 5, 6… — как в 5a).
+ */
+export const repechagePlaceFloor =
+  () =>
+  (rank: number): number => {
+    if (rank >= 1000) return 1;
+    if (rank === 999) return 2;
+    if (rank === 998) return 3;
+    return 1;
+  };

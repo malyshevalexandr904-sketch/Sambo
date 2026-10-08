@@ -13,8 +13,12 @@ import {
   type MatchEventsDto,
   MatchEventVoid,
   MatchNoShowRequest,
+  MatchResultAmend,
   MatchResultInput,
   MatchTransitionRequest,
+  type MatchProtocolDto,
+  MedicalIncidentCreate,
+  type MedicalIncidentDto,
 } from '@sde/contracts';
 import type { Response } from 'express';
 import { CurrentUser } from '../../../common/context/current-user';
@@ -24,7 +28,10 @@ import { Idempotent } from '../../../common/http/idempotency';
 import { UuidParam, ValidBody, ValidQuery } from '../../../common/validation/zod.pipe';
 import { RequirePermission } from '../../access';
 import { WriteAuthority } from '../../venue-sync';
+import { AmendService } from '../application/amend.service';
 import { MatchCommandsService } from '../application/match-commands.service';
+import { MedicalIncidentsService } from '../application/medical-incidents.service';
+import { ProtocolsService } from '../application/protocols.service';
 import { MatchQueriesService } from '../application/match-queries.service';
 import { ResultsService } from '../application/results.service';
 import { ScoringService } from '../application/scoring.service';
@@ -38,6 +45,9 @@ export class MatchesController {
     private readonly commands: MatchCommandsService,
     private readonly scoring: ScoringService,
     private readonly results: ResultsService,
+    private readonly amendments: AmendService,
+    private readonly medical: MedicalIncidentsService,
+    private readonly protocols: ProtocolsService,
   ) {}
 
   private send(res: Response, m: MatchDetailDto): DataEnvelope<MatchDetailDto> {
@@ -145,5 +155,49 @@ export class MatchesController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<DataEnvelope<MatchDetailDto>> {
     return this.send(res, await this.commands.noShow(user, id, version, body));
+  }
+
+  @Post(':id/result/amend')
+  @RequirePermission('result.amend', MATCH)
+  @WriteAuthority(MATCH)
+  @HttpCode(200)
+  async amend(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @IfMatchVersion() version: number,
+    @ValidBody(MatchResultAmend) body: MatchResultAmend,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<DataEnvelope<MatchDetailDto>> {
+    return this.send(res, await this.amendments.amend(user, id, version, body));
+  }
+
+  @Post(':id/medical-incidents')
+  @RequirePermission('medical.record', MATCH)
+  @WriteAuthority(MATCH)
+  async recordIncident(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @ValidBody(MedicalIncidentCreate) body: MedicalIncidentCreate,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<DataEnvelope<MatchDetailDto>> {
+    return this.send(res, await this.medical.record(user, id, body));
+  }
+
+  @Get(':id/medical-incidents')
+  @RequirePermission('medical.view', MATCH)
+  async incidents(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+  ): Promise<DataEnvelope<MedicalIncidentDto[]>> {
+    return ok(await this.medical.list(user, id));
+  }
+
+  @Get(':id/protocol')
+  @RequirePermission('export.create', MATCH)
+  async protocol(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+  ): Promise<DataEnvelope<MatchProtocolDto>> {
+    return ok(await this.protocols.match(user, id));
   }
 }

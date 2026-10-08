@@ -24,6 +24,7 @@ import { CompetitionStatusWriter } from '../../competitions';
 import { entryOn, type MatchRecord, MatchStoreService } from '../../matches';
 import { OutboxService } from '../../outbox';
 import { ActiveMatchService } from '../../registrations';
+import { CategoryResultsService } from '../../results';
 import { WriteLeaseService } from '../../venue-sync';
 import { isLive } from '../domain/match-machine';
 import { MatchContextService, toScoringEvents } from './match-context.service';
@@ -70,6 +71,7 @@ export class ResultsService {
     private readonly competitionStatus: CompetitionStatusWriter,
     private readonly activeMatch: ActiveMatchService,
     private readonly withdrawals: WithdrawalsService,
+    private readonly results: CategoryResultsService,
     private readonly leases: WriteLeaseService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
@@ -165,6 +167,8 @@ export class ResultsService {
       if (drawId) {
         await this.brackets.advance(tx, drawId, matchId, m.competitionId);
         await this.withdrawals.resolve(tx, drawId);
+        // Последнее подтверждение сетки завершает категорию: места и медали (Phase 7b).
+        await this.results.refresh(tx, locked, drawId);
       }
       await this.audit.record(tx, {
         action: 'match.result_confirmed',
