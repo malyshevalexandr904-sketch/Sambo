@@ -253,6 +253,7 @@ export class ProtocolsService {
       roundLabel: m.roundLabel,
       manual: m.bracketNodeId === null,
       mat,
+      durationSeconds: m.durationSeconds,
       startedAt: m.startedAt?.toISOString() ?? null,
       finishedAt: m.finishedAt?.toISOString() ?? null,
       red: red ? (people.get(red) ?? null) : null,

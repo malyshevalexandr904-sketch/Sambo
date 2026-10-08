@@ -420,6 +420,26 @@ describe('postpone, cancel and a manual match', () => {
       sessionId: w.session.id,
     };
     expect((await send(judge.s, 'post', `/api/v1/categories/${categoryId}/matches`, body)).status).toBe(403);
+    // Экраны: кнопка «Добавить схватку» — по праву match.create, протоколы и публикация — в правах турнира.
+    const office = async (s: Session) =>
+      (await s.agent.get(`/api/v1/competitions/${w.competitionId}/officiating`)).body.data as {
+        canCreateMatch: boolean;
+      };
+    expect((await office(judge.s)).canCreateMatch).toBe(false);
+    expect((await office(w.staff.secretary)).canCreateMatch).toBe(true);
+    const actions = async (s: Session) =>
+      (
+        (await s.agent.get(`/api/v1/competitions/${w.competitionId}`)).body.data as {
+          allowedActions: string[];
+        }
+      ).allowedActions;
+    expect(await actions(w.staff.chief)).toEqual(
+      expect.arrayContaining(['result.publish', 'result.amend', 'export.create']),
+    );
+    expect(await actions(w.staff.secretary)).toEqual(
+      expect.arrayContaining(['match.create', 'export.create']),
+    );
+    expect(await actions(w.staff.secretary)).not.toContain('result.amend');
     const created = await send(w.staff.secretary, 'post', `/api/v1/categories/${categoryId}/matches`, body);
     expect(created.status, JSON.stringify(created.body)).toBe(201);
     const m = created.body.data as MatchDetailDto;
@@ -464,6 +484,8 @@ describe('postpone, cancel and a manual match', () => {
     const p = r.body.data as MatchProtocolDto;
     expect(p.red?.fullName.split(' ').length).toBeGreaterThanOrEqual(2);
     expect(p.events.map((e) => e.type)).toEqual(['CLOCK_STARTED', 'SCORE', 'CLOCK_STOPPED']);
+    expect(p.durationSeconds).toBeGreaterThan(0);
+    expect(p.events[2]?.matchClockMs).toBe((p.durationSeconds ?? 0) * 1000);
     expect(p.events[1]).toMatchObject({ points: 4, pointsTo: 'RED', red: 4, blue: 0 });
     expect(p.result).toMatchObject({ winnerSide: 'RED', method: 'POINTS' });
     const c = await w.staff.secretary.agent.get(`/api/v1/categories/${categoryId}/protocol`);

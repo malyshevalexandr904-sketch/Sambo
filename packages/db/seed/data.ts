@@ -231,6 +231,7 @@ export const SEED_USERS: SeedUser[] = [
     person: { lastName: 'Здравова', firstName: 'Инна', birthDate: '1983-05-11', gender: 'FEMALE' },
     grants: [
       { id: g(12), role: 'MEDICAL_STAFF', organizationId: null, competitionId: SEED_IDS.competitionCheckIn },
+      { id: g(24), role: 'MEDICAL_STAFF', organizationId: null, competitionId: SEED_IDS.competitionReferee },
     ],
   },
   {

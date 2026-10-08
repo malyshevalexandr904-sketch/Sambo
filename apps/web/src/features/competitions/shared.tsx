@@ -59,8 +59,8 @@ const CATEGORY_TONE: Record<string, Tone> = {
   READY_FOR_DRAW: 'info',
   DRAWN: 'info',
   IN_PROGRESS: 'info',
-  COMPLETED: 'neutral',
-  RESULTS_PUBLISHED: 'neutral',
+  COMPLETED: 'warning',
+  RESULTS_PUBLISHED: 'success',
   MERGED: 'neutral',
   CANCELLED: 'danger',
 };

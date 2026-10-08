@@ -239,6 +239,8 @@ export interface MatchProtocolDto {
   roundLabel: string;
   manual: boolean;
   mat: { number: number; name: string | null } | null;
+  /** Длительность схватки: «Стоп» на ней — «время вышло». */
+  durationSeconds: number | null;
   startedAt: string | null;
   finishedAt: string | null;
   red: ProtocolParticipant | null;

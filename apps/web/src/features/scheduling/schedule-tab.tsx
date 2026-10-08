@@ -6,6 +6,7 @@ import { Alert, Badge, Button, Card, CardTitle, EmptyState } from '@sde/ui';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { QueryState } from '@/components/common';
+import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { pickName } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
@@ -178,6 +179,14 @@ function MatchRow({
         ) : (
           <MatchStatusBadge status={item.status} />
         )}
+        {!item.noMatch ? (
+          <Link
+            href={`/referee/${competitionId}/matches/${item.matchId}`}
+            className="text-sm font-medium text-blue-700 hover:underline print:hidden"
+          >
+            {t('openMatch')}
+          </Link>
+        ) : null}
         {canManage && !item.noMatch ? (
           <Button size="sm" variant="ghost" onClick={() => setMoving((v) => !v)} className="print:hidden">
             {t('move')}

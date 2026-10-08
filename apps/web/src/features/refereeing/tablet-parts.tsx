@@ -1,10 +1,12 @@
 'use client';
 // Части планшета ковра (план Phase 7a, §5): индикатор связи, заголовок схватки, вызов и неявка до старта,
-// записанный результат с подтверждением, следующая схватка и результаты, ждущие подтверждения.
+// записанный результат с подтверждением, следующая схватка и результаты, ждущие подтверждения; перенос схватки
+// и отметка «Врач на ковре» (Phase 7b).
 import type { MatchDetailDto, MatConsoleDto } from '@sde/contracts';
 import { Alert, Badge, Button, cn } from '@sde/ui';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ReasonAction } from '@/components/common';
 import { ApiError } from '@/lib/api';
 import { useErrorMessage } from '@/lib/errors';
 import { pickName } from '@/lib/queries';
@@ -79,6 +81,11 @@ export function MatchTitle({ match, timezone }: { match: MatchDetailDto; timezon
       >
         {awaiting ? t('awaitingConfirmation') : t(`matchStatuses.${match.status}`)}
       </Badge>
+      {match.incidents.length > 0 ? (
+        <Badge tone="danger" className="px-3 py-1 text-sm">
+          <span aria-hidden="true">✚</span> {t('doctor.onMat')}
+        </Badge>
+      ) : null}
       {match.plannedAt ? (
         <span className="text-sm text-slate-500">{timeInZone(match.plannedAt, timezone, locale)}</span>
       ) : null}
@@ -157,6 +164,16 @@ export function Prestart({
           <Button size="lg" variant="secondary" onClick={() => setNoShow((v) => !v)} aria-expanded={noShow}>
             {t('noShow')}
           </Button>
+        ) : null}
+        {can('transition:POSTPONED') ? (
+          <ReasonAction
+            label={t('hub.postpone')}
+            title={t('hub.postponeTitle')}
+            description={t('hub.postponeHint')}
+            onConfirm={async (reason) => {
+              await run(() => transitionMatch(match, 'POSTPONED', reason));
+            }}
+          />
         ) : null}
       </div>
       {noShow ? (

@@ -315,6 +315,8 @@ export interface OfficiatingDto {
   currentSessionId: string | null;
   mats: OfficiatingMatDto[];
   pendingConfirmations: number;
+  /** Может добавить схватку вручную (`match.create`, Phase 7b). */
+  canCreateMatch: boolean;
 }
 
 /** Планшет ковра: текущая схватка целиком, следующая и ждущие подтверждения. */

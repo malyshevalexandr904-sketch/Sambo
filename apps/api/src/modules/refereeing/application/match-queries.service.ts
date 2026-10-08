@@ -432,6 +432,7 @@ export class MatchQueriesService {
       currentSessionId: session?.id ?? null,
       mats: list,
       pendingConfirmations: rows.filter((r) => r.match.status === 'FINISHED').length,
+      canCreateMatch: await this.policy.can(user, 'match.create', scope),
     };
   }
 }
