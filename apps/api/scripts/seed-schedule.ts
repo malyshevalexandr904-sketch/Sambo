@@ -168,6 +168,28 @@ async function prepareRefereeing(agent: Agent, csrf: string, db: Db): Promise<st
   ].join('\n');
 }
 
+/** События схватки по порядку — с ключом идемпотентности и ожидаемым номером журнала, как у планшета. */
+async function sendEvents(
+  agent: Agent,
+  csrf: string,
+  matchId: string,
+  fromSeq: number,
+  steps: { type: string; matchClockMs: number; side?: string; actionCode?: string }[],
+  duration: number,
+): Promise<number> {
+  let seq = fromSeq;
+  const start = Date.now() - duration;
+  for (const step of steps) {
+    const res = await agent
+      .post(`/api/v1/matches/${matchId}/events`)
+      .set('x-csrf-token', csrf)
+      .set('idempotency-key', randomUUID())
+      .send({ ...step, expectedSeq: seq, deviceTime: new Date(start + step.matchClockMs).toISOString() });
+    seq = ((await expectStatus(res, 201, `event ${step.type}`)).data as MatchEventResultDto).seq;
+  }
+  return seq;
+}
+
 /** Провести схватку на планшете тем же API: вызов, старт, время, бросок победителя, «время вышло», результат. */
 async function playMatch(agent: Agent, csrf: string, matchId: string, winner: 'RED' | 'BLUE'): Promise<void> {
   const get = async (): Promise<MatchDetailDto> =>
@@ -200,16 +222,7 @@ async function playMatch(agent: Agent, csrf: string, matchId: string, winner: 'R
     },
     { type: 'CLOCK_STOPPED', matchClockMs: duration },
   ];
-  let seq = m.seq;
-  const start = Date.now() - duration;
-  for (const step of steps) {
-    const res = await agent
-      .post(`/api/v1/matches/${matchId}/events`)
-      .set('x-csrf-token', csrf)
-      .set('idempotency-key', randomUUID())
-      .send({ ...step, expectedSeq: seq, deviceTime: new Date(start + step.matchClockMs).toISOString() });
-    seq = ((await expectStatus(res, 201, `event ${step.type}`)).data as MatchEventResultDto).seq;
-  }
+  const seq = await sendEvents(agent, csrf, matchId, m.seq, steps, duration);
   m = await get();
   m = (
     await expectStatus(

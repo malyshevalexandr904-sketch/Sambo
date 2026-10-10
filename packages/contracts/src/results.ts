@@ -104,7 +104,7 @@ export interface AthleteHistoryDto {
 // ---------- Изменение подтверждённого результата ----------
 
 /** Способы при изменении: все, кроме «без соперника» (схватка сыграна или решена неявкой). */
-export const AMEND_METHODS = WIN_METHODS.filter((m) => m !== 'BYE') as Exclude<WinMethod, 'BYE'>[];
+export const AMEND_METHODS = WIN_METHODS.filter((m): m is Exclude<WinMethod, 'BYE'> => m !== 'BYE');
 
 export const MatchResultAmend = z.object({
   winnerSide: z.enum(SIDES),
