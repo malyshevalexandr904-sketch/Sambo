@@ -19,6 +19,10 @@ trap 'printf "\n\033[1;31mОшибка в строке %s. Сайт продол
 step "Резервная копия перед обновлением"
 bash "$DIR/backup.sh"
 
+# Caddyfile подключён в контейнер отдельным файлом: после git pull Caddy видит прежний файл, пока контейнер не
+# перезапущен (маршрут /ws для живых данных — Phase 8a). Перезапуск — только если конфигурация изменилась.
+caddy_before="$(sha256sum "$DIR/Caddyfile" | cut -d' ' -f1)"
+
 if [ "${1:-}" != "--no-pull" ]; then
   step "Новая версия из GitHub"
   git -C "$REPO" pull --ff-only
@@ -32,6 +36,10 @@ step "Сборка"
 
 step "Миграции и перезапуск"
 "${COMPOSE[@]}" up -d --remove-orphans
+if [ "$(sha256sum "$DIR/Caddyfile" | cut -d' ' -f1)" != "$caddy_before" ]; then
+  echo "    Маршруты Caddy изменились — перезапуск Caddy (сертификаты сохраняются)"
+  "${COMPOSE[@]}" restart caddy
+fi
 docker image prune -f >/dev/null
 
 step "Готово"

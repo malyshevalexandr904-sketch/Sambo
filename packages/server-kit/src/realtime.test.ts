@@ -15,7 +15,7 @@ class FakeRedis {
   last = new Map<string, string>();
   published: { channel: string; body: string }[] = [];
   async eval(_script: string, _n: number, ...args: (string | number)[]): Promise<unknown> {
-    const [seqKey, lastKey, head, tail, , retain, channel, room] = args.map(String) as string[];
+    const [seqKey, lastKey, head, tail, , retain, channel, room] = args.map(String);
     const seq = (this.seq.get(seqKey as string) ?? 0) + 1;
     this.seq.set(seqKey as string, seq);
     const msg = `${head}${seq}${tail}`;

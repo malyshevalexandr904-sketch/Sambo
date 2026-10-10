@@ -173,7 +173,7 @@ export class ScoreboardService {
     const personIds = [...new Set(entries.map((e) => e.athlete.personId))];
     const kinds: Map<string, Set<ConsentKind>> = personIds.length
       ? await this.consents.activeKinds(this.db, personIds, competitionId)
-      : new Map();
+      : new Map<string, Set<ConsentKind>>();
     const distribution = new Set(personIds.filter((id) => kinds.get(id)?.has('PD_DISTRIBUTION')));
     const rules = matches.some((m) => LIVE.includes(m.status) || m.state !== null)
       ? await this.context.rules(this.db, competitionId).catch(() => null)

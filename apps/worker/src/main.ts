@@ -53,14 +53,9 @@ async function main(): Promise<void> {
 
   const mailer = createMailer(env, logger);
   const emailConsumer = new EmailConsumer(db, mailer, logger, env);
-  const notificationConsumer = new NotificationConsumer(
-    db,
-    mailer,
-    notificationQueue,
-    logger,
-    env,
-    new LivePublisher(connection),
-  );
+  // Новые уведомления — сразу в живой канал пользователя (Phase 8a).
+  const live = new LivePublisher(connection);
+  const notificationConsumer = new NotificationConsumer(db, mailer, notificationQueue, logger, env, live);
   const maintenance = new Maintenance(db, s3, env, logger);
   const importConsumer = new ImportConsumer(db, s3, env, logger);
 

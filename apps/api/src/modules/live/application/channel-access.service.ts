@@ -62,40 +62,17 @@ export class ChannelAccessService {
       case 'user':
         return { room: liveUserRoom(this.requireUser(who).id), state: null, private: true };
       case 'ops:competition':
-        await this.assertStaff(who, channel.competitionId);
+      case 'ops:mat':
+      case 'ops:match':
+        await this.assertStaff(who, await this.competitionOf(who, channel));
         return { room: name, state: null, private: true };
-      case 'ops:mat': {
-        this.requireUser(who);
-        const mat = await this.db.mat.findUnique({
-          where: { id: channel.matId },
-          select: { competitionId: true },
-        });
-        if (!mat) throw new LiveDenied('NOT_FOUND');
-        await this.assertStaff(who, mat.competitionId);
-        return { room: name, state: null, private: true };
-      }
-      case 'ops:match': {
-        this.requireUser(who);
-        const match = await this.db.match.findUnique({
-          where: { id: channel.matchId },
-          select: { competitionId: true },
-        });
-        if (!match) throw new LiveDenied('NOT_FOUND');
-        await this.assertStaff(who, match.competitionId);
-        return { room: name, state: null, private: true };
-      }
-      case 'public:competition': {
-        await this.assertPublic(`slug:${channel.slug}`, () =>
-          this.db.competition.findUnique({ where: { slug: channel.slug }, select: PUBLIC_SELECT }),
-        );
+      case 'public:competition':
+        await this.assertPublic(`slug:${channel.slug}`, () => this.bySlug(channel.slug));
         return { room: name, state: null, private: false };
-      }
       case 'public:mat': {
         const { slug, matNumber } = channel;
         // Снимок мог сохраниться, пока турнир был опубликован: публичность проверяется при каждой подписке.
-        await this.assertPublic(`slug:${slug}`, () =>
-          this.db.competition.findUnique({ where: { slug }, select: PUBLIC_SELECT }),
-        );
+        await this.assertPublic(`slug:${slug}`, () => this.bySlug(slug));
         return {
           room: name,
           state: { type: 'mat.state', compute: () => this.scoreboard.matStateBySlug(slug, matNumber) },
@@ -118,6 +95,25 @@ export class ChannelAccessService {
         };
       }
     }
+  }
+
+  private bySlug(slug: string) {
+    return this.db.competition.findUnique({ where: { slug }, select: PUBLIC_SELECT });
+  }
+
+  /** Турнир служебного канала: сам турнир, турнир ковра или схватки (сначала — вход, потом поиск). */
+  private async competitionOf(
+    who: Subscriber,
+    channel: Extract<ParsedLiveChannel, { kind: 'ops:competition' | 'ops:mat' | 'ops:match' }>,
+  ): Promise<string> {
+    this.requireUser(who);
+    if (channel.kind === 'ops:competition') return channel.competitionId;
+    const row =
+      channel.kind === 'ops:mat'
+        ? await this.db.mat.findUnique({ where: { id: channel.matId }, select: { competitionId: true } })
+        : await this.db.match.findUnique({ where: { id: channel.matchId }, select: { competitionId: true } });
+    if (!row) throw new LiveDenied('NOT_FOUND');
+    return row.competitionId;
   }
 
   /**

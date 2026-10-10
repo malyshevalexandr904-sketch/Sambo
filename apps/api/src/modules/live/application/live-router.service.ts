@@ -15,6 +15,14 @@ import {
 } from '../domain/change-routing';
 import { LivePublisherService } from './live-publisher.service';
 
+interface TouchedMatch {
+  id: string;
+  publicId: string;
+  status: string;
+  matId: string | null;
+  schedule: { matId: string } | null;
+}
+
 /** Публичное состояние схватки — только там, где на неё смотрят: вызвана, идёт, на паузе или только что завершена. */
 const PUBLIC_MATCH_STATUSES = new Set(['READY', 'IN_PROGRESS', 'PAUSED', 'FINISHED']);
 
@@ -43,6 +51,13 @@ export class LiveRouterService {
       select: { id: true, slug: true, status: true, deletedAt: true },
     });
     if (!competition) return;
+    const { matches, mats } = await this.targets(g);
+    await this.publishOps(g, mats);
+    if (isPublicCompetition(competition)) await this.publishPublic(competition.slug, g, mats, matches);
+  }
+
+  /** Затронутые схватки (кроме удалённых) и ковры: из строк, фактический ковёр и ковёр расписания схваток. */
+  private async targets(g: CompetitionChanges): Promise<{ matches: TouchedMatch[]; mats: string[] }> {
     const touched = [...g.matchIds].filter((id) => !g.deletedMatchIds.has(id));
     const matches = touched.length
       ? await this.db.match.findMany({
@@ -56,16 +71,23 @@ export class LiveRouterService {
           },
         })
       : [];
-    const matIds = new Set(g.matIds);
-    for (const m of matches) {
-      if (m.matId) matIds.add(m.matId);
-      if (m.schedule?.matId) matIds.add(m.schedule.matId);
+    if (g.allMats) {
+      const all = await this.db.mat.findMany({
+        where: { competitionId: g.competitionId },
+        select: { id: true },
+      });
+      return { matches, mats: all.map((m) => m.id) };
     }
-    const mats = g.allMats
-      ? await this.db.mat.findMany({ where: { competitionId: g.competitionId }, select: { id: true } })
-      : [...matIds].map((id) => ({ id }));
+    const mats = new Set(g.matIds);
+    for (const m of matches) {
+      if (m.matId) mats.add(m.matId);
+      if (m.schedule?.matId) mats.add(m.schedule.matId);
+    }
+    return { matches, mats: [...mats] };
+  }
 
-    // Служебные каналы: турнир — только изменения статуса и данных; ковры и схватки — и счёт.
+  /** Служебные каналы: турнир — только изменения статуса и данных; ковры и схватки — и счёт. */
+  private async publishOps(g: CompetitionChanges, mats: readonly string[]): Promise<void> {
     if (g.topics.size > 0)
       await this.publisher.publish({
         channel: liveChannel.opsCompetition(g.competitionId),
@@ -78,23 +100,30 @@ export class LiveRouterService {
         type: 'changed',
         payload: changedPayload(g, { topics: ['matches'], matchIds: [id] }),
       });
-    for (const mat of mats)
+    for (const matId of mats)
       await this.publisher.publish({
-        channel: liveChannel.opsMat(mat.id),
+        channel: liveChannel.opsMat(matId),
         type: 'changed',
-        payload: changedPayload(g, { matIds: [mat.id] }),
+        payload: changedPayload(g, { matIds: [matId] }),
       });
+  }
 
-    if (!isPublicCompetition(competition)) return;
-    const publicTopics = [...g.topics].filter((t): t is LiveTopic => PUBLIC_TOPICS.includes(t));
-    if (publicTopics.length > 0)
+  /** Публичные каналы: темы изменений турнира (без идентификаторов), состояние табло ковров и схваток. */
+  private async publishPublic(
+    slug: string,
+    g: CompetitionChanges,
+    mats: readonly string[],
+    matches: readonly TouchedMatch[],
+  ): Promise<void> {
+    const topics = [...g.topics].filter((t): t is LiveTopic => PUBLIC_TOPICS.includes(t));
+    if (topics.length > 0)
       await this.publisher.publish({
-        channel: liveChannel.publicCompetition(competition.slug),
+        channel: liveChannel.publicCompetition(slug),
         type: 'changed',
-        payload: { topics: publicTopics, categoryIds: [], matIds: [], matchIds: [] },
+        payload: { topics, categoryIds: [], matIds: [], matchIds: [] },
       });
-    for (const mat of mats) {
-      const state = await this.scoreboard.matStateById(mat.id);
+    for (const matId of mats) {
+      const state = await this.scoreboard.matStateById(matId);
       if (state)
         await this.publisher.publish({
           channel: state.channel,

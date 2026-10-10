@@ -37,7 +37,7 @@ export function parseChange(payload: string | undefined): ChangeRow | null {
   if (!payload) return null;
   try {
     const p = JSON.parse(payload) as Record<string, unknown>;
-    const str = (k: string): string | null => (typeof p[k] === 'string' ? (p[k] as string) : null);
+    const str = (k: string): string | null => (typeof p[k] === 'string' ? p[k] : null);
     const t = str('t');
     const op = str('op');
     if (!t || !op || !OPS.has(op)) return null;

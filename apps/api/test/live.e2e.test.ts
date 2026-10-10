@@ -190,6 +190,23 @@ describe('live channels', () => {
     });
   });
 
+  it('a revoked session can no longer subscribe to service channels; public ones stay available', async () => {
+    const someone = await credentials(await emailOf(w.refs.judge2.id));
+    const s = await connect({ token: someone.token });
+    expect(await subscribe(s, liveChannel.opsCompetition(w.competitionId))).toMatchObject({ ok: true });
+    const out = await fetch(`${base}/api/v1/auth/logout`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${someone.token}`, 'content-type': 'application/json' },
+      body: '{}',
+    });
+    expect(out.status).toBeLessThan(300);
+    expect(await subscribe(s, liveChannel.opsMat(w.mats[1]!.id))).toEqual({
+      ok: false,
+      error: { code: 'UNAUTHENTICATED' },
+    });
+    expect(await subscribe(s, liveChannel.publicMat(slug, 1))).toMatchObject({ ok: true });
+  });
+
   it('a REST command reaches the match, mat and competition channels and the public scoreboard', async () => {
     await settle();
     const staff = await connect({ token: judge.token });

@@ -1,21 +1,24 @@
 // Уведомления (DATABASE.md, 3.8): по событию outbox — уведомления получателям с доставкой в ленту (сразу) и
 // на email (по настройке пользователя, отдельной задачей с повторами). Идемпотентно: ProcessedEvent и
 // уникальность (событие, получатель).
-import {
-  EVENT_SCHEMAS,
-  type Locale,
-  notificationLink,
-  type NotificationType,
-  ROLE_CODES,
-  ROLE_PERMISSIONS,
-} from '@sde/contracts';
+import { EVENT_SCHEMAS, type Locale, notificationLink, type NotificationType } from '@sde/contracts';
 import { notificationSource, type Prisma, type PrismaClient, uuidv7 } from '@sde/db';
 import { type Env, type LivePublisher, type Logger, liveUserRoom } from '@sde/server-kit';
 import type { Job, Queue } from 'bullmq';
 import type { Mailer } from '../email/mailer';
 import { TemplateParamsError } from '../email/templates';
 import type { OutboxJob } from '../outbox/dispatcher';
+import {
+  affectedOrganizations,
+  applicationRecipients,
+  organizationRecipients,
+  type PlannedNotification,
+  type RecipientsReader,
+  resultsRecipients,
+} from './recipients';
 import { renderNotificationEmail } from './templates';
+
+export type { PlannedNotification } from './recipients';
 
 export const NOTIFICATIONS_CONSUMER = 'notifications';
 
@@ -52,158 +55,12 @@ interface StoredNotification {
   type: NotificationType;
 }
 
-export interface PlannedNotification {
-  userId: string;
-  type: NotificationType;
-  params: Record<string, string>;
-  competitionId: string | null;
-}
-
-type Reader = Pick<
-  PrismaClient,
-  | 'application'
-  | 'entry'
-  | 'document'
-  | 'user'
-  | 'organizationMembership'
-  | 'matchParticipant'
-  | 'placement'
-  | 'guardian'
->;
-
-/** Организационные роли с правом подавать заявки: получатели уведомлений о заявке — только они. */
-const APPLICANT_ROLES = ROLE_CODES.filter(
-  (r) => ROLE_PERMISSIONS[r]['registration.create'] !== undefined && r !== 'SUPER_ADMIN',
-);
-
-/** Действующие пользователи клуба с правом подавать заявки — получатели дайджеста изменений расписания. */
-async function organizationRecipients(db: Reader, organizationId: string): Promise<string[]> {
-  const today = new Date(new Date().toISOString().slice(0, 10));
-  const members = await db.organizationMembership.findMany({
-    where: {
-      organizationId,
-      status: 'ACTIVE',
-      role: { code: { in: APPLICANT_ROLES } },
-      OR: [{ validTo: null }, { validTo: { gte: today } }],
-      user: { status: 'ACTIVE', deletedAt: null },
-    },
-    select: { userId: true },
-  });
-  return [...new Set(members.map((m) => m.userId).filter((x): x is string => !!x))];
-}
-
-/** Клубы (организации заявок), чьи участники затронуты этими схватками. */
-async function affectedOrganizations(db: Reader, matchIds: string[]): Promise<string[]> {
-  const rows = await db.matchParticipant.findMany({
-    where: { matchId: { in: matchIds }, entryId: { not: null } },
-    select: { entry: { select: { application: { select: { organizationId: true } } } } },
-  });
-  return [...new Set(rows.map((r) => r.entry?.application.organizationId).filter((x): x is string => !!x))];
-}
-
-/**
- * Получатели по заявке: подавший и создавший её — если они по-прежнему действующие пользователи с правом подавать
- * заявки в организации заявки (ушедшему из клуба сведения о заявке не отправляются).
- */
-async function applicationRecipients(db: Reader, applicationId: string) {
-  const app = await db.application.findUnique({
-    where: { id: applicationId },
-    select: { competitionId: true, organizationId: true, submittedByUserId: true, createdById: true },
-  });
-  if (!app) return null;
-  const ids = [...new Set([app.submittedByUserId, app.createdById].filter((x): x is string => !!x))];
-  const today = new Date(new Date().toISOString().slice(0, 10));
-  const members = await db.organizationMembership.findMany({
-    where: {
-      organizationId: app.organizationId,
-      userId: { in: ids },
-      status: 'ACTIVE',
-      role: { code: { in: APPLICANT_ROLES } },
-      OR: [{ validTo: null }, { validTo: { gte: today } }],
-      user: { status: 'ACTIVE', deletedAt: null },
-    },
-    select: { userId: true },
-  });
-  const userIds = [...new Set(members.map((m) => m.userId).filter((x): x is string => !!x))];
-  return { competitionId: app.competitionId, userIds };
-}
-
-/**
- * Получатели «опубликованы результаты» (план Phase 8a, §5): по каждому месту категории — клуб (подавший и
- * создавший заявку, пока они в клубе с правом подавать заявки), подтверждённые действующие представители и сам
- * спортсмен с учётной записью. Одно уведомление на получателя; спортсмен один — ссылка на его карточку.
- */
-async function resultsRecipients(
-  db: Reader,
-  competitionId: string,
-  categoryId: string,
-): Promise<PlannedNotification[]> {
-  const placements = await db.placement.findMany({
-    where: { categoryResult: { categoryId } },
-    select: {
-      entry: {
-        select: { id: true, athleteId: true, applicationId: true, athlete: { select: { personId: true } } },
-      },
-    },
-  });
-  const athletesOf = new Map<string, Map<string, string>>();
-  const add = (userId: string, athleteId: string, entryId: string): void => {
-    const m = athletesOf.get(userId) ?? new Map<string, string>();
-    m.set(athleteId, entryId);
-    athletesOf.set(userId, m);
-  };
-  const byApplication = new Map<string, string[]>();
-  for (const { entry } of placements) {
-    const club =
-      byApplication.get(entry.applicationId) ??
-      (await applicationRecipients(db, entry.applicationId))?.userIds ??
-      [];
-    byApplication.set(entry.applicationId, club);
-    for (const userId of club) add(userId, entry.athleteId, entry.id);
-  }
-  const athleteIds = [...new Set(placements.map((p) => p.entry.athleteId))];
-  const guardians = athleteIds.length
-    ? await db.guardian.findMany({
-        where: { athleteId: { in: athleteIds }, verifiedAt: { not: null }, endedAt: null },
-        select: {
-          athleteId: true,
-          guardianPerson: { select: { user: { select: { id: true, status: true } } } },
-        },
-      })
-    : [];
-  const entryOf = new Map(placements.map((p) => [p.entry.athleteId, p.entry.id]));
-  for (const g of guardians) {
-    const u = g.guardianPerson.user;
-    if (u?.status === 'ACTIVE') add(u.id, g.athleteId, entryOf.get(g.athleteId) as string);
-  }
-  const personIds = [...new Set(placements.map((p) => p.entry.athlete.personId))];
-  const selves = personIds.length
-    ? await db.user.findMany({
-        where: { personId: { in: personIds }, status: 'ACTIVE', deletedAt: null },
-        select: { id: true, personId: true },
-      })
-    : [];
-  for (const u of selves) {
-    const p = placements.find((x) => x.entry.athlete.personId === u.personId);
-    if (p) add(u.id, p.entry.athleteId, p.entry.id);
-  }
-  return [...athletesOf].map(([userId, athletes]) => {
-    const single = athletes.size === 1 ? [...athletes][0] : undefined;
-    return {
-      userId,
-      type: 'results.published' as const,
-      params: { competitionId, categoryId, ...(single ? { athleteId: single[0], entryId: single[1] } : {}) },
-      competitionId,
-    };
-  });
-}
-
 /**
  * Какие уведомления создаёт событие: «заявка возвращена», «решение по заявке», «участие отклонено», «документ
  * отклонён», «опубликованы результаты».
  */
 export async function planNotifications(
-  db: Reader,
+  db: RecipientsReader,
   type: string,
   payload: unknown,
 ): Promise<PlannedNotification[]> {

@@ -31,7 +31,7 @@ import { Redis } from 'ioredis';
 import { type Namespace, Server, type Socket } from 'socket.io';
 import { DomainError } from '../../../common/errors/domain-error';
 import { ENV } from '../../../config/config.module';
-import { AccessTokenAuthenticator } from '../../auth';
+import { AccessTokenAuthenticator, SessionService } from '../../auth';
 import {
   ChannelAccessService,
   type ChannelGrant,
@@ -92,6 +92,7 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     private readonly adapterHost: HttpAdapterHost,
     @Inject(ENV) private readonly env: Env,
     private readonly authenticator: AccessTokenAuthenticator,
+    private readonly sessions: SessionService,
     private readonly access: ChannelAccessService,
   ) {
     this.allowedOrigins = new Set([new URL(env.APP_URL).origin, ...env.CORS_ORIGINS]);
@@ -194,16 +195,21 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
 
   /** Срок входа истёк: служебные подписки сняты, клиенту — `expired` (обновить сессию и подключиться заново). */
   private expire(socket: Socket): void {
-    const state = socket.data as SocketState;
+    this.dropUser(socket, socket.data as SocketState, 'TOKEN_EXPIRED');
+    socket.emit(LIVE_EVENTS.expired);
+  }
+
+  /** Соединение становится анонимным: служебные подписки сняты, публичные остаются. */
+  private dropUser(socket: Socket, state: SocketState, reason: LiveErrorCode): void {
     state.user = null;
-    state.authError = 'TOKEN_EXPIRED';
+    state.authError = reason;
+    if (state.expiryTimer) clearTimeout(state.expiryTimer);
     state.expiryTimer = null;
     for (const [channel, grant] of state.subscriptions) {
       if (!grant.private) continue;
       state.subscriptions.delete(channel);
       void socket.leave(grant.room);
     }
-    socket.emit(LIVE_EVENTS.expired);
   }
 
   private allow(state: SocketState): boolean {
@@ -242,6 +248,13 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     if (!state.subscriptions.has(channel) && state.subscriptions.size >= LIVE_MAX_SUBSCRIPTIONS)
       return fail('RATE_LIMITED');
     try {
+      // Служебный канал — сессия ещё действует (выход на другом устройстве, отзыв администратором).
+      if (
+        state.user &&
+        !parsed.kind.startsWith('public:') &&
+        !(await this.sessions.isActive(state.user.sessionId))
+      )
+        this.dropUser(socket, state, 'UNAUTHENTICATED');
       const grant = await this.access.authorize(state, parsed, channel);
       // Сначала комната, потом номер и снимок: сообщение, пришедшее между ними, клиент отбросит по seq.
       await socket.join(grant.room);
