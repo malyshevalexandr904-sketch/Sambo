@@ -21,6 +21,8 @@ export const CONSUMERS: Partial<Record<EventType, readonly string[]>> = {
   'document.rejected': ['notifications'],
   // 'schedule.published' смотрят в приложении (турнир переходит в SCHEDULED) — отдельное уведомление не нужно.
   'schedule.changed': ['notifications'],
+  // Phase 8a: «опубликованы результаты» — клубу, представителям и спортсменам с учётной записью.
+  'category.results_published': ['notifications'],
 };
 
 /** Очередь потребителя: достаточно постановки задачи (очередь может принимать и другие задачи). */

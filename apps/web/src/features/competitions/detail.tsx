@@ -9,6 +9,7 @@ import { useSearchParams } from 'next/navigation';
 import { QueryState } from '@/components/common';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { ApiError } from '@/lib/api';
+import { useCompetitionLive } from '@/lib/live';
 import { AdmissionTab } from '@/features/operations/admission-tab';
 import { CheckInTab } from '@/features/operations/checkin-tab';
 import { MedicalTab } from '@/features/operations/medical-tab';
@@ -66,6 +67,8 @@ export function CompetitionPage({ id }: { id: string }) {
   const t = useTranslations('competitions');
   const locale = useLocale();
   const query = useCompetition(id);
+  // Персонал турнира: вкладки (итоги, сетки, расписание, допуск, прибытие, взвешивание) обновляются сами (Phase 8a).
+  useCompetitionLive(query.data?.allowedActions.includes('competition.view') ? id : null);
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();

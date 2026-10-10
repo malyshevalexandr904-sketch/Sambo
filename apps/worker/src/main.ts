@@ -2,7 +2,7 @@
 import { createServer } from 'node:http';
 import { S3Client } from '@aws-sdk/client-s3';
 import { createPrismaClient } from '@sde/db';
-import { createLogger, InvalidEnvironmentError, loadEnv } from '@sde/server-kit';
+import { createLogger, InvalidEnvironmentError, LivePublisher, loadEnv } from '@sde/server-kit';
 import { type Job, Queue, Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import { EmailConsumer } from './email/email.consumer';
@@ -53,7 +53,14 @@ async function main(): Promise<void> {
 
   const mailer = createMailer(env, logger);
   const emailConsumer = new EmailConsumer(db, mailer, logger, env);
-  const notificationConsumer = new NotificationConsumer(db, mailer, notificationQueue, logger, env);
+  const notificationConsumer = new NotificationConsumer(
+    db,
+    mailer,
+    notificationQueue,
+    logger,
+    env,
+    new LivePublisher(connection),
+  );
   const maintenance = new Maintenance(db, s3, env, logger);
   const importConsumer = new ImportConsumer(db, s3, env, logger);
 

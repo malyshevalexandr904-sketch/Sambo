@@ -1,5 +1,5 @@
 // Письма уведомлений по локалям (DATABASE.md, 3.8). В письмах нет ПДн детей (SECURITY.md, 3.7): имя спортсмена
-// показывается только в ленте приложения, куда пользователь входит с проверкой прав.
+// и место показываются только в приложении, куда пользователь входит с проверкой прав.
 import type { Locale, NotificationType } from '@sde/contracts';
 import { type RenderedEmail, renderDefinition, type TemplateDef } from '../email/templates';
 
@@ -57,6 +57,15 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       action: { label: 'Открыть турнир', param: 'url' },
       required: ['competitionName', 'url'],
     },
+    'results.published': {
+      subject: 'Опубликованы результаты — SAMBO Digital',
+      lines: [
+        'Опубликованы результаты категории «{categoryName}» турнира «{competitionName}».',
+        'Места и медали ваших спортсменов — в разделе «Результаты» карточки спортсмена.',
+      ],
+      action: { label: 'Посмотреть результаты', param: 'url' },
+      required: ['competitionName', 'categoryName', 'url'],
+    },
   },
   en: {
     'application.returned': {
@@ -105,6 +114,15 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       ],
       action: { label: 'Open tournament', param: 'url' },
       required: ['competitionName', 'url'],
+    },
+    'results.published': {
+      subject: 'Results published — SAMBO Digital',
+      lines: [
+        'Results of the category “{categoryName}” at “{competitionName}” have been published.',
+        'Places and medals of your athletes are in the Results section of the athlete card.',
+      ],
+      action: { label: 'View results', param: 'url' },
+      required: ['competitionName', 'categoryName', 'url'],
     },
   },
 };

@@ -12,6 +12,7 @@ import { QueryState } from '@/components/common';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { useErrorMessage } from '@/lib/errors';
+import { useCompetitionLive } from '@/lib/live';
 import { pickName } from '@/lib/queries';
 import { CompetitionStatusBadge, formatDates } from '@/features/competitions/shared';
 import { timeInZone, useRoundLabel } from '@/features/scheduling/shared';
@@ -86,6 +87,7 @@ export function OfficiatingMats({ competitionId }: { competitionId: string }) {
   const locale = useLocale();
   const round = useRoundLabel();
   const query = useOfficiating(competitionId);
+  useCompetitionLive(competitionId);
   return (
     <QueryState isPending={query.isPending} error={query.data ? null : query.error}>
       {() => {
@@ -187,6 +189,14 @@ export function OfficiatingMats({ competitionId }: { competitionId: string }) {
                             className={SECONDARY}
                           >
                             {t('openQueue')}
+                          </Link>
+                          <Link
+                            href={`/scoreboard/mat/${mat.id}`}
+                            target="_blank"
+                            rel="noopener"
+                            className={SECONDARY}
+                          >
+                            {t('openScoreboard')}
                           </Link>
                           {c ? (
                             <Link href={`/referee/${competitionId}/matches/${c.id}`} className={SECONDARY}>
@@ -302,6 +312,7 @@ export function Confirmations({ competitionId }: { competitionId: string }) {
   const qc = useQueryClient();
   const query = usePendingConfirmations(competitionId);
   const officiating = useOfficiating(competitionId);
+  useCompetitionLive(competitionId);
   const [done, setDone] = useState(false);
   const refresh = (): void => {
     setDone(true);

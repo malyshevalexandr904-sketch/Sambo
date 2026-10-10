@@ -5,10 +5,8 @@ import { COOKIE_ACCESS } from '@sde/contracts';
 import type { Request } from 'express';
 import { RequestContextStore } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
-import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import type { AccessAwareRequest } from '../../access';
-import { SessionService } from '../application/session.service';
-import { JwtService } from '../infrastructure/jwt.service';
+import { AccessTokenAuthenticator } from '../application/access-token.authenticator';
 
 function extractToken(req: Request): { token: string; via: 'cookie' | 'bearer' } | null {
   const header = req.header('authorization');
@@ -23,11 +21,7 @@ function extractToken(req: Request): { token: string; via: 'cookie' | 'bearer' }
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(
-    private readonly jwt: JwtService,
-    private readonly sessions: SessionService,
-    private readonly db: PrismaService,
-  ) {}
+  constructor(private readonly authenticator: AccessTokenAuthenticator) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<AccessAwareRequest>();
@@ -35,34 +29,9 @@ export class AuthGuard implements CanActivate {
     const extracted = extractToken(req);
     if (!extracted) return true;
     try {
-      const claims = await this.jwt.verify(extracted.token);
-      if (!(await this.sessions.isActive(claims.sid))) throw new DomainError('UNAUTHENTICATED');
-      const user = await this.db.user.findUnique({
-        where: { id: claims.sub },
-        select: {
-          id: true,
-          status: true,
-          permissionsVersion: true,
-          totpEnabledAt: true,
-          personId: true,
-          email: true,
-          emailVerifiedAt: true,
-          locale: true,
-        },
-      });
-      if (!user || user.status === 'PENDING_VERIFICATION') throw new DomainError('UNAUTHENTICATED');
-      if (user.status === 'BLOCKED') throw new DomainError('ACCOUNT_BLOCKED');
-      ctx.user = {
-        id: user.id,
-        sessionId: claims.sid,
-        permissionsVersion: user.permissionsVersion,
-        totpEnabled: user.totpEnabledAt !== null,
-        personId: user.personId,
-        email: user.email,
-        emailVerified: user.emailVerifiedAt !== null,
-        via: extracted.via,
-      };
-      if (!req.header('accept-language')) ctx.locale = user.locale === 'en' ? 'en' : 'ru';
+      const { user, locale } = await this.authenticator.authenticate(extracted.token, extracted.via);
+      ctx.user = user;
+      if (!req.header('accept-language')) ctx.locale = locale;
     } catch (e) {
       if (!(e instanceof DomainError)) throw e;
       req.authError = e;

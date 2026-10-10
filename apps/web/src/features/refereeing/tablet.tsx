@@ -10,6 +10,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryState } from '@/components/common';
 import { Link } from '@/i18n/navigation';
+import { useLiveStatus } from '@/lib/live';
 import { timeInZone } from '@/features/scheduling/shared';
 import { refereeKeys, transitionMatch, useMatConsole } from './api';
 import { actionPoints, toScoringRules, useRefereeLabels } from './labels';
@@ -304,6 +305,8 @@ function TabletHeader({ data, offline }: { data: MatConsoleDto; offline: boolean
   const locale = useLocale();
   const tz = data.competition.timezone;
   const roles = data.myRoles.map((r) => tRoles(r));
+  // Связь с сервером есть, а живого канала нет (сеть зала режет WebSocket): экран обновляется опросом.
+  const live = useLiveStatus();
   return (
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
       <div>
@@ -323,6 +326,10 @@ function TabletHeader({ data, offline }: { data: MatConsoleDto; offline: boolean
         {offline ? (
           <Badge tone="danger" className="px-3 py-1 text-sm">
             <span aria-hidden="true">■</span> {t('offline')}
+          </Badge>
+        ) : live === 'offline' ? (
+          <Badge tone="neutral" className="px-3 py-1 text-sm">
+            {t('liveOff')}
           </Badge>
         ) : null}
         <Link

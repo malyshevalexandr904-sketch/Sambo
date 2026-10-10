@@ -2,10 +2,14 @@
 // названия и причины берутся из исходных записей при показе (API) и при отправке письма (worker).
 import type { Prisma } from '../generated/client/index.js';
 
-type Reader = Pick<Prisma.TransactionClient, 'application' | 'entry' | 'document' | 'competition'>;
+type Reader = Pick<
+  Prisma.TransactionClient,
+  'application' | 'entry' | 'document' | 'competition' | 'competitionCategory'
+>;
 
 export interface NotificationSource {
   competitionName?: string;
+  categoryName?: string;
   organizationName?: string;
   /** Организация заявки — для проверки, что получатель всё ещё её владелец. */
   organizationId?: string;
@@ -55,6 +59,27 @@ export async function notificationSource(
     return {
       documentType: locale === 'en' ? doc.type.nameEn : doc.type.nameRu,
       reason: doc.rejectReason ?? undefined,
+    };
+  }
+  if (type === 'results.published') {
+    const [competition, category, entry] = await Promise.all([
+      params.competitionId
+        ? db.competition.findUnique({ where: { id: params.competitionId }, select: { name: true } })
+        : null,
+      params.categoryId
+        ? db.competitionCategory.findUnique({
+            where: { id: params.categoryId },
+            select: { nameRu: true, nameEn: true },
+          })
+        : null,
+      params.entryId
+        ? db.entry.findUnique({ where: { id: params.entryId }, select: { publicName: true } })
+        : null,
+    ]);
+    return {
+      competitionName: competition?.name,
+      categoryName: category ? (locale === 'en' ? category.nameEn : category.nameRu) : undefined,
+      athleteName: entry?.publicName,
     };
   }
   const app = await applicationSource(db, params.applicationId);

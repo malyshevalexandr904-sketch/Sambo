@@ -53,7 +53,7 @@ async function ensureCsrf(): Promise<string> {
 let refreshPromise: Promise<boolean> | null = null;
 
 /** Одно обновление сессии на все запросы, получившие 401 одновременно (ротация refresh token строгая). */
-function refreshSession(): Promise<boolean> {
+export function refreshSession(): Promise<boolean> {
   refreshPromise ??= (async () => {
     try {
       const csrf = await ensureCsrf();

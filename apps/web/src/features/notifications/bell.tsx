@@ -1,19 +1,23 @@
 'use client';
-// Значок уведомлений в каркасе кабинета: число непрочитанных, обновляется раз в минуту.
-import type { DataEnvelope, UnreadCountDto } from '@sde/contracts';
+// Значок уведомлений в каркасе кабинета: число непрочитанных. Новое уведомление приходит по каналу `user`
+// (Phase 8a) — значок и лента обновляются сразу; без живого соединения — раз в минуту.
+import { type DataEnvelope, liveChannel, type UnreadCountDto } from '@sde/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
+import { useLiveInterval, useLiveInvalidate } from '@/lib/live';
 
 export const UNREAD_KEY = ['me', 'notifications', 'unread'] as const;
 
 export function useUnreadCount() {
+  const refetchInterval = useLiveInterval(60_000, 5 * 60_000);
+  useLiveInvalidate(liveChannel.user, () => [['me', 'notifications']]);
   return useQuery({
     queryKey: UNREAD_KEY,
     queryFn: async () =>
       (await api<DataEnvelope<UnreadCountDto>>('/me/notifications/unread-count')).data.unread,
-    refetchInterval: 60_000,
+    refetchInterval,
   });
 }
 

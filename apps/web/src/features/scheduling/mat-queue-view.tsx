@@ -1,12 +1,15 @@
 'use client';
 // Экран «Ковры» (план Phase 6, §6; Phase 7a, §1): текущая и до трёх следующих схваток ковра с реальным статусом
 // (вызвана, идёт, пауза) и счётом, ожидаемое время следующих с учётом опоздания ковра, сыгранные схватки, ждущие
-// подтверждения. Плановое время расписания не переписывается. Обновление каждые 15 секунд.
+// подтверждения. Плановое время расписания не переписывается. Изменения ковра приходят сразу (Phase 8a), без
+// живого соединения — каждые 15 секунд; ссылка на табло ковра для экрана в зале.
 import type { MatQueueItemDto } from '@sde/contracts';
 import { Badge, cn, EmptyState, Spinner } from '@sde/ui';
 import { useLocale, useTranslations } from 'next-intl';
 import { QueryState } from '@/components/common';
 import { useCompetition } from '@/features/competitions/shared';
+import { Link } from '@/i18n/navigation';
+import { useLiveStatus } from '@/lib/live';
 import { pickName } from '@/lib/queries';
 import { timeInZone, useMatQueue, useRoundLabel } from './shared';
 
@@ -84,6 +87,7 @@ export function MatQueueView({ matId, timezone }: { matId: string; timezone: str
   const t = useTranslations('scheduling.queue');
   const tr = useTranslations('referee');
   const query = useMatQueue(matId);
+  const live = useLiveStatus();
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
       <QueryState isPending={query.isPending} error={query.error}>
@@ -96,9 +100,20 @@ export function MatQueueView({ matId, timezone }: { matId: string; timezone: str
                 <h1 className="text-3xl font-bold">
                   {t('matTitle', { number: data.matNumber })} {data.matName ?? ''}
                 </h1>
-                <Badge tone="info">
-                  <Spinner className="h-3 w-3" /> {t('autoRefresh')}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge tone="info">
+                    {live === 'online' ? null : <Spinner className="h-3 w-3" />}{' '}
+                    {live === 'online' ? t('liveRefresh') : t('autoRefresh')}
+                  </Badge>
+                  <Link
+                    href={`/scoreboard/mat/${matId}`}
+                    target="_blank"
+                    rel="noopener"
+                    className="inline-flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-medium hover:bg-slate-50"
+                  >
+                    {tr('openScoreboard')}
+                  </Link>
+                </div>
               </div>
               {data.delaySeconds >= 60 ? (
                 <p

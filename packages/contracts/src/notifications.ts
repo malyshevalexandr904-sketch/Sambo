@@ -10,6 +10,7 @@ export const NOTIFICATION_TYPES = [
   'entry.rejected',
   'document.rejected',
   'schedule.changed',
+  'results.published',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -46,6 +47,7 @@ export type NotificationPreferencesPut = z.infer<typeof NotificationPreferencesP
  */
 export interface NotificationContext {
   competitionName?: string;
+  categoryName?: string;
   organizationName?: string;
   athleteName?: string;
   documentType?: string;
@@ -74,9 +76,16 @@ export interface NotificationPreferenceDto {
   enabled: boolean;
 }
 
-/** Ссылка из уведомления: заявка или раздел документов. */
+/**
+ * Ссылка из уведомления: заявка, раздел документов, турнир; «опубликованы результаты» — карточка спортсмена
+ * (раздел «Результаты»), если у получателя в категории один спортсмен, иначе турнир.
+ */
 export function notificationLink(type: NotificationType, params: Record<string, string>): string | null {
   if (type === 'document.rejected') return '/documents';
+  if (type === 'results.published') {
+    if (params.athleteId) return `/athletes/${params.athleteId}`;
+    return params.competitionId ? `/competitions/${params.competitionId}` : null;
+  }
   if (type === 'schedule.changed')
     return params.competitionId ? `/competitions/${params.competitionId}` : null;
   return params.applicationId ? `/applications/${params.applicationId}` : null;

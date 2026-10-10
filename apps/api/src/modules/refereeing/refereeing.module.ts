@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BracketsModule } from '../brackets';
 import { CategoriesModule } from '../categories';
 import { CompetitionsModule } from '../competitions';
+import { ConsentsModule } from '../consents';
 import { MatchesModule } from '../matches';
 import { RegistrationsModule } from '../registrations';
 import { ResultsModule } from '../results';
@@ -16,6 +17,7 @@ import { ProtocolsService } from './application/protocols.service';
 import { MatchContextService } from './application/match-context.service';
 import { MatchQueriesService } from './application/match-queries.service';
 import { ResultsService } from './application/results.service';
+import { ScoreboardService } from './application/scoreboard.service';
 import { ScoringService } from './application/scoring.service';
 import { WithdrawalsService } from './application/withdrawals.service';
 
@@ -25,12 +27,14 @@ import { WithdrawalsService } from './application/withdrawals.service';
  * расписания (бригады, места схваток), заявок (участник «на ковре»), турниров и категорий (статусы первой схватки).
  * Phase 7b: изменение подтверждённого результата, врач на ковре, ручная схватка, перенос и отмена, протоколы;
  * итоги категории пересчитывает модуль results по вызову отсюда. Хранение схватки — модуль matches.
+ * Phase 8a: табло ковра — публичная проекция ковра и схватки (ScoreboardService) для живых каналов и публичного API.
  */
 @Module({
   imports: [
     BracketsModule,
     CategoriesModule,
     CompetitionsModule,
+    ConsentsModule,
     MatchesModule,
     RegistrationsModule,
     ResultsModule,
@@ -48,6 +52,8 @@ import { WithdrawalsService } from './application/withdrawals.service';
     MedicalIncidentsService,
     ManualMatchesService,
     ProtocolsService,
+    ScoreboardService,
   ],
+  exports: [ScoreboardService],
 })
 export class RefereeingModule {}

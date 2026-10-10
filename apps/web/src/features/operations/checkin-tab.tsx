@@ -17,6 +17,7 @@ import { useCallback, useState } from 'react';
 import { QueryState, ReasonAction } from '@/components/common';
 import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
+import { useLiveInterval } from '@/lib/live';
 import { pickName } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 import { QrScanner } from './qr-scanner';
@@ -28,11 +29,12 @@ const newKey = (): string => crypto.randomUUID();
 
 function SummaryCard({ competitionId }: { competitionId: string }) {
   const t = useTranslations('checkin.summary');
+  const refetchInterval = useLiveInterval(30_000);
   const summary = useQuery({
     queryKey: ['competitions', competitionId, 'check-in', 'summary'],
     queryFn: async () =>
       (await api<DataEnvelope<CheckInSummaryDto>>(`/competitions/${competitionId}/check-in/summary`)).data,
-    refetchInterval: 30_000,
+    refetchInterval,
   });
   const keys = [
     'declared',

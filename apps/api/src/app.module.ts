@@ -31,6 +31,7 @@ import { DocumentsModule } from './modules/documents';
 import { DrawsModule } from './modules/draws';
 import { FilesModule } from './modules/files';
 import { HealthModule } from './modules/health';
+import { LiveModule } from './modules/live';
 import { MedicalModule } from './modules/medical';
 import { NotificationsModule } from './modules/notifications';
 import { OrganizationsModule } from './modules/organizations';
@@ -111,6 +112,7 @@ import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
     MedicalModule,
     NotificationsModule,
     PublicModule,
+    LiveModule,
     AdminModule,
     DictionariesModule,
     HealthModule,
