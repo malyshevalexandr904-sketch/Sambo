@@ -1,0 +1,39 @@
+# Caddy: HTTPS (Let's Encrypt, выпуск и продление сами), маршруты к сервисам (compose.yml).
+# Домен приходит из переменной DOMAIN (.env).
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# API — напрямую, без второго прокси в web: TRUST_PROXY=true доверяет ровно одному хопу (IP клиента для
+	# rate limit и аудита). /health и /ready наружу не открыты: у них нет префикса /api.
+	handle /api/* {
+		reverse_proxy api:4000
+	}
+
+	# Почтовый ящик Mailpit (вход — логин и пароль из .env: MAILPIT_USER, MAILPIT_PASSWORD).
+	handle /mail* {
+		reverse_proxy mailpit:8025
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}
+
+# www и дополнительные домены (REDIRECT_SITES из .env, например «digitalsambo.online, www.digitalsambo.online»).
+www.{$DOMAIN}, {$REDIRECT_SITES} {
+	redir https://{$DOMAIN}{uri} permanent
+}
+
+# Хранилище файлов: подпись presigned-ссылок включает хост, поэтому Host передаётся как есть (по умолчанию).
+s3.{$DOMAIN} {
+	request_body {
+		max_size 60MB
+	}
+	reverse_proxy minio:9000
+}

@@ -1,0 +1,199 @@
+# Сервер с публичным адресом: один VPS, всё в Docker (docs/DEPLOYMENT.md, «Сервер»).
+# Установка — install.sh, обновление — update.sh, резервные копии — backup.sh.
+# Значения переменных — в .env рядом с этим файлом: его создаёт install.sh, в git он не попадает.
+# Наружу открыт только Caddy (80/443): HTTPS-сертификаты Let's Encrypt он выпускает и продлевает сам.
+#   https://<домен>        — сайт; /api/* — напрямую в api (один прокси перед api: TRUST_PROXY = 1 хоп)
+#   https://s3.<домен>     — хранилище файлов: браузер загружает по presigned POST и скачивает по presigned URL
+#   https://<домен>/mail/  — почтовый ящик Mailpit (пока письма не уходят наружу; вход по паролю из .env)
+#   www.<домен> и дополнительные домены (REDIRECT_SITES) — перенаправление на https://<домен>
+
+name: sambo
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: '5' }
+
+x-app-env: &app-env
+  NODE_ENV: production
+  DEPLOYMENT_MODE: cloud
+  LOG_LEVEL: info
+  APP_URL: https://${DOMAIN:?DOMAIN не задан}
+  API_PORT: '4000'
+  API_INTERNAL_URL: http://api:4000
+  TRUST_PROXY: 'true'
+  COOKIE_SECURE: 'true'
+  DATABASE_URL: postgresql://sde_app:${DB_APP_PASSWORD:?}@postgres:5432/sde
+  DATABASE_ADMIN_URL: postgresql://sde:${DB_OWNER_PASSWORD:?}@postgres:5432/sde
+  REDIS_URL: redis://redis:6379
+  JWT_SECRET: ${JWT_SECRET:?}
+  JWT_KID: ${JWT_KID:-k1}
+  AUTH_SECRET: ${AUTH_SECRET:?}
+  TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:?}
+  STORAGE_ENDPOINT: http://minio:9000
+  STORAGE_PUBLIC_ENDPOINT: https://s3.${DOMAIN}
+  STORAGE_REGION: ru-central1
+  STORAGE_ACCESS_KEY: ${STORAGE_ACCESS_KEY:?}
+  STORAGE_SECRET_KEY: ${STORAGE_SECRET_KEY:?}
+  STORAGE_BUCKET_PUBLIC: sde-public-media
+  STORAGE_BUCKET_PRIVATE: sde-private-documents
+  STORAGE_BUCKET_GENERATED: sde-generated
+  STORAGE_PUBLIC_URL: https://s3.${DOMAIN}/sde-public-media
+  STORAGE_FORCE_PATH_STYLE: 'true'
+  # По умолчанию письма попадают в Mailpit на этом же сервере. Настоящая почта — SMTP_* в .env и update.sh.
+  EMAIL_PROVIDER: smtp
+  EMAIL_FROM: ${EMAIL_FROM:-SAMBO Digital <no-reply@${DOMAIN}>}
+  SMTP_HOST: ${SMTP_HOST:-mailpit}
+  SMTP_PORT: ${SMTP_PORT:-1025}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  RATE_LIMIT_ENABLED: 'true'
+  WORKER_PORT: '4100'
+  # Учебные данные (install.sh): пароль и секрет TOTP администратора — свои для этого сервера, не из README.
+  SEED_PASSWORD: ${SEED_PASSWORD:-}
+  SEED_ADMIN_TOTP_SECRET: ${SEED_ADMIN_TOTP_SECRET:-}
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      # Без дополнительных доменов — заглушка только по http (сертификат для неё не запрашивается).
+      REDIRECT_SITES: ${REDIRECT_SITES:-http://redirect.invalid}
+    ports: ['80:80', '443:443', '443:443/udp']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web, api, minio, mailpit]
+    <<: *logging
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sde
+      POSTGRES_PASSWORD: ${DB_OWNER_PASSWORD}
+      POSTGRES_DB: sde
+      SDE_APP_PASSWORD: ${DB_APP_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../../infra/postgres/init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U sde -d sde']
+      interval: 5s
+      retries: 30
+    <<: *logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      retries: 30
+    <<: *logging
+
+  # S3-совместимое хранилище на этом же сервере (тот же замороженный образ, что в docker-compose.yml).
+  # Для пилота — S3 облачного провайдера (решение Q-07): переменные STORAGE_* и без этого сервиса.
+  minio:
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5@sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_KEY}
+      MINIO_API_CORS_ALLOW_ORIGIN: https://${DOMAIN}
+    volumes: [miniodata:/bitnami/minio/data]
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:9000/minio/health/live']
+      interval: 5s
+      retries: 30
+    <<: *logging
+
+  minio-init:
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5@sha256:6dabb4a2088c9a79908de3bc05f4586c23ad2182c8908e7e3acbf61c1467fb20
+    depends_on:
+      minio: { condition: service_healthy }
+    environment:
+      HOME: /tmp
+      MC_USER: ${STORAGE_ACCESS_KEY}
+      MC_PASSWORD: ${STORAGE_SECRET_KEY}
+    entrypoint: >
+      /bin/sh -c "
+      n=0; until mc alias set local http://minio:9000 \"$$MC_USER\" \"$$MC_PASSWORD\" >/dev/null; do
+      n=$$((n+1)); [ $$n -ge 60 ] && exit 1; sleep 1; done &&
+      mc mb --ignore-existing local/sde-public-media local/sde-private-documents local/sde-generated &&
+      mc anonymous set download local/sde-public-media &&
+      mc anonymous set none local/sde-private-documents &&
+      mc anonymous set none local/sde-generated
+      "
+    <<: *logging
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    environment:
+      MP_WEBROOT: /mail/
+      MP_UI_AUTH: ${MAILPIT_USER:-mail}:${MAILPIT_PASSWORD:?}
+      MP_MAX_MESSAGES: '2000'
+      MP_DATABASE: /data/mailpit.db
+    volumes: [mailpitdata:/data]
+    <<: *logging
+
+  # Миграции выполняются при каждом запуске (update.sh), учебные данные — один раз из install.sh.
+  migrate:
+    build: { context: ../.., dockerfile: infra/docker/Dockerfile.api, target: migrate }
+    image: sambo-migrate:local
+    environment: *app-env
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    <<: *logging
+
+  api:
+    build: { context: ../.., dockerfile: infra/docker/Dockerfile.api, target: api }
+    image: sambo-api:local
+    restart: unless-stopped
+    environment: *app-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+      minio-init: { condition: service_completed_successfully }
+    <<: *logging
+
+  worker:
+    build: { context: ../.., dockerfile: infra/docker/Dockerfile.api, target: worker }
+    image: sambo-worker:local
+    restart: unless-stopped
+    environment: *app-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    <<: *logging
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.web
+      target: web
+      args: { API_INTERNAL_URL: 'http://api:4000' }
+    image: sambo-web:local
+    restart: unless-stopped
+    environment:
+      API_INTERNAL_URL: http://api:4000
+      STORAGE_UPLOAD_ORIGIN: https://s3.${DOMAIN}
+    depends_on:
+      api: { condition: service_healthy }
+    <<: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:
+  pgdata:
+  redisdata:
+  miniodata:
+  mailpitdata:

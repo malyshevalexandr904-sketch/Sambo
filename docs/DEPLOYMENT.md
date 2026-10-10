@@ -1,6 +1,6 @@
-# DEPLOYMENT (dev) — SAMBO DIGITAL ECOSYSTEM
+# DEPLOYMENT — SAMBO DIGITAL ECOSYSTEM
 
-Phase 2: локальная среда и CI. Staging появляется в Phase 4, production — до пилота (IMPLEMENTATION_PLAN, 5).
+Phase 2: локальная среда и CI. С 0.9.1 — сервер с публичным адресом на одном VPS (раздел [«Сервер»](#сервер)); production для пилота — до Phase 12 (IMPLEMENTATION_PLAN, 5).
 
 ## Компоненты
 
@@ -98,3 +98,47 @@ MinIO используется только для разработки; product
 3. `curl localhost:4000/ready` → `{"status":"ok"}`.
 4. Seed: `/ru/tournaments` показывает «Кубок Юности» с открытой регистрацией; `organizer@sambo.local` видит заявку «Самбо-Север» в разделе «Заявки» турнира.
 5. Seed Phase 4b: `secretary@sambo.local` открывает «Открытое первенство „Самбо-Север“» — вкладки «Допуск», «Прибытие», «Взвешивание»; `doctor@sambo.local` — вкладка «Медицина». Секретарь возвращает заявку «Кубка Юности» на исправление — через несколько секунд у `manager1@sambo.local` появляется уведомление (worker, очередь `notifications`), письмо — в Mailpit.
+
+## Сервер
+
+Один VPS, всё в Docker: `deploy/server/compose.yml`. Подходит для демонстрации и проверки заказчиком; для пилота — managed PostgreSQL и S3 провайдера (Q-07), отдельная почта и резервные копии вне сервера.
+
+| Что | Где |
+|---|---|
+| Сайт | `https://<домен>`; `www.<домен>` и дополнительные домены (`REDIRECT_SITES`) перенаправляют на него |
+| API | `https://<домен>/api/*` — Caddy отправляет напрямую в `api` (один прокси: `TRUST_PROXY=true` доверяет одному хопу) |
+| Хранилище | `https://s3.<домен>` → MinIO; Host не меняется — подпись presigned URL включает хост |
+| Почта | `https://<домен>/mail/` — Mailpit с паролем, пока не подключён SMTP |
+| Наружу | только 80 и 443 (Caddy, сертификаты Let's Encrypt); PostgreSQL, Redis, MinIO — во внутренней сети Docker |
+
+### DNS
+
+Записи **A** на IP сервера: `@`, `www`, `s3` основного домена; `@`, `www` — каждого дополнительного. Сертификаты выпускаются, как только записи начинают указывать на сервер; до этого Caddy повторяет попытки сам.
+
+### Установка
+
+```bash
+apt-get update && apt-get install -y git
+git clone https://github.com/malyshevalexandr904-sketch/Sambo.git /opt/sambo
+bash /opt/sambo/deploy/server/install.sh digitalsambo.ru digitalsambo.online
+```
+
+`install.sh` (от root, Ubuntu 22.04/24.04 или Debian 12): защита входа (при ключе в `/root/.ssh/authorized_keys` — только по ключу, `/etc/ssh/sshd_config.d/10-sambo.conf`; fail2ban), файл подкачки до 6 ГБ памяти вместе с подкачкой, Docker (download.docker.com, иначе пакеты дистрибутива; зеркало `mirror.gcr.io`, при недоступности Docker Hub — ещё `dockerhub.timeweb.cloud`), проверка портов 80/443 и DNS, секреты в `deploy/server/.env` (права 600), сборка по очереди (backend, затем web — на 2 ГБ две сборки не помещаются), миграции, учебные данные один раз (`DEMO_DATA_LOADED` в `.env`), cron резервных копий. Итог — в `/root/sambo-access.txt`. Повторный запуск продолжает с того же места; панели вроде ISPmanager занимают 80/443 — сервер ставится на чистую ОС.
+
+Учебные данные — те же учётные записи, что в README, но пароль (`SEED_PASSWORD`) и секрет TOTP администратора (`SEED_ADMIN_TOTP_SECRET`) генерируются для сервера: значения из репозитория на нём не действуют. `seed-schedule.ts` проводит жеребьёвки через код API в своём процессе по HTTP без TLS, поэтому запускается с `NODE_ENV=development COOKIE_SECURE=false` — работающего `api` это не касается.
+
+### Обновление, почта, резервные копии
+
+- **Обновление:** `bash /opt/sambo/deploy/server/update.sh` — резервная копия, `git pull` ветки `main`, сборка, миграции (`migrate` выполняется при каждом `up`), перезапуск.
+- **Настоящая почта:** в `deploy/server/.env` — `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM` (образец — в комментарии файла), затем `update.sh --no-pull`. Для доставки — SPF и DKIM домена у почтового провайдера.
+- **Резервные копии:** каждую ночь в 03:30 (`/etc/cron.d/sambo-backup`) — `/var/backups/sambo/db-*.dump` (pg_dump custom) и `files-*.tar.gz` (данные MinIO), 14 дней; вручную — `backup.sh`. Копии лежат на том же диске: дополнительно включите резервное копирование у хостинга.
+- **Восстановление базы:**
+
+```bash
+cd /opt/sambo/deploy/server
+docker compose stop api worker web
+docker compose exec -T postgres pg_restore -U sde -d sde --clean --if-exists < /var/backups/sambo/db-<дата>.dump
+docker compose start api worker web
+```
+
+- **Журналы:** `docker compose -f /opt/sambo/deploy/server/compose.yml logs --tail 100 api` (ротация — 5 файлов по 10 МБ на сервис).

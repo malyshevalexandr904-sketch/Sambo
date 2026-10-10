@@ -5,7 +5,10 @@
 **/coverage
 packages/db/generated
 .git
-.env
-.env.*
+# Скрипты и настройки сервера (deploy/server) образам не нужны: их правка не пересобирает приложение
+deploy
+# Секреты, в том числе сервера (deploy/server/.env), не попадают в контекст сборки образов
+**/.env
+**/.env.*
 !.env.example
 *.log
