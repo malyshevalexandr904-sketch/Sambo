@@ -110,3 +110,8 @@ jobs:
         run: docker build -f infra/docker/Dockerfile.web --target web -t sde-web:ci .
       - name: compose config
         run: cp .env.example .env && docker compose config -q
+      - name: server compose config
+        run: >-
+          DOMAIN=example.ru DB_OWNER_PASSWORD=x DB_APP_PASSWORD=x JWT_SECRET=x AUTH_SECRET=x TOTP_ENCRYPTION_KEY=x
+          STORAGE_ACCESS_KEY=x STORAGE_SECRET_KEY=x MAILPIT_PASSWORD=x
+          docker compose -f deploy/server/compose.yml config -q
