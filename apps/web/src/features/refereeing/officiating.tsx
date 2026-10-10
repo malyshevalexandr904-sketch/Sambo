@@ -1,7 +1,8 @@
 'use client';
 // Раздел «Судейство» (план Phase 7a, §5): турниры, где пользователь в персонале и идут (или вот-вот начнутся)
 // схватки; ковры турнира текущей сессии — свои сверху, с переходом на планшет ковра; подтверждение результатов
-// для руководителя ковра и главного судьи — список, удобный с телефона.
+// для руководителя ковра и главного судьи — список, удобный с телефона; переход на страницу схватки (врач на
+// ковре, перенос, изменение результата) и ручная схватка (Phase 7b).
 import type { CompetitionSummary, Page, PendingConfirmationDto } from '@sde/contracts';
 import { Alert, Badge, Button, Card, EmptyState, PageHeader } from '@sde/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -101,14 +102,21 @@ export function OfficiatingMats({ competitionId }: { competitionId: string }) {
                   : t('noSession')
               }
               actions={
-                <Link href={`/referee/${competitionId}/confirmations`} className={SECONDARY}>
-                  {t('confirmations')}
-                  {data.pendingConfirmations > 0 ? (
-                    <Badge tone="warning" className="ml-2">
-                      {data.pendingConfirmations}
-                    </Badge>
+                <>
+                  <Link href={`/referee/${competitionId}/confirmations`} className={SECONDARY}>
+                    {t('confirmations')}
+                    {data.pendingConfirmations > 0 ? (
+                      <Badge tone="warning" className="ml-2">
+                        {data.pendingConfirmations}
+                      </Badge>
+                    ) : null}
+                  </Link>
+                  {data.canCreateMatch ? (
+                    <Link href={`/referee/${competitionId}/matches/new`} className={SECONDARY}>
+                      {t('manual.action')}
+                    </Link>
                   ) : null}
-                </Link>
+                </>
               }
             />
             {data.mats.length === 0 ? (
@@ -180,6 +188,11 @@ export function OfficiatingMats({ competitionId }: { competitionId: string }) {
                           >
                             {t('openQueue')}
                           </Link>
+                          {c ? (
+                            <Link href={`/referee/${competitionId}/matches/${c.id}`} className={SECONDARY}>
+                              {t('hub.open')}
+                            </Link>
+                          ) : null}
                         </div>
                       </Card>
                     </li>
@@ -196,10 +209,12 @@ export function OfficiatingMats({ competitionId }: { competitionId: string }) {
 
 function PendingCard({
   item,
+  competitionId,
   timezone,
   onConfirmed,
 }: {
   item: PendingConfirmationDto;
+  competitionId: string;
   timezone: string | null;
   onConfirmed: () => void;
 }) {
@@ -244,11 +259,17 @@ function PendingCard({
               })
             : t('summaryBoth', { method: label.method(r.method) })}
           {r.reason ? (
-            <span className="block text-sm text-slate-600">{`${t('reason')}: ${r.reason}`}</span>
+            <span className="block text-sm text-slate-600">{`${t('reason')}: ${label.reason(r.reason)}`}</span>
           ) : null}
         </p>
       ) : null}
       {error ? <Alert tone="danger">{error}</Alert> : null}
+      <Link
+        href={`/referee/${competitionId}/matches/${item.id}`}
+        className="self-start text-sm font-medium text-blue-700 hover:underline"
+      >
+        {t('hub.open')}
+      </Link>
       {item.canConfirm ? (
         <Button
           size="lg"
@@ -313,6 +334,7 @@ export function Confirmations({ competitionId }: { competitionId: string }) {
                 <li key={item.id}>
                   <PendingCard
                     item={item}
+                    competitionId={competitionId}
                     timezone={officiating.data?.competition.timezone ?? null}
                     onConfirmed={refresh}
                   />

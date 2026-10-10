@@ -82,6 +82,92 @@ export class MatchStoreService {
     });
   }
 
+  /** Перенос схватки (место в расписании сохраняется, очередь ковра её пропускает) и возврат в очередь. */
+  setPostponed(tx: Tx, m: MatchRecord, postponed: boolean): Promise<MatchRecord> {
+    return this.bump(tx, m, { status: postponed ? 'POSTPONED' : 'SCHEDULED', readyAt: null });
+  }
+
+  /** Отмена схватки вне сетки: остаётся в расписании и журнале отменённой, очередь ковра её пропускает. */
+  cancel(tx: Tx, m: MatchRecord): Promise<MatchRecord> {
+    return this.bump(tx, m, { status: 'CANCELLED', readyAt: null });
+  }
+
+  /**
+   * Изменение подтверждённого результата (Phase 7b, `result.amend`): прежний вариант — в прежние варианты (только
+   * дополняются), результат — AMENDED с номером варианта + 1, победитель схватки — новый.
+   */
+  async amend(
+    tx: Tx,
+    m: MatchRecord,
+    next: {
+      winnerSide: Side;
+      method: WinMethod;
+      methodDetail: string | null;
+      redScore: number | null;
+      blueScore: number | null;
+      reason: string;
+      changedById: string;
+    },
+  ): Promise<MatchRecord> {
+    const r = m.result;
+    if (!r) throw new DomainError('MATCH_RESULT_INCOMPLETE', { matchId: m.id });
+    await tx.matchResultRevision.create({
+      data: {
+        id: uuidv7(),
+        competitionId: m.competitionId,
+        matchResultId: r.id,
+        matchId: m.id,
+        revision: r.revision,
+        status: r.status,
+        winnerSide: r.winnerSide,
+        method: r.method,
+        methodDetail: r.methodDetail,
+        redScore: r.redScore,
+        blueScore: r.blueScore,
+        confirmedById: r.confirmedById,
+        confirmedAt: r.confirmedAt,
+        reason: next.reason,
+        changedById: next.changedById,
+      },
+    });
+    await tx.matchResult.update({
+      where: { id: r.id },
+      data: {
+        status: 'AMENDED',
+        winnerSide: next.winnerSide,
+        method: next.method,
+        methodDetail: next.methodDetail,
+        redScore: next.redScore,
+        blueScore: next.blueScore,
+        reason: next.reason,
+        // Текущий вариант подтверждён тем, кто его изменил (прежний подтвердивший — в прежнем варианте).
+        confirmedById: next.changedById,
+        confirmedAt: new Date(),
+        revision: { increment: 1 },
+        version: { increment: 1 },
+      },
+    });
+    return this.bump(tx, m, { winnerSide: next.winnerSide });
+  }
+
+  /** Прежние варианты результатов схваток (по номеру варианта). */
+  revisions(tx: Tx | null, matchIds: readonly string[]) {
+    if (matchIds.length === 0) return Promise.resolve([]);
+    return (tx ?? this.db).matchResultRevision.findMany({
+      where: { matchId: { in: [...matchIds] } },
+      orderBy: [{ matchId: 'asc' }, { revision: 'asc' }],
+    });
+  }
+
+  /** Врач на ковре по схваткам (по времени записи). */
+  incidents(tx: Tx | null, matchIds: readonly string[]) {
+    if (matchIds.length === 0) return Promise.resolve([]);
+    return (tx ?? this.db).medicalIncident.findMany({
+      where: { matchId: { in: [...matchIds] } },
+      orderBy: [{ recordedAt: 'asc' }, { id: 'asc' }],
+    });
+  }
+
   /** Длинная остановка (врач, экипировка) и продолжение. */
   setPaused(tx: Tx, m: MatchRecord, paused: boolean): Promise<MatchRecord> {
     return this.bump(tx, m, { status: paused ? 'PAUSED' : 'IN_PROGRESS' });
@@ -184,7 +270,7 @@ export class MatchStoreService {
       SELECT m.id
         FROM "match" m
        WHERE m.bracket_node_id = ANY(${[...bracketNodeIds]}::uuid[])
-         AND m.status IN ('SCHEDULED', 'READY')
+         AND m.status IN ('SCHEDULED', 'READY', 'POSTPONED')
          AND NOT EXISTS (SELECT 1 FROM "match_participant" p WHERE p.match_id = m.id AND p.entry_id IS NULL)
          AND EXISTS (SELECT 1 FROM "match_participant" p JOIN "entry" e ON e.id = p.entry_id
                       WHERE p.match_id = m.id AND e.status = 'WITHDRAWN')

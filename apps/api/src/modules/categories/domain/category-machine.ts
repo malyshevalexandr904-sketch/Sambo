@@ -1,5 +1,5 @@
 // Машина состояний категории турнира (ARCHITECTURE.md, 16.2; C-03). Часть переходов выполняет только система:
-// жеребьёвка (Phase 5), схватки и итоги (Phase 7, 9), объединение — отдельной командой.
+// жеребьёвка (Phase 5), схватки и итоги (Phase 7), объединение — отдельной командой.
 import type { CategoryStatus, CompetitionStatus } from '@sde/contracts';
 
 export interface CategoryTransition {
@@ -34,6 +34,8 @@ export const CATEGORY_TRANSITIONS: readonly CategoryTransition[] = [
   t('DRAWN', 'READY_FOR_DRAW', false, OPERATIONS_PHASE),
   t('DRAWN', 'IN_PROGRESS', false, OPERATIONS_PHASE),
   t('IN_PROGRESS', 'COMPLETED', false, OPERATIONS_PHASE),
+  // Изменение подтверждённого результата открыло новые схватки неопубликованной категории (Phase 7b).
+  t('COMPLETED', 'IN_PROGRESS', false, OPERATIONS_PHASE),
   t('COMPLETED', 'RESULTS_PUBLISHED', false, [...OPERATIONS_PHASE, 'FINISHED']),
   ...(['REGISTRATION', 'CLOSED', 'WEIGH_IN', 'READY_FOR_DRAW'] as const).flatMap((from) => [
     t(from, 'MERGED', false, ANY_ACTIVE),

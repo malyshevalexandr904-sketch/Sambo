@@ -8,9 +8,11 @@ import type { Side } from '@sde/contracts';
 import type { Tx } from '@sde/db';
 import { AuditService } from '../../audit';
 import { BracketsService } from '../../brackets';
+import { CategoryWorkflowService } from '../../categories';
 import { entryOn, MatchStoreService } from '../../matches';
 import { OutboxService } from '../../outbox';
 import { ActiveMatchService } from '../../registrations';
+import { CategoryResultsService } from '../../results';
 
 /** Предел шагов: каждое продвижение может открыть новую схватку со снятым участником (утешительные). */
 const MAX_ROUNDS = 64;
@@ -19,6 +21,8 @@ const MAX_ROUNDS = 64;
 export class WithdrawalsService implements OnModuleInit {
   constructor(
     private readonly brackets: BracketsService,
+    private readonly categories: CategoryWorkflowService,
+    private readonly results: CategoryResultsService,
     private readonly store: MatchStoreService,
     private readonly activeMatch: ActiveMatchService,
     private readonly audit: AuditService,
@@ -36,8 +40,11 @@ export class WithdrawalsService implements OnModuleInit {
     const entry = await tx.entry.findUnique({ where: { id: entryId }, select: { categoryId: true } });
     if (!entry) return;
     const drawId = await this.brackets.publishedDrawOfCategory(tx, entry.categoryId);
-    if (!drawId || !(await this.brackets.lockDraw(tx, drawId))) return;
-    await this.resolve(tx, drawId);
+    if (!drawId) return;
+    // Категория уже заблокирована командой снятия (повторная блокировка в той же транзакции не ждёт).
+    const locked = await this.categories.lockForCommand(tx, entry.categoryId);
+    if (!(await this.brackets.lockDraw(tx, drawId))) return;
+    if ((await this.resolve(tx, drawId)) > 0) await this.results.refresh(tx, locked, drawId);
   }
 
   /**
@@ -52,7 +59,7 @@ export class WithdrawalsService implements OnModuleInit {
       if (candidates.length === 0) break;
       for (const c of candidates) {
         const m = await this.store.lock(tx, c.id);
-        if (m.status !== 'SCHEDULED' && m.status !== 'READY') continue;
+        if (m.status !== 'SCHEDULED' && m.status !== 'READY' && m.status !== 'POSTPONED') continue;
         const red = entryOn(m, 'RED');
         const blue = entryOn(m, 'BLUE');
         if (!red || !blue) continue;

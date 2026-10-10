@@ -1,5 +1,7 @@
 // DTO схватки для планшета ковра, подтверждения результатов и экрана «Ковры» (contracts/matches.ts).
 import type {
+  MatchResultRevisionDto,
+  MedicalIncidentDto,
   LocalizedText,
   MatchBriefDto,
   MatchEventDto,
@@ -11,7 +13,7 @@ import type {
   RuleSetParametersV1,
   Side,
 } from '@sde/contracts';
-import type { MatchEvent, Prisma } from '@sde/db';
+import type { MatchEvent, MatchResultRevision, MedicalIncident, Prisma } from '@sde/db';
 import { sideOf, type MatchRecord } from '../../matches';
 
 /** Участие стороны схватки: снимок для отображения (Q-04 — «Фамилия И.»). */
@@ -145,5 +147,40 @@ export function eventDto(e: MatchEvent, excluded: ReadonlySet<string>, names: Us
     voided: excluded.has(e.id),
     reason,
     recordedBy: userRef(e.recordedById, names),
+  };
+}
+
+export function revisionDto(r: MatchResultRevision, names: UserNames): MatchResultRevisionDto {
+  return {
+    revision: r.revision,
+    status: r.status,
+    winnerSide: r.winnerSide,
+    method: r.method,
+    methodDetail: r.methodDetail,
+    redScore: r.redScore,
+    blueScore: r.blueScore,
+    reason: r.reason,
+    changedBy: userRef(r.changedById, names),
+    changedAt: r.changedAt.toISOString(),
+  };
+}
+
+/** Запись врача без заметки: заметку видит только медицинский персонал (отдельный запрос, журнал доступа). */
+export function incidentDto(
+  i: MedicalIncident,
+  names: UserNames,
+  note: string | null = null,
+): MedicalIncidentDto {
+  return {
+    id: i.id,
+    matchId: i.matchId,
+    side: i.side,
+    entryId: i.entryId,
+    kind: i.kind,
+    decision: i.decision,
+    matchClockMs: i.matchClockMs,
+    recordedAt: i.recordedAt.toISOString(),
+    recordedBy: userRef(i.recordedById, names),
+    note,
   };
 }

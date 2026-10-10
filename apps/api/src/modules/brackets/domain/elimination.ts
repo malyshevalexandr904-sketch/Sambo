@@ -68,7 +68,18 @@ export function eliminationRanks(graph: BracketGraph, state: BracketState): Map<
   return ranks;
 }
 
+/**
+ * Наименьшее место ранга выбывания: чемпион — 1, проигравший в круге r — 2^(rounds − r) + 1 (финал — 2,
+ * полуфинал — 3, четвертьфинал — 5…). Совпадает с относительным местом в полной сетке и не даёт поднять места,
+ * когда схватку выиграть было некому (сняты оба участника).
+ */
+export const eliminationPlaceFloor =
+  (rounds: number) =>
+  (rank: number): number =>
+    rank > rounds ? 1 : 2 ** (rounds - rank) + 1;
+
 export function singleEliminationPlacements(graph: BracketGraph, state: BracketState): Placement[] | null {
   if (!isComplete(state)) return null;
-  return placesByRank(eliminationRanks(graph, state), winLoss(state));
+  const rounds = eliminationRounds(graph.size);
+  return placesByRank(eliminationRanks(graph, state), winLoss(state), eliminationPlaceFloor(rounds));
 }

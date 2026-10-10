@@ -117,4 +117,9 @@ export const ACTION_CANDIDATES: readonly PermissionCode[] = [
   'schedule.manage',
   'schedule.publish',
   'mat_assignment.manage',
+  // Phase 7b: итоги, ручная схватка, протоколы.
+  'result.publish',
+  'result.amend',
+  'match.create',
+  'export.create',
 ];

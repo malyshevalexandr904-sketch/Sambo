@@ -1,6 +1,7 @@
 // Машина состояний схватки (ARCHITECTURE.md, 16.6; план Phase 7a, §1): переходы по команде с правом каждого.
 // Завершение — командой результата (POST …/result: предварительный результат и завершение вместе); переход
-// FINISHED без результата — MATCH_RESULT_INCOMPLETE. Перенос и отмена (POSTPONED, CANCELLED) — Phase 7b.
+// FINISHED без результата — MATCH_RESULT_INCOMPLETE. Перенос (POSTPONED) и отмена (CANCELLED; только вне сетки —
+// проверяет команда) — Phase 7b.
 import type { MatchStatus, MatchTransitionTarget, PermissionCode } from '@sde/contracts';
 
 export interface MatchTransition {
@@ -27,6 +28,14 @@ export const MATCH_TRANSITIONS: readonly MatchTransition[] = [
   // Завершение требует предварительного результата (команда result).
   t('IN_PROGRESS', 'FINISHED', 'match.finish'),
   t('PAUSED', 'FINISHED', 'match.finish'),
+  // Перенос (место в расписании сохраняется, очередь ковра пропускает) и возврат в очередь.
+  t('SCHEDULED', 'POSTPONED', 'match.update'),
+  t('READY', 'POSTPONED', 'match.update'),
+  t('POSTPONED', 'SCHEDULED', 'match.update'),
+  // Отмена — только схватки вне сетки (исход схватки сетки нужен для продвижения: неявка или снятие).
+  t('SCHEDULED', 'CANCELLED', 'match.cancel'),
+  t('READY', 'CANCELLED', 'match.cancel'),
+  t('POSTPONED', 'CANCELLED', 'match.cancel'),
 ];
 
 export function findMatchTransition(from: MatchStatus, to: MatchTransitionTarget): MatchTransition | null {

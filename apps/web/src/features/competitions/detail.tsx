@@ -1,6 +1,6 @@
 'use client';
 // Страница турнира: обзор и переходы, положение, категории, персонал, заявки и участники, мандатная комиссия
-// (допуск, прибытие, взвешивание, медицина). Вкладки и действия —
+// (допуск, прибытие, взвешивание, медицина), жеребьёвка, расписание, бригады, итоги. Вкладки и действия —
 // по allowedActions турнира: интерфейс лишь скрывает недоступное, решает сервер.
 import { type Competition } from '@sde/contracts';
 import { Alert, Badge, EmptyState, PageHeader, cn } from '@sde/ui';
@@ -15,6 +15,7 @@ import { MedicalTab } from '@/features/operations/medical-tab';
 import { WeighInTab } from '@/features/operations/weighin-tab';
 import { DrawsTab } from '@/features/draws/draws-tab';
 import { CrewsTab } from '@/features/scheduling/crews-tab';
+import { ResultsTab } from '@/features/results/results-tab';
 import { ScheduleTab } from '@/features/scheduling/schedule-tab';
 import { ApplicationsTab, EntriesTab } from './registrations-tabs';
 import { CategoriesTab } from './categories';
@@ -37,6 +38,7 @@ const TABS = [
   'draws',
   'schedule',
   'crews',
+  'results',
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -55,6 +57,7 @@ function visibleTabs(c: Competition): Tab[] {
     if (tab === 'draws') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
     if (tab === 'schedule') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
     if (tab === 'crews') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
+    if (tab === 'results') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
     return true;
   });
 }
@@ -143,6 +146,7 @@ export function CompetitionPage({ id }: { id: string }) {
             {tab === 'draws' ? <DrawsTab competition={c} /> : null}
             {tab === 'schedule' ? <ScheduleTab competition={c} /> : null}
             {tab === 'crews' ? <CrewsTab competition={c} /> : null}
+            {tab === 'results' ? <ResultsTab competition={c} /> : null}
           </>
         );
       }}

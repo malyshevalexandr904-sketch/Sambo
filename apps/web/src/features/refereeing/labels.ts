@@ -54,7 +54,13 @@ export function useRefereeLabels() {
         : '',
     [t],
   );
-  return { code, side, method, proposal, rejection, precondition };
+  /** Причина исхода: код системы (снятие участника, снятие врачом) — по словарю, текст судьи — как есть. */
+  const reason = useCallback(
+    (r: string | null | undefined): string =>
+      !r ? '' : /^[a-z_]+$/.test(r) && t.has(`reasons.${r}`) ? t(`reasons.${r}`) : r,
+    [t],
+  );
+  return { code, side, method, proposal, rejection, precondition, reason };
 }
 
 /** Ценность действия по правилам (для подписи кнопки). */

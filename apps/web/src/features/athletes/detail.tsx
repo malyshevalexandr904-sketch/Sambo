@@ -1,5 +1,6 @@
 'use client';
-// Карточка спортсмена (API.md, 4.1): данные, клуб и тренер, разряды, представители, согласия, документы.
+// Карточка спортсмена (API.md, 4.1): данные, клуб и тренер, разряды, результаты (Phase 7b), представители,
+// согласия, документы.
 // Доступные действия приходят с сервера (allowedActions): интерфейс лишь скрывает недоступное.
 import { type Athlete, type DataEnvelope, fullName } from '@sde/contracts';
 import { Alert, Badge, Button, Card, CardTitle, EmptyState, Field, Input, PageHeader } from '@sde/ui';
@@ -9,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { QueryState, ReasonAction, StatusBadge } from '@/components/common';
 import { fieldErrors, PersonFields, type PersonValues, withPrefix } from '@/components/person-fields';
 import { AthleteDocuments } from '@/features/documents/athlete-documents';
+import { AthleteHistoryPanel } from '@/features/results/athlete-history';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
@@ -65,6 +67,7 @@ export function AthleteDetail({ id }: { id: string }) {
               <ClubPanel athlete={a} editable={can('athlete.update')} />
               <RanksPanel athlete={a} editable={can('athlete.update')} />
               <GuardiansPanel athlete={a} editable={can('guardian.manage')} />
+              <AthleteHistoryPanel athleteId={a.id} />
               <ConsentsPanel athlete={a} />
               {can('document.view') ? <AthleteDocuments athlete={a} /> : null}
               {can('athlete.archive') || can('athlete.merge') ? <AdminPanel athlete={a} /> : null}

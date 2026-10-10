@@ -28,3 +28,4 @@ export * from './draws.js';
 export * from './scheduling.js';
 export * from './scoring.js';
 export * from './matches.js';
+export * from './results.js';

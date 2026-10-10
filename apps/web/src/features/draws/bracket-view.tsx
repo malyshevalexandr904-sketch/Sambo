@@ -12,19 +12,23 @@ import type {
 import { Badge, cn } from '@sde/ui';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
+import { Link } from '@/i18n/navigation';
 
 interface Ctx {
   participants: Map<string, DrawParticipantDto>;
   nodes: Map<string, BracketNodeDto>;
+  /** Ссылка на страницу схватки (опубликованная сетка, Phase 7b). */
+  matchHref?: (matchId: string) => string;
 }
 
-function useCtx(view: BracketViewDto): Ctx {
+function useCtx(view: BracketViewDto, matchHref?: (matchId: string) => string): Ctx {
   return useMemo(
     () => ({
       participants: new Map(view.participants.map((p) => [p.entryId, p])),
       nodes: new Map(view.nodes.map((n) => [n.key, n])),
+      matchHref,
     }),
-    [view],
+    [view, matchHref],
   );
 }
 
@@ -109,7 +113,16 @@ function MatchCard({ node, ctx }: { node: BracketNodeDto; ctx: Ctx }) {
       aria-label={`${t(`rounds.${node.label}`)} ${number !== null ? t('match', { number }) : ''}`.trim()}
     >
       <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-2 py-0.5 text-xs text-slate-600 print:py-0 print:text-[9px]">
-        <span className="font-medium">{title}</span>
+        {node.match && number !== null && ctx.matchHref ? (
+          <Link
+            href={ctx.matchHref(node.match.id)}
+            className="font-medium text-blue-800 hover:underline print:text-inherit"
+          >
+            {title}
+          </Link>
+        ) : (
+          <span className="font-medium">{title}</span>
+        )}
         <span className="flex items-center gap-1">
           {node.placeForWinner === 3 ? <span>{t('forThird')}</span> : null}
           <MatchProgress node={node} />
@@ -156,9 +169,9 @@ function RoundTabs({
   );
 }
 
-function EliminationView({ view }: { view: BracketViewDto }) {
+function EliminationView({ view, matchHref }: { view: BracketViewDto; matchHref?: (id: string) => string }) {
   const t = useTranslations('bracket');
-  const ctx = useCtx(view);
+  const ctx = useCtx(view, matchHref);
   const main = view.nodes.filter((n) => n.stage === 'MAIN');
   const rounds = [...new Set(main.map((n) => n.round))].sort((a, b) => a - b);
   const labels = new Map(
@@ -234,9 +247,9 @@ function EliminationView({ view }: { view: BracketViewDto }) {
   );
 }
 
-function RoundRobinView({ view }: { view: BracketViewDto }) {
+function RoundRobinView({ view, matchHref }: { view: BracketViewDto; matchHref?: (id: string) => string }) {
   const t = useTranslations('bracket');
-  const ctx = useCtx(view);
+  const ctx = useCtx(view, matchHref);
   const order = [...view.participants].sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
   const pairNode = (a: string, b: string): BracketNodeDto | undefined =>
     view.nodes.find(
@@ -319,6 +332,17 @@ function RoundRobinView({ view }: { view: BracketViewDto }) {
   );
 }
 
-export function BracketView({ view }: { view: BracketViewDto }) {
-  return view.format === 'ROUND_ROBIN' ? <RoundRobinView view={view} /> : <EliminationView view={view} />;
+export function BracketView({
+  view,
+  matchHref,
+}: {
+  view: BracketViewDto;
+  /** Ссылка на страницу схватки: номер схватки в карточке становится ссылкой. */
+  matchHref?: (matchId: string) => string;
+}) {
+  return view.format === 'ROUND_ROBIN' ? (
+    <RoundRobinView view={view} matchHref={matchHref} />
+  ) : (
+    <EliminationView view={view} matchHref={matchHref} />
+  );
 }

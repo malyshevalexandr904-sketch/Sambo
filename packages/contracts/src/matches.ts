@@ -11,6 +11,7 @@ import {
   type UserRef,
   type WinMethod,
 } from './draws.js';
+import type { MedicalIncidentDto, MatchResultRevisionDto } from './results.js';
 import type { MatchEventType, MatchState, ProposedOutcome } from './scoring.js';
 import type { MatCrewRole } from './scheduling.js';
 
@@ -20,7 +21,15 @@ import type { MatCrewRole } from './scheduling.js';
 export const CONFIRMED_RESULT_STATUSES: readonly MatchResultStatus[] = ['CONFIRMED', 'PUBLISHED', 'AMENDED'];
 
 /** Переходы схватки по команде (план §1). Завершение — командой результата (`POST …/result`). */
-export const MATCH_TRANSITION_TARGETS = ['SCHEDULED', 'READY', 'IN_PROGRESS', 'PAUSED', 'FINISHED'] as const;
+export const MATCH_TRANSITION_TARGETS = [
+  'SCHEDULED',
+  'READY',
+  'IN_PROGRESS',
+  'PAUSED',
+  'FINISHED',
+  'POSTPONED',
+  'CANCELLED',
+] as const;
 export type MatchTransitionTarget = (typeof MATCH_TRANSITION_TARGETS)[number];
 
 /** Способы, которые вносит бригада: исходы борьбы и исходы без борьбы во время схватки. */
@@ -54,10 +63,16 @@ const ClockMs = z.number().int().min(0).max(3_600_000);
 
 // ---------- Запросы ----------
 
-export const MatchTransitionRequest = z.object({
-  to: z.enum(MATCH_TRANSITION_TARGETS),
-  reason: Reason.optional(),
-});
+/** Перенос и отмена схватки (Phase 7b) — с причиной. */
+export const MatchTransitionRequest = z
+  .object({
+    to: z.enum(MATCH_TRANSITION_TARGETS),
+    reason: Reason.optional(),
+  })
+  .refine((v) => (v.to !== 'POSTPONED' && v.to !== 'CANCELLED') || v.reason !== undefined, {
+    path: ['reason'],
+    message: 'required',
+  });
 export type MatchTransitionRequest = z.infer<typeof MatchTransitionRequest>;
 
 /**
@@ -176,11 +191,16 @@ export type MatchAction =
   | 'transition:SCHEDULED'
   | 'transition:IN_PROGRESS'
   | 'transition:PAUSED'
+  | 'transition:POSTPONED'
+  | 'transition:CANCELLED'
   | 'event.create'
   | 'event.void'
   | 'result.record'
   | 'result.confirm'
-  | 'no_show';
+  | 'result.amend'
+  | 'medical.record'
+  | 'no_show'
+  | 'protocol';
 
 export interface MatchDetailDto {
   id: string;
@@ -207,6 +227,12 @@ export interface MatchDetailDto {
   result: MatchResultDto | null;
   proposedOutcome: ProposedOutcome | null;
   rules: MatchRulesDto;
+  /** Схватка вне сетки (создана вручную): на места не влияет. */
+  manual: boolean;
+  /** Прежние варианты изменённого результата (Phase 7b). */
+  revisions: MatchResultRevisionDto[];
+  /** Врач на ковре; заметка — только медицинскому персоналу. */
+  incidents: MedicalIncidentDto[];
   version: number;
   allowedActions: MatchAction[];
 }
@@ -289,6 +315,8 @@ export interface OfficiatingDto {
   currentSessionId: string | null;
   mats: OfficiatingMatDto[];
   pendingConfirmations: number;
+  /** Может добавить схватку вручную (`match.create`, Phase 7b). */
+  canCreateMatch: boolean;
 }
 
 /** Планшет ковра: текущая схватка целиком, следующая и ждущие подтверждения. */

@@ -1,6 +1,8 @@
 // Публикация жеребьёвок для учебного турнира «Открытый ковёр» (seed Phase 6: packages/db/seed/phase6.ts;
 // план Phase 6, §10) и подготовка турнира «Кубок ковра» к судейству (seed Phase 7a: packages/db/seed/phase7.ts;
-// план Phase 7a, §8): жеребьёвки, расписание, публикация, «Расписание готово», бригады ковров. Запускается один раз после "pnpm db:seed": сам seed пишет фикстуры прямо в БД, а сетку и
+// план Phase 7a, §8): жеребьёвки, расписание, публикация, «Расписание готово», бригады ковров; для итогов
+// (Phase 7b) главный судья проводит все схватки категории «Девушки свыше 44 кг» — она завершена, места посчитаны,
+// результаты ждут публикации. Запускается один раз после "pnpm db:seed": сам seed пишет фикстуры прямо в БД, а сетку и
 // схватки категории создаёт только реальный код API (BracketsService/DrawsService) — так демонстрационные
 // данные проходят ту же бизнес-логику, что и настоящая жеребьёвка, вместо повторной реализации её в seed.
 // Расписание не строится — секретарь строит его на экране при демонстрации.
@@ -10,7 +12,8 @@
 import 'reflect-metadata';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
-import type { Competition, DrawDto, ScheduleDto } from '@sde/contracts';
+import { randomUUID } from 'node:crypto';
+import type { Competition, DrawDto, MatchDetailDto, MatchEventResultDto, ScheduleDto } from '@sde/contracts';
 import request from 'supertest';
 import type TestAgent from 'supertest/lib/agent';
 import { AppModule } from '../src/app.module';
@@ -26,6 +29,9 @@ const REFEREE_COMPETITION_ID = '01920000-0000-7000-8015-000000000005';
 const REFEREE_MATS = ['01920000-0000-7000-8040-000000000001', '01920000-0000-7000-8040-000000000002'];
 const REFEREE_SESSION = '01920000-0000-7000-8041-000000000001';
 const ORGANIZER_EMAIL = 'organizer@sambo.local';
+/** P7.category(3) — «Девушки 12–15 лет, свыше 44 кг» (круговая, 5 участниц): её проводит seed для итогов Phase 7b. */
+const RESULTS_CATEGORY = '01920000-0000-7000-8036-000000000003';
+const CHIEF_REFEREE_EMAIL = 'referee1@sambo.local';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -162,6 +168,120 @@ async function prepareRefereeing(agent: Agent, csrf: string, db: Db): Promise<st
   ].join('\n');
 }
 
+/** События схватки по порядку — с ключом идемпотентности и ожидаемым номером журнала, как у планшета. */
+async function sendEvents(
+  agent: Agent,
+  csrf: string,
+  matchId: string,
+  fromSeq: number,
+  steps: { type: string; matchClockMs: number; side?: string; actionCode?: string }[],
+  duration: number,
+): Promise<number> {
+  let seq = fromSeq;
+  const start = Date.now() - duration;
+  for (const step of steps) {
+    const res = await agent
+      .post(`/api/v1/matches/${matchId}/events`)
+      .set('x-csrf-token', csrf)
+      .set('idempotency-key', randomUUID())
+      .send({ ...step, expectedSeq: seq, deviceTime: new Date(start + step.matchClockMs).toISOString() });
+    seq = ((await expectStatus(res, 201, `event ${step.type}`)).data as MatchEventResultDto).seq;
+  }
+  return seq;
+}
+
+/** Провести схватку на планшете тем же API: вызов, старт, время, бросок победителя, «время вышло», результат. */
+async function playMatch(agent: Agent, csrf: string, matchId: string, winner: 'RED' | 'BLUE'): Promise<void> {
+  const get = async (): Promise<MatchDetailDto> =>
+    (await expectStatus(await agent.get(`/api/v1/matches/${matchId}`), 200, 'match')).data as MatchDetailDto;
+  const go = async (m: MatchDetailDto, to: string): Promise<MatchDetailDto> =>
+    (
+      await expectStatus(
+        await agent
+          .post(`/api/v1/matches/${matchId}/transitions`)
+          .set('x-csrf-token', csrf)
+          .set('if-match', `"v${m.version}"`)
+          .send({ to }),
+        200,
+        `match → ${to}`,
+      )
+    ).data as MatchDetailDto;
+  let m = await get();
+  if (m.status === 'SCHEDULED') m = await go(m, 'READY');
+  if (m.status === 'READY') m = await go(m, 'IN_PROGRESS');
+  const duration = (m.durationSeconds ?? 180) * 1000;
+  const throwAt = 20_000 + ((m.number ?? 0) % 10) * 5_000;
+  const steps = [
+    { type: 'CLOCK_STARTED', matchClockMs: 0 },
+    { type: 'SCORE', side: winner, actionCode: 'THROW_2', matchClockMs: throwAt },
+    {
+      type: 'SCORE',
+      side: winner === 'RED' ? 'BLUE' : 'RED',
+      actionCode: 'THROW_1',
+      matchClockMs: throwAt + 35_000,
+    },
+    { type: 'CLOCK_STOPPED', matchClockMs: duration },
+  ];
+  const seq = await sendEvents(agent, csrf, matchId, m.seq, steps, duration);
+  m = await get();
+  m = (
+    await expectStatus(
+      await agent
+        .post(`/api/v1/matches/${matchId}/result`)
+        .set('x-csrf-token', csrf)
+        .set('if-match', `"v${m.version}"`)
+        .send({ expectedSeq: seq, winnerSide: winner, method: 'POINTS' }),
+      200,
+      'result',
+    )
+  ).data as MatchDetailDto;
+  await expectStatus(
+    await agent
+      .post(`/api/v1/matches/${matchId}/result/confirm`)
+      .set('x-csrf-token', csrf)
+      .set('if-match', `"v${m.version}"`)
+      .send({}),
+    200,
+    'confirm',
+  );
+}
+
+/**
+ * Итоги (Phase 7b): главный судья проводит все схватки категории «Девушки свыше 44 кг» — после последнего
+ * подтверждения категория завершается автоматически, места и медали посчитаны; публикацию показывают вручную.
+ * Победитель пары — участница с меньшим номером участия (места 1–5 без равенств). Уже проведённое пропускается.
+ */
+async function playResultsCategory(agent: Agent, csrf: string, db: Db): Promise<string> {
+  const category = await db.competitionCategory.findUnique({
+    where: { id: RESULTS_CATEGORY },
+    select: { status: true, nameRu: true },
+  });
+  if (!category) return 'seed-schedule: results category not found (seed Phase 7a not run yet).';
+  if (category.status !== 'DRAWN' && category.status !== 'IN_PROGRESS')
+    return `seed-schedule: «${category.nameRu}» — ${category.status}, nothing to play.`;
+  const matches = await db.match.findMany({
+    where: { categoryId: RESULTS_CATEGORY, status: { notIn: ['FINISHED', 'CANCELLED'] } },
+    include: { participants: true },
+    orderBy: { matchNumber: 'asc' },
+  });
+  let played = 0;
+  for (const match of matches) {
+    const red = match.participants.find((p) => p.side === 'RED')?.entryId;
+    const blue = match.participants.find((p) => p.side === 'BLUE')?.entryId;
+    if (!red || !blue) continue;
+    await playMatch(agent, csrf, match.id, red < blue ? 'RED' : 'BLUE');
+    played += 1;
+  }
+  const after = await db.competitionCategory.findUniqueOrThrow({
+    where: { id: RESULTS_CATEGORY },
+    select: { status: true },
+  });
+  return [
+    `seed-schedule: «${category.nameRu}» — ${played} match(es) played and confirmed, category ${after.status}.`,
+    '  «Итоги» tab of «Кубок ковра»: publish the results as referee1@sambo.local (chief referee).',
+  ].join('\n');
+}
+
 async function main(): Promise<void> {
   const password = required('SEED_PASSWORD');
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -180,6 +300,9 @@ async function main(): Promise<void> {
         : 'seed-schedule: «Открытый ковёр» — no categories at READY_FOR_DRAW (already published or seed not run).\n',
     );
     process.stdout.write(`${await prepareRefereeing(agent, csrf, db)}\n`);
+    const chief = request.agent(app.getHttpServer());
+    const chiefCsrf = await login(chief, CHIEF_REFEREE_EMAIL, password);
+    process.stdout.write(`${await playResultsCategory(chief, chiefCsrf, db)}\n`);
   } finally {
     await app.close();
   }

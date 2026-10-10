@@ -1,6 +1,7 @@
 'use client';
 // Версия жеребьёвки: seed и хеш входа (ADR-11), отчёт о разведении, публикация с перечнем последствий,
-// новая версия с причиной, проверка повтора по seed, сетка и её печать.
+// новая версия с причиной, проверка повтора по seed, сетка и её печать; под опубликованной сеткой — места
+// (Phase 7b), номер схватки ведёт на её страницу.
 import {
   type Competition,
   type DataEnvelope,
@@ -16,6 +17,7 @@ import { useState } from 'react';
 import { ReasonAction } from '@/components/common';
 import { api } from '@/lib/api';
 import { useAction } from '@/lib/use-action';
+import { CategoryPlacements } from '@/features/results/category-placements';
 import { BracketView } from './bracket-view';
 import { DrawStatusBadge, useCommandError, useFormatLabel } from './shared';
 
@@ -258,8 +260,14 @@ export function DrawView({
               ? t('supersededTitle')
               : t('bracketTitle')}
         </CardTitle>
-        <BracketView view={draw.bracket} />
+        <BracketView
+          view={draw.bracket}
+          matchHref={
+            draw.status === 'PUBLISHED' ? (id) => `/referee/${competition.id}/matches/${id}` : undefined
+          }
+        />
       </Card>
+      {draw.status === 'PUBLISHED' ? <CategoryPlacements categoryId={draw.categoryId} /> : null}
     </div>
   );
 }

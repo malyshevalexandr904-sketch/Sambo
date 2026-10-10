@@ -14,6 +14,6 @@ export {
   MAX_DRAW_PARTICIPANTS,
   strategyFor,
 } from './domain/strategies';
-export type { BracketGraph, GraphNode } from './domain/graph';
+export type { BracketGraph, GraphNode, Placement } from './domain/graph';
 export { nodeDependencies, participantsKnownAtPublish } from './domain/dependencies';
 export { numberingOrder } from './application/bracket-mapping';

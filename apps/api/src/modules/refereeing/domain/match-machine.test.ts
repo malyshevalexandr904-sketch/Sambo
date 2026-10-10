@@ -25,3 +25,20 @@ describe('match state machine (ARCHITECTURE.md, 16.6)', () => {
     expect(noShowAllowed('IN_PROGRESS')).toBe(false);
   });
 });
+
+describe('postpone and cancel (Phase 7b)', () => {
+  it('postpones a scheduled or called match and returns it to the queue', () => {
+    expect(findMatchTransition('SCHEDULED', 'POSTPONED')?.permission).toBe('match.update');
+    expect(findMatchTransition('READY', 'POSTPONED')?.permission).toBe('match.update');
+    expect(findMatchTransition('POSTPONED', 'SCHEDULED')?.permission).toBe('match.update');
+    expect(findMatchTransition('POSTPONED', 'READY')).toBeNull();
+    expect(findMatchTransition('IN_PROGRESS', 'POSTPONED')).toBeNull();
+  });
+
+  it('cancels only before the start, with its own permission', () => {
+    expect(findMatchTransition('SCHEDULED', 'CANCELLED')?.permission).toBe('match.cancel');
+    expect(findMatchTransition('POSTPONED', 'CANCELLED')?.permission).toBe('match.cancel');
+    expect(findMatchTransition('IN_PROGRESS', 'CANCELLED')).toBeNull();
+    expect(matchTransitionsFrom('CANCELLED')).toEqual([]);
+  });
+});

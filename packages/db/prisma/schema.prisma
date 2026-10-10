@@ -145,6 +145,9 @@ model User {
   publishedSchedules        Schedule[]               @relation("SchedulePublisher")
   matAssignments            MatAssignment[]
   recordedMatchEvents       MatchEvent[]             @relation("MatchEventRecorder")
+  publishedCategoryResults  CategoryResult[]         @relation("CategoryResultPublisher")
+  matchResultRevisions      MatchResultRevision[]    @relation("MatchResultReviser")
+  medicalIncidents          MedicalIncident[]        @relation("MedicalIncidentRecorder")
   proposedMatchResults      MatchResult[]            @relation("MatchResultProposer")
   confirmedMatchResults     MatchResult[]            @relation("MatchResultConfirmer")
 
@@ -753,6 +756,7 @@ model AthleteProfile {
   guardians   Guardian[]
   documents   Document[]
   entries     Entry[]
+  results     AthleteResult[]
   checkIns    CheckIn[]
   clearances  MedicalClearance[]
 
@@ -1339,6 +1343,11 @@ model Competition {
   matAssignments    MatAssignment[]
   matchEvents       MatchEvent[]
   matchResults      MatchResult[]
+  matchRevisions    MatchResultRevision[]
+  categoryResults   CategoryResult[]
+  placements        Placement[]
+  athleteResults    AthleteResult[]
+  medicalIncidents  MedicalIncident[]
 
   @@index([status, startDate])
   @@index([organizerOrganizationId, startDate])
@@ -1385,6 +1394,8 @@ model CompetitionCategory {
   draws           Draw[]
   brackets        Bracket[]
   matches         Match[]
+  result          CategoryResult?
+  athleteResults  AthleteResult[]
 
   @@unique([competitionId, code])
   @@index([competitionId, status])
@@ -1539,6 +1550,9 @@ model Entry {
   drawSlots            DrawSlot[]
   matchParticipations  MatchParticipant[]
   activeMatch          Match?              @relation("EntryActiveMatch", fields: [activeMatchId], references: [id], onDelete: Restrict)
+  placements           Placement[]
+  athleteResult        AthleteResult?
+  medicalIncidents     MedicalIncident[]
 
   @@index([competitionId, status])
   @@index([applicationId])
@@ -2158,15 +2172,17 @@ model Match {
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  competition   Competition         @relation(fields: [competitionId], references: [id], onDelete: Restrict)
-  category      CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  bracketNode   BracketNode?        @relation(fields: [bracketNodeId], references: [id], onDelete: Restrict)
-  mat           Mat?                @relation(fields: [matId], references: [id], onDelete: Restrict)
+  competition   Competition           @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category      CompetitionCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  bracketNode   BracketNode?          @relation(fields: [bracketNodeId], references: [id], onDelete: Restrict)
+  mat           Mat?                  @relation(fields: [matId], references: [id], onDelete: Restrict)
   participants  MatchParticipant[]
   schedule      MatchSchedule?
   events        MatchEvent[]
   result        MatchResult?
-  activeEntries Entry[]             @relation("EntryActiveMatch")
+  activeEntries Entry[]               @relation("EntryActiveMatch")
+  revisions     MatchResultRevision[]
+  incidents     MedicalIncident[]
 
   @@unique([competitionId, matchNumber])
   @@index([competitionId, status])
@@ -2235,13 +2251,176 @@ model MatchResult {
   createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
-  match       Match       @relation(fields: [matchId], references: [id], onDelete: Restrict)
-  proposedBy  User?       @relation("MatchResultProposer", fields: [proposedById], references: [id], onDelete: Restrict)
-  confirmedBy User?       @relation("MatchResultConfirmer", fields: [confirmedById], references: [id], onDelete: Restrict)
+  competition Competition           @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  match       Match                 @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  proposedBy  User?                 @relation("MatchResultProposer", fields: [proposedById], references: [id], onDelete: Restrict)
+  confirmedBy User?                 @relation("MatchResultConfirmer", fields: [confirmedById], references: [id], onDelete: Restrict)
+  revisions   MatchResultRevision[]
 
   @@index([competitionId, status])
   @@map("match_result")
+}
+
+/// Прежние варианты подтверждённого результата (Phase 7b, `result.amend`): снимок варианта `revision`, причина
+/// изменения, кто и когда изменил. Только дополняется — у роли приложения нет UPDATE и DELETE.
+model MatchResultRevision {
+  id            String            @id @default(uuid(7)) @db.Uuid
+  competitionId String            @map("competition_id") @db.Uuid
+  matchResultId String            @map("match_result_id") @db.Uuid
+  matchId       String            @map("match_id") @db.Uuid
+  /// Номер прежнего варианта (1 — первоначальный подтверждённый результат).
+  revision      Int
+  status        MatchResultStatus
+  winnerSide    Side?             @map("winner_side")
+  method        WinMethod
+  methodDetail  String?           @map("method_detail")
+  redScore      Int?              @map("red_score")
+  blueScore     Int?              @map("blue_score")
+  confirmedById String?           @map("confirmed_by_id") @db.Uuid
+  confirmedAt   DateTime?         @map("confirmed_at") @db.Timestamptz(3)
+  /// Причина изменения (почему этот вариант заменён).
+  reason        String
+  changedById   String            @map("changed_by_id") @db.Uuid
+  changedAt     DateTime          @default(now()) @map("changed_at") @db.Timestamptz(3)
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  matchResult MatchResult @relation(fields: [matchResultId], references: [id], onDelete: Restrict)
+  match       Match       @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  changedBy   User        @relation("MatchResultReviser", fields: [changedById], references: [id], onDelete: Restrict)
+
+  @@unique([matchResultId, revision])
+  @@index([matchId])
+  @@map("match_result_revision")
+}
+
+enum CategoryResultStatus {
+  PROVISIONAL
+  PUBLISHED
+  AMENDED
+}
+
+enum Medal {
+  GOLD
+  SILVER
+  BRONZE
+}
+
+/// Итоги категории (Phase 7b): места и медали завершённой сетки. Считаются при завершении категории и при
+/// изменении подтверждённого результата; публикация — `result.publish`.
+model CategoryResult {
+  id            String               @id @default(uuid(7)) @db.Uuid
+  competitionId String               @map("competition_id") @db.Uuid
+  categoryId    String               @unique @map("category_id") @db.Uuid
+  drawId        String               @map("draw_id") @db.Uuid
+  status        CategoryResultStatus @default(PROVISIONAL)
+  computedAt    DateTime             @map("computed_at") @db.Timestamptz(3)
+  publishedAt   DateTime?            @map("published_at") @db.Timestamptz(3)
+  publishedById String?              @map("published_by_id") @db.Uuid
+  amendedAt     DateTime?            @map("amended_at") @db.Timestamptz(3)
+  version       Int                  @default(1)
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition    Competition         @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category       CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  publishedBy    User?               @relation("CategoryResultPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
+  placements     Placement[]
+  athleteResults AthleteResult[]
+
+  @@index([competitionId, status])
+  @@map("category_result")
+}
+
+/// Место участника в итогах категории: место (делится: 3, 3, 5, 5), медаль за 1–3 места, победы и поражения
+/// (схватки без соперника не считаются).
+model Placement {
+  id               String @id @default(uuid(7)) @db.Uuid
+  competitionId    String @map("competition_id") @db.Uuid
+  categoryResultId String @map("category_result_id") @db.Uuid
+  entryId          String @map("entry_id") @db.Uuid
+  place            Int
+  medal            Medal?
+  wins             Int    @default(0)
+  losses           Int    @default(0)
+
+  competition    Competition    @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  categoryResult CategoryResult @relation(fields: [categoryResultId], references: [id], onDelete: Cascade)
+  entry          Entry          @relation(fields: [entryId], references: [id], onDelete: Restrict)
+
+  @@unique([categoryResultId, entryId])
+  @@index([entryId])
+  @@map("placement")
+}
+
+/// История спортсмена (Phase 7b): опубликованное место участия со снимком турнира и категории — переживает
+/// переименования; обновляется при изменении результата после публикации.
+model AthleteResult {
+  id                   String               @id @default(uuid(7)) @db.Uuid
+  athleteId            String               @map("athlete_id") @db.Uuid
+  entryId              String               @unique @map("entry_id") @db.Uuid
+  competitionId        String               @map("competition_id") @db.Uuid
+  categoryId           String               @map("category_id") @db.Uuid
+  categoryResultId     String               @map("category_result_id") @db.Uuid
+  competitionName      String               @map("competition_name")
+  competitionStartDate DateTime             @map("competition_start_date") @db.Date
+  competitionEndDate   DateTime             @map("competition_end_date") @db.Date
+  competitionLevel     CompetitionLevel     @map("competition_level")
+  categoryNameRu       String               @map("category_name_ru")
+  categoryNameEn       String               @map("category_name_en")
+  clubName             String?              @map("club_name")
+  place                Int
+  medal                Medal?
+  wins                 Int                  @default(0)
+  losses               Int                  @default(0)
+  status               CategoryResultStatus
+  publishedAt          DateTime             @map("published_at") @db.Timestamptz(3)
+  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  athlete        AthleteProfile      @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  entry          Entry               @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  competition    Competition         @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category       CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  categoryResult CategoryResult      @relation(fields: [categoryResultId], references: [id], onDelete: Restrict)
+
+  @@index([athleteId, competitionStartDate(sort: Desc)])
+  @@index([competitionId])
+  @@map("athlete_result")
+}
+
+enum MedicalIncidentKind {
+  ASSISTANCE
+  STOPPAGE
+}
+
+enum MedicalIncidentDecision {
+  CONTINUE
+  WITHDRAWN_BY_DOCTOR
+}
+
+/// Врач на ковре (G-05, часть 2; Phase 7b): помощь или остановка схватки и решение врача. Без диагнозов; заметка
+/// видна только медицинскому персоналу, её чтение — в журнал доступа.
+model MedicalIncident {
+  id            String                  @id @default(uuid(7)) @db.Uuid
+  competitionId String                  @map("competition_id") @db.Uuid
+  matchId       String                  @map("match_id") @db.Uuid
+  entryId       String                  @map("entry_id") @db.Uuid
+  side          Side
+  kind          MedicalIncidentKind
+  decision      MedicalIncidentDecision
+  matchClockMs  Int?                    @map("match_clock_ms")
+  note          String?
+  recordedById  String                  @map("recorded_by_id") @db.Uuid
+  recordedAt    DateTime                @default(now()) @map("recorded_at") @db.Timestamptz(3)
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  match       Match       @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  entry       Entry       @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  recordedBy  User        @relation("MedicalIncidentRecorder", fields: [recordedById], references: [id], onDelete: Restrict)
+
+  @@index([matchId])
+  @@index([entryId])
+  @@map("medical_incident")
 }
 
 /// Сторона схватки: участие (пусто, пока не известно) или BYE — не одновременно (CHECK).

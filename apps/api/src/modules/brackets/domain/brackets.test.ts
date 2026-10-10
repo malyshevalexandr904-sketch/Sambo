@@ -355,6 +355,70 @@ describe('both participants lost (Phase 7a: both withdrawn after the draw)', () 
     expect(places?.find((p) => p.entryId === e(3))?.place).toBe(1);
     const semiLosers = places?.filter((p) => [e(1), e(2), e(4)].includes(p.entryId)) ?? [];
     expect(semiLosers.map((p) => p.losses)).toEqual([1, 1, 1]);
-    expect(semiLosers.every((p) => p.place === 2)).toBe(true);
+    // Проиграли в полуфинале — третьи (Phase 7b: место не выше достигнутого круга; второго места нет).
+    expect(semiLosers.every((p) => p.place === 3)).toBe(true);
+  });
+
+  it('gives no gold when both finalists are withdrawn: both are second', () => {
+    const strategy = strategyFor('SINGLE_ELIMINATION')!;
+    const graph = strategy.build(4);
+    const slots: SlotMap = new Map([1, 2, 3, 4].map((i) => [i, e(i)]));
+    const outcomes = new Map<string, Outcome>([
+      [mainKey(1, 1), { winner: 'RED', method: 'POINTS' }],
+      [mainKey(1, 2), { winner: 'RED', method: 'POINTS' }],
+      [mainKey(2, 1), { winner: null, method: 'NO_SHOW' }],
+    ]);
+    const state = resolveFormat(strategy, graph, slots, outcomes);
+    const places = strategy.placements(graph, state, outcomes)!;
+    const at = (id: string) => places.find((p) => p.entryId === id)?.place;
+    expect([at(e(1)), at(e(3))]).toEqual([2, 2]);
+    expect([at(e(2)), at(e(4))]).toEqual([3, 3]);
+    expect(places.some((p) => p.place === 1)).toBe(false);
+  });
+
+  it('completes a repechage bracket when a pool final has no winner (both withdrawn)', () => {
+    const strategy = strategyFor('ELIMINATION_WITH_REPECHAGE')!;
+    const graph = strategy.build(8);
+    const slots: SlotMap = new Map([1, 2, 3, 4, 5, 6, 7, 8].map((i) => [i, e(i)]));
+    const outcomes = new Map<string, Outcome>();
+    let state = resolveFormat(strategy, graph, slots, outcomes);
+    // Пул A: финал подгруппы (полуфинал) — сняты оба; остальное — красные побеждают.
+    for (let i = 0; i < 20; i++) {
+      const ready = graph.nodes.filter((n) => state.get(n.key)?.status === 'READY');
+      if (ready.length === 0) break;
+      for (const n of ready)
+        outcomes.set(
+          n.key,
+          n.key === mainKey(2, 1) ? { winner: null, method: 'NO_SHOW' } : { winner: 'RED', method: 'POINTS' },
+        );
+      state = resolveFormat(strategy, graph, slots, outcomes);
+    }
+    expect(statuses(state).filter((st) => st === 'PENDING' || st === 'READY')).toEqual([]);
+    const places = strategy.placements(graph, state, outcomes)!;
+    expect(places).not.toBeNull();
+    expect(places.filter((p) => p.place === 1)).toHaveLength(1);
+    expect(places.some((p) => p.place === 2)).toBe(false);
+  });
+});
+
+describe('place floors keep normal brackets unchanged (property)', () => {
+  it('places in a fully played bracket follow 1, 2, 3, 3, 5… for every size', () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom<DrawFormat>('SINGLE_ELIMINATION', 'ELIMINATION_WITH_REPECHAGE'),
+        fc.integer({ min: 2, max: 40 }),
+        fc.infiniteStream(fc.boolean()),
+        (format, n, coins) => {
+          const run = play(format, n, () => (coins.next().value ? 'RED' : 'BLUE'));
+          const places = strategyFor(format)!.placements(run.graph, run.state, run.outcomes)!;
+          const sorted = places.map((p) => p.place).sort((a, b) => a - b);
+          expect(sorted[0]).toBe(1);
+          expect(sorted[1]).toBe(2);
+          // Место = 1 + число участников строго выше (деление мест не создаёт пропусков вверх).
+          for (const p of places) expect(p.place).toBe(1 + places.filter((q) => q.place < p.place).length);
+        },
+      ),
+      { numRuns: 200 },
+    );
   });
 });

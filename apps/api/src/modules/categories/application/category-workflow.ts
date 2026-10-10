@@ -18,6 +18,7 @@ import type { CategoryRow } from './category-mapper';
 
 export interface LockedCategory {
   competitionStatus: CompetitionStatus;
+  /** Актуальная строка категории: системный переход обновляет её на месте. */
   category: CategoryRow;
 }
 
@@ -84,6 +85,9 @@ export class CategoryWorkflowService implements OnModuleInit {
       where: { id: row.id },
       data: { status: to, version: { increment: 1 } },
     });
+    // Блокировка держит актуальную строку: следующий переход в той же транзакции идёт от нового статуса
+    // (DRAWN → IN_PROGRESS → COMPLETED, Phase 7b).
+    locked.category = { ...row, status: to, version: row.version + 1 };
     await this.audit.record(tx, {
       action: 'category.status_changed',
       entityType: 'CompetitionCategory',

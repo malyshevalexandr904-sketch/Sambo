@@ -16,7 +16,8 @@ import {
   MatchesService,
 } from '../../matches';
 import { nodeDependencies, participantsKnownAtPublish } from '../domain/dependencies';
-import type { BracketGraph, BracketState, Outcome } from '../domain/graph';
+import type { BracketGraph, BracketState, Outcome, Placement } from '../domain/graph';
+import { isComplete } from '../domain/resolve';
 import { type FormatStrategy, resolveFormat, strategyFor } from '../domain/strategies';
 import {
   type MatchDurations,
@@ -56,8 +57,10 @@ export interface MatchDependency {
 }
 
 interface LiveBracket {
+  strategy: FormatStrategy;
   graph: BracketGraph;
   state: BracketState;
+  outcomes: Map<string, Outcome>;
   nodeIds: Map<string, string>;
   matchByKey: Map<string, MatchRecord>;
   competitionId: string;
@@ -159,8 +162,10 @@ export class BracketsService {
     }
     const state = resolveFormat(strategy, graph, slotMap(draw.slots), outcomes);
     return {
+      strategy,
       graph,
       state,
+      outcomes,
       nodeIds,
       matchByKey,
       competitionId: draw.competitionId,
@@ -201,18 +206,57 @@ export class BracketsService {
     return result;
   }
 
-  /** Движок продвижения: стороны и статусы схваток приводятся к состоянию сетки. Возвращает число изменений. */
-  async propagate(tx: Tx, drawId: string): Promise<number> {
+  /**
+   * Итог сетки (Phase 7b): завершена ли (все узлы решены подтверждёнными исходами или без схватки) и места по
+   * правилу формата. Сетки нет — null.
+   */
+  async standing(
+    tx: Tx | null,
+    drawId: string,
+  ): Promise<{ complete: boolean; placements: Placement[] | null; format: CompetitionFormatCode } | null> {
     const live = await this.live(tx, drawId);
-    if (!live) return 0;
-    const specs = live.graph.nodes.map((n) =>
+    if (!live) return null;
+    const placements = live.strategy.placements(live.graph, live.state, live.outcomes);
+    return { complete: isComplete(live.state), placements, format: live.graph.format };
+  }
+
+  /**
+   * Продвижение после изменения подтверждённого результата (Phase 7b): зависимые схватки, которые уже провели люди,
+   * менять нельзя — DEPENDENT_MATCHES_STARTED со списком; исходы системы (автоматическая неявка) со сменой сторон
+   * снимаются и пересчитываются, пока сетка не придёт в равновесие. Вызывается под блокировкой жеребьёвки.
+   */
+  async propagateAfterAmend(tx: Tx, drawId: string): Promise<number> {
+    for (let round = 0; round < 64; round++) {
+      const live = await this.live(tx, drawId);
+      if (!live) return 0;
+      const specs = this.specs(live);
+      const plan = await this.matches.planSync(tx, specs);
+      if (plan.conflicts.length > 0)
+        throw new DomainError('DEPENDENT_MATCHES_STARTED', {
+          matchIds: plan.conflicts.map((m) => m.id),
+          matchNumbers: plan.conflicts.map((m) => m.matchNumber),
+        });
+      if (plan.resets.length === 0) return this.matches.sync(tx, live.competitionId, specs);
+      await this.matches.resetSystemDecided(tx, plan.resets);
+    }
+    throw new Error(`Bracket of draw ${drawId} did not settle after an amended result`);
+  }
+
+  private specs(live: LiveBracket) {
+    return live.graph.nodes.map((n) =>
       // Длительность задана при публикации; продвижение меняет только стороны и статусы.
       matchSpec(n, nodeState(live.state, n.key), live.nodeIds.get(n.key) as string, {
         main: null,
         repechage: null,
       }),
     );
-    return this.matches.sync(tx, live.competitionId, specs);
+  }
+
+  /** Движок продвижения: стороны и статусы схваток приводятся к состоянию сетки. Возвращает число изменений. */
+  async propagate(tx: Tx, drawId: string): Promise<number> {
+    const live = await this.live(tx, drawId);
+    if (!live) return 0;
+    return this.matches.sync(tx, live.competitionId, this.specs(live));
   }
 
   /**
