@@ -4,10 +4,12 @@
 // исходы системы пересчитываются; места категории — заново (у опубликованной — AMENDED и история спортсменов).
 // Блокировки — как у подтверждения: категория → жеребьёвка → схватка.
 import { Injectable } from '@nestjs/common';
-import type { MatchDetailDto, MatchResultAmend } from '@sde/contracts';
+import type { MatchDetailDto, MatchResultAmend, Side } from '@sde/contracts';
+import type { Tx } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { PolicyService } from '../../access';
 import { AuditService } from '../../audit';
 import { BracketsService } from '../../brackets';
 import { CategoryWorkflowService } from '../../categories';
@@ -32,6 +34,7 @@ function assertAmendable(m: MatchRecord): NonNullable<MatchRecord['result']> {
 export class AmendService {
   constructor(
     private readonly db: PrismaService,
+    private readonly policy: PolicyService,
     private readonly context: MatchContextService,
     private readonly queries: MatchQueriesService,
     private readonly store: MatchStoreService,
@@ -50,18 +53,16 @@ export class AmendService {
     input: MatchResultAmend,
   ): Promise<MatchDetailDto> {
     const head = await this.context.head(matchId);
+    const access = await this.policy.assert(
+      user,
+      'result.amend',
+      await this.context.scopeOf(head.competitionId),
+    );
     await this.db.tx(async (tx) => {
       const locked = await this.categories.lockForCommand(tx, head.categoryId);
       const drawId = await this.brackets.lockDrawOfMatch(tx, matchId);
       const m = await this.store.lock(tx, matchId, version);
       const r = assertAmendable(m);
-      const before = {
-        revision: r.revision,
-        winnerSide: r.winnerSide,
-        method: r.method,
-        methodDetail: r.methodDetail,
-        score: [r.redScore, r.blueScore],
-      };
       const next = {
         winnerSide: input.winnerSide,
         method: input.method,
@@ -77,29 +78,58 @@ export class AmendService {
         await this.withdrawals.resolve(tx, drawId);
         await this.results.refresh(tx, locked, drawId);
       }
-      const winnerChanged = r.winnerSide !== input.winnerSide;
-      await this.audit.record(tx, {
-        action: 'match.result_amended',
-        entityType: 'Match',
-        entityId: matchId,
-        competitionId: m.competitionId,
-        before,
-        after: {
-          revision: r.revision + 1,
-          winnerSide: next.winnerSide,
-          method: next.method,
-          methodDetail: next.methodDetail,
-          score: [next.redScore, next.blueScore],
-        },
-        reason: input.reason,
-      });
-      await this.outbox.enqueue(tx, {
-        type: 'match.result_amended',
-        aggregate: { type: 'Match', id: matchId },
-        competitionId: m.competitionId,
-        payload: { matchId, categoryId: m.categoryId, revision: r.revision + 1, winnerChanged },
-      });
+      await this.record(tx, m, r, next, access.viaPlatform);
     });
     return this.queries.detail(user, matchId);
+  }
+
+  /** Аудит «было → стало» с причиной и событие изменения результата. */
+  private async record(
+    tx: Tx,
+    m: MatchRecord,
+    r: NonNullable<MatchRecord['result']>,
+    next: {
+      winnerSide: Side;
+      method: string;
+      methodDetail: string | null;
+      redScore: number | null;
+      blueScore: number | null;
+      reason: string;
+    },
+    platformIntervention: boolean,
+  ): Promise<void> {
+    await this.audit.record(tx, {
+      action: 'match.result_amended',
+      entityType: 'Match',
+      entityId: m.id,
+      competitionId: m.competitionId,
+      before: {
+        revision: r.revision,
+        winnerSide: r.winnerSide,
+        method: r.method,
+        methodDetail: r.methodDetail,
+        score: [r.redScore, r.blueScore],
+      },
+      after: {
+        revision: r.revision + 1,
+        winnerSide: next.winnerSide,
+        method: next.method,
+        methodDetail: next.methodDetail,
+        score: [next.redScore, next.blueScore],
+      },
+      reason: next.reason,
+      platformIntervention,
+    });
+    await this.outbox.enqueue(tx, {
+      type: 'match.result_amended',
+      aggregate: { type: 'Match', id: m.id },
+      competitionId: m.competitionId,
+      payload: {
+        matchId: m.id,
+        categoryId: m.categoryId,
+        revision: r.revision + 1,
+        winnerChanged: r.winnerSide !== next.winnerSide,
+      },
+    });
   }
 }

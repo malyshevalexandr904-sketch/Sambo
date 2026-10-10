@@ -26,9 +26,14 @@ function useAmendError(): (e: unknown) => string {
   };
 }
 
-const score = (v: string): number | undefined => {
-  const n = Number.parseInt(v, 10);
-  return Number.isFinite(n) && n >= 0 && n <= 999 ? n : undefined;
+/**
+ * Счёт поля: 0–999; пусто — счёта нет (null), только если его не было и в результате (неявка, травма без счёта);
+ * неверное значение — undefined (кнопка «Далее» недоступна).
+ */
+const score = (v: string, was: number | null): number | null | undefined => {
+  if (v.trim() === '') return was === null ? null : undefined;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n <= 999 ? n : undefined;
 };
 
 export function AmendForm({
@@ -48,8 +53,10 @@ export function AmendForm({
   const [method, setMethod] = useState<AmendMethod>(
     r && (AMEND_METHODS as WinMethod[]).includes(r.method) ? (r.method as AmendMethod) : 'POINTS',
   );
-  const [red, setRed] = useState(String(r?.redScore ?? 0));
-  const [blue, setBlue] = useState(String(r?.blueScore ?? 0));
+  const [red, setRed] = useState(r?.redScore === null || r?.redScore === undefined ? '' : String(r.redScore));
+  const [blue, setBlue] = useState(
+    r?.blueScore === null || r?.blueScore === undefined ? '' : String(r.blueScore),
+  );
   const [reason, setReason] = useState('');
   const [step, setStep] = useState<1 | 2>(1);
   const [busy, setBusy] = useState(false);
@@ -57,8 +64,8 @@ export function AmendForm({
   if (!r) return null;
   const sideName = (s: Side): string =>
     `${label.side(s)} — ${(s === 'RED' ? match.red : match.blue).publicName ?? ''}`;
-  const redScore = score(red);
-  const blueScore = score(blue);
+  const redScore = score(red, r.redScore);
+  const blueScore = score(blue, r.blueScore);
   const changed =
     winner !== r.winnerSide || method !== r.method || redScore !== r.redScore || blueScore !== r.blueScore;
   const ready = changed && reason.trim().length >= 5 && redScore !== undefined && blueScore !== undefined;
@@ -72,8 +79,8 @@ export function AmendForm({
         winnerSide: winner,
         method,
         ...(method === r.method && r.methodDetail ? { methodDetail: r.methodDetail } : {}),
-        redScore,
-        blueScore,
+        ...(redScore !== null && redScore !== undefined ? { redScore } : {}),
+        ...(blueScore !== null && blueScore !== undefined ? { blueScore } : {}),
         reason: reason.trim(),
       });
       onDone(res.data);

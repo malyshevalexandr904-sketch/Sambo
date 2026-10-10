@@ -355,7 +355,7 @@ export class ProtocolsService {
       categoryName: { ru: category.nameRu, en: category.nameEn },
       format: draw?.format ?? null,
       participants: draw ? draw.slots.filter((s) => s.entryId !== null).length : entryIds.length,
-      resultStatus: result?.status ?? null,
+      resultStatus: result && result.placements.length > 0 ? result.status : null,
       publishedAt: result?.publishedAt?.toISOString() ?? null,
       places: (result?.placements ?? [])
         .map((p) => {

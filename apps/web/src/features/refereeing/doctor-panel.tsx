@@ -82,7 +82,10 @@ export function DoctorPanel({
                 key={s}
                 type="button"
                 aria-pressed={side === s}
-                onClick={() => setSide(s)}
+                onClick={() => {
+                  setSide(s);
+                  setConfirming(false);
+                }}
                 className={cn(
                   'min-h-12 rounded-lg border-2 px-3 text-left font-semibold',
                   s === 'RED' ? 'border-red-600' : 'border-blue-600',
@@ -109,6 +112,7 @@ export function DoctorPanel({
                 aria-pressed={kind === k}
                 onClick={() => {
                   setKind(k);
+                  setConfirming(false);
                   if (k === 'ASSISTANCE') setDecision('CONTINUE');
                 }}
                 className={choice(kind === k)}
@@ -129,7 +133,10 @@ export function DoctorPanel({
                   key={d}
                   type="button"
                   aria-pressed={decision === d}
-                  onClick={() => setDecision(d)}
+                  onClick={() => {
+                    setDecision(d);
+                    setConfirming(false);
+                  }}
                   className={choice(decision === d)}
                 >
                   {decision === d ? '✓ ' : ''}
@@ -151,6 +158,7 @@ export function DoctorPanel({
         {confirming && side ? (
           <Alert tone="warning" title={t('withdrawTitle', { who: who(side) })}>
             <ul className="list-disc space-y-1 pl-5">
+              <li>{t('stopFirst')}</li>
               <li>{t('withdrawResult')}</li>
               <li>{t('withdrawEntry')}</li>
               <li>{t('withdrawNext')}</li>

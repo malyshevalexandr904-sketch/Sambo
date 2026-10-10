@@ -112,8 +112,9 @@ export class ResultsQueriesService {
         categoryName: { ru: c.nameRu, en: c.nameEn },
         categoryStatus: c.status,
         format: c.draws[0]?.format ?? null,
-        status: r?.status ?? null,
-        computedAt: r?.computedAt.toISOString() ?? null,
+        // Сетку снова открыло изменение результата — итоги без мест не показываются, пока категория не завершится.
+        status: r && r.placements.length > 0 ? r.status : null,
+        computedAt: r && r.placements.length > 0 ? r.computedAt.toISOString() : null,
         publishedAt: r?.publishedAt?.toISOString() ?? null,
         publishedBy: r?.publishedBy ? { id: r.publishedBy.id, displayName: r.publishedBy.displayName } : null,
         amendedAt: r?.amendedAt?.toISOString() ?? null,
@@ -122,7 +123,7 @@ export class ResultsQueriesService {
         matchesDecided: n.decided,
         awaitingConfirmation: n.awaiting,
         placements,
-        canPublish: mayPublish && c.status === 'COMPLETED' && !!r,
+        canPublish: mayPublish && c.status === 'COMPLETED' && !!r && r.placements.length > 0,
       };
     });
   }

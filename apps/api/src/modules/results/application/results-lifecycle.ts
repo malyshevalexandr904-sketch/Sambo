@@ -1,6 +1,8 @@
 // Завершение турнира (план Phase 7b, §1): «Идут соревнования → Завершён» — вручную, когда результаты всех категорий
-// с сеткой опубликованы; категории без сетки (не разыграны) — предупреждение с подтверждением.
+// с сеткой опубликованы; категории без сетки (не разыграны) — предупреждение с подтверждением. Слияние дублей
+// спортсменов: история результатов переходит к оставшемуся профилю (как и участия).
 import { Injectable, type OnModuleInit } from '@nestjs/common';
+import { AthleteExtensions } from '../../athletes';
 import { CompetitionExtensions } from '../../competitions';
 import { DRAWN_STATUSES } from './results-queries.service';
 
@@ -8,9 +10,18 @@ const BEFORE_DRAW = ['REGISTRATION', 'CLOSED', 'WEIGH_IN', 'READY_FOR_DRAW'] as 
 
 @Injectable()
 export class ResultsLifecycle implements OnModuleInit {
-  constructor(private readonly extensions: CompetitionExtensions) {}
+  constructor(
+    private readonly extensions: CompetitionExtensions,
+    private readonly athletes: AthleteExtensions,
+  ) {}
 
   onModuleInit(): void {
+    this.athletes.registerMergeParticipant(async (tx, source, target) => {
+      await tx.athleteResult.updateMany({
+        where: { athleteId: source.athleteId },
+        data: { athleteId: target.athleteId },
+      });
+    });
     this.extensions.registerCheck(async ({ tx, competition, to }) => {
       if (to !== 'FINISHED') return { blocking: [] };
       const rows = await tx.competitionCategory.findMany({

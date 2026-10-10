@@ -44,8 +44,6 @@ type Tab = (typeof TABS)[number];
 
 /** До мандатной комиссии жеребьёвки нет — вкладка не нужна. */
 const BEFORE_DRAW: readonly string[] = ['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'];
-/** Итоги — когда схватки уже проводятся (расписание утверждено) и после турнира. */
-const WITH_RESULTS: readonly string[] = ['SCHEDULED', 'IN_PROGRESS', 'FINISHED', 'ARCHIVED'];
 
 function visibleTabs(c: Competition): Tab[] {
   const can = (a: string): boolean => c.allowedActions.includes(a);
@@ -59,7 +57,7 @@ function visibleTabs(c: Competition): Tab[] {
     if (tab === 'draws') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
     if (tab === 'schedule') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
     if (tab === 'crews') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
-    if (tab === 'results') return can('competition.view') && WITH_RESULTS.includes(c.status);
+    if (tab === 'results') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
     return true;
   });
 }

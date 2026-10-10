@@ -289,6 +289,7 @@ describe('amendments that move the bracket', () => {
     await decide(chief, s2, 'RED');
     expect(await categoryStatus(categoryId)).toBe('COMPLETED');
     expect((await results(chief, categoryId)).placements[0]?.entryId).toBe(s2!.red.entryId);
+    const completedOnce = await results(chief, categoryId);
     // Первый полуфинал исправлен: в финал выходит неснятый — финал снова настоящая схватка, категория открыта.
     const m = await getMatch(chief, first.id);
     const r = await amend(chief, m, { winnerSide: 'BLUE', method: 'POINTS', reason: 'Пересмотр по видео' });
@@ -297,9 +298,64 @@ describe('amendments that move the bracket', () => {
     expect(final).toMatchObject({ status: 'READY', match: { status: 'SCHEDULED', result: null } });
     expect(await categoryStatus(categoryId)).toBe('IN_PROGRESS');
     expect((await results(chief, categoryId)).status).toBeNull();
-    // Финал сыгран и подтверждён — категория снова завершена.
+    // Финал сыгран и подтверждён — категория снова завершена; версия итогов не повторяется: публикация по
+    // итогам, которые видели до изменения, — конфликт версии.
     await decide(chief, final, 'BLUE');
     expect(await categoryStatus(categoryId)).toBe('COMPLETED');
+    const again = await results(chief, categoryId);
+    expect(again.version).toBeGreaterThan(completedOnce.version);
+    const stale = await send(
+      chief,
+      'post',
+      `/api/v1/categories/${categoryId}/results/publish`,
+      {},
+      completedOnce.version,
+    );
+    expect(stale.status).toBe(409);
+  });
+
+  it('publishes the outcomes the system recomputes after an amendment of a published category', async () => {
+    const w = await refereeWorld(t, [{ admitted: 4, format: 'SINGLE_ELIMINATION' }]);
+    const categoryId = w.categories[0]!.categoryId;
+    const chief = w.staff.chief;
+    const [s1, s2] = (await nodes(chief, categoryId)).filter((n) => n.label === 'SEMIFINAL');
+    const first = await decide(chief, s1, 'RED');
+    // Оба участника первого полуфинала сняты после него: финал решается неявкой автоматически.
+    for (const entryId of [s1!.red.entryId!, s1!.blue.entryId!]) {
+      const e = await t.admin.entry.findUniqueOrThrow({ where: { id: entryId } });
+      const wd = await send(
+        w.staff.manager,
+        'post',
+        `/api/v1/entries/${entryId}/withdraw`,
+        { reason: 'Травма на разминке' },
+        e.version,
+      );
+      expect(wd.status, JSON.stringify(wd.body)).toBe(200);
+    }
+    await decide(chief, s2, 'RED');
+    expect(await categoryStatus(categoryId)).toBe('COMPLETED');
+    const r0 = await results(chief, categoryId);
+    const pub = await send(chief, 'post', `/api/v1/categories/${categoryId}/results/publish`, {}, r0.version);
+    expect(pub.status, JSON.stringify(pub.body)).toBe(200);
+    // Изменён первый полуфинал: в финал выходит другой снятый — неявка пересчитана и тоже опубликована.
+    const amended = await amend(chief, await getMatch(chief, first.id), {
+      winnerSide: 'BLUE',
+      method: 'POINTS',
+      reason: 'Пересмотр по видео',
+    });
+    expect(amended.status, JSON.stringify(amended.body)).toBe(200);
+    expect(await categoryStatus(categoryId)).toBe('RESULTS_PUBLISHED');
+    const final = (await nodes(chief, categoryId)).find((n) => n.label === 'FINAL')!;
+    const finalResult = await t.admin.matchResult.findUniqueOrThrow({ where: { matchId: final.match!.id } });
+    expect(finalResult).toMatchObject({ status: 'PUBLISHED', method: 'NO_SHOW' });
+    expect(final.red.entryId ?? final.blue.entryId).toBeTruthy();
+    const after = await results(chief, categoryId);
+    expect(after.status).toBe('AMENDED');
+    const second = after.placements.find((p) => p.place === 2);
+    expect(second?.entryId).toBe(s1!.blue.entryId);
+    expect(await t.admin.matchResult.count({ where: { status: 'CONFIRMED', match: { categoryId } } })).toBe(
+      0,
+    );
   });
 
   it('confirming the last match and amending another at the same moment leave consistent results', async () => {
@@ -348,12 +404,19 @@ describe('doctor on the mat', () => {
       0,
     );
     // Снятие врачом: «травма», победитель — соперник, участие снято, оставшаяся схватка снятого — неявка.
+    // Снятие завершает схватку — только при остановленном времени (как запись результата).
     const injured = seen.blue.entryId!;
-    const stop = await send(doctor.s, 'post', `/api/v1/matches/${d.id}/medical-incidents`, {
-      side: 'BLUE',
-      kind: 'STOPPAGE',
-      decision: 'WITHDRAWN_BY_DOCTOR',
+    const withdraw = { side: 'BLUE', kind: 'STOPPAGE', decision: 'WITHDRAWN_BY_DOCTOR' };
+    const running = await send(doctor.s, 'post', `/api/v1/matches/${d.id}/medical-incidents`, withdraw);
+    expect(running.status).toBe(422);
+    expect(running.body.error.details.failed).toEqual(['clock_running']);
+    const stopped = await event(chief, d.id, {
+      type: 'CLOCK_STOPPED',
+      matchClockMs: 42_000,
+      expectedSeq: seen.seq,
     });
+    expect(stopped.status, JSON.stringify(stopped.body)).toBe(201);
+    const stop = await send(doctor.s, 'post', `/api/v1/matches/${d.id}/medical-incidents`, withdraw);
     expect(stop.status, JSON.stringify(stop.body)).toBe(201);
     expect(stop.body.data).toMatchObject({
       status: 'FINISHED',
@@ -370,6 +433,14 @@ describe('doctor on the mat', () => {
       include: { result: true },
     });
     expect(others.map((m) => [m.status, m.result?.method])).toEqual([['FINISHED', 'NO_SHOW']]);
+    // Запись врача — операционные данные турнира (DATABASE.md, 7): в журнале синхронизации, только вставка.
+    expect(
+      await t.admin.syncLog.count({
+        where: { competitionId: w.competitionId, tableName: 'medical_incident', op: 'INSERT' },
+      }),
+    ).toBe(2);
+    const db = t.app.get(PrismaService);
+    await expect(db.$executeRaw`UPDATE medical_incident SET note = 'x'`).rejects.toThrow();
   });
 });
 

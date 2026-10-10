@@ -221,6 +221,12 @@ export class MatchesService {
    * неявка снятого участника) со сменой сторон — `resets`: их исход пересчитывается заново.
    */
   async planSync(tx: Tx, specs: MatchSpec[]): Promise<{ conflicts: MatchRecord[]; resets: MatchRecord[] }> {
+    // Схватки узлов блокируются (по id — один порядок для всех) до чтения: вызов, старт или неявка бригады не
+    // проскочат между проверкой «провели ли люди» и приведением сторон (их команды держат только свою схватку).
+    const nodeIds = specs.map((s) => s.bracketNodeId);
+    if (nodeIds.length > 0)
+      await tx.$queryRaw`
+        SELECT id FROM "match" WHERE bracket_node_id = ANY(${nodeIds}::uuid[]) ORDER BY id FOR UPDATE`;
     const current = await this.byNodes(
       tx,
       specs.map((s) => s.bracketNodeId),

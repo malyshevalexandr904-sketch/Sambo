@@ -75,7 +75,13 @@ export class CategoryResultsService {
     const status = locked.category.status;
     if (status === 'RESULTS_PUBLISHED') throw blocked('results_published_bracket_reopens');
     if (status !== 'COMPLETED') return;
-    await tx.categoryResult.deleteMany({ where: { categoryId: locked.category.id } });
+    // Итоги не удаляются: места снимаются, версия растёт — устаревшая публикация получит VERSION_CONFLICT,
+    // даже когда категория снова завершится.
+    const existing = await tx.categoryResult.findUnique({ where: { categoryId: locked.category.id } });
+    if (existing) {
+      await tx.placement.deleteMany({ where: { categoryResultId: existing.id } });
+      await tx.categoryResult.update({ where: { id: existing.id }, data: { version: { increment: 1 } } });
+    }
     await this.categories.systemTransition(tx, locked, 'IN_PROGRESS', 'result_amended');
   }
 
@@ -91,9 +97,12 @@ export class CategoryResultsService {
       where: { categoryId },
       include: { placements: true },
     });
-    if (existing && samePlacements(existing.placements, placements)) return;
-    const now = new Date();
     const published = !!existing && isPublished(existing.status);
+    // Опубликованная категория: исходы, пересчитанные системой после изменения (автоматическая неявка, «без
+    // соперника»), записаны подтверждёнными — публикуются вместе с категорией.
+    if (published) await this.publishMatchResults(tx, categoryId);
+    if (existing && existing.placements.length > 0 && samePlacements(existing.placements, placements)) return;
+    const now = new Date();
     const result = existing
       ? await tx.categoryResult.update({
           where: { id: existing.id },
@@ -136,6 +145,13 @@ export class CategoryResultsService {
         competitionId,
         payload: { categoryId, competitionId },
       });
+  }
+
+  private async publishMatchResults(tx: Tx, categoryId: string): Promise<void> {
+    await tx.matchResult.updateMany({
+      where: { status: 'CONFIRMED', match: { categoryId } },
+      data: { status: 'PUBLISHED', version: { increment: 1 } },
+    });
   }
 
   /** История спортсменов по итогам категории: снимок турнира и категории на момент публикации. */
@@ -197,8 +213,9 @@ export class CategoryResultsService {
         throw new DomainError('INVALID_TRANSITION', { from: status, to: 'RESULTS_PUBLISHED', allowed: [] });
       const result = await tx.categoryResult.findUnique({ where: { categoryId } });
       if (status !== 'COMPLETED' || !result) {
+        // Ручные схватки на итоги не влияют — ждущие подтверждения считаются только по сетке.
         const awaiting = await tx.matchResult.count({
-          where: { status: 'PROVISIONAL', match: { categoryId } },
+          where: { status: 'PROVISIONAL', match: { categoryId, bracketNodeId: { not: null } } },
         });
         throw new DomainError('RESULT_NOT_CONFIRMED', {
           categoryStatus: status,
@@ -211,10 +228,7 @@ export class CategoryResultsService {
         where: { id: result.id },
         data: { status: 'PUBLISHED', publishedAt: now, publishedById: user.id, version: { increment: 1 } },
       });
-      await tx.matchResult.updateMany({
-        where: { status: 'CONFIRMED', match: { categoryId } },
-        data: { status: 'PUBLISHED', version: { increment: 1 } },
-      });
+      await this.publishMatchResults(tx, categoryId);
       await this.writeHistory(tx, result.id, 'PUBLISHED', now);
       await this.categories.systemTransition(tx, locked, 'RESULTS_PUBLISHED');
       await this.audit.record(tx, {
