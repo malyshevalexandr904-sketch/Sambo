@@ -204,10 +204,11 @@ export class LiveClient {
     this.socket = socket;
     socket.on('connect', () => {
       this.reconnectDelay = RECONNECT_MIN_MS;
+      // Сначала подписки, потом «online»: экраны видят каналы «устанавливаются», а не «работают» до ответа.
+      for (const [channel, state] of this.channels) this.sync(channel, state);
       this.setStatus('online');
       this.ping();
       if (!this.pingTimer) this.pingTimer = setInterval(() => this.ping(), PING_EVERY_MS);
-      for (const [channel, state] of this.channels) this.sync(channel, state);
     });
     socket.on('disconnect', (reason: string) => {
       this.setStatus('offline');
@@ -310,7 +311,6 @@ export class LiveClient {
         for (const fn of state.listeners) fn({ kind: 'error', code });
         return;
       }
-      const wasLive = state.seq !== null && state.error === null;
       state.error = null;
       state.retryDelay = RETRY_MIN_MS;
       const missed = lastSeq === undefined || ack.seq !== lastSeq || ack.snapshot !== null;
@@ -320,7 +320,8 @@ export class LiveClient {
       if (missed) for (const fn of state.listeners) fn({ kind: 'resync', snapshot: ack.snapshot });
       const buffered = state.buffer.sort((a, b) => a.seq - b.seq);
       state.buffer = [];
-      if (!wasLive) this.changed();
+      // Канал снова работает (в том числе после переподключения: «online» объявлено раньше подтверждения).
+      this.changed();
       for (const m of buffered) this.apply(channel, state, m);
     });
   }

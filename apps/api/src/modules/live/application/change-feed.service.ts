@@ -23,8 +23,9 @@ export const LIVE_PG_CHANNEL = 'sde_live';
 const LEADER_KEY = 'sde:live:leader';
 const LEADER_TTL_MS = 10_000;
 const LEADER_RENEW_MS = 3_000;
-/** Проверка соединения прослушивания: не ответило — соединение считается потерянным. */
+/** Проверка соединения прослушивания: не ответило дважды подряд — соединение считается потерянным. */
 const HEALTH_TIMEOUT_MS = 5_000;
+const HEALTH_MAX_TIMEOUTS = 2;
 /** Окно сбора пачки: изменения одной команды приходят вместе и публикуются одним сообщением. */
 const BATCH_WINDOW_MS = 40;
 const BATCH_MAX = 1_000;
@@ -77,6 +78,11 @@ export class ChangeFeedService implements OnApplicationBootstrap, OnModuleDestro
   private flushing: Promise<void> | null = null;
   private resyncing: Promise<void> | null = null;
   private checking: Promise<void> | null = null;
+  private healthTimeouts = 0;
+  private lastResyncAt = Number.NEGATIVE_INFINITY;
+  /** Полная пересинхронизация — не чаще (база перегружена, ведущий меняется раз за разом). Тесты уменьшают. */
+  resyncMinIntervalMs = 30_000;
+  private resyncTimer: NodeJS.Timeout | null = null;
   /** Последнее успешное продление (или захват) блокировки ведущего. */
   private renewedAt = 0;
 
@@ -105,8 +111,10 @@ export class ChangeFeedService implements OnApplicationBootstrap, OnModuleDestro
     this.stopped = true;
     if (this.leaderTimer) clearInterval(this.leaderTimer);
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.resyncTimer) clearTimeout(this.resyncTimer);
     if (this.flushTimer) clearTimeout(this.flushTimer);
     await this.flushing?.catch(() => undefined);
+    await this.resyncing?.catch(() => undefined);
     await this.release();
     const client = this.client;
     this.client = null;
@@ -226,20 +234,30 @@ export class ChangeFeedService implements OnApplicationBootstrap, OnModuleDestro
     this.logger.warn({ why }, 'Live feed: leadership lost');
   }
 
-  /** Соединение прослушивания живо: отвечает на запрос. Не ответило — переподключение. */
+  /**
+   * Соединение прослушивания живо: отвечает на запрос. Ошибка запроса — переподключение сразу; нет ответа дважды
+   * подряд (перегруженная база отвечает медленно, но соединение цело) — тоже.
+   */
   private async healthy(): Promise<boolean> {
     const client = this.client;
     if (!this.listening || !client) return false;
     let timer: NodeJS.Timeout | undefined;
+    const timeout = new Promise<'timeout'>((resolve) => {
+      timer = setTimeout(() => resolve('timeout'), HEALTH_TIMEOUT_MS);
+    });
     try {
-      await Promise.race([
-        client.query('SELECT 1'),
-        new Promise((_, reject) => {
-          timer = setTimeout(() => reject(new Error('health check timeout')), HEALTH_TIMEOUT_MS);
-        }),
-      ]);
-      return true;
+      const r = await Promise.race([client.query('SELECT 1'), timeout]);
+      if (r !== 'timeout') {
+        this.healthTimeouts = 0;
+        return true;
+      }
+      this.healthTimeouts += 1;
+      if (this.healthTimeouts < HEALTH_MAX_TIMEOUTS) return this.listening;
+      this.healthTimeouts = 0;
+      this.onConnectionLost(client, new Error('health check timeout'));
+      return false;
     } catch (err) {
+      this.healthTimeouts = 0;
       this.onConnectionLost(client, err instanceof Error ? err : null);
       return false;
     } finally {
@@ -247,14 +265,35 @@ export class ChangeFeedService implements OnApplicationBootstrap, OnModuleDestro
     }
   }
 
-  /** Пересинхронизация действующих турниров — одна за раз, вслед за ней публикуются накопленные изменения. */
+  /**
+   * Пересинхронизация действующих турниров — одна за раз и не чаще раза в 30 с (иначе — позже, по таймеру). Идущая
+   * публикация пачки завершается до неё, накопленные за время пересинхронизации изменения публикуются после: так
+   * сохранённый снимок не оказывается старее опубликованного.
+   */
   private resync(): void {
     if (this.resyncing) return;
-    this.resyncing = this.router
-      .resyncAll()
+    const wait = this.lastResyncAt + this.resyncMinIntervalMs - Date.now();
+    if (this.resyncTimer) {
+      // Уже назначена на потом; срок подошёл раньше (интервал уменьшен) — сейчас.
+      if (wait > 0) return;
+      clearTimeout(this.resyncTimer);
+      this.resyncTimer = null;
+    }
+    if (wait > 0) {
+      this.resyncTimer = setTimeout(() => {
+        this.resyncTimer = null;
+        if (this.leader) this.resync();
+      }, wait);
+      this.resyncTimer.unref();
+      return;
+    }
+    this.lastResyncAt = Date.now();
+    this.resyncing = (this.flushing ?? Promise.resolve())
+      .then(() => this.router.resyncAll())
       .catch((err: unknown) => this.logger.error({ err }, 'Live feed: resync failed'))
       .finally(() => {
         this.resyncing = null;
+        if (this.buffer.length && !this.flushTimer) this.flush();
       });
   }
 
@@ -283,8 +322,8 @@ export class ChangeFeedService implements OnApplicationBootstrap, OnModuleDestro
 
   /** Пачки публикуются по одной, по порядку прихода. */
   private flush(): void {
-    // Идёт публикация: следующую пачку заберёт её завершение (finally ниже).
-    if (this.flushing) return;
+    // Идёт публикация или пересинхронизация: следующую пачку заберёт их завершение (finally).
+    if (this.flushing || this.resyncing) return;
     const batch = this.buffer;
     this.buffer = [];
     if (batch.length === 0) return;

@@ -48,8 +48,11 @@ interface SocketState extends Subscriber {
   ip: string;
 }
 
-/** Соединений с одного адреса на узле: экраны и табло зала за одним NAT — десятки, не сотни. */
-const MAX_CONNECTIONS_PER_IP = 200;
+/**
+ * Соединений с одного адреса на узле — ограничение злоупотреблений, а не нагрузки: персонал и табло зала за одним
+ * NAT — десятки. Зрители в одной сети (Wi-Fi зала, NAT оператора) — Phase 9: тогда пересмотреть.
+ */
+const MAX_CONNECTIONS_PER_IP = 1_000;
 
 const LIVE_CODES = new Set<string>([
   'UNAUTHENTICATED',
@@ -294,12 +297,16 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     try {
       // Служебный канал — сессия ещё действует (выход на другом устройстве, отзыв администратором), пользователь
       // не заблокирован, права — текущие (снятая должность в турнире действует сразу, как в REST).
-      if (state.user && !parsed.kind.startsWith('public:')) {
+      // Пока пользователь перечитывается, вход мог истечь или быть снят другой подпиской: результат применяется,
+      // только если пользователь соединения остался тем же.
+      const before = state.user;
+      if (before && !parsed.kind.startsWith('public:')) {
         try {
-          state.user = await this.authenticator.reload(state.user);
+          const fresh = await this.authenticator.reload(before);
+          if (state.user === before) state.user = fresh;
         } catch (e) {
           if (!(e instanceof DomainError)) throw e;
-          this.dropUser(socket, state, 'UNAUTHENTICATED');
+          if (state.user === before) this.dropUser(socket, state, 'UNAUTHENTICATED');
         }
       }
       const grant = await this.access.authorize(state, parsed, channel);

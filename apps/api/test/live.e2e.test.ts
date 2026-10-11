@@ -402,8 +402,10 @@ describe('live channels', () => {
     const boards = record(viewer);
     expect(await subscribe(viewer, liveChannel.publicMat(slug, 1))).toMatchObject({ ok: true });
     // Блокировка ведущего пропала (истекла, пока узел стоял): узел теряет роль и занимает её заново.
+    const feed = t.app.get(ChangeFeedService);
+    feed.resyncMinIntervalMs = 0;
     await t.redis.del('sde:live:leader');
-    expect(await t.app.get(ChangeFeedService).ensureLeadership()).toBe(true);
+    expect(await feed.ensureLeadership()).toBe(true);
     const resync = await waitFor(() =>
       msgs.find(
         (x) =>

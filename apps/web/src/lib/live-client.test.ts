@@ -226,6 +226,21 @@ describe('LiveClient', () => {
     expect(subscribes('ops:forbidden')).toBe(2);
   });
 
+  it('tells the screens when their channel works again after a reconnect', () => {
+    listen('ops:x');
+    const seen: string[] = [];
+    client.onStatus(() => seen.push(client.channelHealth('ops:x')));
+    socket.open();
+    socket.answer('ops:x', { ok: true, seq: 1, snapshot: null });
+    expect(seen.at(-1)).toBe('live');
+    socket.fire('disconnect', 'transport close');
+    expect(seen.at(-1)).toBe('down');
+    socket.open();
+    expect(seen.at(-1)).toBe('pending');
+    socket.answer('ops:x', { ok: true, seq: 1, snapshot: null });
+    expect(seen.at(-1)).toBe('live');
+  });
+
   it('estimates the server clock offset from ping', () => {
     listen('ops:x');
     socket.open();

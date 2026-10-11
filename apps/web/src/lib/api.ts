@@ -12,7 +12,7 @@ import {
   type UploadPurpose,
   type UploadTicket,
 } from '@sde/contracts';
-import { browserLock, coordinatedRefresh } from './session-refresh';
+import { browserLock, coordinatedRefresh, lockedRequestSignal } from './session-refresh';
 
 export class ApiError extends Error {
   constructor(
@@ -63,13 +63,20 @@ export function refreshSession(): Promise<boolean> {
       return await coordinatedRefresh({
         withLock: browserLock,
         sessionAlive: async () =>
-          (await fetch(`${BASE}/me`, { credentials: 'same-origin', cache: 'no-store' })).ok,
+          (
+            await fetch(`${BASE}/me`, {
+              credentials: 'same-origin',
+              cache: 'no-store',
+              signal: lockedRequestSignal(),
+            })
+          ).ok,
         refresh: async () => {
           const csrf = await ensureCsrf();
           const res = await fetch(`${BASE}/auth/refresh`, {
             method: 'POST',
             credentials: 'same-origin',
             headers: { [CSRF_HEADER]: csrf },
+            signal: lockedRequestSignal(),
           });
           return res.ok;
         },

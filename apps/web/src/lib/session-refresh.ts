@@ -19,8 +19,20 @@ export function coordinatedRefresh(d: RefreshDeps): Promise<boolean> {
 
 const LOCK_NAME = 'sde-session-refresh';
 
-/** Блокировка между вкладками одного сайта; браузер без Web Locks — без блокировки. */
+/**
+ * Блокировка между вкладками одного сайта. Без Web Locks (старый браузер или страница не по HTTPS) — случайная
+ * пауза до 3 с: вкладки расходятся во времени, и проверка входа видит сессию, уже обновлённую другой вкладкой.
+ */
 export async function browserLock<T>(fn: () => Promise<T>): Promise<T> {
   const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
-  return locks ? await locks.request(LOCK_NAME, fn) : fn();
+  if (locks) return await locks.request(LOCK_NAME, fn);
+  await new Promise((resolve) => setTimeout(resolve, Math.random() * 3_000));
+  return fn();
+}
+
+/** Запрос под блокировкой не держит её дольше 10 с (зависшее соединение не останавливает остальные вкладки). */
+export function lockedRequestSignal(): AbortSignal | undefined {
+  return typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+    ? AbortSignal.timeout(10_000)
+    : undefined;
 }
