@@ -1,21 +1,24 @@
 // Уведомления (DATABASE.md, 3.8): по событию outbox — уведомления получателям с доставкой в ленту (сразу) и
 // на email (по настройке пользователя, отдельной задачей с повторами). Идемпотентно: ProcessedEvent и
 // уникальность (событие, получатель).
-import {
-  EVENT_SCHEMAS,
-  type Locale,
-  notificationLink,
-  type NotificationType,
-  ROLE_CODES,
-  ROLE_PERMISSIONS,
-} from '@sde/contracts';
+import { EVENT_SCHEMAS, type Locale, notificationLink, type NotificationType } from '@sde/contracts';
 import { notificationSource, type Prisma, type PrismaClient, uuidv7 } from '@sde/db';
-import type { Env, Logger } from '@sde/server-kit';
+import { type Env, type LivePublisher, type Logger, liveUserRoom } from '@sde/server-kit';
 import type { Job, Queue } from 'bullmq';
 import type { Mailer } from '../email/mailer';
 import { TemplateParamsError } from '../email/templates';
 import type { OutboxJob } from '../outbox/dispatcher';
+import {
+  affectedOrganizations,
+  applicationRecipients,
+  organizationRecipients,
+  type PlannedNotification,
+  type RecipientsReader,
+  resultsRecipients,
+} from './recipients';
 import { renderNotificationEmail } from './templates';
+
+export type { PlannedNotification } from './recipients';
 
 export const NOTIFICATIONS_CONSUMER = 'notifications';
 
@@ -46,78 +49,18 @@ const isDigestJob = (j: NotificationJob): j is ScheduleDigestJob =>
 /** Окно объединения изменений расписания в одно уведомление клубу (план Phase 6, §4). */
 export const SCHEDULE_DIGEST_DELAY_MS = 10 * 60 * 1000;
 
-export interface PlannedNotification {
+interface StoredNotification {
+  id: string;
   userId: string;
   type: NotificationType;
-  params: Record<string, string>;
-  competitionId: string | null;
-}
-
-type Reader = Pick<
-  PrismaClient,
-  'application' | 'entry' | 'document' | 'user' | 'organizationMembership' | 'matchParticipant'
->;
-
-/** Организационные роли с правом подавать заявки: получатели уведомлений о заявке — только они. */
-const APPLICANT_ROLES = ROLE_CODES.filter(
-  (r) => ROLE_PERMISSIONS[r]['registration.create'] !== undefined && r !== 'SUPER_ADMIN',
-);
-
-/** Действующие пользователи клуба с правом подавать заявки — получатели дайджеста изменений расписания. */
-async function organizationRecipients(db: Reader, organizationId: string): Promise<string[]> {
-  const today = new Date(new Date().toISOString().slice(0, 10));
-  const members = await db.organizationMembership.findMany({
-    where: {
-      organizationId,
-      status: 'ACTIVE',
-      role: { code: { in: APPLICANT_ROLES } },
-      OR: [{ validTo: null }, { validTo: { gte: today } }],
-      user: { status: 'ACTIVE', deletedAt: null },
-    },
-    select: { userId: true },
-  });
-  return [...new Set(members.map((m) => m.userId).filter((x): x is string => !!x))];
-}
-
-/** Клубы (организации заявок), чьи участники затронуты этими схватками. */
-async function affectedOrganizations(db: Reader, matchIds: string[]): Promise<string[]> {
-  const rows = await db.matchParticipant.findMany({
-    where: { matchId: { in: matchIds }, entryId: { not: null } },
-    select: { entry: { select: { application: { select: { organizationId: true } } } } },
-  });
-  return [...new Set(rows.map((r) => r.entry?.application.organizationId).filter((x): x is string => !!x))];
 }
 
 /**
- * Получатели по заявке: подавший и создавший её — если они по-прежнему действующие пользователи с правом подавать
- * заявки в организации заявки (ушедшему из клуба сведения о заявке не отправляются).
+ * Какие уведомления создаёт событие: «заявка возвращена», «решение по заявке», «участие отклонено», «документ
+ * отклонён», «опубликованы результаты».
  */
-async function applicationRecipients(db: Reader, applicationId: string) {
-  const app = await db.application.findUnique({
-    where: { id: applicationId },
-    select: { competitionId: true, organizationId: true, submittedByUserId: true, createdById: true },
-  });
-  if (!app) return null;
-  const ids = [...new Set([app.submittedByUserId, app.createdById].filter((x): x is string => !!x))];
-  const today = new Date(new Date().toISOString().slice(0, 10));
-  const members = await db.organizationMembership.findMany({
-    where: {
-      organizationId: app.organizationId,
-      userId: { in: ids },
-      status: 'ACTIVE',
-      role: { code: { in: APPLICANT_ROLES } },
-      OR: [{ validTo: null }, { validTo: { gte: today } }],
-      user: { status: 'ACTIVE', deletedAt: null },
-    },
-    select: { userId: true },
-  });
-  const userIds = [...new Set(members.map((m) => m.userId).filter((x): x is string => !!x))];
-  return { competitionId: app.competitionId, userIds };
-}
-
-/** Какие уведомления создаёт событие: «заявка возвращена», «решение по заявке», «участие отклонено», «документ отклонён». */
 export async function planNotifications(
-  db: Reader,
+  db: RecipientsReader,
   type: string,
   payload: unknown,
 ): Promise<PlannedNotification[]> {
@@ -167,6 +110,10 @@ export async function planNotifications(
         },
       ];
     }
+    case 'category.results_published': {
+      const p = EVENT_SCHEMAS[type].parse(payload);
+      return resultsRecipients(db, p.competitionId, p.categoryId);
+    }
     default:
       return [];
   }
@@ -179,7 +126,23 @@ export class NotificationConsumer {
     private readonly queue: Queue<NotificationJob>,
     private readonly logger: Logger,
     private readonly env: Env,
+    /** Живой канал `user` (Phase 8a): колокольчик и лента обновляются сразу. Без него — опросом. */
+    private readonly live: LivePublisher | null = null,
   ) {}
+
+  /** Новые уведомления — в канал пользователя после фиксации; сбой публикации не мешает доставке. */
+  private async announce(created: readonly StoredNotification[]): Promise<void> {
+    if (!this.live) return;
+    for (const n of created)
+      await this.live
+        .publish({
+          channel: 'user',
+          room: liveUserRoom(n.userId),
+          type: 'notification',
+          payload: { notificationId: n.id, type: n.type },
+        })
+        .catch((err: unknown) => this.logger.warn({ err }, 'Live notification publish failed'));
+  }
 
   async handle(job: Job<NotificationJob>): Promise<void> {
     if ('deliveryId' in job.data) return this.deliver(job as Job<DeliveryJob>);
@@ -202,11 +165,17 @@ export class NotificationConsumer {
         return;
       }
       const plan = await planNotifications(this.db, event.type, event.payload);
-      await this.db.$transaction(async (tx) => {
-        for (const p of plan) await this.store(tx, eventId, p);
+      const created = await this.db.$transaction(async (tx) => {
+        const out: StoredNotification[] = [];
+        for (const p of plan) {
+          const n = await this.store(tx, eventId, p);
+          if (n) out.push(n);
+        }
         await tx.processedEvent.create({ data: { consumer: NOTIFICATIONS_CONSUMER, eventId } });
+        return out;
       });
       this.logger.info({ eventId, traceId, notifications: plan.length }, 'Notifications created');
+      await this.announce(created);
     }
     await this.enqueueEmails(eventId);
   }
@@ -244,15 +213,20 @@ export class NotificationConsumer {
   private async sendDigest(data: ScheduleDigestJob): Promise<void> {
     const userIds = await organizationRecipients(this.db, data.organizationId);
     if (userIds.length === 0) return;
-    await this.db.$transaction(async (tx) => {
-      for (const userId of userIds)
-        await this.store(tx, data.digestId, {
+    const created = await this.db.$transaction(async (tx) => {
+      const out: StoredNotification[] = [];
+      for (const userId of userIds) {
+        const n = await this.store(tx, data.digestId, {
           userId,
           type: 'schedule.changed',
           params: { competitionId: data.competitionId },
           competitionId: data.competitionId,
         });
+        if (n) out.push(n);
+      }
+      return out;
     });
+    await this.announce(created);
     this.logger.info(
       {
         competitionId: data.competitionId,
@@ -277,13 +251,17 @@ export class NotificationConsumer {
       await this.queue.add('deliver-email', { deliveryId: d.id }, { jobId: `email-${d.id}` });
   }
 
-  /** Уведомление с доставками: лента — сразу, email — по настройке и подтверждённому адресу. */
-  private async store(tx: Prisma.TransactionClient, eventId: string, p: PlannedNotification): Promise<void> {
+  /** Уведомление с доставками: лента — сразу, email — по настройке и подтверждённому адресу. Повтор — null. */
+  private async store(
+    tx: Prisma.TransactionClient,
+    eventId: string,
+    p: PlannedNotification,
+  ): Promise<StoredNotification | null> {
     const exists = await tx.notification.findUnique({
       where: { sourceEventId_userId: { sourceEventId: eventId, userId: p.userId } },
       select: { id: true },
     });
-    if (exists) return;
+    if (exists) return null;
     const user = await tx.user.findUnique({
       where: { id: p.userId },
       select: { email: true, emailVerifiedAt: true },
@@ -292,9 +270,10 @@ export class NotificationConsumer {
       where: { userId_type_channel: { userId: p.userId, type: p.type, channel: 'EMAIL' } },
     });
     const email = (pref?.enabled ?? true) && !!user?.email && !!user.emailVerifiedAt;
+    const id = uuidv7();
     await tx.notification.create({
       data: {
-        id: uuidv7(),
+        id,
         userId: p.userId,
         type: p.type,
         params: p.params,
@@ -308,6 +287,7 @@ export class NotificationConsumer {
         },
       },
     });
+    return { id, userId: p.userId, type: p.type };
   }
 
   /** Письмо уведомления. Шаблон без данных (запись удалена) — FAILED без повторов; сбой отправки — повтор. */

@@ -28,6 +28,7 @@ function useNotificationText(): (n: NotificationDto) => { title: string; body: s
       competitionName: n.context.competitionName ?? none,
       organizationName: n.context.organizationName ?? none,
       athleteName: n.context.athleteName ?? none,
+      categoryName: n.context.categoryName ?? none,
       documentType: n.context.documentType ?? none,
       reason: n.context.reason ?? none,
       status: n.context.status && statuses.has(n.context.status) ? statuses(n.context.status) : none,

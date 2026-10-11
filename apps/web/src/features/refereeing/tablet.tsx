@@ -3,13 +3,14 @@
 // наказания, «Отменить последнее», предложенный исход и двухшаговое подтверждение; индикатор связи и
 // неотправленных команд; следующая схватка ковра и результаты, ждущие подтверждения (руководитель ковра,
 // работающий за планшетом, подтверждает здесь же вторым шагом).
-import { clockNowMs, type MatchDetailDto, type MatConsoleDto } from '@sde/contracts';
+import { clockNowMs, liveChannel, type MatchDetailDto, type MatConsoleDto } from '@sde/contracts';
 import { Alert, Badge, Button, EmptyState, Input } from '@sde/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryState } from '@/components/common';
 import { Link } from '@/i18n/navigation';
+import { useChannelHealth } from '@/lib/live';
 import { timeInZone } from '@/features/scheduling/shared';
 import { refereeKeys, transitionMatch, useMatConsole } from './api';
 import { actionPoints, toScoringRules, useRefereeLabels } from './labels';
@@ -304,6 +305,9 @@ function TabletHeader({ data, offline }: { data: MatConsoleDto; offline: boolean
   const locale = useLocale();
   const tz = data.competition.timezone;
   const roles = data.myRoles.map((r) => tRoles(r));
+  // Связь с сервером есть, а живого канала ковра нет (сеть зала режет WebSocket, подписка отклонена): экран
+  // обновляется опросом.
+  const live = useChannelHealth(liveChannel.opsMat(data.mat.id));
   return (
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
       <div>
@@ -323,6 +327,10 @@ function TabletHeader({ data, offline }: { data: MatConsoleDto; offline: boolean
         {offline ? (
           <Badge tone="danger" className="px-3 py-1 text-sm">
             <span aria-hidden="true">■</span> {t('offline')}
+          </Badge>
+        ) : live === 'down' ? (
+          <Badge tone="neutral" className="px-3 py-1 text-sm">
+            {t('liveOff')}
           </Badge>
         ) : null}
         <Link

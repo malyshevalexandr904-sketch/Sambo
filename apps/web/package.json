@@ -1,6 +1,6 @@
 {
   "name": "@sde/web",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "private": true,
   "description": "Веб-клиент: публичные страницы, кабинеты, админ-панель (Next.js)",
   "scripts": {
@@ -23,6 +23,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-hook-form": "7.88.0",
+    "socket.io-client": "4.8.4",
     "zod": "4.6.5"
   },
   "devDependencies": {

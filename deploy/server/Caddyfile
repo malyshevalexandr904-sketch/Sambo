@@ -10,6 +10,12 @@
 		reverse_proxy api:4000
 	}
 
+	# Живые данные (Phase 8a): Socket.IO — WebSocket и запасной long polling — тоже напрямую в api (Caddy сам
+	# пропускает Upgrade). Origin проверяет api: cookie входа принимается только со своего сайта.
+	handle /ws* {
+		reverse_proxy api:4000
+	}
+
 	# Почтовый ящик Mailpit (вход — логин и пароль из .env: MAILPIT_USER, MAILPIT_PASSWORD).
 	handle /mail* {
 		reverse_proxy mailpit:8025

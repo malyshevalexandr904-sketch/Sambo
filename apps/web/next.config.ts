@@ -17,8 +17,13 @@ const config: NextConfig = {
   eslint: { ignoreDuringBuilds: true },
   transpilePackages: ['@sde/ui', '@sde/contracts'],
   // Браузер обращается к API через тот же origin: cookie сессии и CSRF работают без CORS (API.md, 1.6).
+  // Живые данные (Phase 8a): Socket.IO на пути /ws — Next.js проксирует и long polling, и WebSocket (upgrade).
+  // На сервере /ws уходит в api напрямую через Caddy (deploy/server/Caddyfile), сюда не доходит.
   async rewrites() {
-    return [{ source: '/api/:path*', destination: `${apiUrl}/api/:path*` }];
+    return [
+      { source: '/api/:path*', destination: `${apiUrl}/api/:path*` },
+      { source: '/ws', destination: `${apiUrl}/ws` },
+    ];
   },
   async headers() {
     return [{ source: '/:path*', headers: SECURITY_HEADERS }];

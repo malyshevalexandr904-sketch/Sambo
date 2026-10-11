@@ -1,22 +1,24 @@
 'use client';
 // Итоги (план Phase 7b): итоги турнира и категории, публикация, история спортсмена, схватка целиком (изменение
 // результата, перенос, отмена, врач на ковре), ручная схватка и данные печатных протоколов.
-import type {
-  AthleteHistoryDto,
-  CategoryProtocolDto,
-  CategoryResultsDto,
-  CompetitionResultsDto,
-  DataEnvelope,
-  ManualMatchCreate,
-  MatchDetailDto,
-  MatchProtocolDto,
-  MatchResultAmend,
-  MedicalIncidentCreate,
-  MedicalIncidentDto,
+import {
+  type AthleteHistoryDto,
+  type CategoryProtocolDto,
+  type CategoryResultsDto,
+  type CompetitionResultsDto,
+  type DataEnvelope,
+  liveChannel,
+  type ManualMatchCreate,
+  type MatchDetailDto,
+  type MatchProtocolDto,
+  type MatchResultAmend,
+  type MedicalIncidentCreate,
+  type MedicalIncidentDto,
 } from '@sde/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { api } from '@/lib/api';
+import { useLiveInterval, useLiveInvalidate } from '@/lib/live';
 
 export const resultKeys = {
   competition: (competitionId: string) => ['competitions', competitionId, 'results'] as const,
@@ -29,11 +31,12 @@ export const resultKeys = {
 };
 
 export function useCompetitionResults(competitionId: string) {
+  const refetchInterval = useLiveInterval(liveChannel.opsCompetition(competitionId), 15_000);
   return useQuery({
     queryKey: resultKeys.competition(competitionId),
     queryFn: async () =>
       (await api<DataEnvelope<CompetitionResultsDto>>(`/competitions/${competitionId}/results`)).data,
-    refetchInterval: 15_000,
+    refetchInterval,
   });
 }
 
@@ -53,14 +56,23 @@ export function useAthleteHistory(athleteId: string) {
   });
 }
 
-/** Схватка целиком; идущая — опрос каждые 5 секунд (врач на ковре, счёт). */
+/**
+ * Схватка целиком: канал схватки (счёт, врач на ковре, результат) — сразу; без живого соединения идущая —
+ * опрос каждые 5 секунд.
+ */
 export function useMatch(matchId: string) {
+  const live = useLiveInterval(liveChannel.opsMatch(matchId), 5_000);
+  const idle = useLiveInterval(liveChannel.opsMatch(matchId), 15_000);
+  useLiveInvalidate(liveChannel.opsMatch(matchId), () => [
+    resultKeys.match(matchId),
+    resultKeys.incidents(matchId),
+  ]);
   return useQuery({
     queryKey: resultKeys.match(matchId),
     queryFn: async () => (await api<DataEnvelope<MatchDetailDto>>(`/matches/${matchId}`)).data,
     refetchInterval: (q) => {
       const s = q.state.data?.status;
-      return s === 'IN_PROGRESS' || s === 'PAUSED' || s === 'READY' ? 5_000 : 15_000;
+      return s === 'IN_PROGRESS' || s === 'PAUSED' || s === 'READY' ? live : idle;
     },
   });
 }

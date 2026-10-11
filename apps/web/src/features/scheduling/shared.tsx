@@ -3,6 +3,7 @@
 import {
   type CrewCandidateDto,
   type DataEnvelope,
+  liveChannel,
   type MatAssignmentDto,
   type MatDto,
   type MatQueueDto,
@@ -12,6 +13,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { api, ApiError } from '@/lib/api';
+import { useLiveInterval, useLiveInvalidate } from '@/lib/live';
 
 export const schedulingKeys = {
   mats: (competitionId: string) => ['competitions', competitionId, 'mats'] as const,
@@ -61,12 +63,17 @@ export function useCrewCandidates(competitionId: string) {
   });
 }
 
-/** Экран ковра «Ковры» (кворум зала): обновляется каждые 15 секунд, пока экран открыт. */
+/**
+ * Экран ковра «Ковры» (кворум зала): изменения ковра приходят по его каналу сразу (Phase 8a); без живого
+ * соединения — опрос каждые 15 секунд.
+ */
 export function useMatQueue(matId: string) {
+  const refetchInterval = useLiveInterval(liveChannel.opsMat(matId), 15_000);
+  useLiveInvalidate(liveChannel.opsMat(matId), () => [schedulingKeys.matQueue(matId)]);
   return useQuery({
     queryKey: schedulingKeys.matQueue(matId),
     queryFn: async () => (await api<DataEnvelope<MatQueueDto>>(`/mats/${matId}/queue`)).data,
-    refetchInterval: 15_000,
+    refetchInterval,
   });
 }
 

@@ -1507,6 +1507,10 @@
       "schedule_changed": {
         "title": "Schedule changed",
         "body": "Tournament \"{competitionName}\": the match schedule has changed — check your athletes' times."
+      },
+      "results_published": {
+        "title": "Results published: {categoryName}",
+        "body": "Tournament \"{competitionName}\". Places and medals are in the Results section of the athlete card."
       }
     },
     "preferencesTitle": "Email",
@@ -1516,7 +1520,8 @@
       "application_decided": "Application decision",
       "entry_rejected": "Entry rejected",
       "document_rejected": "Document rejected",
-      "schedule_changed": "Schedule changes"
+      "schedule_changed": "Schedule changes",
+      "results_published": "Results published"
     },
     "saved": "Saved",
     "noValue": "—"
@@ -1765,7 +1770,8 @@
       "noCurrent": "Nothing on the mat right now",
       "next": "Up next",
       "noNext": "No upcoming matches",
-      "bye": "Bye"
+      "bye": "Bye",
+      "liveRefresh": "Live"
     }
   },
   "referee": {
@@ -2039,7 +2045,9 @@
     "reasons": {
       "participant_withdrawn": "the participant is withdrawn",
       "withdrawn_by_doctor": "withdrawn by the doctor"
-    }
+    },
+    "openScoreboard": "Scoreboard",
+    "liveOff": "Refresh every 5 s"
   },
   "results": {
     "medals": {
@@ -2184,5 +2192,33 @@
     "footGenerated": "generated {at}",
     "forbidden": "Protocols are printed by the secretary, the chief referee and the tournament manager.",
     "notFound": "Protocol not found."
+  },
+  "scoreboard": {
+    "title": "Mat scoreboard",
+    "mat": "Mat {number}",
+    "match": "Bout No. {number}",
+    "red": "Red corner",
+    "blue": "Blue corner",
+    "waiting": "To be decided",
+    "points": "Points",
+    "winner": "Winner",
+    "noWinner": "No winner",
+    "provisional": "awaiting confirmation",
+    "timeUp": "Time is up",
+    "next": "Up next",
+    "idle": "No bouts on this mat yet",
+    "notFound": "Scoreboard unavailable: the tournament is not published or the mat does not exist.",
+    "loading": "Loading scoreboard…",
+    "online": "Live",
+    "offline": "No live connection — refreshing every 5 s",
+    "fullscreen": "Full screen",
+    "status": {
+      "IN_PROGRESS": "Bout in progress",
+      "PAUSED": "Paused",
+      "READY": "Called to the mat",
+      "FINISHED": "Result",
+      "NEXT": "Next bout"
+    },
+    "holdLabel": "Hold"
   }
 }

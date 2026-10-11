@@ -1,5 +1,6 @@
 // Уведомления пользователя (Phase 4b): лента с подстановками из исходных записей, прочтение, настройки каналов.
 // Сами уведомления создаёт worker (apps/worker/test/notifications.e2e.test.ts); здесь они — фикстуры.
+import { CONFIGURABLE_CHANNELS, NOTIFICATION_TYPES } from '@sde/contracts';
 import { uuidv7 } from '@sde/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createOrg, createTestApp, createUser, login, resetData, type TestApp } from './helpers/app';
@@ -92,7 +93,8 @@ describe('notifications', () => {
   it('email can be switched off per type; the in-app feed is not configurable', async () => {
     const s = await login(t, (await createUser(t)).email);
     const defaults = await s.agent.get('/api/v1/me/notification-preferences').expect(200);
-    expect(defaults.body.data).toHaveLength(5);
+    // По строке на каждый вид уведомления и настраиваемый канал (Phase 8a: + «опубликованы результаты»).
+    expect(defaults.body.data).toHaveLength(NOTIFICATION_TYPES.length * CONFIGURABLE_CHANNELS.length);
     expect(
       defaults.body.data.every(
         (p: { channel: string; enabled: boolean }) => p.channel === 'EMAIL' && p.enabled,

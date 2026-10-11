@@ -12,6 +12,11 @@ export interface AccessClaims {
   pv: number;
 }
 
+/** Проверенный токен: заявки и срок действия (WebSocket-шлюз закрывает служебные подписки по сроку). */
+export interface VerifiedAccessClaims extends AccessClaims {
+  expiresAt: Date;
+}
+
 const ISSUER = 'sde';
 const AUDIENCE = 'sde-api';
 
@@ -42,7 +47,7 @@ export class JwtService {
     return { token, expiresAt: new Date(exp * 1000) };
   }
 
-  async verify(token: string): Promise<AccessClaims> {
+  async verify(token: string): Promise<VerifiedAccessClaims> {
     try {
       const { payload } = await jwtVerify(
         token,
@@ -56,11 +61,12 @@ export class JwtService {
       if (
         typeof payload.sub !== 'string' ||
         typeof payload.sid !== 'string' ||
-        typeof payload.pv !== 'number'
+        typeof payload.pv !== 'number' ||
+        typeof payload.exp !== 'number'
       ) {
         throw new DomainError('UNAUTHENTICATED');
       }
-      return { sub: payload.sub, sid: payload.sid, pv: payload.pv };
+      return { sub: payload.sub, sid: payload.sid, pv: payload.pv, expiresAt: new Date(payload.exp * 1000) };
     } catch (e) {
       if (e instanceof errors.JWTExpired) throw new DomainError('TOKEN_EXPIRED');
       if (e instanceof DomainError) throw e;

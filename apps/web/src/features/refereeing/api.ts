@@ -1,16 +1,19 @@
 'use client';
 // Судейство (API.md, 6.3; план Phase 7a, §5): запросы раздела «Судейство», планшета ковра, журнала схватки и
-// схваток, ждущих подтверждения. Экраны обновляются опросом (мгновенное обновление — Phase 8).
-import type {
-  DataEnvelope,
-  MatchDetailDto,
-  MatchEventsDto,
-  MatConsoleDto,
-  OfficiatingDto,
-  PendingConfirmationDto,
+// схваток, ждущих подтверждения. Экраны обновляются по живым каналам (Phase 8a); опрос — запасной: редкий, пока
+// соединение живо, прежний — без него.
+import {
+  type DataEnvelope,
+  liveChannel,
+  type MatchDetailDto,
+  type MatchEventsDto,
+  type MatConsoleDto,
+  type OfficiatingDto,
+  type PendingConfirmationDto,
 } from '@sde/contracts';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useLiveInterval, useLiveInvalidate } from '@/lib/live';
 
 export const refereeKeys = {
   officiating: (competitionId: string) => ['competitions', competitionId, 'officiating'] as const,
@@ -20,15 +23,17 @@ export const refereeKeys = {
 };
 
 export function useOfficiating(competitionId: string) {
+  const refetchInterval = useLiveInterval(liveChannel.opsCompetition(competitionId), 10_000);
   return useQuery({
     queryKey: refereeKeys.officiating(competitionId),
     queryFn: async () =>
       (await api<DataEnvelope<OfficiatingDto>>(`/competitions/${competitionId}/officiating`)).data,
-    refetchInterval: 10_000,
+    refetchInterval,
   });
 }
 
 export function usePendingConfirmations(competitionId: string) {
+  const refetchInterval = useLiveInterval(liveChannel.opsCompetition(competitionId), 10_000);
   return useQuery({
     queryKey: refereeKeys.pending(competitionId),
     queryFn: async () =>
@@ -37,16 +42,21 @@ export function usePendingConfirmations(competitionId: string) {
           `/competitions/${competitionId}/pending-confirmations`,
         )
       ).data,
-    refetchInterval: 10_000,
+    refetchInterval,
   });
 }
 
-/** Планшет ковра: опрос каждые 5 секунд (второй планшет, вызов пары секретарём, новые схватки ковра). */
+/**
+ * Планшет ковра: канал ковра — второй планшет, вызов пары секретарём, подтверждение, новые схватки ковра — сразу;
+ * без живого соединения — опрос каждые 5 секунд.
+ */
 export function useMatConsole(matId: string, paused: boolean) {
+  const interval = useLiveInterval(liveChannel.opsMat(matId), 5_000);
+  useLiveInvalidate(liveChannel.opsMat(matId), () => [refereeKeys.console(matId)]);
   return useQuery({
     queryKey: refereeKeys.console(matId),
     queryFn: async () => (await api<DataEnvelope<MatConsoleDto>>(`/mats/${matId}/console`)).data,
-    refetchInterval: paused ? false : 5_000,
+    refetchInterval: paused ? false : interval,
   });
 }
 
