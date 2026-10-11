@@ -7,11 +7,15 @@ import {
   type PublicMatStateDto,
 } from '@sde/contracts';
 
-/** Новое состояние ковра; текущая схватка — не старее показанной. */
+/**
+ * Новое состояние ковра. Состояние, посчитанное раньше показанного (снимок подписки после свежего ответа REST,
+ * запоздавшая публикация), не показывается; текущая схватка — не старее показанной.
+ */
 export function mergeMatState(
   shown: PublicMatStateDto | null,
   incoming: PublicMatStateDto,
 ): PublicMatStateDto {
+  if (shown && Date.parse(incoming.serverTime) < Date.parse(shown.serverTime)) return shown;
   if (!shown || !shown.current || !incoming.current) return incoming;
   return isNewerMatchState(incoming.current, shown.current)
     ? incoming

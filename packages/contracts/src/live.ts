@@ -58,11 +58,9 @@ export type ParsedLiveChannel =
 
 const PATTERNS: [RegExp, (m: RegExpExecArray) => ParsedLiveChannel | null][] = [
   [
-    new RegExp(`^public:mat:(${SLUG}):(\\d{1,3})$`),
-    (m) => {
-      const matNumber = Number(m[2]);
-      return matNumber >= 1 ? { kind: 'public:mat', slug: m[1] as string, matNumber } : null;
-    },
+    // Номер ковра без ведущих нулей: у канала одно имя (`…:01` дал бы отдельную комнату без сообщений).
+    new RegExp(`^public:mat:(${SLUG}):([1-9]\\d{0,2})$`),
+    (m) => ({ kind: 'public:mat', slug: m[1] as string, matNumber: Number(m[2]) }),
   ],
   [new RegExp(`^public:match:(${PUBLIC_ID})$`), (m) => ({ kind: 'public:match', publicId: m[1] as string })],
   [
@@ -109,7 +107,11 @@ export interface LiveMessage<P = unknown> {
   payload: P;
 }
 
-/** Что изменилось в турнире (каналы `ops:*`, `public:competition`): по темам и идентификаторам. */
+/**
+ * Что изменилось в турнире (каналы `ops:*`, `public:competition`): по темам и идентификаторам. Темы приходят только
+ * от операционных таблиц турнира (журнал синхронизации, ADR-21); заявки, требования положения и медицинские допуски
+ * в него не пишутся — их экраны обновляются опросом.
+ */
 export const LIVE_TOPICS = [
   'competition',
   'categories',
@@ -117,7 +119,6 @@ export const LIVE_TOPICS = [
   'admission',
   'checkin',
   'weighin',
-  'medical',
   'draws',
   'schedule',
   'crews',

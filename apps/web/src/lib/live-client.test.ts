@@ -7,6 +7,7 @@ type Handler = (...args: never[]) => void;
 /** Подмена Socket.IO: события сервера вызываются вручную, ответы на subscribe — по очереди или по требованию. */
 class FakeSocket implements LiveSocket {
   connected = false;
+  active = true;
   handlers = new Map<string, Handler[]>();
   emitted: { event: string; payload: unknown; ack?: (res: never) => void }[] = [];
   connects = 0;
@@ -176,6 +177,53 @@ describe('LiveClient', () => {
     expect(count()).toBe(1);
     vi.advanceTimersByTime(10_001);
     expect(count()).toBe(2);
+  });
+
+  it('reconnects after the server refused the handshake (socket.io-client does not retry it)', () => {
+    listen('ops:x');
+    socket.active = false;
+    socket.fire('connect_error', new Error('handshake'));
+    expect(client.status).toBe('offline');
+    expect(socket.connects).toBe(0);
+    vi.advanceTimersByTime(3_000);
+    expect(socket.connects).toBe(1);
+    // Ещё отказ — пауза растёт.
+    socket.fire('connect_error', new Error('handshake'));
+    vi.advanceTimersByTime(3_000);
+    expect(socket.connects).toBe(1);
+    vi.advanceTimersByTime(3_000);
+    expect(socket.connects).toBe(2);
+    // Обычный обрыв Socket.IO переподключает сам — без лишних попыток.
+    socket.active = true;
+    socket.fire('connect_error', new Error('transport'));
+    vi.advanceTimersByTime(60_000);
+    expect(socket.connects).toBe(2);
+  });
+
+  it('a transient refusal is retried; a permanent one is not; health follows the channel', () => {
+    const events = listen('ops:x');
+    listen('ops:forbidden');
+    expect(client.channelHealth('ops:x')).toBe('pending');
+    socket.open();
+    socket.answer('ops:forbidden', { ok: false, error: { code: 'FORBIDDEN' } });
+    socket.answer('ops:x', { ok: false, error: { code: 'INTERNAL_ERROR' } });
+    expect(events).toEqual([{ kind: 'error', code: 'INTERNAL_ERROR' }]);
+    expect(client.channelHealth('ops:x')).toBe('down');
+    const subscribes = (channel: string) =>
+      socket.emitted.filter(
+        (e) => e.event === 'subscribe' && (e.payload as { channel: string }).channel === channel,
+      ).length;
+    vi.advanceTimersByTime(5_001);
+    expect(subscribes('ops:x')).toBe(2);
+    expect(subscribes('ops:forbidden')).toBe(1);
+    socket.answer('ops:x', { ok: true, seq: 3, snapshot: null });
+    expect(client.channelHealth('ops:x')).toBe('live');
+    expect(client.channelHealth('ops:forbidden')).toBe('down');
+    // Без связи канал не работает; после переподключения отказ «нет прав» запрашивается заново.
+    socket.fire('disconnect', 'transport close');
+    expect(client.channelHealth('ops:x')).toBe('down');
+    socket.open();
+    expect(subscribes('ops:forbidden')).toBe(2);
   });
 
   it('estimates the server clock offset from ping', () => {

@@ -5,6 +5,7 @@
 import {
   LIVE_CLIENT_RATE_PER_SECOND,
   LIVE_EVENTS,
+  LIVE_TOPICS,
   LIVE_NAMESPACE,
   LIVE_PATH,
   liveChannel,
@@ -24,6 +25,7 @@ import { createTestApp, createUser, PASSWORD, resetData, type TestApp } from './
 import {
   event,
   getMatch,
+  official,
   refereeWorld,
   type RefereeWorld,
   scheduledMatches,
@@ -346,6 +348,39 @@ describe('live channels', () => {
     expect(mb).toEqual([]);
   });
 
+  it('a role removed in the tournament stops new service subscriptions on an open connection at once', async () => {
+    const ref = await official(t, w.competitionId);
+    const s = await connect({ token: (await credentials(await emailOf(ref.id))).token });
+    expect(await subscribe(s, liveChannel.opsCompetition(w.competitionId))).toMatchObject({ ok: true });
+    // Как PATCH участника турнира (staff.service): должность снята, версия прав пользователя выросла.
+    await t.admin.competitionMembership.updateMany({
+      where: { competitionId: w.competitionId, userId: ref.id },
+      data: { status: 'ENDED' },
+    });
+    await t.admin.user.update({ where: { id: ref.id }, data: { permissionsVersion: { increment: 1 } } });
+    expect(await subscribe(s, liveChannel.opsMat(w.mats[0]!.id))).toEqual({
+      ok: false,
+      error: { code: 'FORBIDDEN' },
+    });
+  });
+
+  it('an unsubscribe sent while the subscription is still being checked wins', async () => {
+    const s = await connect({ token: judge.token });
+    const msgs = record(s);
+    const channel = liveChannel.opsMatch(matchId);
+    const sub = subscribe(s, channel);
+    const unsub = new Promise((resolve) => s.emit(LIVE_EVENTS.unsubscribe, { channel }, resolve));
+    expect(await sub).toMatchObject({ ok: true });
+    expect(await unsub).toEqual({ ok: true });
+    await t.app.get(LivePublisherService).publish({
+      channel,
+      type: 'changed',
+      payload: { topics: ['matches'], categoryIds: [], matIds: [], matchIds: [matchId] },
+    });
+    await settle(300);
+    expect(msgs.filter((m) => m.channel === channel)).toEqual([]);
+  });
+
   it('limits client requests per second', async () => {
     const s = await connect({ token: judge.token });
     const acks = await Promise.all(
@@ -357,6 +392,27 @@ describe('live channels', () => {
     expect(
       acks.slice(LIVE_CLIENT_RATE_PER_SECOND).every((a) => !a.ok && a.error.code === 'RATE_LIMITED'),
     ).toBe(true);
+  });
+
+  it('a new leader node resyncs the screens of active tournaments (changes nobody listened to)', async () => {
+    const staff = await connect({ token: judge.token });
+    const msgs = record(staff);
+    expect(await subscribe(staff, liveChannel.opsCompetition(w.competitionId))).toMatchObject({ ok: true });
+    const viewer = await connect();
+    const boards = record(viewer);
+    expect(await subscribe(viewer, liveChannel.publicMat(slug, 1))).toMatchObject({ ok: true });
+    // Блокировка ведущего пропала (истекла, пока узел стоял): узел теряет роль и занимает её заново.
+    await t.redis.del('sde:live:leader');
+    expect(await t.app.get(ChangeFeedService).ensureLeadership()).toBe(true);
+    const resync = await waitFor(() =>
+      msgs.find(
+        (x) =>
+          x.channel === liveChannel.opsCompetition(w.competitionId) &&
+          (x.payload as { topics: string[] }).topics.length === LIVE_TOPICS.length,
+      ),
+    );
+    expect(resync.type).toBe('changed');
+    await waitFor(() => boards.find((x) => x.type === 'mat.state'));
   });
 });
 
@@ -409,11 +465,16 @@ describe('public scoreboard snapshot', () => {
     const red = after.next?.red ?? after.current?.red;
     expect(red).toMatchObject({ name: entry.publicName, hidden: false });
 
+    const slug = (await t.admin.competition.findUniqueOrThrow({ where: { id: w.competitionId } })).slug;
+    // Снимок табло этого ковра сохраняется публикацией (расписание изменено выше), пока турнир опубликован.
+    await t.app.get(ChangeFeedService).drain();
+    const retained = `sde:live:last:${liveChannel.publicMat(slug, 1)}`;
+    for (let i = 0; i < 40 && !(await t.redis.exists(retained)); i++) await settle(50);
+    expect(await t.redis.exists(retained)).toBe(1);
     await t.admin.competition.update({ where: { id: w.competitionId }, data: { status: 'DRAFT' } });
     expect((await t.http().get(`/api/public/v1/mats/${matId}/scoreboard`)).status).toBe(404);
-    // Сохранённый снимок табло остался с тех пор, как турнир был опубликован, — но подписка его не получит.
-    expect(await t.redis.keys('sde:live:last:public:mat:*')).not.toEqual([]);
-    const slug = (await t.admin.competition.findUniqueOrThrow({ where: { id: w.competitionId } })).slug;
+    // Сохранённый снимок остался с тех пор, как турнир был опубликован, — но подписка его не получит.
+    expect(await t.redis.exists(retained)).toBe(1);
     const viewer = await connect();
     expect(await subscribe(viewer, liveChannel.publicMat(slug, 1))).toEqual({
       ok: false,

@@ -15,15 +15,14 @@ export interface ChangeRow {
   s: string | null;
 }
 
-/** Тема по таблице. Таблиц без темы (служебных) в уведомлениях нет — журнал синхронизации их не пишет. */
+/**
+ * Тема по таблице — ровно таблицы с триггером журнала синхронизации (миграции Phase 4a–7b): только они дают
+ * уведомления `sde_live`. Заявки, требования положения, площадки и медицинские допуски в журнал не пишутся.
+ */
 export const TABLE_TOPICS: Readonly<Record<string, LiveTopic>> = {
   competition: 'competition',
   competition_membership: 'competition',
-  competition_requirement: 'competition',
-  venue: 'competition',
   competition_category: 'categories',
-  category_rule: 'categories',
-  application: 'registrations',
   entry: 'registrations',
   admission: 'admission',
   admission_check: 'admission',
@@ -33,7 +32,6 @@ export const TABLE_TOPICS: Readonly<Record<string, LiveTopic>> = {
   weigh_in_window_category: 'weighin',
   weigh_in_attempt: 'weighin',
   weigh_in_record: 'weighin',
-  medical_clearance: 'medical',
   draw: 'draws',
   draw_slot: 'draws',
   bracket: 'draws',

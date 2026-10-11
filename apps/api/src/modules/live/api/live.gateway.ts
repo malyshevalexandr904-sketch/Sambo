@@ -31,7 +31,7 @@ import { Redis } from 'ioredis';
 import { type Namespace, Server, type Socket } from 'socket.io';
 import { DomainError } from '../../../common/errors/domain-error';
 import { ENV } from '../../../config/config.module';
-import { AccessTokenAuthenticator, SessionService } from '../../auth';
+import { AccessTokenAuthenticator } from '../../auth';
 import {
   ChannelAccessService,
   type ChannelGrant,
@@ -43,7 +43,13 @@ interface SocketState extends Subscriber {
   subscriptions: Map<string, ChannelGrant>;
   expiryTimer: NodeJS.Timeout | null;
   window: { startedAt: number; count: number };
+  /** Очередь запросов по каналу: отписка ждёт идущую подписку того же канала (иначе подписка «осиротеет»). */
+  queues: Map<string, Promise<unknown>>;
+  ip: string;
 }
+
+/** Соединений с одного адреса на узле: экраны и табло зала за одним NAT — десятки, не сотни. */
+const MAX_CONNECTIONS_PER_IP = 200;
 
 const LIVE_CODES = new Set<string>([
   'UNAUTHENTICATED',
@@ -87,12 +93,12 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
   private nsp: Namespace | null = null;
   private subscriber: Redis | null = null;
   private readonly allowedOrigins: Set<string>;
+  private readonly perIp = new Map<string, number>();
 
   constructor(
     private readonly adapterHost: HttpAdapterHost,
     @Inject(ENV) private readonly env: Env,
     private readonly authenticator: AccessTokenAuthenticator,
-    private readonly sessions: SessionService,
     private readonly access: ChannelAccessService,
   ) {
     this.allowedOrigins = new Set([new URL(env.APP_URL).origin, ...env.CORS_ORIGINS]);
@@ -113,7 +119,11 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     io.use((_socket, next) => next(new Error('namespace')));
     const nsp = io.of(LIVE_NAMESPACE);
     nsp.use((socket, next) => {
-      this.authenticate(socket).then(
+      const ip = this.clientIp(socket);
+      if ((this.perIp.get(ip) ?? 0) >= MAX_CONNECTIONS_PER_IP) return next(new Error('too many connections'));
+      // Отказ (сбой БД или Redis при проверке входа) клиент повторит сам: socket.io-client после отказа
+      // middleware не переподключается, это делает LiveClient (apps/web/src/lib/live-client.ts).
+      this.authenticate(socket, ip).then(
         () => next(),
         (err: unknown) => {
           this.logger.warn({ err }, 'Live handshake failed');
@@ -160,17 +170,28 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
+  /** Адрес клиента: за Caddy (TRUST_PROXY — один прокси) — последний адрес X-Forwarded-For, как у HTTP. */
+  private clientIp(socket: Socket): string {
+    const forwarded = socket.handshake.headers['x-forwarded-for'];
+    const header = Array.isArray(forwarded) ? forwarded.join(',') : forwarded;
+    const last = header?.split(',').pop()?.trim();
+    return this.env.TRUST_PROXY && last ? last : socket.handshake.address;
+  }
+
   /**
    * Вход по Bearer (`auth.token`) или cookie `sde_at`. Cookie принимается только без Origin или с разрешённого
-   * Origin: страница чужого сайта не подключится к служебным каналам от имени пользователя (CSWSH).
+   * Origin: страница чужого сайта не подключится к служебным каналам от имени пользователя (CSWSH). Без Origin
+   * браузер WebSocket не открывает; cookie `sde_at` — SameSite=Lax.
    */
-  private async authenticate(socket: Socket): Promise<void> {
+  private async authenticate(socket: Socket, ip: string): Promise<void> {
     const state: SocketState = {
       user: null,
       authError: null,
       subscriptions: new Map(),
       expiryTimer: null,
       window: { startedAt: Date.now(), count: 0 },
+      queues: new Map(),
+      ip,
     };
     socket.data = state;
     const auth = socket.handshake.auth as Record<string, unknown> | undefined;
@@ -219,15 +240,35 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     return state.window.count <= LIVE_CLIENT_RATE_PER_SECOND;
   }
 
+  /** Запросы одного канала — по очереди, в порядке прихода. */
+  private queued<T>(state: SocketState, raw: unknown, fn: () => Promise<T>): Promise<T> {
+    const channel =
+      typeof raw === 'object' && raw !== null && typeof (raw as { channel?: unknown }).channel === 'string'
+        ? (raw as { channel: string }).channel.slice(0, 160)
+        : '';
+    const prev = state.queues.get(channel) ?? Promise.resolve();
+    const run = prev.then(fn, fn);
+    const tail = run.catch(() => undefined);
+    state.queues.set(channel, tail);
+    void tail.then(() => {
+      if (state.queues.get(channel) === tail) state.queues.delete(channel);
+    });
+    return run;
+  }
+
   private onConnection(socket: Socket): void {
     const state = socket.data as SocketState;
+    // Принятые соединения с адреса (лимит проверяется в рукопожатии).
+    this.perIp.set(state.ip, (this.perIp.get(state.ip) ?? 0) + 1);
     socket.on(LIVE_EVENTS.subscribe, (raw: unknown, ack: unknown) => {
       if (!this.allow(state)) return reply(ack, fail('RATE_LIMITED'));
-      void this.subscribe(socket, state, raw).then((r) => reply(ack, r));
+      void this.queued(state, raw, () => this.subscribe(socket, state, raw)).then((r) => reply(ack, r));
     });
     socket.on(LIVE_EVENTS.unsubscribe, (raw: unknown, ack: unknown) => {
       if (!this.allow(state)) return reply(ack, fail('RATE_LIMITED'));
-      reply<LiveAck>(ack, this.unsubscribe(socket, state, raw));
+      void this.queued(state, raw, () => this.unsubscribe(socket, state, raw)).then((r) =>
+        reply<LiveAck>(ack, r),
+      );
     });
     socket.on(LIVE_EVENTS.ping, (_raw: unknown, ack: unknown) => {
       if (!this.allow(state)) return;
@@ -236,6 +277,9 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     socket.on('disconnect', () => {
       if (state.expiryTimer) clearTimeout(state.expiryTimer);
       state.subscriptions.clear();
+      const left = (this.perIp.get(state.ip) ?? 1) - 1;
+      if (left > 0) this.perIp.set(state.ip, left);
+      else this.perIp.delete(state.ip);
     });
   }
 
@@ -248,13 +292,16 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     if (!state.subscriptions.has(channel) && state.subscriptions.size >= LIVE_MAX_SUBSCRIPTIONS)
       return fail('RATE_LIMITED');
     try {
-      // Служебный канал — сессия ещё действует (выход на другом устройстве, отзыв администратором).
-      if (
-        state.user &&
-        !parsed.kind.startsWith('public:') &&
-        !(await this.sessions.isActive(state.user.sessionId))
-      )
-        this.dropUser(socket, state, 'UNAUTHENTICATED');
+      // Служебный канал — сессия ещё действует (выход на другом устройстве, отзыв администратором), пользователь
+      // не заблокирован, права — текущие (снятая должность в турнире действует сразу, как в REST).
+      if (state.user && !parsed.kind.startsWith('public:')) {
+        try {
+          state.user = await this.authenticator.reload(state.user);
+        } catch (e) {
+          if (!(e instanceof DomainError)) throw e;
+          this.dropUser(socket, state, 'UNAUTHENTICATED');
+        }
+      }
       const grant = await this.access.authorize(state, parsed, channel);
       // Сначала комната, потом номер и снимок: сообщение, пришедшее между ними, клиент отбросит по seq.
       await socket.join(grant.room);
@@ -274,13 +321,13 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     }
   }
 
-  private unsubscribe(socket: Socket, state: SocketState, raw: unknown): LiveAck {
+  private async unsubscribe(socket: Socket, state: SocketState, raw: unknown): Promise<LiveAck> {
     const req = LiveUnsubscribeRequest.safeParse(raw);
     if (!req.success) return fail('VALIDATION_FAILED');
     const grant = state.subscriptions.get(req.data.channel);
     if (grant) {
       state.subscriptions.delete(req.data.channel);
-      void socket.leave(grant.room);
+      await socket.leave(grant.room);
     }
     return { ok: true };
   }

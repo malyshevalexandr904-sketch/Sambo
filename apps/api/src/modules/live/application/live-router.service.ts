@@ -1,8 +1,8 @@
 // Публикация пачки изменений в живые каналы (Phase 8a; API.md, 7.2): служебные каналы турнира, ковров и схваток
 // получают «что изменилось» (экраны перечитывают данные по REST), публичные каналы ковров и схваток — состояние
 // для табло (ADR-15: публичная проекция), публичный канал турнира — темы изменений.
-import { Injectable } from '@nestjs/common';
-import { liveChannel, type LiveTopic } from '@sde/contracts';
+import { Injectable, Logger } from '@nestjs/common';
+import { LIVE_LAST_RESULT_MS, LIVE_TOPICS, liveChannel, type LiveTopic } from '@sde/contracts';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { isPublicCompetition, ScoreboardService } from '../../refereeing';
 import {
@@ -20,14 +20,41 @@ interface TouchedMatch {
   publicId: string;
   status: string;
   matId: string | null;
+  finishedAt: Date | null;
   schedule: { matId: string } | null;
 }
 
-/** Публичное состояние схватки — только там, где на неё смотрят: вызвана, идёт, на паузе или только что завершена. */
-const PUBLIC_MATCH_STATUSES = new Set(['READY', 'IN_PROGRESS', 'PAUSED', 'FINISHED']);
+const TOUCHED_SELECT = {
+  id: true,
+  publicId: true,
+  status: true,
+  matId: true,
+  finishedAt: true,
+  schedule: { select: { matId: true } },
+} as const;
+
+/** Схватка вызвана, идёт или на паузе. */
+const LIVE_MATCH_STATUSES = ['READY', 'IN_PROGRESS', 'PAUSED'] as const;
+
+/** Турниры, где идут или вот-вот начнутся схватки: при пересинхронизации — и ковры, и идущие схватки. */
+const OPERATING_STATUSES = ['SCHEDULED', 'IN_PROGRESS'] as const;
+/** Турниры с живыми служебными экранами (прибытие, взвешивание, допуск, жеребьёвка, судейство). */
+const ACTIVE_STATUSES = ['REGISTRATION_CLOSED', 'CHECK_IN', 'DRAWING', ...OPERATING_STATUSES] as const;
+
+/**
+ * Публичное состояние схватки — только там, где на неё смотрят: вызвана, идёт, на паузе или завершена в последний
+ * час. Публикация итогов категории меняет результаты всех её схваток — давние схватки табло не пересчитывает.
+ */
+function watched(m: TouchedMatch, now: number): boolean {
+  if ((LIVE_MATCH_STATUSES as readonly string[]).includes(m.status)) return true;
+  return (
+    m.status === 'FINISHED' && m.finishedAt !== null && now - m.finishedAt.getTime() < LIVE_LAST_RESULT_MS
+  );
+}
 
 @Injectable()
 export class LiveRouterService {
+  private readonly logger = new Logger('LiveRouter');
   private memory = new BoundedVersionMemory();
 
   constructor(
@@ -42,7 +69,49 @@ export class LiveRouterService {
   }
 
   async handle(rows: readonly ChangeRow[]): Promise<void> {
-    for (const g of groupChanges(rows, this.memory)) await this.publishCompetition(g);
+    for (const g of groupChanges(rows, this.memory)) await this.safely(() => this.publishCompetition(g));
+  }
+
+  /**
+   * Пересинхронизация (новый ведущий узел, восстановленное прослушивание): изменения, записанные, пока ленту никто
+   * не слушал, не пришли. Служебным экранам действующих турниров — «перечитать всё», табло — состояние ковров и
+   * идущих схваток заново.
+   */
+  async resyncAll(): Promise<void> {
+    const competitions = await this.db.competition.findMany({
+      where: { deletedAt: null, status: { in: [...ACTIVE_STATUSES] } },
+      select: { id: true, status: true },
+    });
+    for (const c of competitions) {
+      const operating = (OPERATING_STATUSES as readonly string[]).includes(c.status);
+      await this.safely(async () => {
+        const live = operating
+          ? await this.db.match.findMany({
+              where: { competitionId: c.id, status: { in: [...LIVE_MATCH_STATUSES] } },
+              select: { id: true },
+            })
+          : [];
+        await this.publishCompetition({
+          competitionId: c.id,
+          topics: new Set(LIVE_TOPICS),
+          categoryIds: new Set(),
+          matIds: new Set(),
+          matchIds: new Set(live.map((m) => m.id)),
+          statusMatchIds: new Set(),
+          deletedMatchIds: new Set(),
+          allMats: operating,
+        });
+      });
+    }
+  }
+
+  /** Сбой одной проекции (запрос к БД) не мешает остальным каналам пачки. */
+  private async safely(fn: () => Promise<void>): Promise<void> {
+    try {
+      await fn();
+    } catch (err) {
+      this.logger.warn({ err }, 'Live publication skipped');
+    }
   }
 
   private async publishCompetition(g: CompetitionChanges): Promise<void> {
@@ -60,16 +129,7 @@ export class LiveRouterService {
   private async targets(g: CompetitionChanges): Promise<{ matches: TouchedMatch[]; mats: string[] }> {
     const touched = [...g.matchIds].filter((id) => !g.deletedMatchIds.has(id));
     const matches = touched.length
-      ? await this.db.match.findMany({
-          where: { id: { in: touched } },
-          select: {
-            id: true,
-            publicId: true,
-            status: true,
-            matId: true,
-            schedule: { select: { matId: true } },
-          },
-        })
+      ? await this.db.match.findMany({ where: { id: { in: touched } }, select: TOUCHED_SELECT })
       : [];
     if (g.allMats) {
       const all = await this.db.mat.findMany({
@@ -122,26 +182,30 @@ export class LiveRouterService {
         type: 'changed',
         payload: { topics, categoryIds: [], matIds: [], matchIds: [] },
       });
-    for (const matId of mats) {
-      const state = await this.scoreboard.matStateById(matId);
-      if (state)
-        await this.publisher.publish({
-          channel: state.channel,
-          type: 'mat.state',
-          payload: state,
-          retain: true,
-        });
-    }
+    for (const matId of mats)
+      await this.safely(async () => {
+        const state = await this.scoreboard.matStateById(matId);
+        if (state)
+          await this.publisher.publish({
+            channel: state.channel,
+            type: 'mat.state',
+            payload: state,
+            retain: true,
+          });
+      });
+    const now = Date.now();
     for (const m of matches) {
-      if (!PUBLIC_MATCH_STATUSES.has(m.status)) continue;
-      const state = await this.scoreboard.matchState(m.publicId);
-      if (state)
-        await this.publisher.publish({
-          channel: liveChannel.publicMatch(m.publicId),
-          type: 'match.state',
-          payload: state,
-          retain: true,
-        });
+      if (!watched(m, now)) continue;
+      await this.safely(async () => {
+        const state = await this.scoreboard.matchState(m.publicId);
+        if (state)
+          await this.publisher.publish({
+            channel: liveChannel.publicMatch(m.publicId),
+            type: 'match.state',
+            payload: state,
+            retain: true,
+          });
+      });
     }
   }
 }

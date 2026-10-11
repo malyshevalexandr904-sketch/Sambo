@@ -1,7 +1,9 @@
 // Лента изменений для живых данных (Phase 8a; ARCHITECTURE.md, 13): уведомления PostgreSQL `sde_live` (триггер на
 // журнале синхронизации, приходят только после commit) → пачки → LiveRouterService. Узлов api может быть
-// несколько: публикует ведущий (блокировка в Redis с продлением), раздают сообщения все. Пока ведущий
-// меняется, сообщения могут потеряться — экраны догонят запасным опросом.
+// несколько: публикует ведущий (блокировка в Redis с продлением), раздают сообщения все. Соединение прослушивания
+// проверяется запросом при каждом продлении: «тихий» обрыв (NAT, межсетевой экран) снимает роль ведущего. Новый
+// ведущий (в том числе после восстановления связи) пересинхронизирует действующие турниры — изменения, записанные,
+// пока ленту никто не слушал, экраны получают «перечитать всё».
 import {
   Inject,
   Injectable,
@@ -21,6 +23,8 @@ export const LIVE_PG_CHANNEL = 'sde_live';
 const LEADER_KEY = 'sde:live:leader';
 const LEADER_TTL_MS = 10_000;
 const LEADER_RENEW_MS = 3_000;
+/** Проверка соединения прослушивания: не ответило — соединение считается потерянным. */
+const HEALTH_TIMEOUT_MS = 5_000;
 /** Окно сбора пачки: изменения одной команды приходят вместе и публикуются одним сообщением. */
 const BATCH_WINDOW_MS = 40;
 const BATCH_MAX = 1_000;
@@ -71,6 +75,10 @@ export class ChangeFeedService implements OnApplicationBootstrap, OnModuleDestro
   private reconnectTimer: NodeJS.Timeout | null = null;
   private reconnectDelay = 1_000;
   private flushing: Promise<void> | null = null;
+  private resyncing: Promise<void> | null = null;
+  private checking: Promise<void> | null = null;
+  /** Последнее успешное продление (или захват) блокировки ведущего. */
+  private renewedAt = 0;
 
   constructor(
     @Inject(ENV) private readonly env: Env,
@@ -113,22 +121,29 @@ export class ChangeFeedService implements OnApplicationBootstrap, OnModuleDestro
   async ensureLeadership(): Promise<boolean> {
     await this.leadership();
     if (!this.leader) await this.leadership();
+    await this.resyncing;
     return this.leader;
   }
 
-  /** Дождаться публикации накопленных изменений (тесты и плавная остановка). */
+  /** Дождаться публикации накопленных изменений и пересинхронизации (тесты и плавная остановка). */
   async drain(): Promise<void> {
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
       this.flushTimer = null;
       this.flush();
     }
-    while (this.flushing) await this.flushing;
+    while (this.flushing || this.resyncing) await (this.flushing ?? this.resyncing);
   }
 
   private async connect(): Promise<void> {
     if (this.stopped) return;
-    const client = new Client({ connectionString: this.env.DATABASE_URL, application_name: 'sde-live' });
+    const client = new Client({
+      connectionString: this.env.DATABASE_URL,
+      application_name: 'sde-live',
+      // TCP keepalive: соединение, которое долго молчит, не закрывает NAT или межсетевой экран.
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
+    });
     client.on('notification', (n: Notification) => this.onNotification(n));
     client.on('error', (err) => this.onConnectionLost(client, err));
     client.on('end', () => this.onConnectionLost(client, null));
@@ -167,30 +182,80 @@ export class ChangeFeedService implements OnApplicationBootstrap, OnModuleDestro
     this.reconnectDelay = Math.min(this.reconnectDelay * 2, 30_000);
   }
 
-  private async leadership(): Promise<void> {
+  /** Проверки не накладываются: продление по таймеру и `ensureLeadership` ждут одну и ту же. */
+  private leadership(): Promise<void> {
+    this.checking ??= this.checkLeadership().finally(() => {
+      this.checking = null;
+    });
+    return this.checking;
+  }
+
+  private async checkLeadership(): Promise<void> {
     if (this.stopped) return;
+    // Продления не было дольше срока блокировки (Redis недоступен, процесс стоял): её мог занять другой узел.
+    if (this.leader && Date.now() - this.renewedAt >= LEADER_TTL_MS) this.loseLeadership('expired');
+    if (!(await this.healthy())) {
+      if (this.leader) await this.release();
+      return;
+    }
     try {
-      if (!this.listening) {
-        if (this.leader) await this.release();
-        return;
-      }
       if (this.leader) {
         const renewed = await this.redis.eval(RENEW_SCRIPT, 1, LEADER_KEY, this.nodeId, LEADER_TTL_MS);
-        if (Number(renewed) !== 1) {
-          this.leader = false;
-          this.logger.warn('Live feed: leadership lost');
-        }
+        if (Number(renewed) === 1) this.renewedAt = Date.now();
+        else this.loseLeadership('taken');
         return;
       }
       const acquired = await this.redis.set(LEADER_KEY, this.nodeId, 'PX', LEADER_TTL_MS, 'NX');
       if (acquired === 'OK') {
         this.leader = true;
+        this.renewedAt = Date.now();
         this.router.reset();
         this.logger.log('Live feed: this node publishes live updates');
+        this.resync();
       }
     } catch (err) {
+      // Продлить не удалось — публикацию прекращаем: иначе после истечения блокировки ведущих станет двое.
+      if (this.leader) this.loseLeadership('renew failed');
       this.logger.warn({ err }, 'Live feed: leadership check failed');
     }
+  }
+
+  private loseLeadership(why: string): void {
+    this.leader = false;
+    this.buffer = [];
+    this.logger.warn({ why }, 'Live feed: leadership lost');
+  }
+
+  /** Соединение прослушивания живо: отвечает на запрос. Не ответило — переподключение. */
+  private async healthy(): Promise<boolean> {
+    const client = this.client;
+    if (!this.listening || !client) return false;
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        client.query('SELECT 1'),
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('health check timeout')), HEALTH_TIMEOUT_MS);
+        }),
+      ]);
+      return true;
+    } catch (err) {
+      this.onConnectionLost(client, err instanceof Error ? err : null);
+      return false;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /** Пересинхронизация действующих турниров — одна за раз, вслед за ней публикуются накопленные изменения. */
+  private resync(): void {
+    if (this.resyncing) return;
+    this.resyncing = this.router
+      .resyncAll()
+      .catch((err: unknown) => this.logger.error({ err }, 'Live feed: resync failed'))
+      .finally(() => {
+        this.resyncing = null;
+      });
   }
 
   private async release(): Promise<void> {

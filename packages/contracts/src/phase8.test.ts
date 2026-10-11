@@ -40,6 +40,8 @@ describe('live channels', () => {
       'user:other-id',
       'ops:competition:not-a-uuid',
       'public:mat:kubok:0',
+      'public:mat:kubok:01',
+      'public:mat:kubok:1000',
       'public:mat:Kubok:1',
       'public:mat:kubok:1:extra',
       'ops:mat:*',

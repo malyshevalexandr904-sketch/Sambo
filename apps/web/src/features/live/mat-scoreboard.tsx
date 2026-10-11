@@ -17,11 +17,13 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatClock, useRefereeLabels } from '@/features/refereeing/labels';
 import { useRoundLabel } from '@/features/scheduling/shared';
-import { liveClient, useLiveChannel, useLiveStatus } from '@/lib/live';
+import { liveClient, useChannelHealth, useLiveChannel, useLiveStatus } from '@/lib/live';
 import { pickName } from '@/lib/queries';
 import { mergeMatState, type ScoreboardView, scoreboardView, upNext } from './scoreboard-state';
 
 const POLL_MS = 5_000;
+/** При живом соединении — сверка со снимком раз в минуту (тихий обрыв ленты на сервере, смена номера ковра). */
+const RESYNC_MS = 60_000;
 const TICK_MS = 200;
 
 const SIDE_STYLE: Record<Side, { panel: string; accent: string; win: string }> = {
@@ -312,19 +314,27 @@ export function MatScoreboard({ matId }: { matId: string }) {
   useEffect(() => {
     void load();
   }, [load]);
-  // Запасной опрос: пока живого соединения нет (сеть зала режет WebSocket, сервер перезапускается).
+  const channel = state?.channel ?? null;
+  const health = useChannelHealth(channel);
+  // Запасной опрос: пока канал табло не работает (сеть зала режет WebSocket, сервер перезапускается) — часто;
+  // при живом канале — сверка раз в минуту.
   useEffect(() => {
-    if (online) return;
-    const id = setInterval(() => void load(), POLL_MS);
+    const id = setInterval(() => void load(), health === 'live' ? RESYNC_MS : POLL_MS);
     return () => clearInterval(id);
-  }, [online, load]);
+  }, [health, load]);
 
-  useLiveChannel(state?.channel ?? null, (e) => {
-    if (e.kind === 'message' && e.message.type === 'mat.state')
-      setState((prev) => mergeMatState(prev, e.message.payload as PublicMatStateDto));
+  /** Состояние из канала — только этого ковра (номер ковра мог смениться: канал тогда перечитывается). */
+  const apply = (incoming: PublicMatStateDto): void => {
+    if (incoming.mat.id !== matId) {
+      void load();
+      return;
+    }
+    setState((prev) => mergeMatState(prev, incoming));
+  };
+  useLiveChannel(channel, (e) => {
+    if (e.kind === 'message' && e.message.type === 'mat.state') apply(e.message.payload as PublicMatStateDto);
     else if (e.kind === 'resync') {
-      if (e.snapshot?.type === 'mat.state')
-        setState((prev) => mergeMatState(prev, e.snapshot?.payload as PublicMatStateDto));
+      if (e.snapshot?.type === 'mat.state') apply(e.snapshot.payload as PublicMatStateDto);
       else void load();
     } else if (e.kind === 'error' && e.code === 'NOT_FOUND') setNotFound(true);
   });
@@ -336,6 +346,8 @@ export function MatScoreboard({ matId }: { matId: string }) {
   }, []);
 
   const serverNow = useServerNow(restOffset, online);
+  // «В эфире» — канал табло работает, а не просто есть соединение.
+  const onAir = health === 'live';
 
   if (notFound)
     return (
@@ -366,15 +378,15 @@ export function MatScoreboard({ matId }: { matId: string }) {
           <span
             className={cn(
               'inline-flex items-center gap-[0.5vw] text-[min(2.4vh,1.6vw)]',
-              online ? 'text-emerald-300' : 'text-amber-300',
+              onAir ? 'text-emerald-300' : 'text-amber-300',
             )}
             role="status"
           >
             <span
               aria-hidden="true"
-              className={cn('h-[1.4vh] w-[1.4vh] rounded-full', online ? 'bg-emerald-400' : 'bg-amber-400')}
+              className={cn('h-[1.4vh] w-[1.4vh] rounded-full', onAir ? 'bg-emerald-400' : 'bg-amber-400')}
             />
-            {online ? t('online') : t('offline')}
+            {onAir ? t('online') : t('offline')}
           </span>
           {!fullscreen ? (
             <button

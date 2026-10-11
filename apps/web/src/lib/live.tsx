@@ -14,7 +14,7 @@ import { type QueryKey, useQueryClient } from '@tanstack/react-query';
 import { io } from 'socket.io-client';
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { refreshSession } from './api';
-import { LiveClient, type LiveEvent, type LiveStatus } from './live-client';
+import { type ChannelHealth, LiveClient, type LiveEvent, type LiveStatus } from './live-client';
 
 let client: LiveClient | null = null;
 
@@ -24,14 +24,21 @@ export function liveClient(): LiveClient {
       io(LIVE_NAMESPACE, {
         path: LIVE_PATH,
         addTrailingSlash: false,
-        // Сначала WebSocket; где он закрыт (прокси, сеть зала) — long polling.
+        // Сначала WebSocket; где он закрыт (прокси, сеть зала) — long polling. Без tryAllTransports
+        // engine.io-client после неудачи WebSocket следующий транспорт не пробует.
         transports: ['websocket', 'polling'],
+        tryAllTransports: true,
         withCredentials: true,
         reconnectionDelayMax: 10_000,
       }),
     refresh: refreshSession,
   });
   return client;
+}
+
+/** Закрыть соединение: выход и вход (соединение не должно пережить смену пользователя во вкладке). */
+export function closeLive(): void {
+  client?.close();
 }
 
 /** Состояние соединения: «online» — данные приходят сразу. */
@@ -43,13 +50,21 @@ export function useLiveStatus(): LiveStatus {
   );
 }
 
+/** Здоровье канала экрана (`live` — изменения приходят сразу; `down` — связи нет или подписка отклонена). */
+export function useChannelHealth(channel: string | null): ChannelHealth {
+  return useSyncExternalStore(
+    (fn) => liveClient().onStatus(fn),
+    () => (channel ? liveClient().channelHealth(channel) : 'down'),
+    () => 'pending',
+  );
+}
+
 /**
- * Интервал запасного опроса: при живом соединении — `onlineMs` (по умолчанию раз в минуту; не чаще, чем экран
- * опрашивает без связи), без связи — прежний интервал экрана.
+ * Интервал запасного опроса экрана, который обновляется по каналу `channel`: пока канал работает — `onlineMs`
+ * (по умолчанию раз в минуту; не чаще, чем экран опрашивает без связи), иначе — прежний интервал экрана.
  */
-export function useLiveInterval(offlineMs: number, onlineMs = 60_000): number {
-  const status = useLiveStatus();
-  return status === 'online' ? Math.max(offlineMs, onlineMs) : offlineMs;
+export function useLiveInterval(channel: string | null, offlineMs: number, onlineMs = 60_000): number {
+  return useChannelHealth(channel) === 'live' ? Math.max(offlineMs, onlineMs) : offlineMs;
 }
 
 /** Подписка экрана на канал; `channel = null` — без подписки. */
@@ -66,12 +81,15 @@ export function useLiveChannel(channel: string | null, onEvent: (e: LiveEvent) =
  * Канал изменений → обновить запросы. Сообщения за 250 мс складываются в одно обновление; после пропуска
  * (`resync`) обновляется всё, что канал покрывает.
  */
+/** Что обновить: запросы с этим префиксом ключа или (`exact`) ровно этот запрос. */
+export type LiveTarget = QueryKey | { exact: QueryKey };
+
 export function useLiveInvalidate(
   channel: string | null,
-  keysFor: (payload: LiveChangedPayload | null) => QueryKey[],
+  keysFor: (payload: LiveChangedPayload | null) => LiveTarget[],
 ): void {
   const qc = useQueryClient();
-  const pending = useRef<{ keys: QueryKey[]; timer: ReturnType<typeof setTimeout> | null }>({
+  const pending = useRef<{ keys: LiveTarget[]; timer: ReturnType<typeof setTimeout> | null }>({
     keys: [],
     timer: null,
   });
@@ -94,11 +112,12 @@ export function useLiveInvalidate(
       p.keys = [];
       p.timer = null;
       const seen = new Set<string>();
-      for (const queryKey of keys) {
-        const id = JSON.stringify(queryKey);
+      for (const target of keys) {
+        const id = JSON.stringify(target);
         if (seen.has(id)) continue;
         seen.add(id);
-        void qc.invalidateQueries({ queryKey });
+        if ('exact' in target) void qc.invalidateQueries({ queryKey: target.exact, exact: true });
+        else void qc.invalidateQueries({ queryKey: target });
       }
     }, 250);
   });
@@ -107,13 +126,40 @@ export function useLiveInvalidate(
 const DAY_TOPICS: readonly LiveTopic[] = ['matches', 'schedule', 'crews', 'results', 'draws', 'categories'];
 
 /**
- * Запросы, которые затрагивает изменение турнира: всё под `['competitions', id]`, а изменения дня соревнований —
- * ещё ковры, схватки, сетки категорий и жеребьёвки; итоги — история спортсменов. Обновляются только открытые
- * экраны (TanStack Query перечитывает активные запросы, остальные помечает устаревшими).
+ * Разделы турнира (`['competitions', id, раздел]`), которые затрагивает тема. Изменения турнира и участий
+ * затрагивают всё. Взвешивание или прибытие не заставляют перечитывать «Судейство», а оценка — экран взвешивания.
  */
-export function competitionKeys(competitionId: string, payload: LiveChangedPayload | null): QueryKey[] {
+const TOPIC_SECTIONS: Record<Exclude<LiveTopic, 'competition' | 'registrations'>, readonly string[]> = {
+  categories: ['categories', 'draws', 'results', 'entries', 'eligible', 'officiating'],
+  admission: ['admission', 'entries', 'draws', 'check-in', 'weigh-in'],
+  checkin: ['check-in', 'admission', 'weigh-in'],
+  weighin: ['weigh-in', 'scales', 'weigh-in-windows', 'admission', 'entries'],
+  draws: ['draws', 'categories', 'results', 'schedule', 'officiating', 'pending-confirmations'],
+  schedule: ['schedule', 'sessions', 'mats', 'officiating', 'pending-confirmations'],
+  crews: ['mat-assignments', 'crew-candidates', 'officiating'],
+  matches: ['officiating', 'pending-confirmations', 'results', 'draws', 'schedule'],
+  results: ['results', 'draws', 'categories'],
+};
+
+/**
+ * Запросы, которые затрагивает изменение турнира: карточка турнира (счётчики, статусы, доступные действия) и
+ * разделы по темам; изменения дня соревнований — ещё ковры, схватки, сетки категорий и жеребьёвки; итоги — история
+ * спортсменов. Обновляются только открытые экраны (TanStack Query перечитывает активные запросы, остальные
+ * помечает устаревшими).
+ */
+export function competitionKeys(competitionId: string, payload: LiveChangedPayload | null): LiveTarget[] {
   const topics = new Set<LiveTopic>(payload?.topics ?? LIVE_TOPICS);
-  const keys: QueryKey[] = [['competitions', competitionId]];
+  const base = ['competitions', competitionId] as const;
+  const keys: LiveTarget[] = [];
+  if (topics.has('competition') || topics.has('registrations')) keys.push([...base]);
+  else {
+    keys.push({ exact: [...base] });
+    const sections = new Set<string>();
+    for (const t of topics)
+      if (t in TOPIC_SECTIONS)
+        for (const x of TOPIC_SECTIONS[t as keyof typeof TOPIC_SECTIONS]) sections.add(x);
+    for (const x of sections) keys.push([...base, x]);
+  }
   if (DAY_TOPICS.some((t) => topics.has(t))) keys.push(['mats'], ['matches'], ['categories'], ['draws']);
   if (topics.has('results')) keys.push(['athletes']);
   if (topics.has('registrations') || topics.has('admission'))

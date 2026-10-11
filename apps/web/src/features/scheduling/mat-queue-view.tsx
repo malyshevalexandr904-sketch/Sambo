@@ -3,13 +3,13 @@
 // (вызвана, идёт, пауза) и счётом, ожидаемое время следующих с учётом опоздания ковра, сыгранные схватки, ждущие
 // подтверждения. Плановое время расписания не переписывается. Изменения ковра приходят сразу (Phase 8a), без
 // живого соединения — каждые 15 секунд; ссылка на табло ковра для экрана в зале.
-import type { MatQueueItemDto } from '@sde/contracts';
+import { liveChannel, type MatQueueItemDto } from '@sde/contracts';
 import { Badge, cn, EmptyState, Spinner } from '@sde/ui';
 import { useLocale, useTranslations } from 'next-intl';
 import { QueryState } from '@/components/common';
 import { useCompetition } from '@/features/competitions/shared';
 import { Link } from '@/i18n/navigation';
-import { useLiveStatus } from '@/lib/live';
+import { useChannelHealth } from '@/lib/live';
 import { pickName } from '@/lib/queries';
 import { timeInZone, useMatQueue, useRoundLabel } from './shared';
 
@@ -87,7 +87,7 @@ export function MatQueueView({ matId, timezone }: { matId: string; timezone: str
   const t = useTranslations('scheduling.queue');
   const tr = useTranslations('referee');
   const query = useMatQueue(matId);
-  const live = useLiveStatus();
+  const live = useChannelHealth(liveChannel.opsMat(matId));
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
       <QueryState isPending={query.isPending} error={query.error}>
@@ -102,8 +102,8 @@ export function MatQueueView({ matId, timezone }: { matId: string; timezone: str
                 </h1>
                 <div className="flex items-center gap-2">
                   <Badge tone="info">
-                    {live === 'online' ? null : <Spinner className="h-3 w-3" />}{' '}
-                    {live === 'online' ? t('liveRefresh') : t('autoRefresh')}
+                    {live === 'live' ? null : <Spinner className="h-3 w-3" />}{' '}
+                    {live === 'live' ? t('liveRefresh') : t('autoRefresh')}
                   </Badge>
                   <Link
                     href={`/scoreboard/mat/${matId}`}

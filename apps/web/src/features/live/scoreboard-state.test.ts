@@ -34,6 +34,17 @@ const state = (p: Partial<PublicMatStateDto>): PublicMatStateDto => ({
 });
 
 describe('mergeMatState', () => {
+  it('ignores a state computed before the shown one (a stale snapshot after a fresh REST answer)', () => {
+    const shown = state({ current: match({ publicId: 'm2', status: 'READY', version: 1, seq: 0 }) });
+    const stale = state({
+      current: match({ publicId: 'm1', seq: 9 }),
+      serverTime: new Date(NOW - 2_000).toISOString(),
+    });
+    expect(mergeMatState(shown, stale)).toBe(shown);
+    const fresh = state({ current: match({ publicId: 'm3' }), serverTime: new Date(NOW + 1).toISOString() });
+    expect(mergeMatState(shown, fresh)).toBe(fresh);
+  });
+
   it('keeps the newer state of the same match when an older one arrives late', () => {
     const shown = state({ current: match({ seq: 7 }) });
     const late = state({ current: match({ seq: 6 }), next: match({ publicId: 'm2', status: 'SCHEDULED' }) });

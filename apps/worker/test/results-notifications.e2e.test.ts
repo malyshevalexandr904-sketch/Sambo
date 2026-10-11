@@ -269,6 +269,32 @@ async function world(): Promise<World> {
 
 const job = <T>(data: T) => ({ data, attemptsMade: 0, opts: { attempts: 5 } }) as unknown as Job<T>;
 
+/** Событие «результаты категории опубликованы» и его обработка потребителем уведомлений. */
+async function publishResults(w: World): Promise<FakeLive> {
+  const live = new FakeLive();
+  const consumer = new NotificationConsumer(
+    db,
+    new FakeMailer(),
+    new FakeQueue() as unknown as Queue<NotificationJob>,
+    logger,
+    env,
+    live as unknown as LivePublisher,
+  );
+  const eventId = uuidv7();
+  await db.outboxEvent.create({
+    data: {
+      id: eventId,
+      type: 'category.results_published',
+      aggregateType: 'CompetitionCategory',
+      aggregateId: w.categoryId,
+      competitionId: w.competitionId,
+      payload: { categoryId: w.categoryId, competitionId: w.competitionId },
+    },
+  });
+  await consumer.handle(job({ eventId, type: 'category.results_published', traceId: null }));
+  return live;
+}
+
 describe('results published', () => {
   it('notifies the club once, the verified guardian and the athlete with an account; live channel and email', async () => {
     const w = await world();
@@ -327,5 +353,45 @@ describe('results published', () => {
     expect(mailer.sent.map((m) => m.email.text).join('\n')).not.toMatch(/Иванов|Петров|GOLD|золото/);
     const toMother = mailer.sent.find((m) => m.to === 'mother@family.test');
     expect(toMother?.email.text).toContain(`https://sambo.test/ru/athletes/${w.athleteA}`);
+  });
+
+  it('leaves out a user who left the club and a blocked guardian; a coach who is also a guardian gets one', async () => {
+    const w = await world();
+    const yesterday = new Date(Date.now() - 2 * 86_400_000);
+    await db.organizationMembership.updateMany({
+      where: { userId: w.manager },
+      data: { validTo: yesterday },
+    });
+    await db.user.update({ where: { id: w.guardianUser }, data: { status: 'BLOCKED' } });
+    const coachPerson = uuidv7();
+    await db.person.create({
+      data: {
+        id: coachPerson,
+        lastName: 'Сидоров',
+        firstName: 'Тест',
+        birthDate: new Date('1980-01-01'),
+        gender: 'MALE',
+      },
+    });
+    await db.user.update({ where: { id: w.coach }, data: { personId: coachPerson } });
+    await db.guardian.create({
+      data: {
+        id: uuidv7(),
+        athleteId: w.athleteB,
+        guardianPersonId: coachPerson,
+        relation: 'OTHER',
+        verifiedAt: new Date(),
+        verificationBasis: 'DOCUMENT_SHOWN',
+      },
+    });
+    const live = await publishResults(w);
+    const rows = await db.notification.findMany({ where: { type: 'results.published' } });
+    expect(rows.map((r) => r.userId).sort()).toEqual([w.coach, w.selfUser].sort());
+    // Тренер — два спортсмена (клуб) и представитель одного из них: одно уведомление, ссылка на турнир.
+    expect(rows.find((r) => r.userId === w.coach)?.params).toEqual({
+      competitionId: w.competitionId,
+      categoryId: w.categoryId,
+    });
+    expect(live.published).toHaveLength(2);
   });
 });

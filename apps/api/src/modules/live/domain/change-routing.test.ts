@@ -1,5 +1,13 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { BoundedVersionMemory, type ChangeRow, changedPayload, groupChanges } from './change-routing';
+import {
+  BoundedVersionMemory,
+  type ChangeRow,
+  changedPayload,
+  groupChanges,
+  TABLE_TOPICS,
+} from './change-routing';
 
 const C1 = '01920000-0000-7000-8000-000000000001';
 const C2 = '01920000-0000-7000-8000-000000000002';
@@ -102,5 +110,25 @@ describe('BoundedVersionMemory', () => {
     memory.sameVersion('c', 1);
     expect(memory.sameVersion('a', 1)).toBe(false);
     expect(memory.sameVersion('c', 1)).toBe(true);
+  });
+});
+
+describe('TABLE_TOPICS', () => {
+  it('covers exactly the tables whose changes reach the sync log (and so the live feed)', () => {
+    const dir = path.resolve(__dirname, '../../../../../../packages/db/prisma/migrations');
+    const triggers = new Set<string>();
+    for (const m of readdirSync(dir)) {
+      const file = path.join(dir, m, 'migration.sql');
+      let sql = '';
+      try {
+        sql = readFileSync(file, 'utf8');
+      } catch {
+        continue;
+      }
+      for (const [, table] of sql.matchAll(/CREATE TRIGGER "\w+_sync_log"\s+AFTER [A-Z ]+ ON "(\w+)"/g))
+        triggers.add(table as string);
+    }
+    expect(triggers.size).toBeGreaterThan(20);
+    expect(Object.keys(TABLE_TOPICS).sort()).toEqual([...triggers].sort());
   });
 });

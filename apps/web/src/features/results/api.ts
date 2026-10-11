@@ -31,7 +31,7 @@ export const resultKeys = {
 };
 
 export function useCompetitionResults(competitionId: string) {
-  const refetchInterval = useLiveInterval(15_000);
+  const refetchInterval = useLiveInterval(liveChannel.opsCompetition(competitionId), 15_000);
   return useQuery({
     queryKey: resultKeys.competition(competitionId),
     queryFn: async () =>
@@ -61,8 +61,8 @@ export function useAthleteHistory(athleteId: string) {
  * опрос каждые 5 секунд.
  */
 export function useMatch(matchId: string) {
-  const live = useLiveInterval(5_000);
-  const idle = useLiveInterval(15_000);
+  const live = useLiveInterval(liveChannel.opsMatch(matchId), 5_000);
+  const idle = useLiveInterval(liveChannel.opsMatch(matchId), 15_000);
   useLiveInvalidate(liveChannel.opsMatch(matchId), () => [
     resultKeys.match(matchId),
     resultKeys.incidents(matchId),

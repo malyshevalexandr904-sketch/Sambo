@@ -68,7 +68,7 @@ export function useCrewCandidates(competitionId: string) {
  * соединения — опрос каждые 15 секунд.
  */
 export function useMatQueue(matId: string) {
-  const refetchInterval = useLiveInterval(15_000);
+  const refetchInterval = useLiveInterval(liveChannel.opsMat(matId), 15_000);
   useLiveInvalidate(liveChannel.opsMat(matId), () => [schedulingKeys.matQueue(matId)]);
   return useQuery({
     queryKey: schedulingKeys.matQueue(matId),

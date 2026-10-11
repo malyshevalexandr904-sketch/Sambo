@@ -11,7 +11,7 @@ import { useLiveInterval, useLiveInvalidate } from '@/lib/live';
 export const UNREAD_KEY = ['me', 'notifications', 'unread'] as const;
 
 export function useUnreadCount() {
-  const refetchInterval = useLiveInterval(60_000, 5 * 60_000);
+  const refetchInterval = useLiveInterval(liveChannel.user, 60_000, 5 * 60_000);
   useLiveInvalidate(liveChannel.user, () => [['me', 'notifications']]);
   return useQuery({
     queryKey: UNREAD_KEY,

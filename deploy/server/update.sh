@@ -19,10 +19,6 @@ trap 'printf "\n\033[1;31mОшибка в строке %s. Сайт продол
 step "Резервная копия перед обновлением"
 bash "$DIR/backup.sh"
 
-# Caddyfile подключён в контейнер отдельным файлом: после git pull Caddy видит прежний файл, пока контейнер не
-# перезапущен (маршрут /ws для живых данных — Phase 8a). Перезапуск — только если конфигурация изменилась.
-caddy_before="$(sha256sum "$DIR/Caddyfile" | cut -d' ' -f1)"
-
 if [ "${1:-}" != "--no-pull" ]; then
   step "Новая версия из GitHub"
   git -C "$REPO" pull --ff-only
@@ -36,7 +32,12 @@ step "Сборка"
 
 step "Миграции и перезапуск"
 "${COMPOSE[@]}" up -d --remove-orphans
-if [ "$(sha256sum "$DIR/Caddyfile" | cut -d' ' -f1)" != "$caddy_before" ]; then
+# Caddyfile подключён в контейнер отдельным файлом: после git pull Caddy видит прежний файл, пока контейнер не
+# перезапущен (маршрут /ws для живых данных — Phase 8a). Сравнивается с тем, что видит сам Caddy, — так изменение
+# не потеряется, даже если прошлое обновление скачало его и остановилось на сборке.
+caddy_file="$(sha256sum "$DIR/Caddyfile" | cut -d' ' -f1)"
+caddy_live="$("${COMPOSE[@]}" exec -T caddy cat /etc/caddy/Caddyfile 2>/dev/null | sha256sum | cut -d' ' -f1 || true)"
+if [ "$caddy_file" != "$caddy_live" ]; then
   echo "    Маршруты Caddy изменились — перезапуск Caddy (сертификаты сохраняются)"
   "${COMPOSE[@]}" restart caddy
 fi

@@ -109,14 +109,15 @@ async function familyRecipients(
         where: { athleteId: { in: athleteIds }, verifiedAt: { not: null }, endedAt: null },
         select: {
           athleteId: true,
-          guardianPerson: { select: { user: { select: { id: true, status: true } } } },
+          guardianPerson: { select: { user: { select: { id: true, status: true, deletedAt: true } } } },
         },
       })
     : [];
   for (const g of guardians) {
     const u = g.guardianPerson.user;
     const entryId = entryOf.get(g.athleteId);
-    if (u?.status === 'ACTIVE' && entryId) addAthlete(out, u.id, g.athleteId, entryId);
+    if (u?.status === 'ACTIVE' && u.deletedAt === null && entryId)
+      addAthlete(out, u.id, g.athleteId, entryId);
   }
   const byPerson = new Map(placements.map((p) => [p.entry.athlete.personId, p.entry]));
   const selves = byPerson.size

@@ -23,7 +23,7 @@ export const refereeKeys = {
 };
 
 export function useOfficiating(competitionId: string) {
-  const refetchInterval = useLiveInterval(10_000);
+  const refetchInterval = useLiveInterval(liveChannel.opsCompetition(competitionId), 10_000);
   return useQuery({
     queryKey: refereeKeys.officiating(competitionId),
     queryFn: async () =>
@@ -33,7 +33,7 @@ export function useOfficiating(competitionId: string) {
 }
 
 export function usePendingConfirmations(competitionId: string) {
-  const refetchInterval = useLiveInterval(10_000);
+  const refetchInterval = useLiveInterval(liveChannel.opsCompetition(competitionId), 10_000);
   return useQuery({
     queryKey: refereeKeys.pending(competitionId),
     queryFn: async () =>
@@ -51,7 +51,7 @@ export function usePendingConfirmations(competitionId: string) {
  * без живого соединения — опрос каждые 5 секунд.
  */
 export function useMatConsole(matId: string, paused: boolean) {
-  const interval = useLiveInterval(5_000);
+  const interval = useLiveInterval(liveChannel.opsMat(matId), 5_000);
   useLiveInvalidate(liveChannel.opsMat(matId), () => [refereeKeys.console(matId)]);
   return useQuery({
     queryKey: refereeKeys.console(matId),

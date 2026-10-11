@@ -19,6 +19,7 @@ import { z } from 'zod';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { applyFieldErrors, useErrorMessage, useFieldMessage } from '@/lib/errors';
+import { closeLive } from '@/lib/live';
 import { qk } from '@/lib/queries';
 
 /** Переход после входа — только на внутренний путь (защита от открытого редиректа). */
@@ -48,6 +49,8 @@ export function LoginForm() {
         body: values,
         noRefresh: true,
       });
+      // Соединение живых данных открывается заново — уже с cookie вошедшего пользователя.
+      closeLive();
       queryClient.setQueryData(qk.me, res.data);
       router.replace(safeNext(search.get('next')));
     } catch (e) {

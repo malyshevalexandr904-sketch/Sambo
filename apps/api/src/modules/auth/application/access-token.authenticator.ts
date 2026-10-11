@@ -26,9 +26,26 @@ export class AccessTokenAuthenticator {
   /** Ошибки — DomainError: TOKEN_EXPIRED, UNAUTHENTICATED, ACCOUNT_BLOCKED. */
   async authenticate(token: string, via: AuthUser['via']): Promise<Authenticated> {
     const claims = await this.jwt.verify(token);
-    if (!(await this.sessions.isActive(claims.sid))) throw new DomainError('UNAUTHENTICATED');
+    const { user, locale } = await this.load(claims.sub, claims.sid, via);
+    return { user, locale, expiresAt: claims.expiresAt };
+  }
+
+  /**
+   * Пользователь долгоживущего соединения (WebSocket) заново: сессия не отозвана, пользователь не заблокирован,
+   * версия прав — текущая. Новый объект: права, собранные для прежнего, не переиспользуются.
+   */
+  async reload(user: AuthUser): Promise<AuthUser> {
+    return (await this.load(user.id, user.sessionId, user.via)).user;
+  }
+
+  private async load(
+    userId: string,
+    sessionId: string,
+    via: AuthUser['via'],
+  ): Promise<{ user: AuthUser; locale: Locale }> {
+    if (!(await this.sessions.isActive(sessionId))) throw new DomainError('UNAUTHENTICATED');
     const user = await this.db.user.findUnique({
-      where: { id: claims.sub },
+      where: { id: userId },
       select: {
         id: true,
         status: true,
@@ -45,7 +62,7 @@ export class AccessTokenAuthenticator {
     return {
       user: {
         id: user.id,
-        sessionId: claims.sid,
+        sessionId,
         permissionsVersion: user.permissionsVersion,
         totpEnabled: user.totpEnabledAt !== null,
         personId: user.personId,
@@ -54,7 +71,6 @@ export class AccessTokenAuthenticator {
         via,
       },
       locale: user.locale === 'en' ? 'en' : 'ru',
-      expiresAt: claims.expiresAt,
     };
   }
 }

@@ -12,6 +12,7 @@ import {
   type UploadPurpose,
   type UploadTicket,
 } from '@sde/contracts';
+import { browserLock, coordinatedRefresh } from './session-refresh';
 
 export class ApiError extends Error {
   constructor(
@@ -52,17 +53,27 @@ async function ensureCsrf(): Promise<string> {
 
 let refreshPromise: Promise<boolean> | null = null;
 
-/** Одно обновление сессии на все запросы, получившие 401 одновременно (ротация refresh token строгая). */
+/**
+ * Одно обновление сессии на все запросы вкладки, получившие 401 одновременно, и одно на все вкладки браузера
+ * (ротация refresh token строгая — см. session-refresh.ts).
+ */
 export function refreshSession(): Promise<boolean> {
   refreshPromise ??= (async () => {
     try {
-      const csrf = await ensureCsrf();
-      const res = await fetch(`${BASE}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { [CSRF_HEADER]: csrf },
+      return await coordinatedRefresh({
+        withLock: browserLock,
+        sessionAlive: async () =>
+          (await fetch(`${BASE}/me`, { credentials: 'same-origin', cache: 'no-store' })).ok,
+        refresh: async () => {
+          const csrf = await ensureCsrf();
+          const res = await fetch(`${BASE}/auth/refresh`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { [CSRF_HEADER]: csrf },
+          });
+          return res.ok;
+        },
       });
-      return res.ok;
     } catch {
       return false;
     } finally {

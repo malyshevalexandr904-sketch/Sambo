@@ -8,6 +8,7 @@ import {
   type CheckInSummaryDto,
   type Competition,
   type DataEnvelope,
+  liveChannel,
   type Page,
 } from '@sde/contracts';
 import { Alert, Button, Card, CardTitle, EmptyState, Field, Input, Select } from '@sde/ui';
@@ -29,7 +30,7 @@ const newKey = (): string => crypto.randomUUID();
 
 function SummaryCard({ competitionId }: { competitionId: string }) {
   const t = useTranslations('checkin.summary');
-  const refetchInterval = useLiveInterval(30_000);
+  const refetchInterval = useLiveInterval(liveChannel.opsCompetition(competitionId), 30_000);
   const summary = useQuery({
     queryKey: ['competitions', competitionId, 'check-in', 'summary'],
     queryFn: async () =>

@@ -9,6 +9,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { hasAnywhere, platformHas } from '@/lib/access';
+import { closeLive } from '@/lib/live';
 import { useMe, useMyAthletes } from '@/lib/queries';
 import { NotificationBell } from '@/features/notifications/bell';
 import { Brand } from './brand';
@@ -114,6 +115,8 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
     try {
       await api('/auth/logout', { method: 'POST', noRefresh: true });
     } finally {
+      // Соединение живых данных — от имени вышедшего пользователя: закрыть, а не оставлять следующему.
+      closeLive();
       queryClient.clear();
       router.replace('/login');
     }
