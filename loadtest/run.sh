@@ -40,7 +40,7 @@ run() {
   taskset -c 1 node "$ROOT/loadtest/sample.mjs" "$API_PID" > "$OUT/res-$name.csv" &
   local sampler=$!
   sleep 1
-  env "$@" STAND="$OUT/stand.json" API=http://127.0.0.1:4001 \
+  env SOCKETS_PER_VU=200 SAMPLE_EVERY=10 "$@" STAND="$OUT/stand.json" API=http://127.0.0.1:4001 \
     taskset -c 1 "$K6" run --quiet --summary-export "$OUT/k6-$name.json" "$ROOT/loadtest/live.k6.js" > "$OUT/k6-$name.txt" 2>&1 || true
   kill "$sampler"
   psql "$ADMIN_URL" -qc 'ALTER TABLE sync_log ENABLE TRIGGER sync_log_notify'

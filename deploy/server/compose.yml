@@ -50,6 +50,10 @@ x-app-env: &app-env
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   RATE_LIMIT_ENABLED: 'true'
   WORKER_PORT: '4100'
+  # Web Push (Phase 8b): не заданы — ключи VAPID выводятся из AUTH_SECRET.
+  WEB_PUSH_VAPID_PUBLIC_KEY: ${WEB_PUSH_VAPID_PUBLIC_KEY:-}
+  WEB_PUSH_VAPID_PRIVATE_KEY: ${WEB_PUSH_VAPID_PRIVATE_KEY:-}
+  WEB_PUSH_SUBJECT: ${WEB_PUSH_SUBJECT:-}
   # Учебные данные (install.sh): пароль и секрет TOTP администратора — свои для этого сервера, не из README.
   SEED_PASSWORD: ${SEED_PASSWORD:-}
   SEED_ADMIN_TOTP_SECRET: ${SEED_ADMIN_TOTP_SECRET:-}
