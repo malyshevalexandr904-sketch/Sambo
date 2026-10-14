@@ -87,7 +87,14 @@ export class NotificationWriter {
     if (inserted.count === 0) return null;
     await tx.notificationDelivery.createMany({
       data: [
-        { id: uuidv7(), notificationId: id, channel: 'IN_APP', status: 'SENT', attempts: 1, sentAt: new Date() },
+        {
+          id: uuidv7(),
+          notificationId: id,
+          channel: 'IN_APP',
+          status: 'SENT',
+          attempts: 1,
+          sentAt: new Date(),
+        },
         { id: uuidv7(), notificationId: id, channel: 'EMAIL', status: email ? 'PENDING' : 'SKIPPED' },
         { id: uuidv7(), notificationId: id, channel: 'PUSH', status: push ? 'PENDING' : 'SKIPPED' },
       ],

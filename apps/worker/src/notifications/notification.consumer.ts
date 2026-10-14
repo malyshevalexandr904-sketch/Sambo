@@ -336,7 +336,8 @@ export class NotificationConsumer {
       created += stored.length;
     }
     await this.writer.enqueueDeliveries(due.map((d) => soonSourceKey(d.matchId)));
-    if (created > 0) this.logger.info({ competitionId, notifications: created }, 'Match soon notifications created');
+    if (created > 0)
+      this.logger.info({ competitionId, notifications: created }, 'Match soon notifications created');
   }
 
   /** Поминутный обход: проверка каждого турнира — своей задачей (сбой одного не мешает остальным, по одной на турнир). */

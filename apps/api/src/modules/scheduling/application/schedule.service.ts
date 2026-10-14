@@ -416,10 +416,13 @@ export class ScheduleService {
       await this.outbox.enqueue(tx, {
         type: 'schedule.changed',
         aggregate: { type: 'Schedule', id: competitionId },
-        payload: { competitionId, matchIds: chunk, timeChangedMatchIds: chunk.filter((id) => notice.has(id)) },
+        payload: {
+          competitionId,
+          matchIds: chunk,
+          timeChangedMatchIds: chunk.filter((id) => notice.has(id)),
+        },
         competitionId,
       });
     }
   }
-
 }
