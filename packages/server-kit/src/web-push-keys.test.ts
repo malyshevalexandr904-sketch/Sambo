@@ -47,7 +47,7 @@ describe('VAPID keys', () => {
     const keys = webPushKeys({
       ...base,
       WEB_PUSH_VAPID_PUBLIC_KEY: pub,
-      WEB_PUSH_VAPID_PRIVATE_KEY: jwk.d as string,
+      WEB_PUSH_VAPID_PRIVATE_KEY: jwk.d,
       WEB_PUSH_SUBJECT: 'https://digitalsambo.ru',
     });
     expect(keys).toEqual({ publicKey: pub, privateKey: jwk.d, subject: 'https://digitalsambo.ru' });
@@ -55,7 +55,7 @@ describe('VAPID keys', () => {
       webPushKeys({
         ...base,
         WEB_PUSH_VAPID_PUBLIC_KEY: webPushKeys(base).publicKey,
-        WEB_PUSH_VAPID_PRIVATE_KEY: jwk.d as string,
+        WEB_PUSH_VAPID_PRIVATE_KEY: jwk.d,
       }),
     ).toThrow(WebPushKeyError);
     expect(() => webPushKeys({ ...base, WEB_PUSH_SUBJECT: 'http://localhost' })).toThrow(WebPushKeyError);
