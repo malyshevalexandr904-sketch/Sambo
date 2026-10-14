@@ -43,12 +43,14 @@ function Devices() {
         <ul className="mt-1 divide-y divide-slate-100">
           {rows.map((d) => {
             const name = deviceName(d.userAgent);
+            const added = t('added', { date: formatDateTime(d.createdAt, locale) });
+            const label = name ? t('device', name) : t('unknownDevice');
             return (
               <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                 <div className="min-w-0 text-sm">
-                  <p className="font-medium">{name ? t('device', name) : t('unknownDevice')}</p>
+                  <p className="font-medium">{label}</p>
                   <p className="text-xs text-slate-500">
-                    {t('added', { date: formatDateTime(d.createdAt, locale) })}
+                    {added}
                     {d.lastUsedAt
                       ? ` · ${t('lastUsed', { date: formatDateTime(d.lastUsedAt, locale) })}`
                       : ''}
@@ -58,6 +60,7 @@ function Devices() {
                   size="sm"
                   variant="secondary"
                   disabled={action.busy}
+                  aria-label={t('removeDevice', { device: label, added })}
                   onClick={() =>
                     void action.run(async () => {
                       await api(`/me/push/subscriptions/${d.id}`, { method: 'DELETE' });

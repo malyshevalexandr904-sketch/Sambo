@@ -53,7 +53,9 @@ export class ScheduleAppendService {
         type: 'schedule.changed',
         aggregate: { type: 'Schedule', id: input.competitionId },
         competitionId: input.competitionId,
-        payload: { competitionId: input.competitionId, matchIds: [input.matchId] },
+        // Новая схватка: клубу — в сводку; семьям «изменилось время» не о чем (прежнего времени не было) — их
+        // предупредит «скоро выступает».
+        payload: { competitionId: input.competitionId, matchIds: [input.matchId], timeChangedMatchIds: [] },
       });
     return { plannedAt, orderInMat };
   }

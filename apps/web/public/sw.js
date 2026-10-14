@@ -11,11 +11,31 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-/** Только путь своего сайта: ссылка из сообщения не уводит на чужой адрес. */
-function safePath(url) {
-  if (typeof url !== 'string' || !url.startsWith('/') || url.startsWith('//') || url.includes('\\'))
-    return '/';
-  return url;
+/**
+ * Только адрес своего сайта: ссылка из сообщения не уводит на чужой. Проверяется уже разобранный адрес — разбор
+ * выбрасывает табуляции и переводы строк, и «/\t/evil.example» иначе стал бы чужим адресом.
+ */
+function safeUrl(url) {
+  try {
+    if (typeof url === 'string' && url.startsWith('/')) {
+      const u = new URL(url, self.location.origin);
+      if (u.origin === self.location.origin) return u.href;
+    }
+  } catch (e) {
+    // Неразборчивая ссылка — главная.
+  }
+  return new URL('/', self.location.origin).href;
+}
+
+/** Адрес из данных показанного уведомления (уже полный): только своего сайта. */
+function ownHref(href) {
+  try {
+    const u = new URL(href);
+    if (u.origin === self.location.origin) return u.href;
+  } catch (e) {
+    // Неразборчивый адрес — главная.
+  }
+  return new URL('/', self.location.origin).href;
 }
 
 function parse(event) {
@@ -37,7 +57,7 @@ self.addEventListener('push', (event) => {
     body: m ? m.body : '',
     icon: '/icons/icon-192.png',
     badge: '/icons/badge-96.png',
-    data: { url: safePath(m && m.url) },
+    data: { url: safeUrl(m && m.url) },
   };
   if (tag) {
     options.tag = tag;
@@ -46,26 +66,17 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
+// Нажатие: вкладка с этой страницей уже открыта — на неё; иначе — новое окно. Открытые вкладки приложения не
+// переходят сами: на них может быть недозаполненная форма.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
-  const target = new URL(safePath(data.url), self.location.origin).href;
+  const target = ownHref(data.url);
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      const own = windows.filter((c) => new URL(c.url).origin === self.location.origin);
-      const same = own.find((c) => c.url === target);
+      const same = windows.find((c) => c.url === target);
       if (same) return same.focus();
-      // Открытая вкладка приложения — перейти в ней; не вышло (вкладка не под этим service worker) — новое окно.
-      for (const c of own) {
-        if (!('navigate' in c)) continue;
-        try {
-          const moved = await c.navigate(target);
-          if (moved) return moved.focus();
-        } catch (e) {
-          // Следующая вкладка или новое окно.
-        }
-      }
       return self.clients.openWindow(target);
     })(),
   );

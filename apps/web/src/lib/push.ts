@@ -136,10 +136,20 @@ export async function disablePush(): Promise<void> {
   }
 }
 
-/** Выход: не дольше `ms` — выход из системы не ждёт медленный service worker. */
-export async function disablePushForLogout(ms = 3000): Promise<void> {
+/**
+ * Выход пользователя `userId` (не дольше `ms` — выход не ждёт медленный service worker). Своё устройство — подписка
+ * снимается и на сервере, и в браузере. Устройство другого пользователя (общий планшет семьи: push включил другой) —
+ * на сервере снимается только запись этого пользователя, если она есть; подписка браузера и отметка владельца
+ * остаются — владелец, войдя снова, получает push без повторного включения.
+ */
+export async function disablePushForLogout(userId: string, ms = 3000): Promise<void> {
   if (pushSupport() !== 'supported') return;
-  await Promise.race([disablePush().catch(() => undefined), new Promise((r) => setTimeout(r, ms))]);
+  const work = async (): Promise<void> => {
+    if (readOwner() === userId) return disablePush();
+    const sub = await currentSubscription();
+    if (sub) await api('/me/push/subscriptions', { method: 'DELETE', body: { endpoint: sub.endpoint } });
+  };
+  await Promise.race([work().catch(() => undefined), new Promise((r) => setTimeout(r, ms))]);
 }
 
 /**

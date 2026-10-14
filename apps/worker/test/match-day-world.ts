@@ -339,17 +339,26 @@ export async function finish(db: PrismaClient, matchId: string): Promise<void> {
   await db.match.update({ where: { id: matchId }, data: { status: 'FINISHED', finishedAt: new Date() } });
 }
 
-/** Сессия входа (семейство refresh-токенов): живая или завершённая выходом. */
-export async function loginSession(db: PrismaClient, userId: string, revoked = false): Promise<string> {
+/**
+ * Сессия входа (семейство refresh-токенов): живая, завершённая выходом, истёкшая без выхода (неделю назад) или
+ * истёкшая давно (40 дней назад — её удаляет ежедневная очистка).
+ */
+export async function loginSession(
+  db: PrismaClient,
+  userId: string,
+  state: 'live' | 'revoked' | 'expired' | 'expiredLongAgo' = 'live',
+): Promise<string> {
   const familyId = uuidv7();
+  const day = 86_400_000;
+  const expiresIn = { live: 30, revoked: 30, expired: -7, expiredLongAgo: -40 }[state];
   await db.refreshToken.create({
     data: {
       id: uuidv7(),
       userId,
       familyId,
       tokenHash: randomBytes(32),
-      expiresAt: new Date(Date.now() + 30 * 86_400_000),
-      revokedAt: revoked ? new Date() : null,
+      expiresAt: new Date(Date.now() + expiresIn * day),
+      revokedAt: state === 'revoked' ? new Date() : null,
     },
   });
   return familyId;

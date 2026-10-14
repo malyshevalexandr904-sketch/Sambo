@@ -187,8 +187,8 @@ export interface FollowStateDto {
 
 export interface FollowDto {
   athleteId: string;
-  /** «Фамилия И.» — как в публичных списках; полная карточка — по ссылке, пока у подписавшегося есть доступ. */
-  name: string;
+  /** «Фамилия И.» — пока пользователь видит карточку спортсмена; доступа больше нет — null. */
+  name: string | null;
   createdAt: string;
 }
 

@@ -52,6 +52,9 @@ for (const [net, prefix] of [
   ['fe80::', 10],
   ['ff00::', 8],
   ['64:ff9b::', 96],
+  // 6to4 и Teredo: внутри — IPv4-адрес, проверить его здесь нельзя.
+  ['2002::', 16],
+  ['2001::', 32],
 ] as const)
   BLOCKED.addSubnet(net, prefix, 'ipv6');
 
@@ -135,21 +138,27 @@ export class WebPushTransport implements PushTransport {
   async send(target: PushTarget, payload: string, opts: PushSendOptions): Promise<{ statusCode: number }> {
     const problem = pushEndpointProblem(target.endpoint);
     if (problem) throw new PushEndpointRejected(problem);
-    const details = webpush.generateRequestDetails(target, payload, {
-      vapidDetails: {
-        subject: this.keys.subject,
-        publicKey: this.keys.publicKey,
-        privateKey: this.keys.privateKey,
-      },
-      TTL: opts.ttlSeconds,
-      urgency: opts.urgency,
-      topic: opts.topic,
-      contentEncoding: 'aes128gcm',
-    });
+    let details: ReturnType<typeof webpush.generateRequestDetails>;
+    try {
+      details = webpush.generateRequestDetails(target, payload, {
+        vapidDetails: {
+          subject: this.keys.subject,
+          publicKey: this.keys.publicKey,
+          privateKey: this.keys.privateKey,
+        },
+        TTL: opts.ttlSeconds,
+        urgency: opts.urgency,
+        topic: opts.topic,
+        contentEncoding: 'aes128gcm',
+      });
+    } catch (e) {
+      // Ключ устройства — не точка P-256 (или неверный секрет): зашифровать нельзя никогда, подписка негодна.
+      throw new PushEndpointRejected(`push subscription keys rejected: ${(e as Error).message}`);
+    }
     return this.requester({
       endpoint: details.endpoint,
       headers: details.headers,
-      body: details.body,
+      body: details.body ?? Buffer.alloc(0),
     });
   }
 

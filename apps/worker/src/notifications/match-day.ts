@@ -5,7 +5,7 @@
 import type { NotificationType } from '@sde/contracts';
 import type { PrismaClient } from '@sde/db';
 import { APPLICANT_ROLES, type PlannedNotification } from './recipients';
-import { dueSoon, type SoonDue, type SoonQueueItem, sourceKey } from './soon';
+import { dueSoon, SOON_WINDOW_MS, type SoonDue, type SoonQueueItem, sourceKey } from './soon';
 
 export type MatchDayReader = Pick<
   PrismaClient,
@@ -155,7 +155,7 @@ export const timeChangedSourceKey = (eventId: string, matchId: string): string =
 
 /** Турниры, где сейчас может понадобиться «скоро»: расписание опубликовано или соревнования идут. */
 const SOON_STATUSES = ['SCHEDULED', 'IN_PROGRESS'] as const;
-const QUEUE_STATUSES = ['SCHEDULED', 'READY', 'IN_PROGRESS', 'PAUSED'] as const;
+const ACTIVE_STATUSES = ['READY', 'IN_PROGRESS', 'PAUSED'] as const;
 
 /** Схватки турнира, о которых пора сообщить «скоро» (по коврам, правило — `dueSoon`). */
 export async function soonDueFor(
@@ -174,8 +174,16 @@ export async function soonDueFor(
     !(SOON_STATUSES as readonly string[]).includes(competition.status)
   )
     return [];
+  // Только окно «скоро»: вызванные и идущие — всегда, ждущие — с началом не позже чем через 2 часа (схватки позже
+  // ни объявлять, ни считать впереди не нужно — они идут после кандидатов).
   const rows = await db.matchSchedule.findMany({
-    where: { competitionId, match: { status: { in: [...QUEUE_STATUSES] } } },
+    where: {
+      competitionId,
+      OR: [
+        { match: { status: { in: [...ACTIVE_STATUSES] } } },
+        { plannedAt: { lte: new Date(nowMs + SOON_WINDOW_MS) }, match: { status: 'SCHEDULED' } },
+      ],
+    },
     select: {
       matId: true,
       plannedAt: true,
@@ -205,10 +213,20 @@ export async function soonDueFor(
   return [...byMat.values()].flatMap((items) => dueSoon(items, competition.notifyMatchesAhead, nowMs));
 }
 
-/** Идущие турниры для поминутной проверки «скоро» (перенос, отмена, начало сессии — без событий outbox). */
-export async function soonCompetitions(db: MatchDayReader): Promise<string[]> {
+/**
+ * Турниры для поминутной проверки (перенос, отмена, начало сессии — без событий outbox): идут или опубликовано
+ * расписание, «скоро» включено, есть ждущая схватка с началом в окне 2 часов.
+ */
+export async function soonCompetitions(db: MatchDayReader, nowMs: number): Promise<string[]> {
   const rows = await db.competition.findMany({
-    where: { status: { in: [...SOON_STATUSES] }, deletedAt: null, notifyMatchesAhead: { gt: 0 } },
+    where: {
+      status: { in: [...SOON_STATUSES] },
+      deletedAt: null,
+      notifyMatchesAhead: { gt: 0 },
+      matchSchedules: {
+        some: { plannedAt: { lte: new Date(nowMs + SOON_WINDOW_MS) }, match: { status: 'SCHEDULED' } },
+      },
+    },
     select: { id: true },
   });
   return rows.map((r) => r.id);

@@ -19,14 +19,16 @@ export function FollowButton({ athleteId }: { athleteId: string }) {
   });
   if (!state.data) return null;
   const following = state.data.following;
+  const hintId = `follow-hint-${athleteId}`;
   return (
     <span className="inline-flex flex-col items-end gap-1">
+      {/* Переключатель: подпись постоянная, состояние — aria-pressed и отметка (скринридер не слышит его дважды). */}
       <Button
         size="sm"
-        variant={following ? 'secondary' : 'primary'}
+        variant={following ? 'primary' : 'secondary'}
         aria-pressed={following}
+        aria-describedby={hintId}
         loading={action.busy}
-        title={following ? t('offHint') : t('onHint')}
         onClick={() =>
           void action.run(async () => {
             const r = await api<DataEnvelope<FollowStateDto>>(`/athletes/${athleteId}/follow`, {
@@ -36,8 +38,12 @@ export function FollowButton({ athleteId }: { athleteId: string }) {
           })
         }
       >
-        {following ? t('following') : t('follow')}
+        <span aria-hidden="true">{following ? '✓ ' : ''}</span>
+        {t('follow')}
       </Button>
+      <span id={hintId} className="max-w-xs text-right text-xs text-slate-500">
+        {t('hint')}
+      </span>
       {action.error ? <span className="text-xs text-red-700">{action.error}</span> : null}
     </span>
   );

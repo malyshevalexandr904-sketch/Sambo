@@ -517,9 +517,7 @@
     "backToList": "Back to athletes",
     "follow": {
       "follow": "Notify me about bouts",
-      "following": "Bout notifications on",
-      "onHint": "Competition-day notifications about this athlete's bouts: coming up, started, time changed",
-      "offHint": "Press to turn off notifications about this athlete's bouts"
+      "hint": "On competition day: coming up, started, time changed. Sent to coaches and managers of the club that entered the athlete in the tournament."
     }
   },
   "guardians": {
@@ -1581,7 +1579,8 @@
       "unknownDevice": "Device",
       "added": "added {date}",
       "lastUsed": "last notification {date}",
-      "remove": "Remove"
+      "remove": "Remove",
+      "removeDevice": "Remove device “{device}”, {added}"
     }
   },
   "draws": {

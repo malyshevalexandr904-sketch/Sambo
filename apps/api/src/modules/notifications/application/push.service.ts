@@ -1,5 +1,6 @@
 // Устройства Web Push (Phase 8b; API.md, 5.8): подписка браузера пользователя, список устройств, отписка. Ключ
 // VAPID — из окружения или из AUTH_SECRET (server-kit). Отправляет push worker; здесь — только учёт устройств.
+import { ECDH } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   MAX_PUSH_DEVICES,
@@ -15,10 +16,18 @@ import { DomainError } from '../../../common/errors/domain-error';
 import { ENV } from '../../../config/config.module';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 
-/** Ключи устройства по RFC 8291: открытый ключ P-256 без сжатия (65 байт) и секрет аутентификации (16 байт). */
+/**
+ * Ключи устройства по RFC 8291: открытый ключ — точка кривой P-256 без сжатия (65 байт), секрет аутентификации —
+ * 16 байт. Ключ не на кривой зашифровать нельзя никогда — такая подписка не принимается.
+ */
 function keysProblem(keys: PushSubscriptionPut['keys']): string | null {
   const p256dh = Buffer.from(keys.p256dh, 'base64url');
   if (p256dh.length !== 65 || p256dh[0] !== 4) return 'invalid_p256dh';
+  try {
+    ECDH.convertKey(p256dh, 'prime256v1');
+  } catch {
+    return 'invalid_p256dh';
+  }
   if (Buffer.from(keys.auth, 'base64url').length !== 16) return 'invalid_auth';
   return null;
 }

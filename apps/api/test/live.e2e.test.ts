@@ -22,6 +22,7 @@ import { io, type Socket } from 'socket.io-client';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { ChangeFeedService, LivePublisherService } from '../src/modules/live';
 import { createTestApp, createUser, PASSWORD, resetData, type TestApp } from './helpers/app';
+import { send } from './helpers/phase3';
 import {
   event,
   getMatch,
@@ -246,11 +247,6 @@ describe('live channels', () => {
     expect(competitionMsg).toMatchObject({ v: 1, type: 'changed' });
     expect((competitionMsg.payload as { topics: string[]; matchIds: string[] }).topics).toContain('matches');
     expect((competitionMsg.payload as { matchIds: string[] }).matchIds).toContain(matchId);
-    const cacheReset = await waitFor(() =>
-      viewerMsgs.find((x) => x.channel === liveChannel.publicCompetitions),
-    );
-    // Только slug и темы — без идентификаторов.
-    expect(cacheReset).toMatchObject({ type: 'changed', payload: { slug, topics: ['matches'] } });
     await waitFor(() => staffMsgs.find((x) => x.channel === liveChannel.opsMat(w.mats[0]!.id)));
     const calledState = await waitFor(() =>
       viewerMsgs.find(
@@ -311,6 +307,31 @@ describe('live channels', () => {
       .map((x) => x.seq);
     expect(boardSeqs).toEqual([...boardSeqs].sort((a, b) => a - b));
     expect(new Set(boardSeqs).size).toBe(boardSeqs.length);
+    // Вызов, старт и счёт схватки в кэшируемые публичные ответы не входят; сброс — только из-за статусов турнира и
+    // категории (первая схватка начала соревнования).
+    const resets = viewerMsgs.filter((x) => x.channel === liveChannel.publicCompetitions);
+    for (const r of resets)
+      expect(
+        (r.payload as { topics: string[] }).topics.every((x) => ['competition', 'categories'].includes(x)),
+      ).toBe(true);
+  });
+
+  it('the cache reset channel tells the web server about tournament data changes, not about bouts', async () => {
+    const viewer = await connect();
+    const msgs = record(viewer);
+    expect((await subscribe(viewer, liveChannel.publicCompetitions)).ok).toBe(true);
+    const current = await t.admin.competition.findUniqueOrThrow({ where: { id: w.competitionId } });
+    const r = await send(
+      w.staff.manager,
+      'patch',
+      `/api/v1/competitions/${w.competitionId}`,
+      { shortName: 'Ковёр-тест' },
+      current.version,
+    );
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const reset = await waitFor(() => msgs.find((x) => x.channel === liveChannel.publicCompetitions));
+    // Только slug и темы — без идентификаторов.
+    expect(reset).toMatchObject({ type: 'changed', payload: { slug, topics: ['competition'] } });
   });
 
   it('publishes only committed changes', async () => {

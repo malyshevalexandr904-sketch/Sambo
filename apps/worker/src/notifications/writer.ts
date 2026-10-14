@@ -1,6 +1,7 @@
 // Запись уведомлений и постановка доставок (DATABASE.md, 3.8): лента — сразу, письмо и push — отдельными задачами с
 // повторами, по настройкам пользователя (значения по умолчанию — contracts: notificationChannelDefault). Повтор того
-// же источника тому же получателю ничего не создаёт (unique `(source_event_id, user_id)`).
+// же источника тому же получателю ничего не создаёт (unique `(source_event_id, user_id)`, вставка ON CONFLICT DO
+// NOTHING — и при одновременной записи).
 import { type ConfigurableChannel, notificationChannelDefault, type NotificationType } from '@sde/contracts';
 import { type Prisma, type PrismaClient, uuidv7 } from '@sde/db';
 import { type LivePublisher, type Logger, liveUserRoom } from '@sde/server-kit';
@@ -68,22 +69,28 @@ export class NotificationWriter {
       (user?._count.pushSubscriptions ?? 0) > 0 &&
       (await this.channelOn(tx, p.userId, p.type, 'PUSH'));
     const id = uuidv7();
-    await tx.notification.create({
-      data: {
-        id,
-        userId: p.userId,
-        type: p.type,
-        params: p.params,
-        competitionId: p.competitionId,
-        sourceEventId: sourceId,
-        deliveries: {
-          create: [
-            { id: uuidv7(), channel: 'IN_APP', status: 'SENT', attempts: 1, sentAt: new Date() },
-            { id: uuidv7(), channel: 'EMAIL', status: email ? 'PENDING' : 'SKIPPED' },
-            { id: uuidv7(), channel: 'PUSH', status: push ? 'PENDING' : 'SKIPPED' },
-          ],
+    // Вставка без ошибки при гонке: две проверки одновременно (поминутная и по событию) — одна запись, вторая
+    // ничего не создаёт и не прерывает транзакцию остальных уведомлений пачки.
+    const inserted = await tx.notification.createMany({
+      data: [
+        {
+          id,
+          userId: p.userId,
+          type: p.type,
+          params: p.params,
+          competitionId: p.competitionId,
+          sourceEventId: sourceId,
         },
-      },
+      ],
+      skipDuplicates: true,
+    });
+    if (inserted.count === 0) return null;
+    await tx.notificationDelivery.createMany({
+      data: [
+        { id: uuidv7(), notificationId: id, channel: 'IN_APP', status: 'SENT', attempts: 1, sentAt: new Date() },
+        { id: uuidv7(), notificationId: id, channel: 'EMAIL', status: email ? 'PENDING' : 'SKIPPED' },
+        { id: uuidv7(), notificationId: id, channel: 'PUSH', status: push ? 'PENDING' : 'SKIPPED' },
+      ],
     });
     return { id, userId: p.userId, type: p.type };
   }

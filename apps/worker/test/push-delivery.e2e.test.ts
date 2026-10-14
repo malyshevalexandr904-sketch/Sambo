@@ -98,8 +98,9 @@ describe('web push delivery', () => {
     const phone = new TestPushDevice('https://push.example.test/send/phone');
     const loggedOut = new TestPushDevice('https://push.example.test/send/old-laptop');
     const gone = new TestPushDevice('https://push.example.test/send/reinstalled');
-    await phone.subscribe(db, w.mother, await loginSession(db, w.mother));
-    await loggedOut.subscribe(db, w.mother, await loginSession(db, w.mother, true));
+    // Телефон: вход истёк неделю назад без выхода — push всё равно приходит (родитель не открывал приложение).
+    await phone.subscribe(db, w.mother, await loginSession(db, w.mother, 'expired'));
+    await loggedOut.subscribe(db, w.mother, await loginSession(db, w.mother, 'revoked'));
     await gone.subscribe(db, w.mother, await loginSession(db, w.mother));
     service.status.set(gone.endpoint, 410);
 
@@ -162,7 +163,7 @@ describe('web push delivery', () => {
 
   it('a device whose session ended gets nothing; an internal push address is rejected and removed', async () => {
     const old = new TestPushDevice('https://push.example.test/send/after-logout');
-    await old.subscribe(db, w.selfB, await loginSession(db, w.selfB, true));
+    await old.subscribe(db, w.selfB, await loginSession(db, w.selfB, 'revoked'));
     const internal = new TestPushDevice('https://127.0.0.1/send/x');
     await db.pushSubscription.create({
       data: {
@@ -182,13 +183,36 @@ describe('web push delivery', () => {
     expect(await db.pushSubscription.count()).toBe(0);
   });
 
-  it('daily cleanup removes subscriptions of ended sessions and keeps live ones', async () => {
+  it('a device with keys that cannot be used is removed instead of retried', async () => {
+    const broken = new TestPushDevice('https://push.example.test/send/broken');
+    const id = await broken.subscribe(db, w.selfB, await loginSession(db, w.selfB));
+    // 65 байт с префиксом 0x04, но не точка кривой P-256 — так ключ прошёл бы и проверку длины в api.
+    await db.pushSubscription.update({
+      where: { id },
+      data: { p256dh: Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 1)]).toString('base64url') },
+    });
+    await finish(db, w.running);
+    await consumer.soonCheck(w.competitionId);
+    for (const d of queue.push()) await consumer.handle(job(d));
+    expect(service.requests).toEqual([]);
+    expect(await pushDelivery(w.selfB)).toMatchObject({ status: 'SKIPPED', lastErrorCode: 'NO_DEVICES' });
+    expect(await db.pushSubscription.count({ where: { id } })).toBe(0);
+  });
+
+  it('daily cleanup removes subscriptions of ended and long-expired sessions, keeps live and recently expired', async () => {
     const live = new TestPushDevice('https://push.example.test/send/live');
     const ended = new TestPushDevice('https://push.example.test/send/ended');
+    const idle = new TestPushDevice('https://push.example.test/send/idle-week');
+    const abandoned = new TestPushDevice('https://push.example.test/send/abandoned');
     await live.subscribe(db, w.mother, await loginSession(db, w.mother));
-    await ended.subscribe(db, w.mother, await loginSession(db, w.mother, true));
+    await ended.subscribe(db, w.mother, await loginSession(db, w.mother, 'revoked'));
+    await idle.subscribe(db, w.mother, await loginSession(db, w.mother, 'expired'));
+    await abandoned.subscribe(db, w.mother, await loginSession(db, w.mother, 'expiredLongAgo'));
     await new Maintenance(db, {} as S3Client, env, logger).run('cleanupTokens');
-    const left = await db.pushSubscription.findMany({ select: { endpoint: true } });
-    expect(left).toEqual([{ endpoint: live.endpoint }]);
+    const left = await db.pushSubscription.findMany({
+      select: { endpoint: true },
+      orderBy: { endpoint: 'asc' },
+    });
+    expect(left.map((r) => r.endpoint)).toEqual([idle.endpoint, live.endpoint].sort());
   });
 });

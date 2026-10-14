@@ -110,7 +110,10 @@ export class FollowsService {
     return { following, total: athleteIds.length };
   }
 
-  /** Мои подписки: «Фамилия И.» спортсмена (новые сверху). */
+  /**
+   * Мои подписки (новые сверху): «Фамилия И.» — пока пользователь видит карточку спортсмена; потерял доступ — без
+   * имени (подписку можно снять).
+   */
   async mine(user: AuthUser): Promise<FollowDto[]> {
     const rows = await this.db.follow.findMany({
       where: { userId: user.id, targetType: 'ATHLETE' },
@@ -123,12 +126,25 @@ export class FollowsService {
         })
       : [];
     const names = new Map(profiles.map((p) => [p.id, publicName(p.person.lastName, p.person.firstName)]));
-    return rows
-      .filter((r) => names.has(r.targetId))
-      .map((r) => ({
+    const out: FollowDto[] = [];
+    for (const r of rows) {
+      if (!names.has(r.targetId)) continue;
+      out.push({
         athleteId: r.targetId,
-        name: names.get(r.targetId) as string,
+        name: (await this.sees(user, r.targetId)) ? (names.get(r.targetId) as string) : null,
         createdAt: r.createdAt.toISOString(),
-      }));
+      });
+    }
+    return out;
+  }
+
+  private async sees(user: AuthUser, athleteId: string): Promise<boolean> {
+    try {
+      await this.athletes.assertView(user, athleteId);
+      return true;
+    } catch (e) {
+      if (e instanceof DomainError) return false;
+      throw e;
+    }
   }
 }

@@ -121,6 +121,15 @@ describe('push devices', () => {
       keys: { ...bad.keys, p256dh: Buffer.alloc(64, 4).toString('base64url') },
     });
     expect(shortKey.status).toBe(400);
+    // 65 байт с префиксом 0x04, но не точка кривой.
+    const offCurve = await put(s, {
+      ...bad,
+      keys: {
+        ...bad.keys,
+        p256dh: Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 1)]).toString('base64url'),
+      },
+    });
+    expect(offCurve.status).toBe(400);
     const badAuth = await put(s, {
       ...bad,
       keys: { ...bad.keys, auth: randomBytes(12).toString('base64url') },
@@ -285,5 +294,49 @@ describe('follows', () => {
     const outsider = await login(t, (await createUser(t)).email);
     const res = await send(outsider, 'post', `/api/v1/applications/${w.applicationId}/follow`, {});
     expect(res.status).toBe(404);
+  });
+
+  it('a merge of duplicates moves follows to the kept athlete; a follower without access sees no name', async () => {
+    const w = await applicationWorld();
+    const coach = await login(t, w.coachUser.email);
+    const keep = w.athletes[0]!;
+    // Дубль — запись того же клуба без участия в турнире (участников одной категории слить нельзя).
+    const { athleteId: dup } = await clubAthlete(t, { clubId: w.clubId, lastName: 'Дублев' });
+    await send(coach, 'put', `/api/v1/athletes/${dup}/follow`).expect(200);
+    const both = await login(
+      t,
+      (await createUser(t, { orgs: [{ organizationId: w.clubId, role: 'COACH' }] })).email,
+    );
+    await send(both, 'put', `/api/v1/athletes/${keep}/follow`).expect(200);
+    await send(both, 'put', `/api/v1/athletes/${dup}/follow`).expect(200);
+    const adminUser = await createUser(t, { platform: ['SUPER_ADMIN'] });
+    const admin = await login(t, adminUser.email, { totp: true });
+    const merged = await send(admin, 'post', '/api/v1/admin/athletes/merge', {
+      sourceAthleteId: dup,
+      targetAthleteId: keep,
+      reason: 'Дубль',
+    });
+    expect(merged.status, JSON.stringify(merged.body)).toBe(200);
+    expect(
+      (await coach.agent.get('/api/v1/me/follows').expect(200)).body.data.map(
+        (f: { athleteId: string }) => f.athleteId,
+      ),
+    ).toEqual([keep]);
+    // У подписанного на обоих — одна подписка, без дублей.
+    expect((await both.agent.get('/api/v1/me/follows').expect(200)).body.data).toHaveLength(1);
+
+    // Тренер ушёл из клуба: подписка видна, имени нет.
+    await t.admin.organizationMembership.updateMany({
+      where: { userId: w.coachUser.id },
+      data: { status: 'ENDED' },
+    });
+    await t.admin.user.update({
+      where: { id: w.coachUser.id },
+      data: { permissionsVersion: { increment: 1 } },
+    });
+    const again = await login(t, w.coachUser.email);
+    expect((await again.agent.get('/api/v1/me/follows').expect(200)).body.data).toEqual([
+      { athleteId: keep, name: null, createdAt: expect.any(String) },
+    ]);
   });
 });

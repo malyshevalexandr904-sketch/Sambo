@@ -202,7 +202,7 @@ export class NotificationConsumer {
   private sourceIdsOf(type: string, eventId: string, payload: unknown): string[] {
     if (type !== 'schedule.changed') return [];
     const p = EVENT_SCHEMAS['schedule.changed'].parse(payload);
-    return p.matchIds.map((m) => timeChangedSourceKey(eventId, m));
+    return (p.timeChangedMatchIds ?? p.matchIds).map((m) => timeChangedSourceKey(eventId, m));
   }
 
   /** Уведомления события с их источниками. */
@@ -217,7 +217,7 @@ export class NotificationConsumer {
       await this.scheduleDigest(payload);
       const p = EVENT_SCHEMAS['schedule.changed'].parse(payload);
       const out: PlannedFromSource[] = [];
-      for (const matchId of p.matchIds) {
+      for (const matchId of p.timeChangedMatchIds ?? p.matchIds) {
         const match = await this.db.match.findUnique({ where: { id: matchId }, select: { status: true } });
         if (!match || !WAITING.has(match.status)) continue;
         const sourceId = timeChangedSourceKey(eventId, matchId);
@@ -255,7 +255,14 @@ export class NotificationConsumer {
         organizationId,
         matchIds: [...p.matchIds],
       };
-      await this.queue.add('schedule-digest', data, { jobId, delay: SCHEDULE_DIGEST_DELAY_MS });
+      // Выполненная задача удаляется: BullMQ не принимает новую задачу с jobId сохранённой выполненной — иначе
+      // следующие дайджесты клуба на этом турнире молча терялись бы.
+      await this.queue.add('schedule-digest', data, {
+        jobId,
+        delay: SCHEDULE_DIGEST_DELAY_MS,
+        removeOnComplete: true,
+        removeOnFail: true,
+      });
     }
   }
 
@@ -287,14 +294,15 @@ export class NotificationConsumer {
   }
 
   /**
-   * Проверка «скоро» по турниру — одна на турнир за раз: задача с тем же jobId, пока она ждёт, не дублируется,
-   * а после выполнения удаляется (иначе BullMQ не принял бы следующую с тем же jobId).
+   * Проверка «скоро» по турниру — одна на турнир за раз: задача с тем же jobId, пока она ждёт или выполняется, не
+   * дублируется, а после выполнения удаляется (иначе BullMQ не принял бы следующую с тем же jobId). Событие,
+   * пришедшее во время проверки, учтёт поминутный обход.
    */
-  private async scheduleSoonCheck(competitionId: string): Promise<void> {
+  private async scheduleSoonCheck(competitionId: string, delay = this.soonCheckDelayMs): Promise<void> {
     const data: SoonCheckJob = { kind: 'soon-check', competitionId };
     await this.queue.add('soon-check', data, {
       jobId: `soon-check-${competitionId}`,
-      delay: this.soonCheckDelayMs,
+      delay,
       removeOnComplete: true,
       removeOnFail: true,
     });
@@ -303,10 +311,12 @@ export class NotificationConsumer {
   /**
    * «Скоро выступает»: схватки, перед которыми на ковре осталось не больше N. Получатель, уже получивший «скоро» по
    * схватке, второго не получает (ключ источника — схватка); подписавшийся позже, пока схватка ещё впереди, — получит.
+   * Доставки ставятся по всем объявленным схваткам: ожидающие после сбоя прошлой проверки тоже уходят (jobId — без
+   * дублей).
    */
   async soonCheck(competitionId: string): Promise<void> {
     const due = await soonDueFor(this.db, competitionId, Date.now());
-    const sourceIds: string[] = [];
+    let created = 0;
     for (const { matchId, ahead } of due) {
       const sourceId = soonSourceKey(matchId);
       const plans = await planMatchNotifications(this.db, 'match.soon', matchId, { ahead: String(ahead) });
@@ -321,17 +331,18 @@ export class NotificationConsumer {
       );
       const fresh = plans.filter((p) => !known.has(p.userId));
       if (fresh.length === 0) continue;
-      const created = await this.writer.storeMany(fresh.map((plan) => ({ sourceId, plan })));
-      await this.writer.announce(created);
-      sourceIds.push(sourceId);
+      const stored = await this.writer.storeMany(fresh.map((plan) => ({ sourceId, plan })));
+      await this.writer.announce(stored);
+      created += stored.length;
     }
-    await this.writer.enqueueDeliveries(sourceIds);
-    if (sourceIds.length > 0)
-      this.logger.info({ competitionId, matches: sourceIds.length }, 'Match soon notifications created');
+    await this.writer.enqueueDeliveries(due.map((d) => soonSourceKey(d.matchId)));
+    if (created > 0) this.logger.info({ competitionId, notifications: created }, 'Match soon notifications created');
   }
 
+  /** Поминутный обход: проверка каждого турнира — своей задачей (сбой одного не мешает остальным, по одной на турнир). */
   private async soonScan(): Promise<void> {
-    for (const competitionId of await soonCompetitions(this.db)) await this.soonCheck(competitionId);
+    for (const competitionId of await soonCompetitions(this.db, Date.now()))
+      await this.scheduleSoonCheck(competitionId, 0);
   }
 
   /** Письмо уведомления. Шаблон без данных (запись удалена) — FAILED без повторов; сбой отправки — повтор. */

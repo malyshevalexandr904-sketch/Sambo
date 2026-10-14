@@ -1,16 +1,17 @@
 // Публичное API витрины (API.md, 5.9) для серверных страниц: без cookie и CSRF. Браузер эти запросы не делает —
 // страницы рендерятся на сервере web. Ответы кэшируются в процессе, включая «не найдено»: все посетители приходят
 // в API с адреса сервера web, и без кэша лимит публичного API (120 запросов в минуту на IP) расходовался бы на всех
-// посетителей сразу. Кэш сбрасывается по событию (канал `public:competitions`, Phase 8b) — страницы турнира
-// показывают изменения сразу; 60 секунд — запасной срок, пока соединения с живыми данными нет.
-import { publicFeedReady, startPublicCacheFeed } from './public-cache-feed';
+// посетителей сразу. Кэш сбрасывается и по событию (канал `public:competitions`, Phase 8b) — страница турнира
+// показывает изменения данных турнира, категорий и участий сразу; 60 секунд — для остального и без соединения.
+import { startPublicCacheFeed } from './public-cache-feed';
 
 const API = process.env.API_INTERNAL_URL ?? 'http://localhost:4000';
 const PREFIX = `${API}/api/public/v1`;
-/** Без соединения с каналом сброса — как Cache-Control самого API. */
+/**
+ * Как Cache-Control самого API. Срок не удлиняется и при соединении с каналом сброса: часть данных меняется без
+ * событий (площадка, наступление срока приёма заявок).
+ */
 const TTL_MS = 60_000;
-/** С соединением: изменения приходят событием, срок — страховка от потерянного сообщения. */
-const TTL_LIVE_MS = 10 * 60_000;
 const MAX_ENTRIES = 500;
 
 export class PublicApiError extends Error {
@@ -58,8 +59,7 @@ export function publicApi<T>(path: string, query: Record<string, string | undefi
   const qs = params.toString();
   const url = `${PREFIX}${path}${qs ? `?${qs}` : ''}`;
   const hit = cache.get(url);
-  const ttl = publicFeedReady() ? TTL_LIVE_MS : TTL_MS;
-  if (hit && Date.now() - hit.at < ttl) return hit.value as Promise<T>;
+  if (hit && Date.now() - hit.at < TTL_MS) return hit.value as Promise<T>;
   const value = load<T>(url);
   cache.delete(url);
   cache.set(url, { at: Date.now(), value });

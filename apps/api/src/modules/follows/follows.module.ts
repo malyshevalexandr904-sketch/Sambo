@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { AthletesModule } from '../athletes';
 import { RegistrationsModule } from '../registrations';
 import { FollowsController } from './api/follows.controller';
+import { FollowsLifecycle } from './application/follows-lifecycle';
 import { FollowsService } from './application/follows.service';
 
 /**
@@ -11,6 +12,6 @@ import { FollowsService } from './application/follows.service';
 @Module({
   imports: [AthletesModule, RegistrationsModule],
   controllers: [FollowsController],
-  providers: [FollowsService],
+  providers: [FollowsService, FollowsLifecycle],
 })
 export class FollowsModule {}

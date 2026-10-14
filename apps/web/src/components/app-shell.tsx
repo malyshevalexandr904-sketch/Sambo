@@ -121,7 +121,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
   const logout = async (): Promise<void> => {
     try {
       // Push на это устройство после выхода не приходит: подписка снимается, пока сессия ещё действует.
-      await disablePushForLogout();
+      await disablePushForLogout(user.id);
       await api('/auth/logout', { method: 'POST', noRefresh: true });
     } finally {
       // Соединение живых данных — от имени вышедшего пользователя: закрыть, а не оставлять следующему.

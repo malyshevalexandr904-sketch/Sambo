@@ -160,6 +160,40 @@ describe('match soon', () => {
     expect(after.find((r) => r.userId === w.formerMember)?.params).toMatchObject({ ahead: '1' });
   });
 
+  it('two checks of the same tournament at once create each notification once and queue every delivery', async () => {
+    await finish(db, w.running);
+    await db.pushSubscription.create({
+      data: {
+        id: uuidv7(),
+        userId: w.mother,
+        sessionId: uuidv7(),
+        endpoint: 'https://push.example.test/mother',
+        p256dh: `B${'A'.repeat(86)}`,
+        auth: 'A'.repeat(22),
+      },
+    });
+    await Promise.all([consumer.soonCheck(w.competitionId), consumer.soonCheck(w.competitionId)]);
+    const rows = await notifications('match.soon');
+    expect(rows.map((r) => r.userId).sort()).toEqual([w.mother, w.selfB, w.coach].sort());
+    // Доставка push матери поставлена, хотя уведомление могла записать «другая» проверка.
+    const pushRow = rows.find((r) => r.userId === w.mother)?.deliveries.find((d) => d.channel === 'PUSH');
+    expect(pushRow?.status).toBe('PENDING');
+    expect(queue.deliveries('push')).toEqual([{ deliveryId: pushRow?.id }]);
+  });
+
+  it('the minute scan queues a check per tournament with a bout in the next two hours only', async () => {
+    const queueOf = () => queue.jobs.filter((j) => j.name === 'soon-check').map((j) => j.jobId);
+    await consumer.handle(job({ kind: 'soon-scan' }));
+    expect(queueOf()).toEqual([`soon-check-${w.competitionId}`]);
+    queue.jobs = [];
+    await db.matchSchedule.updateMany({
+      where: { competitionId: w.competitionId },
+      data: { plannedAt: new Date(Date.now() + 3 * 60 * MIN) },
+    });
+    await consumer.handle(job({ kind: 'soon-scan' }));
+    expect(queueOf()).toEqual([]);
+  });
+
   it('respects N = 0, the 2-hour window and a move to another mat', async () => {
     await db.competition.update({ where: { id: w.competitionId }, data: { notifyMatchesAhead: 0 } });
     await consumer.soonCheck(w.competitionId);
@@ -283,5 +317,17 @@ describe('match started and time changed', () => {
     expect(await notifications('match.time_changed')).toHaveLength(5);
     // Клубу — по-прежнему сводка через 10 минут (Phase 6).
     expect(queue.jobs.some((j) => j.name === 'schedule-digest')).toBe(true);
+  });
+
+  it('tells families only about the bouts the edit marked as noticeable; the club digest still gets all', async () => {
+    await outbox('schedule.changed', {
+      competitionId: w.competitionId,
+      matchIds: [w.ab, w.late],
+      timeChangedMatchIds: [w.late],
+    });
+    const rows = await notifications('match.time_changed');
+    expect(rows.map((r) => (r.params as Record<string, string>).matchId)).toEqual([w.late, w.late]);
+    const digest = queue.jobs.find((j) => j.name === 'schedule-digest')?.data as { matchIds: string[] };
+    expect(digest.matchIds.sort()).toEqual([w.ab, w.late].sort());
   });
 });

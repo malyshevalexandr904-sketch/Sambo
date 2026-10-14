@@ -60,7 +60,13 @@ export const EVENT_SCHEMAS = {
   // затронутых участников) резолвятся потребителем по matchIds, чтобы не хранить ПДн в payload; события за
   // 10 минут объединяются в одно уведомление на клуб (apps/worker/src/notifications).
   'schedule.published': z.object({ competitionId: Uuid }),
-  'schedule.changed': z.object({ competitionId: Uuid, matchIds: z.array(Uuid).min(1).max(500) }),
+  // Phase 8b: `timeChangedMatchIds` — схватки, о которых сообщить семьям «изменилось время» (сменился ковёр или
+  // время сдвинулось на 10 минут и больше); нет поля (события до 0.11.0) — все `matchIds`.
+  'schedule.changed': z.object({
+    competitionId: Uuid,
+    matchIds: z.array(Uuid).min(1).max(500),
+    timeChangedMatchIds: z.array(Uuid).max(500).optional(),
+  }),
   // Phase 7a — схватки. Потребители (уведомления тренерам и представителям, табло, публичные страницы) — Phase 8–9.
   'match.started': z.object({ matchId: Uuid, categoryId: Uuid }),
   'match.result_confirmed': z.object({
