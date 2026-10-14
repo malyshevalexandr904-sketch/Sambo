@@ -28,6 +28,10 @@ function csp(nonce: string, dev: boolean, storage: string | undefined, live: str
     "font-src 'self'",
     // Загрузка файлов идёт напрямую в хранилище по presigned POST (ADR-14).
     `connect-src 'self'${live}${storage ? ` ${storage}` : ''}${dev ? ' ws:' : ''}`,
+    // Service worker push-уведомлений /sw.js (Phase 8b): 'strict-dynamic' в script-src не разрешает 'self' для
+    // воркеров — источник указан явно; манифест PWA — свой origin.
+    "worker-src 'self'",
+    "manifest-src 'self'",
     "frame-ancestors 'none'",
     "form-action 'self'",
     "base-uri 'self'",

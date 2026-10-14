@@ -1,6 +1,7 @@
 'use client';
 // Изменение основных данных турнира (API.md, 5.1): у опубликованного турнира изменение сроков требует причины
 // и уведомляет участников (competition.dates_changed); запрещённые после публикации поля сервер отклоняет.
+// «Скоро выступает» (Phase 8b): за сколько схваток до схватки спортсмена на его ковре уведомлять (0 — не уведомлять).
 import {
   COMPETITION_LEVELS,
   type Competition,
@@ -37,6 +38,7 @@ export function EditCard({ competition: c }: { competition: Competition }) {
     contactName: c.contactInfo?.name ?? '',
     contactEmail: c.contactInfo?.email ?? '',
     contactPhone: c.contactInfo?.phone ?? '',
+    notifyMatchesAhead: String(c.notifyMatchesAhead),
     reason: '',
   };
   const [v, setV] = useState(initial);
@@ -61,6 +63,7 @@ export function EditCard({ competition: c }: { competition: Competition }) {
         email: v.contactEmail.trim() || undefined,
         phone: v.contactPhone.trim() || undefined,
       },
+      notifyMatchesAhead: Number(v.notifyMatchesAhead),
     };
     if (scheduleChanged) {
       Object.assign(patch, {
@@ -175,6 +178,20 @@ export function EditCard({ competition: c }: { competition: Competition }) {
           error={tf(errors['contactInfo.phone'])}
         >
           <Input id="e-cphone" type="tel" value={v.contactPhone} onChange={set('contactPhone')} />
+        </Field>
+        <Field
+          id="e-ahead"
+          label={t('competitions.notifyMatchesAhead')}
+          hint={t('competitions.notifyMatchesAheadHint')}
+          error={tf(errors.notifyMatchesAhead)}
+        >
+          <Select id="e-ahead" value={v.notifyMatchesAhead} onChange={set('notifyMatchesAhead')}>
+            {Array.from({ length: 11 }, (_, n) => (
+              <option key={n} value={String(n)}>
+                {t('competitions.notifyMatchesAheadOption', { n })}
+              </option>
+            ))}
+          </Select>
         </Field>
         <div className="sm:col-span-2">
           <Button

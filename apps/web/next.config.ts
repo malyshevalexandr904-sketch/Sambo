@@ -16,6 +16,9 @@ const config: NextConfig = {
   // ESLint запускается отдельно в CI (pnpm lint) с общей конфигурацией монорепозитория.
   eslint: { ignoreDuringBuilds: true },
   transpilePackages: ['@sde/ui', '@sde/contracts'],
+  // Сервер web слушает канал сброса кэша публичных ответов (lib/public-cache-feed.ts): клиент Socket.IO с его
+  // WebSocket для Node.js подключается из node_modules, а не собирается в серверный бандл.
+  serverExternalPackages: ['socket.io-client'],
   // Браузер обращается к API через тот же origin: cookie сессии и CSRF работают без CORS (API.md, 1.6).
   // Живые данные (Phase 8a): Socket.IO на пути /ws — Next.js проксирует и long polling, и WebSocket (upgrade).
   // На сервере /ws уходит в api напрямую через Caddy (deploy/server/Caddyfile), сюда не доходит.
@@ -26,7 +29,11 @@ const config: NextConfig = {
     ];
   },
   async headers() {
-    return [{ source: '/:path*', headers: SECURITY_HEADERS }];
+    return [
+      { source: '/:path*', headers: SECURITY_HEADERS },
+      // Service worker: браузер проверяет обновление при каждом открытии, а не по сроку кэша (Phase 8b).
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
+    ];
   },
 };
 

@@ -17,6 +17,7 @@ import { formatDate } from '@/lib/format';
 import { pickName, qk } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 import { ConsentsPanel } from './consents';
+import { FollowButton } from './follow';
 import { GuardiansPanel } from './guardians';
 import { ClubPanel, RanksPanel } from './links';
 import { useAthleteCache } from './shared';
@@ -56,9 +57,11 @@ export function AthleteDetail({ id }: { id: string }) {
                 </>
               }
               actions={
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   {a.relation ? <Badge tone="info">{t(`athletes.relation.${a.relation}`)}</Badge> : null}
                   <StatusBadge status={a.status} />
+                  {/* Представитель и сам спортсмен получают уведомления о схватках без подписки (Phase 8b). */}
+                  {a.relation ? null : <FollowButton athleteId={a.id} />}
                 </div>
               }
             />

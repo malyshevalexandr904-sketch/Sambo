@@ -16,6 +16,7 @@ import { useErrorMessage } from '@/lib/errors';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { pickName, qk } from '@/lib/queries';
 import { AddEntryCard } from './add-entry';
+import { FollowAllCard } from './follow-all';
 import { EntryQr } from '@/features/operations/entry-qr';
 import { AdmissionSummaryView } from '@/features/operations/shared';
 import { timeInZone } from '@/features/scheduling/shared';
@@ -68,6 +69,9 @@ export function ApplicationPage({ id }: { id: string }) {
               <SummaryCard application={q.data} onChanged={refresh} />
               {q.data.canAddEntries ? <AddEntryCard application={q.data} onAdded={refresh} /> : null}
               <EntriesCard application={q.data} onChanged={refresh} />
+              {q.data.allowedActions.includes('application.follow') && q.data.counts.approved > 0 ? (
+                <FollowAllCard application={q.data} />
+              ) : null}
             </div>
           </>
         )

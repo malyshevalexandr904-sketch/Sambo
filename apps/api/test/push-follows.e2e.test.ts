@@ -266,6 +266,8 @@ describe('follows', () => {
   it('the club of an application follows all its approved athletes at once and unfollows them', async () => {
     const w = await applicationWorld();
     const coach = await login(t, w.coachUser.email);
+    const view = await coach.agent.get(`/api/v1/applications/${w.applicationId}`).expect(200);
+    expect(view.body.data.allowedActions).toContain('application.follow');
     const on = await send(coach, 'post', `/api/v1/applications/${w.applicationId}/follow`, {
       follow: true,
     }).expect(200);
