@@ -147,6 +147,17 @@ describe('match soon', () => {
     await finish(db, w.q1);
     await consumer.soonCheck(w.competitionId);
     expect(await notifications('match.soon')).toHaveLength(3);
+
+    // Получил доступ позже (вернулся в клуб), пока схватка ещё впереди, — получает своё «скоро»; остальные — по
+    // одному, как и были.
+    await db.organizationMembership.updateMany({
+      where: { userId: w.formerMember },
+      data: { validTo: null },
+    });
+    await consumer.soonCheck(w.competitionId);
+    const after = await notifications('match.soon');
+    expect(after.map((r) => r.userId).sort()).toEqual([...expected, w.formerMember].sort());
+    expect(after.find((r) => r.userId === w.formerMember)?.params).toMatchObject({ ahead: '1' });
   });
 
   it('respects N = 0, the 2-hour window and a move to another mat', async () => {

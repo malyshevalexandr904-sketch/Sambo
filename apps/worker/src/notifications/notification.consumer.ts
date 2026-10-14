@@ -300,20 +300,28 @@ export class NotificationConsumer {
     });
   }
 
-  /** «Скоро выступает»: схватки, перед которыми на ковре осталось не больше N; уже объявленные — пропускаются. */
+  /**
+   * «Скоро выступает»: схватки, перед которыми на ковре осталось не больше N. Получатель, уже получивший «скоро» по
+   * схватке, второго не получает (ключ источника — схватка); подписавшийся позже, пока схватка ещё впереди, — получит.
+   */
   async soonCheck(competitionId: string): Promise<void> {
     const due = await soonDueFor(this.db, competitionId, Date.now());
     const sourceIds: string[] = [];
     for (const { matchId, ahead } of due) {
       const sourceId = soonSourceKey(matchId);
-      const announced = await this.db.notification.findFirst({
-        where: { sourceEventId: sourceId },
-        select: { id: true },
-      });
-      if (announced) continue;
       const plans = await planMatchNotifications(this.db, 'match.soon', matchId, { ahead: String(ahead) });
       if (plans.length === 0) continue;
-      const created = await this.writer.storeMany(plans.map((plan) => ({ sourceId, plan })));
+      const known = new Set(
+        (
+          await this.db.notification.findMany({
+            where: { sourceEventId: sourceId, userId: { in: plans.map((p) => p.userId) } },
+            select: { userId: true },
+          })
+        ).map((n) => n.userId),
+      );
+      const fresh = plans.filter((p) => !known.has(p.userId));
+      if (fresh.length === 0) continue;
+      const created = await this.writer.storeMany(fresh.map((plan) => ({ sourceId, plan })));
       await this.writer.announce(created);
       sourceIds.push(sourceId);
     }

@@ -1531,7 +1531,7 @@
       "match_soon": {
         "title": "Скоро схватка: {athleteName}",
         "titleNoName": "Скоро схватка",
-        "body": "{ahead, plural, =0 {Следующая} one {Через # схватку} few {Через # схватки} many {Через # схваток} other {Через # схватки}} · ковёр {matNumber} · схватка № {matchNumber} · около {time} · «{competitionName}»"
+        "body": "{ahead, plural, =0 {Следующая} one {Через # схватку} few {Через # схватки} many {Через # схваток} other {Через # схватки}} · ковёр {matNumber} · схватка № {matchNumber} · «{competitionName}»"
       },
       "match_started": {
         "title": "Схватка началась: {athleteName}",

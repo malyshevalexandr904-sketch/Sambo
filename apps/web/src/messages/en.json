@@ -1531,7 +1531,7 @@
       "match_soon": {
         "title": "Bout coming up: {athleteName}",
         "titleNoName": "Bout coming up",
-        "body": "{ahead, plural, =0 {Next up} one {In # bout} other {In # bouts}} · mat {matNumber} · bout № {matchNumber} · about {time} · “{competitionName}”"
+        "body": "{ahead, plural, =0 {Next up} one {In # bout} other {In # bouts}} · mat {matNumber} · bout № {matchNumber} · “{competitionName}”"
       },
       "match_started": {
         "title": "Bout started: {athleteName}",

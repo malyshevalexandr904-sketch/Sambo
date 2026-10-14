@@ -85,14 +85,25 @@ function Preferences() {
   });
   const rows = prefs.data ?? [];
   const types = [...new Set(rows.map((p) => p.type))];
-  const save = (p: NotificationPreferenceDto, enabled: boolean): void =>
-    void action.run(async () => {
-      const r = await api<DataEnvelope<NotificationPreferenceDto[]>>('/me/notification-preferences', {
-        method: 'PUT',
-        body: { preferences: [{ type: p.type, channel: p.channel, enabled }] },
+  const PREFS = ['me', 'notification-preferences'];
+  // Отметка меняется сразу; ответ сервера — итоговое состояние, ошибка — возврат к сохранённому.
+  const save = (p: NotificationPreferenceDto, enabled: boolean): void => {
+    queryClient.setQueryData<NotificationPreferenceDto[]>(PREFS, (old) =>
+      old?.map((x) => (x.type === p.type && x.channel === p.channel ? { ...x, enabled } : x)),
+    );
+    void action
+      .run(async () => {
+        const r = await api<DataEnvelope<NotificationPreferenceDto[]>>('/me/notification-preferences', {
+          method: 'PUT',
+          body: { preferences: [{ type: p.type, channel: p.channel, enabled }] },
+        });
+        queryClient.setQueryData(PREFS, r.data);
+        return true;
+      })
+      .then((ok) => {
+        if (!ok) void queryClient.invalidateQueries({ queryKey: PREFS });
       });
-      queryClient.setQueryData(['me', 'notification-preferences'], r.data);
-    });
+  };
   return (
     <Card>
       <CardTitle>{t('preferencesTitle')}</CardTitle>
