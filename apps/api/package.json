@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
-    "test:integration": "vitest run --project integration"
+    "test:integration": "vitest run --project integration",
+    "load:stand": "vitest run --config vitest.load.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1138.0",
