@@ -6,6 +6,7 @@ import {
   NOTIFICATION_TYPES,
   type NotificationContext,
   type NotificationDto,
+  notificationChannelDefault,
   notificationLink,
   type NotificationPreferenceDto,
   type NotificationPreferencesPut,
@@ -19,6 +20,7 @@ import { type AuthUser, RequestContextStore } from '../../../common/context/requ
 import { DomainError } from '../../../common/errors/domain-error';
 import { decodeCursor, toPage } from '../../../common/http/http';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { AthleteAccessService } from '../../athletes';
 import { RegistrationAccessService } from '../../registrations';
 
 type Row = Prisma.NotificationGetPayload<object>;
@@ -30,11 +32,23 @@ export class NotificationsService {
   constructor(
     private readonly db: PrismaService,
     private readonly registrations: RegistrationAccessService,
+    private readonly athletes: AthleteAccessService,
   ) {}
+
+  /** Имя спортсмена в ленте — пока пользователь видит его карточку (представитель, сам, клуб, тренер). */
+  private async seesAthlete(user: AuthUser, athleteId: string): Promise<boolean> {
+    try {
+      await this.athletes.assertView(user, athleteId);
+      return true;
+    } catch (e) {
+      if (e instanceof DomainError) return false;
+      throw e;
+    }
+  }
 
   /**
    * Подстановки на момент чтения. Сведения о заявке — только пока пользователь владелец её организации
-   * (ушёл из клуба — видит лишь название турнира).
+   * (ушёл из клуба — видит лишь название турнира); имя спортсмена — пока пользователь видит его карточку.
    */
   private async context(
     user: AuthUser,
@@ -45,6 +59,8 @@ export class NotificationsService {
     const { organizationId, ...source } = await notificationSource(this.db, type, params, locale);
     if (organizationId && !(await this.registrations.isOwner(user, organizationId)))
       return { competitionName: source.competitionName };
+    if (source.athleteName && params.athleteId && !(await this.seesAthlete(user, params.athleteId)))
+      return { ...source, athleteName: undefined };
     return source;
   }
 
@@ -109,7 +125,7 @@ export class NotificationsService {
     });
   }
 
-  /** Настройки по всем типам и настраиваемым каналам; строки нет — канал включён. */
+  /** Настройки по всем типам и настраиваемым каналам; строки нет — значение по умолчанию для типа и канала. */
   async preferences(user: AuthUser): Promise<NotificationPreferenceDto[]> {
     const rows = await this.db.notificationPreference.findMany({ where: { userId: user.id } });
     const stored = new Map(rows.map((r) => [`${r.type}:${r.channel}`, r.enabled]));
@@ -117,7 +133,7 @@ export class NotificationsService {
       CONFIGURABLE_CHANNELS.map((channel) => ({
         type,
         channel,
-        enabled: stored.get(`${type}:${channel}`) ?? true,
+        enabled: stored.get(`${type}:${channel}`) ?? notificationChannelDefault(type, channel),
       })),
     );
   }

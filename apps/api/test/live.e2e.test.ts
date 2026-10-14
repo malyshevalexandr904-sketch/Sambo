@@ -223,6 +223,12 @@ describe('live channels', () => {
       expect(await subscribe(staff, c)).toMatchObject({ ok: true });
     const board = await subscribe(viewer, liveChannel.publicMat(slug, 1));
     expect(board.ok).toBe(true);
+    // Канал сброса кэша публичных ответов (сервер web, Phase 8b) — без входа, без снимка.
+    expect(await subscribe(viewer, liveChannel.publicCompetitions)).toEqual({
+      ok: true,
+      seq: expect.any(Number),
+      snapshot: null,
+    });
     const snapshot = board.ok ? (board.snapshot?.payload as PublicMatStateDto) : null;
     expect(snapshot?.mat.number).toBe(1);
     expect(snapshot?.channel).toBe(liveChannel.publicMat(slug, 1));
@@ -240,6 +246,11 @@ describe('live channels', () => {
     expect(competitionMsg).toMatchObject({ v: 1, type: 'changed' });
     expect((competitionMsg.payload as { topics: string[]; matchIds: string[] }).topics).toContain('matches');
     expect((competitionMsg.payload as { matchIds: string[] }).matchIds).toContain(matchId);
+    const cacheReset = await waitFor(() =>
+      viewerMsgs.find((x) => x.channel === liveChannel.publicCompetitions),
+    );
+    // Только slug и темы — без идентификаторов.
+    expect(cacheReset).toMatchObject({ type: 'changed', payload: { slug, topics: ['matches'] } });
     await waitFor(() => staffMsgs.find((x) => x.channel === liveChannel.opsMat(w.mats[0]!.id)));
     const calledState = await waitFor(() =>
       viewerMsgs.find(

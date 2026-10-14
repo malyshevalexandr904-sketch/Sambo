@@ -4,7 +4,7 @@ import type { Prisma } from '../generated/client/index.js';
 
 type Reader = Pick<
   Prisma.TransactionClient,
-  'application' | 'entry' | 'document' | 'competition' | 'competitionCategory'
+  'application' | 'entry' | 'document' | 'competition' | 'competitionCategory' | 'match'
 >;
 
 export interface NotificationSource {
@@ -17,6 +17,12 @@ export interface NotificationSource {
   documentType?: string;
   status?: string;
   reason?: string;
+  /** Схватка (Phase 8b): номер ковра (фактический после старта, иначе по расписанию), номер схватки, плановое начало
+   *  (ISO) и часовой пояс турнира. */
+  matNumber?: string;
+  matchNumber?: string;
+  plannedAt?: string;
+  timezone?: string;
 }
 
 async function applicationSource(db: Reader, applicationId: string | undefined): Promise<NotificationSource> {
@@ -68,6 +74,38 @@ async function resultsSource(
   };
 }
 
+/** Уведомления дня соревнований (Phase 8b): турнир, ковёр, номер и время схватки, «Фамилия И.» спортсмена. */
+async function matchSource(db: Reader, params: Record<string, string>): Promise<NotificationSource> {
+  const [match, entry] = await Promise.all([
+    params.matchId
+      ? db.match.findUnique({
+          where: { id: params.matchId },
+          select: {
+            matchNumber: true,
+            mat: { select: { number: true } },
+            schedule: { select: { plannedAt: true, mat: { select: { number: true } } } },
+            competition: { select: { name: true, timezone: true } },
+          },
+        })
+      : null,
+    params.entryId
+      ? db.entry.findUnique({ where: { id: params.entryId }, select: { publicName: true } })
+      : null,
+  ]);
+  if (!match) return {};
+  const mat = match.mat?.number ?? match.schedule?.mat.number;
+  return {
+    competitionName: match.competition.name,
+    timezone: match.competition.timezone,
+    matNumber: mat !== undefined ? String(mat) : undefined,
+    matchNumber: match.matchNumber !== null ? String(match.matchNumber) : undefined,
+    plannedAt: match.schedule?.plannedAt.toISOString(),
+    athleteName: entry?.publicName,
+  };
+}
+
+const MATCH_TYPES = new Set(['match.soon', 'match.started', 'match.time_changed']);
+
 /** Названия и причина для уведомления типа `type` с параметрами `params`. Нет записи — пустой объект. */
 export async function notificationSource(
   db: Reader,
@@ -89,6 +127,7 @@ export async function notificationSource(
     };
   }
   if (type === 'results.published') return resultsSource(db, params, locale);
+  if (MATCH_TYPES.has(type)) return matchSource(db, params);
   const app = await applicationSource(db, params.applicationId);
   if (type === 'entry.rejected') {
     const entry = params.entryId

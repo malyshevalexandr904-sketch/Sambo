@@ -47,6 +47,7 @@ export function createData(
     ruleSetVersionId: input.ruleSetVersionId ?? null,
     logoFileId: input.logoFileId ?? null,
     contactInfo: input.contactInfo ?? undefined,
+    notifyMatchesAhead: input.notifyMatchesAhead ?? undefined,
     createdById: userId,
     updatedById: userId,
   };
@@ -115,6 +116,7 @@ export function updateData(
     ruleSetVersionId: patch.ruleSetVersionId,
     logoFileId: patch.logoFileId,
     contactInfo: patch.contactInfo !== undefined ? patch.contactInfo : undefined,
+    notifyMatchesAhead: patch.notifyMatchesAhead,
     updatedById: userId,
     version: { increment: 1 },
   };

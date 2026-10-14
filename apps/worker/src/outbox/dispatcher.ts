@@ -23,6 +23,9 @@ export const CONSUMERS: Partial<Record<EventType, readonly string[]>> = {
   'schedule.changed': ['notifications'],
   // Phase 8a: «опубликованы результаты» — клубу, представителям и спортсменам с учётной записью.
   'category.results_published': ['notifications'],
+  // Phase 8b: «началась схватка»; подтверждённый результат сдвигает очередь ковра — проверка «скоро выступает».
+  'match.started': ['notifications'],
+  'match.result_confirmed': ['notifications'],
 };
 
 /** Очередь потребителя: достаточно постановки задачи (очередь может принимать и другие задачи). */

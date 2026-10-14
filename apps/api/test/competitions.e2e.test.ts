@@ -420,6 +420,39 @@ describe('competition lifecycle', () => {
     expect(cancelled.body.error.code).toBe('REASON_REQUIRED');
   });
 
+  it('«bout soon» notifications: 3 bouts ahead by default, 0 switches them off, at most 10 (Phase 8b)', async () => {
+    const w = await world();
+    const c = await draft(w, { notifyMatchesAhead: 2 });
+    expect((await w.organizer.agent.get(`/api/v1/competitions/${c.id}`).expect(200)).body.data).toMatchObject(
+      {
+        notifyMatchesAhead: 2,
+      },
+    );
+    const p = await publish(w);
+    const current = (await w.organizer.agent.get(`/api/v1/competitions/${p.id}`).expect(200)).body.data;
+    expect(current.notifyMatchesAhead).toBe(3);
+    const off = await send(
+      w.organizer,
+      'patch',
+      `/api/v1/competitions/${p.id}`,
+      { notifyMatchesAhead: 0 },
+      current.version,
+    );
+    expect(off.status, JSON.stringify(off.body)).toBe(200);
+    expect(off.body.data.notifyMatchesAhead).toBe(0);
+    const tooMany = await send(
+      w.organizer,
+      'patch',
+      `/api/v1/competitions/${p.id}`,
+      { notifyMatchesAhead: 11 },
+      off.body.data.version,
+    );
+    expect(tooMany.body.error.code).toBe('VALIDATION_FAILED');
+    // Служебная настройка: на публичной странице её нет.
+    const pub = await t.http().get(`/api/public/v1/competitions/${p.slug}`).expect(200);
+    expect(pub.body.data).not.toHaveProperty('notifyMatchesAhead');
+  });
+
   it('only a draft can be deleted; its staff lose their roles', async () => {
     const w = await world();
     const c = await draft(w);

@@ -61,6 +61,15 @@ export const EnvSchema = z
 
     RATE_LIMIT_ENABLED: bool.default(true),
 
+    // Phase 8b (Web Push): пара ключей VAPID в base64url; не заданы — выводятся из AUTH_SECRET. Контакт для
+    // push-служб — `mailto:` или `https://`, по умолчанию — адрес из EMAIL_FROM.
+    WEB_PUSH_VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+    WEB_PUSH_VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+    WEB_PUSH_SUBJECT: z
+      .string()
+      .regex(/^(mailto:|https:\/\/)/, { error: 'must start with mailto: or https://' })
+      .optional(),
+
     // Phase 10 (Telegram, MAX): необязательны до включения каналов.
     TELEGRAM_BOT_TOKEN: z.string().optional(),
     MAX_BOT_TOKEN: z.string().optional(),
@@ -89,6 +98,13 @@ export const EnvSchema = z
       if (env.JWT_SECRET === env.AUTH_SECRET) {
         ctx.addIssue({ code: 'custom', path: ['AUTH_SECRET'], message: 'must differ from JWT_SECRET' });
       }
+    }
+    if (Boolean(env.WEB_PUSH_VAPID_PUBLIC_KEY) !== Boolean(env.WEB_PUSH_VAPID_PRIVATE_KEY)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['WEB_PUSH_VAPID_PRIVATE_KEY'],
+        message: 'set together with WEB_PUSH_VAPID_PUBLIC_KEY',
+      });
     }
     if (Boolean(env.JWT_PREVIOUS_SECRET) !== Boolean(env.JWT_PREVIOUS_KID)) {
       ctx.addIssue({

@@ -1,13 +1,23 @@
-// Уведомления (DATABASE.md, 3.8): по событию outbox — уведомления получателям с доставкой в ленту (сразу) и
-// на email (по настройке пользователя, отдельной задачей с повторами). Идемпотентно: ProcessedEvent и
-// уникальность (событие, получатель).
+// Уведомления (DATABASE.md, 3.8): по событию outbox — уведомления получателям с доставкой в ленту (сразу), на email и
+// push (по настройкам пользователя, отдельными задачами с повторами). Идемпотентно: ProcessedEvent и уникальность
+// (источник, получатель). Phase 8b — уведомления дня соревнований: «началась схватка» по событию, «изменилось время»
+// по правке расписания, «скоро выступает» — проверкой очереди ковров по событиям и раз в минуту.
 import { EVENT_SCHEMAS, type Locale, notificationLink, type NotificationType } from '@sde/contracts';
-import { notificationSource, type Prisma, type PrismaClient, uuidv7 } from '@sde/db';
-import { type Env, type LivePublisher, type Logger, liveUserRoom } from '@sde/server-kit';
+import { notificationSource, type PrismaClient, uuidv7 } from '@sde/db';
+import type { Env, LivePublisher, Logger } from '@sde/server-kit';
 import type { Job, Queue } from 'bullmq';
 import type { Mailer } from '../email/mailer';
 import { TemplateParamsError } from '../email/templates';
 import type { OutboxJob } from '../outbox/dispatcher';
+import { PushDelivery } from '../push/push-delivery';
+import type { PushTransport } from '../push/web-push';
+import {
+  planMatchNotifications,
+  soonCompetitions,
+  soonDueFor,
+  soonSourceKey,
+  timeChangedSourceKey,
+} from './match-day';
 import {
   affectedOrganizations,
   applicationRecipients,
@@ -17,6 +27,7 @@ import {
   resultsRecipients,
 } from './recipients';
 import { renderNotificationEmail } from './templates';
+import { NotificationWriter, type PlannedFromSource } from './writer';
 
 export type { PlannedNotification } from './recipients';
 
@@ -29,8 +40,7 @@ export interface DeliveryJob {
 /**
  * Отложенный дайджест изменений расписания одного клуба (ARCHITECTURE.md, 14.6; план Phase 6, §4): пакеты
  * ручной правки за 10 минут копятся в одной задаче (см. `scheduleDigest`) и уходят одним уведомлением.
- * `digestId` — стабильный UUID дайджеста, использованный как sourceEventId всех его уведомлений (идемпотентность
- * повтора задачи — как у store() ниже). `matchIds` растёт при слиянии повторных событий в ту же задачу.
+ * `digestId` — стабильный UUID дайджеста, использованный как sourceEventId всех его уведомлений.
  */
 export interface ScheduleDigestJob {
   kind: 'schedule-digest';
@@ -40,19 +50,37 @@ export interface ScheduleDigestJob {
   matchIds: string[];
 }
 
-export type NotificationJob = OutboxJob | DeliveryJob | ScheduleDigestJob;
+/** «Скоро выступает» (Phase 8b): проверка очереди ковров турнира и поминутный обход идущих турниров. */
+export interface SoonCheckJob {
+  kind: 'soon-check';
+  competitionId: string;
+}
+export interface SoonScanJob {
+  kind: 'soon-scan';
+}
 
-/** Задача дайджеста ещё не всплыла в очереди (не активна, не выполнена, не упала) — в неё можно слить событие. */
-const isDigestJob = (j: NotificationJob): j is ScheduleDigestJob =>
-  'kind' in j && j.kind === 'schedule-digest';
+export type NotificationJob = OutboxJob | DeliveryJob | ScheduleDigestJob | SoonCheckJob | SoonScanJob;
+
+const kindOf = (j: NotificationJob): string | null => ('kind' in j ? j.kind : null);
+const isDigestJob = (j: NotificationJob): j is ScheduleDigestJob => kindOf(j) === 'schedule-digest';
 
 /** Окно объединения изменений расписания в одно уведомление клубу (план Phase 6, §4). */
 export const SCHEDULE_DIGEST_DELAY_MS = 10 * 60 * 1000;
+/** Проверка «скоро» после события турнира: события одной команды складываются в одну проверку. */
+export const SOON_CHECK_DELAY_MS = 2_000;
+/** Поминутный обход идущих турниров (перенос, отмена, начало сессии — без событий outbox). */
+export const SOON_SCAN_EVERY_MS = 60_000;
 
-interface StoredNotification {
-  id: string;
-  userId: string;
-  type: NotificationType;
+/** События, после которых очередь ковров могла сдвинуться. */
+const SOON_TRIGGERS = new Set(['match.started', 'match.result_confirmed', 'schedule.changed']);
+/** «Изменилось время» — только о схватках, которые ещё не начались. */
+const WAITING = new Set(['SCHEDULED', 'READY', 'POSTPONED']);
+
+/** Задержки повтора задач уведомлений в тестах можно уменьшить. */
+export interface NotificationConsumerOptions {
+  /** Транспорт Web Push (ключи VAPID есть); null — push выключен. */
+  push?: PushTransport | null;
+  soonCheckDelayMs?: number;
 }
 
 /**
@@ -120,64 +148,86 @@ export async function planNotifications(
 }
 
 export class NotificationConsumer {
+  private readonly writer: NotificationWriter;
+  private readonly push: PushDelivery;
+  private readonly soonCheckDelayMs: number;
+
   constructor(
     private readonly db: PrismaClient,
     private readonly mailer: Mailer,
     private readonly queue: Queue<NotificationJob>,
     private readonly logger: Logger,
     private readonly env: Env,
-    /** Живой канал `user` (Phase 8a): колокольчик и лента обновляются сразу. Без него — опросом. */
-    private readonly live: LivePublisher | null = null,
-  ) {}
-
-  /** Новые уведомления — в канал пользователя после фиксации; сбой публикации не мешает доставке. */
-  private async announce(created: readonly StoredNotification[]): Promise<void> {
-    if (!this.live) return;
-    for (const n of created)
-      await this.live
-        .publish({
-          channel: 'user',
-          room: liveUserRoom(n.userId),
-          type: 'notification',
-          payload: { notificationId: n.id, type: n.type },
-        })
-        .catch((err: unknown) => this.logger.warn({ err }, 'Live notification publish failed'));
+    live: LivePublisher | null = null,
+    opts: NotificationConsumerOptions = {},
+  ) {
+    this.writer = new NotificationWriter(db, queue, logger, live, !!opts.push);
+    this.push = new PushDelivery(db, opts.push ?? null, logger);
+    this.soonCheckDelayMs = opts.soonCheckDelayMs ?? SOON_CHECK_DELAY_MS;
   }
 
   async handle(job: Job<NotificationJob>): Promise<void> {
-    if ('deliveryId' in job.data) return this.deliver(job as Job<DeliveryJob>);
-    if (isDigestJob(job.data)) return this.sendDigest(job.data);
-    return this.create(job.data);
+    const data = job.data;
+    if ('deliveryId' in data) {
+      if (job.name === 'deliver-push') return this.push.deliver(job as Job<DeliveryJob>);
+      return this.deliver(job as Job<DeliveryJob>);
+    }
+    if (isDigestJob(data)) return this.sendDigest(data);
+    if ('kind' in data && data.kind === 'soon-check') return this.soonCheck(data.competitionId);
+    if ('kind' in data && data.kind === 'soon-scan') return this.soonScan();
+    return this.create(data);
   }
 
   private async create({ eventId, traceId }: OutboxJob): Promise<void> {
     const done = await this.db.processedEvent.findUnique({
       where: { consumer_eventId: { consumer: NOTIFICATIONS_CONSUMER, eventId } },
     });
+    const event = await this.db.outboxEvent.findUnique({ where: { id: eventId } });
+    if (!event) return;
+    const sources = done ? [] : await this.plan(event.type, eventId, event.payload);
     if (!done) {
-      const event = await this.db.outboxEvent.findUnique({ where: { id: eventId } });
-      if (!event) return;
-      // Изменения расписания не создают уведомление сразу — они копятся в дайджесте клуба (10 минут, план §4)
-      // и не проходят через ProcessedEvent/store: у дайджеста нет единого исходного события.
-      if (event.type === 'schedule.changed') {
-        await this.scheduleDigest(event.payload);
-        await this.db.processedEvent.create({ data: { consumer: NOTIFICATIONS_CONSUMER, eventId } });
-        return;
-      }
-      const plan = await planNotifications(this.db, event.type, event.payload);
-      const created = await this.db.$transaction(async (tx) => {
-        const out: StoredNotification[] = [];
-        for (const p of plan) {
-          const n = await this.store(tx, eventId, p);
-          if (n) out.push(n);
-        }
-        await tx.processedEvent.create({ data: { consumer: NOTIFICATIONS_CONSUMER, eventId } });
-        return out;
-      });
-      this.logger.info({ eventId, traceId, notifications: plan.length }, 'Notifications created');
-      await this.announce(created);
+      const created = await this.writer.storeMany(sources, (tx) =>
+        tx.processedEvent.create({ data: { consumer: NOTIFICATIONS_CONSUMER, eventId } }),
+      );
+      this.logger.info({ eventId, traceId, notifications: created.length }, 'Notifications created');
+      await this.writer.announce(created);
     }
-    await this.enqueueEmails(eventId);
+    await this.writer.enqueueDeliveries([eventId, ...this.sourceIdsOf(event.type, eventId, event.payload)]);
+    // Очередь ковров могла сдвинуться: «скоро выступает» — проверка через пару секунд (и при повторе задачи).
+    if (event.competitionId && SOON_TRIGGERS.has(event.type))
+      await this.scheduleSoonCheck(event.competitionId);
+  }
+
+  /** Источники уведомлений события, кроме самого события (правка расписания — по схватке). */
+  private sourceIdsOf(type: string, eventId: string, payload: unknown): string[] {
+    if (type !== 'schedule.changed') return [];
+    const p = EVENT_SCHEMAS['schedule.changed'].parse(payload);
+    return p.matchIds.map((m) => timeChangedSourceKey(eventId, m));
+  }
+
+  /** Уведомления события с их источниками. */
+  private async plan(type: string, eventId: string, payload: unknown): Promise<PlannedFromSource[]> {
+    if (type === 'match.started') {
+      const p = EVENT_SCHEMAS['match.started'].parse(payload);
+      const plans = await planMatchNotifications(this.db, 'match.started', p.matchId);
+      return plans.map((plan) => ({ sourceId: eventId, plan }));
+    }
+    if (type === 'schedule.changed') {
+      // Клубу — сводка за 10 минут (Phase 6); семье и подписавшимся — по каждой перенесённой схватке сразу.
+      await this.scheduleDigest(payload);
+      const p = EVENT_SCHEMAS['schedule.changed'].parse(payload);
+      const out: PlannedFromSource[] = [];
+      for (const matchId of p.matchIds) {
+        const match = await this.db.match.findUnique({ where: { id: matchId }, select: { status: true } });
+        if (!match || !WAITING.has(match.status)) continue;
+        const sourceId = timeChangedSourceKey(eventId, matchId);
+        for (const plan of await planMatchNotifications(this.db, 'match.time_changed', matchId))
+          out.push({ sourceId, plan });
+      }
+      return out;
+    }
+    const plans = await planNotifications(this.db, type, payload);
+    return plans.map((plan) => ({ sourceId: eventId, plan }));
   }
 
   /**
@@ -213,20 +263,18 @@ export class NotificationConsumer {
   private async sendDigest(data: ScheduleDigestJob): Promise<void> {
     const userIds = await organizationRecipients(this.db, data.organizationId);
     if (userIds.length === 0) return;
-    const created = await this.db.$transaction(async (tx) => {
-      const out: StoredNotification[] = [];
-      for (const userId of userIds) {
-        const n = await this.store(tx, data.digestId, {
+    const created = await this.writer.storeMany(
+      userIds.map((userId) => ({
+        sourceId: data.digestId,
+        plan: {
           userId,
-          type: 'schedule.changed',
+          type: 'schedule.changed' as const,
           params: { competitionId: data.competitionId },
           competitionId: data.competitionId,
-        });
-        if (n) out.push(n);
-      }
-      return out;
-    });
-    await this.announce(created);
+        },
+      })),
+    );
+    await this.writer.announce(created);
     this.logger.info(
       {
         competitionId: data.competitionId,
@@ -235,59 +283,47 @@ export class NotificationConsumer {
       },
       'Schedule change digest sent',
     );
-    await this.enqueueEmails(data.digestId);
+    await this.writer.enqueueDeliveries([data.digestId]);
   }
 
   /**
-   * Письма ставятся в очередь после фиксации уведомлений — и при повторе задачи тоже: если постановка упала или
-   * worker остановился между фиксацией и постановкой, повтор найдёт ожидающие доставки (jobId не даёт дублей).
+   * Проверка «скоро» по турниру — одна на турнир за раз: задача с тем же jobId, пока она ждёт, не дублируется,
+   * а после выполнения удаляется (иначе BullMQ не принял бы следующую с тем же jobId).
    */
-  private async enqueueEmails(eventId: string): Promise<void> {
-    const pending = await this.db.notificationDelivery.findMany({
-      where: { channel: 'EMAIL', status: 'PENDING', notification: { sourceEventId: eventId } },
-      select: { id: true },
+  private async scheduleSoonCheck(competitionId: string): Promise<void> {
+    const data: SoonCheckJob = { kind: 'soon-check', competitionId };
+    await this.queue.add('soon-check', data, {
+      jobId: `soon-check-${competitionId}`,
+      delay: this.soonCheckDelayMs,
+      removeOnComplete: true,
+      removeOnFail: true,
     });
-    for (const d of pending)
-      await this.queue.add('deliver-email', { deliveryId: d.id }, { jobId: `email-${d.id}` });
   }
 
-  /** Уведомление с доставками: лента — сразу, email — по настройке и подтверждённому адресу. Повтор — null. */
-  private async store(
-    tx: Prisma.TransactionClient,
-    eventId: string,
-    p: PlannedNotification,
-  ): Promise<StoredNotification | null> {
-    const exists = await tx.notification.findUnique({
-      where: { sourceEventId_userId: { sourceEventId: eventId, userId: p.userId } },
-      select: { id: true },
-    });
-    if (exists) return null;
-    const user = await tx.user.findUnique({
-      where: { id: p.userId },
-      select: { email: true, emailVerifiedAt: true },
-    });
-    const pref = await tx.notificationPreference.findUnique({
-      where: { userId_type_channel: { userId: p.userId, type: p.type, channel: 'EMAIL' } },
-    });
-    const email = (pref?.enabled ?? true) && !!user?.email && !!user.emailVerifiedAt;
-    const id = uuidv7();
-    await tx.notification.create({
-      data: {
-        id,
-        userId: p.userId,
-        type: p.type,
-        params: p.params,
-        competitionId: p.competitionId,
-        sourceEventId: eventId,
-        deliveries: {
-          create: [
-            { id: uuidv7(), channel: 'IN_APP', status: 'SENT', attempts: 1, sentAt: new Date() },
-            { id: uuidv7(), channel: 'EMAIL', status: email ? 'PENDING' : 'SKIPPED' },
-          ],
-        },
-      },
-    });
-    return { id, userId: p.userId, type: p.type };
+  /** «Скоро выступает»: схватки, перед которыми на ковре осталось не больше N; уже объявленные — пропускаются. */
+  async soonCheck(competitionId: string): Promise<void> {
+    const due = await soonDueFor(this.db, competitionId, Date.now());
+    const sourceIds: string[] = [];
+    for (const { matchId, ahead } of due) {
+      const sourceId = soonSourceKey(matchId);
+      const announced = await this.db.notification.findFirst({
+        where: { sourceEventId: sourceId },
+        select: { id: true },
+      });
+      if (announced) continue;
+      const plans = await planMatchNotifications(this.db, 'match.soon', matchId, { ahead: String(ahead) });
+      if (plans.length === 0) continue;
+      const created = await this.writer.storeMany(plans.map((plan) => ({ sourceId, plan })));
+      await this.writer.announce(created);
+      sourceIds.push(sourceId);
+    }
+    await this.writer.enqueueDeliveries(sourceIds);
+    if (sourceIds.length > 0)
+      this.logger.info({ competitionId, matches: sourceIds.length }, 'Match soon notifications created');
+  }
+
+  private async soonScan(): Promise<void> {
+    for (const competitionId of await soonCompetitions(this.db)) await this.soonCheck(competitionId);
   }
 
   /** Письмо уведомления. Шаблон без данных (запись удалена) — FAILED без повторов; сбой отправки — повтор. */
@@ -297,7 +333,7 @@ export class NotificationConsumer {
       where: { id: deliveryId },
       include: { notification: { include: { user: { select: { email: true, locale: true } } } } },
     });
-    if (!d || d.status !== 'PENDING') return;
+    if (!d || d.status !== 'PENDING' || d.channel !== 'EMAIL') return;
     const n = d.notification;
     const locale: Locale = n.user.locale === 'en' ? 'en' : 'ru';
     const type = n.type as NotificationType;
@@ -312,7 +348,7 @@ export class NotificationConsumer {
       ) as Record<string, string>;
       const result = await this.mailer.send(
         n.user.email,
-        renderNotificationEmail(type, locale, { ...text, url }),
+        renderNotificationEmail(type, locale, { ...text, ahead: params.ahead ?? '', url }),
       );
       await this.db.notificationDelivery.update({
         where: { id: deliveryId },

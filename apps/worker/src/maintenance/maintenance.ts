@@ -67,7 +67,14 @@ export class Maintenance {
     });
     const refresh = await this.db.refreshToken.deleteMany({ where: { expiresAt: { lt: before } } });
     const verification = await this.db.verificationToken.deleteMany({ where: { expiresAt: { lt: before } } });
-    this.logger.info({ refresh: refresh.count, verification: verification.count }, 'Expired tokens removed');
+    // Push-подписки устройств, чья сессия входа закончилась (выход, истечение, отзыв), — Phase 8b.
+    const push = await this.db.$executeRaw`DELETE FROM push_subscription ps WHERE NOT EXISTS (
+      SELECT 1 FROM refresh_token rt WHERE rt.family_id = ps.session_id AND rt.revoked_at IS NULL
+        AND rt.replaced_by_id IS NULL AND rt.expires_at > now())`;
+    this.logger.info(
+      { refresh: refresh.count, verification: verification.count, pushSubscriptions: push },
+      'Expired tokens removed',
+    );
   }
 
   /** OutboxEvent и ProcessedEvent — 30 дней после обработки. */

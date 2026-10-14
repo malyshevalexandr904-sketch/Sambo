@@ -69,6 +69,9 @@ export class ChannelAccessService {
       case 'public:competition':
         await this.assertPublic(`slug:${channel.slug}`, () => this.bySlug(channel.slug));
         return { room: name, state: null, private: false };
+      case 'public:competitions':
+        // Темы изменений всех опубликованных турниров (slug, без идентификаторов): сброс кэша публичных ответов.
+        return { room: name, state: null, private: false };
       case 'public:mat': {
         const { slug, matNumber } = channel;
         // Снимок мог сохраниться, пока турнир был опубликован: публичность проверяется при каждой подписке.
