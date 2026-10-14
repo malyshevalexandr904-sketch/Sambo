@@ -139,7 +139,9 @@ describe('match soon', () => {
       expect(ch.get('EMAIL')).toBe('SKIPPED');
       expect(ch.get('PUSH')).toBe('SKIPPED');
     }
-    expect(live.published.filter((p) => (p.payload as { type: string }).type === 'match.soon')).toHaveLength(3);
+    expect(live.published.filter((p) => (p.payload as { type: string }).type === 'match.soon')).toHaveLength(
+      3,
+    );
 
     // Сдвиг очереди после объявления не создаёт второе «скоро» по той же схватке.
     await finish(db, w.q1);
@@ -156,9 +158,9 @@ describe('match soon', () => {
     // Схватка B на пустой ковёр 2, но через 3 часа — вне окна: рано.
     await db.matchSchedule.update({ where: { matchId: w.late }, data: { matId: w.mat2, orderInMat: 1 } });
     await consumer.soonCheck(w.competitionId);
-    expect((await notifications('match.soon')).filter((r) => r.sourceEventId === soonSourceKey(w.late))).toEqual(
-      [],
-    );
+    expect(
+      (await notifications('match.soon')).filter((r) => r.sourceEventId === soonSourceKey(w.late)),
+    ).toEqual([]);
     // Перенесли на через 10 минут — следующая на ковре 2: самому B и тренеру, матери A — нет.
     await db.matchSchedule.update({
       where: { matchId: w.late },
@@ -167,11 +169,17 @@ describe('match soon', () => {
     await consumer.soonCheck(w.competitionId);
     const late = (await notifications('match.soon')).filter((r) => r.sourceEventId === soonSourceKey(w.late));
     expect(late.map((r) => r.userId).sort()).toEqual([w.selfB, w.coach].sort());
-    expect(late.find((r) => r.userId === w.selfB)?.params).toMatchObject({ ahead: '0', athleteId: w.athleteB });
+    expect(late.find((r) => r.userId === w.selfB)?.params).toMatchObject({
+      ahead: '0',
+      athleteId: w.athleteB,
+    });
   });
 
   it('skips competitions that are not running and withdrawn athletes', async () => {
-    await db.entry.update({ where: { id: w.entryA }, data: { status: 'WITHDRAWN', withdrawReason: 'Травма' } });
+    await db.entry.update({
+      where: { id: w.entryA },
+      data: { status: 'WITHDRAWN', withdrawReason: 'Травма' },
+    });
     await consumer.soonCheck(w.competitionId);
     expect(await notifications('match.soon')).toHaveLength(0);
     await db.entry.update({ where: { id: w.entryA }, data: { status: 'APPROVED', withdrawReason: null } });
@@ -213,7 +221,10 @@ describe('match started and time changed', () => {
         auth: 'A'.repeat(22),
       },
     });
-    await db.match.update({ where: { id: w.ab }, data: { status: 'IN_PROGRESS', matId: w.mat1, startedAt: new Date() } });
+    await db.match.update({
+      where: { id: w.ab },
+      data: { status: 'IN_PROGRESS', matId: w.mat1, startedAt: new Date() },
+    });
     const eventId = await outbox('match.started', { matchId: w.ab, categoryId: w.categoryId });
     await consumer.handle(job({ eventId, type: 'match.started', traceId: null }));
 

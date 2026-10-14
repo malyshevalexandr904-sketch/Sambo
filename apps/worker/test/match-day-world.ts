@@ -71,7 +71,15 @@ export async function user(db: PrismaClient, email: string, personId: string | n
 async function club(db: PrismaClient, name: string): Promise<string> {
   const id = uuidv7();
   await db.organization.create({
-    data: { id, type: 'CLUB', name, shortName: name, slug: `club-${id.slice(-12)}`, countryCode: 'RU', status: 'ACTIVE' },
+    data: {
+      id,
+      type: 'CLUB',
+      name,
+      shortName: name,
+      slug: `club-${id.slice(-12)}`,
+      countryCode: 'RU',
+      status: 'ACTIVE',
+    },
   });
   return id;
 }
@@ -234,7 +242,12 @@ async function competition(db: PrismaClient, organizerOrganizationId: string): P
 }
 
 /** Люди вокруг спортсменов A и B: представитель, сам спортсмен, тренер-подписчик, не получатели. */
-async function people(db: PrismaClient, clubId: string, a: { athleteId: string }, b: { athleteId: string; personId: string }) {
+async function people(
+  db: PrismaClient,
+  clubId: string,
+  a: { athleteId: string },
+  b: { athleteId: string; personId: string },
+) {
   const motherPerson = await person(db, 'Иванова', '1985-01-01');
   const mother = await user(db, 'mother@family.test', motherPerson);
   await db.guardian.create({

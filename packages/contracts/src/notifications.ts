@@ -217,7 +217,8 @@ export function pushEndpointProblem(endpoint: string): string | null {
   if (url.username || url.password) return 'credentials';
   if (url.port && url.port !== '443') return 'port';
   const host = url.hostname.toLowerCase();
-  if (host.startsWith('[') || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || /^[0-9a-f:]+$/.test(host)) return 'ip_host';
+  if (host.startsWith('[') || /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || /^[0-9a-f:]+$/.test(host))
+    return 'ip_host';
   if (!host.includes('.') || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local'))
     return 'local_host';
   return null;

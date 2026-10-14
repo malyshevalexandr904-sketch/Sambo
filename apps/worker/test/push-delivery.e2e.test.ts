@@ -77,9 +77,17 @@ beforeEach(async () => {
   w = await matchDayWorld(db);
   queue = new FakeQueue();
   service = new FakePushService();
-  consumer = new NotificationConsumer(db, mailer, queue as unknown as Queue<NotificationJob>, logger, env, null, {
-    push: new WebPushTransport(keys, service.requester),
-  });
+  consumer = new NotificationConsumer(
+    db,
+    mailer,
+    queue as unknown as Queue<NotificationJob>,
+    logger,
+    env,
+    null,
+    {
+      push: new WebPushTransport(keys, service.requester),
+    },
+  );
 });
 
 const pushDelivery = async (userId: string) =>
