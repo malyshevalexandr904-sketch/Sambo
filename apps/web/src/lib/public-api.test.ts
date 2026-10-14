@@ -6,7 +6,6 @@ import { applyFeedMessage } from './public-cache-feed';
 vi.mock('./public-cache-feed', async (orig) => ({
   ...(await orig<typeof feed>()),
   startPublicCacheFeed: vi.fn(),
-  publicFeedReady: () => false,
 }));
 
 const { invalidatePublic, publicApi } = await import('./public-api');

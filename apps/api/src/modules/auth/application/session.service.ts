@@ -133,7 +133,14 @@ export class SessionService {
     return outcome.session;
   }
 
+  /**
+   * Отзыв всего семейства. Сначала строки семейства блокируются, затем — отдельной командой — отзыв: если в это
+   * время идёт обновление сессии (ротация создаёт новый токен), блокировка дождётся его commit, а отзыв увидит и
+   * новый токен (READ COMMITTED: снимок — на каждую команду). Иначе выход мог проиграть обновлению в соседней
+   * вкладке и оставить сессию с неотозванным токеном (и push на устройство — Phase 8b).
+   */
   private async revokeFamilyTx(tx: Tx, familyId: string, reason: string): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM refresh_token WHERE family_id = ${familyId}::uuid FOR UPDATE`;
     await tx.refreshToken.updateMany({
       where: { familyId, revokedAt: null },
       data: { revokedAt: new Date(), revokeReason: reason },

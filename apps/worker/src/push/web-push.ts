@@ -3,6 +3,7 @@
 // хоста проверяется заранее (contracts: pushEndpointProblem), а адрес, в который оно разрешилось, — при самом
 // подключении (lookup агента): внутренние и служебные адреса отклоняются, подмена DNS между проверкой и запросом
 // не помогает.
+import { ECDH } from 'node:crypto';
 import { type LookupAddress, lookup as dnsLookup } from 'node:dns';
 import { Agent, request } from 'node:https';
 import { BlockList, isIP } from 'node:net';
@@ -95,6 +96,17 @@ export function guardedLookup(hostname: string, options: object, callback: Looku
   });
 }
 
+/** Ключи устройства по RFC 8291: точка P-256 без сжатия и секрет 16 байт; иначе — причина отказа. */
+export function deviceKeysProblem(keys: PushTarget['keys']): string | null {
+  try {
+    ECDH.convertKey(Buffer.from(keys.p256dh, 'base64url'), 'prime256v1');
+  } catch {
+    return 'push subscription p256dh is not a P-256 point';
+  }
+  if (Buffer.from(keys.auth, 'base64url').length !== 16) return 'push subscription auth is not 16 bytes';
+  return null;
+}
+
 /** Запрос к push-службе: зашифрованное тело и заголовки (VAPID, TTL, Urgency, Topic). */
 export interface PushRequest {
   endpoint: string;
@@ -138,23 +150,21 @@ export class WebPushTransport implements PushTransport {
   async send(target: PushTarget, payload: string, opts: PushSendOptions): Promise<{ statusCode: number }> {
     const problem = pushEndpointProblem(target.endpoint);
     if (problem) throw new PushEndpointRejected(problem);
-    let details: ReturnType<typeof webpush.generateRequestDetails>;
-    try {
-      details = webpush.generateRequestDetails(target, payload, {
-        vapidDetails: {
-          subject: this.keys.subject,
-          publicKey: this.keys.publicKey,
-          privateKey: this.keys.privateKey,
-        },
-        TTL: opts.ttlSeconds,
-        urgency: opts.urgency,
-        topic: opts.topic,
-        contentEncoding: 'aes128gcm',
-      });
-    } catch (e) {
-      // Ключ устройства — не точка P-256 (или неверный секрет): зашифровать нельзя никогда, подписка негодна.
-      throw new PushEndpointRejected(`push subscription keys rejected: ${(e as Error).message}`);
-    }
+    // Ключи устройства — до библиотеки: ключ не на кривой P-256 (или секрет не 16 байт) зашифровать нельзя никогда —
+    // подписка негодна. Остальные ошибки библиотеки (настройка сервера) — не повод удалять устройства.
+    const keysProblem = deviceKeysProblem(target.keys);
+    if (keysProblem) throw new PushEndpointRejected(keysProblem);
+    const details = webpush.generateRequestDetails(target, payload, {
+      vapidDetails: {
+        subject: this.keys.subject,
+        publicKey: this.keys.publicKey,
+        privateKey: this.keys.privateKey,
+      },
+      TTL: opts.ttlSeconds,
+      urgency: opts.urgency,
+      topic: opts.topic,
+      contentEncoding: 'aes128gcm',
+    });
     return this.requester({
       endpoint: details.endpoint,
       headers: details.headers,

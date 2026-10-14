@@ -126,16 +126,19 @@ export class FollowsService {
         })
       : [];
     const names = new Map(profiles.map((p) => [p.id, publicName(p.person.lastName, p.person.firstName)]));
-    const out: FollowDto[] = [];
-    for (const r of rows) {
-      if (!names.has(r.targetId)) continue;
-      out.push({
-        athleteId: r.targetId,
-        name: (await this.sees(user, r.targetId)) ? (names.get(r.targetId) as string) : null,
-        createdAt: r.createdAt.toISOString(),
-      });
+    const known = rows.filter((r) => names.has(r.targetId));
+    // Доступ к карточке — по 20 проверок одновременно (подписок бывает до 1000).
+    const visible = new Set<string>();
+    for (let i = 0; i < known.length; i += 20) {
+      const chunk = known.slice(i, i + 20);
+      const seen = await Promise.all(chunk.map((r) => this.sees(user, r.targetId)));
+      chunk.forEach((r, j) => seen[j] && visible.add(r.targetId));
     }
-    return out;
+    return known.map((r) => ({
+      athleteId: r.targetId,
+      name: visible.has(r.targetId) ? (names.get(r.targetId) as string) : null,
+      createdAt: r.createdAt.toISOString(),
+    }));
   }
 
   private async sees(user: AuthUser, athleteId: string): Promise<boolean> {

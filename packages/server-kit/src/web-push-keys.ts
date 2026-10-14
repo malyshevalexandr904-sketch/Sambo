@@ -47,10 +47,24 @@ function defaultSubject(emailFrom: string): string {
   return `mailto:${address.trim()}`;
 }
 
+/**
+ * Контакт как его проверяет библиотека отправки: `mailto:` с адресом или разбираемый `https://` с хостом. Неверный
+ * контакт — push выключен целиком (иначе каждая отправка падала бы).
+ */
+function validSubject(subject: string): boolean {
+  if (/^mailto:[^\s@]+@[^\s@]+$/.test(subject)) return true;
+  try {
+    const u = new URL(subject);
+    return u.protocol === 'https:' && u.hostname.length > 0 && !/\s/.test(subject);
+  } catch {
+    return false;
+  }
+}
+
 export function webPushKeys(env: WebPushEnv): WebPushKeys {
   const subject = env.WEB_PUSH_SUBJECT ?? defaultSubject(env.EMAIL_FROM);
-  if (!/^(mailto:|https:\/\/)/.test(subject))
-    throw new WebPushKeyError('WEB_PUSH_SUBJECT must start with mailto: or https://');
+  if (!validSubject(subject))
+    throw new WebPushKeyError('WEB_PUSH_SUBJECT must be a mailto: address or an https:// URL');
   if (env.WEB_PUSH_VAPID_PUBLIC_KEY && env.WEB_PUSH_VAPID_PRIVATE_KEY) {
     const priv = Buffer.from(env.WEB_PUSH_VAPID_PRIVATE_KEY, 'base64url');
     const pub = Buffer.from(env.WEB_PUSH_VAPID_PUBLIC_KEY, 'base64url');

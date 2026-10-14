@@ -24,11 +24,6 @@ interface FeedState {
 
 const g = globalThis as typeof globalThis & { __sdePublicCacheFeed?: FeedState };
 
-/** Соединение подписано и сообщения идут подряд: кэш сбрасывается по событиям. */
-export function publicFeedReady(): boolean {
-  return g.__sdePublicCacheFeed?.ready === true;
-}
-
 /**
  * Сообщение канала: номера идут подряд — сбросить записи турнира; пропуск — сбросить всё. Возвращает новый
  * последний номер.

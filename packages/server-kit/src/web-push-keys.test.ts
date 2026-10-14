@@ -58,6 +58,7 @@ describe('VAPID keys', () => {
         WEB_PUSH_VAPID_PRIVATE_KEY: jwk.d,
       }),
     ).toThrow(WebPushKeyError);
-    expect(() => webPushKeys({ ...base, WEB_PUSH_SUBJECT: 'http://localhost' })).toThrow(WebPushKeyError);
+    for (const bad of ['http://localhost', 'https://', 'https://my host.ru', 'mailto:', 'mailto:no address'])
+      expect(() => webPushKeys({ ...base, WEB_PUSH_SUBJECT: bad }), bad).toThrow(WebPushKeyError);
   });
 });

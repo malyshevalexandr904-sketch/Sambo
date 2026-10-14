@@ -1,3 +1,4 @@
+import { createECDH, randomBytes } from 'node:crypto';
 import webpush from 'web-push';
 import { describe, expect, it } from 'vitest';
 import { guardedLookup, isPublicAddress, PushEndpointRejected, WebPushTransport } from './web-push';
@@ -53,5 +54,28 @@ describe('web push transport', () => {
       t.send({ endpoint: 'https://push.example.com/x', keys: good }, '{}', opts),
     ).rejects.toBeInstanceOf(PushEndpointRejected);
     t.close();
+  });
+
+  it('a server misconfiguration is not blamed on the device (the subscription is kept, delivery retried)', async () => {
+    const device = createECDH('prime256v1');
+    const target = {
+      endpoint: 'https://push.example.com/x',
+      keys: {
+        p256dh: device.generateKeys().toString('base64url'),
+        auth: randomBytes(16).toString('base64url'),
+      },
+    };
+    const broken = new WebPushTransport({ ...keys, subject: 'https://my host.ru' }, send);
+    const err = await broken
+      .send(target, '{}', { ttlSeconds: 60, urgency: 'normal' })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect(err).not.toBeInstanceOf(PushEndpointRejected);
+    broken.close();
+    const ok = new WebPushTransport(keys, send);
+    await expect(ok.send(target, '{}', { ttlSeconds: 60, urgency: 'normal' })).resolves.toEqual({
+      statusCode: 201,
+    });
+    ok.close();
   });
 });
