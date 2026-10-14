@@ -1,7 +1,16 @@
 // Письма уведомлений по локалям (DATABASE.md, 3.8). В письмах нет ПДн детей (SECURITY.md, 3.7): имя спортсмена
 // и место показываются только в приложении, куда пользователь входит с проверкой прав.
-import type { Locale, NotificationType } from '@sde/contracts';
+import { isMatchDayNotification, type Locale, type NotificationType } from '@sde/contracts';
 import { type RenderedEmail, renderDefinition, type TemplateDef } from '../email/templates';
+import { renderPush } from './push-templates';
+
+/** Письмо о схватке (Phase 8b): та же строка, что в push, — ковёр, номер, время, турнир; без имён. */
+const matchDay = (subject: string, more: string, action: string): TemplateDef => ({
+  subject: `${subject} — SAMBO Digital`,
+  lines: ['{details}.', more],
+  action: { label: action, param: 'url' },
+  required: ['details', 'url'],
+});
 
 const STATUS: Record<Locale, Record<string, string>> = {
   ru: { APPROVED: 'одобрена', REJECTED: 'отклонена' },
@@ -66,6 +75,9 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       action: { label: 'Посмотреть результаты', param: 'url' },
       required: ['competitionName', 'categoryName', 'url'],
     },
+    'match.soon': matchDay('Скоро схватка', 'Подробности — в приложении.', 'Открыть'),
+    'match.started': matchDay('Схватка началась', 'Подробности — в приложении.', 'Открыть'),
+    'match.time_changed': matchDay('Изменилось время схватки', 'Подробности — в приложении.', 'Открыть'),
   },
   en: {
     'application.returned': {
@@ -124,6 +136,9 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       action: { label: 'View results', param: 'url' },
       required: ['competitionName', 'categoryName', 'url'],
     },
+    'match.soon': matchDay('Bout coming up', 'Details are in the app.', 'Open'),
+    'match.started': matchDay('Bout started', 'Details are in the app.', 'Open'),
+    'match.time_changed': matchDay('Bout time changed', 'Details are in the app.', 'Open'),
   },
 };
 
@@ -133,5 +148,10 @@ export function renderNotificationEmail(
   params: Record<string, string>,
 ): RenderedEmail {
   const statusText = params.status ? (STATUS[locale][params.status] ?? params.status) : '';
-  return renderDefinition(TEMPLATES[locale][type], `notification:${type}`, locale, { ...params, statusText });
+  const details = isMatchDayNotification(type) ? renderPush(type, { ...params, locale }).body : '';
+  return renderDefinition(TEMPLATES[locale][type], `notification:${type}`, locale, {
+    ...params,
+    statusText,
+    details,
+  });
 }

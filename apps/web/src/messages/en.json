@@ -514,7 +514,11 @@
     "addRank": "Add rank",
     "notFound": "Athlete not found",
     "notFoundHint": "There is no such record or the athlete belongs to another club: other clubs’ data is not shown.",
-    "backToList": "Back to athletes"
+    "backToList": "Back to athletes",
+    "follow": {
+      "follow": "Notify me about bouts",
+      "hint": "On competition day: coming up, started, time changed. Sent to coaches and managers of the club that entered the athlete in the tournament."
+    }
   },
   "guardians": {
     "title": "Legal guardians",
@@ -1119,7 +1123,10 @@
       "WITHDRAW": "withdrawal from the competition",
       "RECHECK": "a recheck within the window",
       "TRANSFER": "transfer to a category that fits"
-    }
+    },
+    "notifyMatchesAhead": "“Bout coming up” notification",
+    "notifyMatchesAheadHint": "Sent to guardians, athletes and following coaches when this many bouts are left before the athlete's bout on their mat.",
+    "notifyMatchesAheadOption": "{n, plural, =0 {Do not notify} one {# bout ahead} other {# bouts ahead}}"
   },
   "applications": {
     "cardTitle": "Competition application",
@@ -1226,6 +1233,13 @@
       "transferConfirm": "Transfer",
       "transferTitle": "Transfer {name} to another category",
       "cancel": "Cancel"
+    },
+    "follow": {
+      "title": "Bout notifications",
+      "hint": "On competition day the coach and the club manager get notifications about the bouts of the athletes they follow: coming up, started, time changed. You can also follow an athlete from their card.",
+      "followAll": "Notify me about bouts of all athletes in the application",
+      "unfollowAll": "Turn off for all",
+      "result": "Notifications are on for {following} of {total, plural, one {# athlete} other {# athletes}} in the application."
     }
   },
   "tournaments": {
@@ -1511,20 +1525,63 @@
       "results_published": {
         "title": "Results published: {categoryName}",
         "body": "Tournament \"{competitionName}\". Places and medals are in the Results section of the athlete card."
+      },
+      "match_soon": {
+        "title": "Bout coming up: {athleteName}",
+        "titleNoName": "Bout coming up",
+        "body": "{ahead, plural, =0 {Next up} one {In # bout} other {In # bouts}} · mat {matNumber} · bout № {matchNumber} · “{competitionName}”"
+      },
+      "match_started": {
+        "title": "Bout started: {athleteName}",
+        "titleNoName": "Bout started",
+        "body": "Mat {matNumber} · bout № {matchNumber} · “{competitionName}”"
+      },
+      "match_time_changed": {
+        "title": "Bout time changed: {athleteName}",
+        "titleNoName": "Bout time changed",
+        "body": "Now about {time} · mat {matNumber} · bout № {matchNumber} · “{competitionName}”"
       }
     },
-    "preferencesTitle": "Email",
-    "preferencesHint": "Notifications are always shown here. Emails can be switched off per kind.",
+    "preferencesTitle": "Email and push",
+    "preferencesHint": "Notifications are always shown here. Emails and push can be switched off per kind; push goes to the devices where you turned it on.",
     "prefs": {
       "application_returned": "Application returned",
       "application_decided": "Application decision",
       "entry_rejected": "Entry rejected",
       "document_rejected": "Document rejected",
       "schedule_changed": "Schedule changes",
-      "results_published": "Results published"
+      "results_published": "Results published",
+      "match_soon": "Bout coming up",
+      "match_started": "Bout started",
+      "match_time_changed": "Bout time changed"
     },
     "saved": "Saved",
-    "noValue": "—"
+    "noValue": "—",
+    "channels": {
+      "EMAIL": "Email",
+      "PUSH": "Push"
+    },
+    "kind": "Notification kind",
+    "push": {
+      "title": "Push on this device",
+      "hint": "Bout notifications reach your phone even when the site is closed. The lock screen never shows athlete names.",
+      "enable": "Get notifications on this device",
+      "disable": "Turn off on this device",
+      "enabled": "On for this device.",
+      "unsupported": "This browser does not support push notifications. Notifications stay in the feed and reach your other devices.",
+      "iosHomeScreen": "On iPhone and iPad push works for the site added to the Home Screen (iOS 16.4 or later): tap Share → Add to Home Screen and open the site from its icon.",
+      "serverOff": "Push notifications are not configured on the server.",
+      "denied": "Notifications for this site are blocked in the browser settings. Allow them and reload the page.",
+      "dismissed": "Permission was not granted. Press the button again and choose Allow.",
+      "devices": "Devices with push",
+      "noDevices": "Push is not on for any device yet.",
+      "device": "{browser} · {os}",
+      "unknownDevice": "Device",
+      "added": "added {date}",
+      "lastUsed": "last notification {date}",
+      "remove": "Remove",
+      "removeDevice": "Remove device “{device}”, {added}"
+    }
   },
   "draws": {
     "title": "Draw",

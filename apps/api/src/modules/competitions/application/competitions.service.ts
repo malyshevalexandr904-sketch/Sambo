@@ -129,6 +129,7 @@ export class CompetitionsService {
       cancelReason: row.cancelReason,
       counters: await this.extensions.countersFor(row.id),
       weighInFailureOutcome: row.weighInFailureOutcome,
+      notifyMatchesAhead: row.notifyMatchesAhead,
       writeAuthority: await this.leases.authority(row.id),
       viewer: { roles, staff: actions.includes('competition.view') },
       version: row.version,

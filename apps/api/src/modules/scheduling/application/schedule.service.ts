@@ -15,6 +15,7 @@ import { isStartedOrPlayed, MatchesService } from '../../matches';
 import { OutboxService } from '../../outbox';
 import { WriteLeaseService } from '../../venue-sync';
 import { type GenerateScheduleInput, generateSchedule } from '../domain/generator';
+import { scheduleChanges } from '../domain/schedule-changes';
 import { computeTimeline, type TimelineItem } from '../domain/timeline';
 import {
   assembleSchedule,
@@ -28,6 +29,8 @@ import { lockCompetitionShared, lockOrCreateSchedule } from './schedule-locks';
 import { ScheduleQueriesService } from './schedule-queries.service';
 
 const CANDIDATES: readonly PermissionCode[] = ['schedule.manage', 'schedule.publish'];
+/** Схваток в одном событии `schedule.changed` (contracts: EVENT_SCHEMAS). */
+const SCHEDULE_CHANGED_MAX = 500;
 
 @Injectable()
 export class ScheduleService {
@@ -113,6 +116,10 @@ export class ScheduleService {
       const result = generateSchedule(input);
 
       const touchedIds = new Set(matches.filter((m) => !m.pinned).map((m) => m.id));
+      const replaced = await tx.matchSchedule.findMany({
+        where: { matchId: { in: [...touchedIds] } },
+        select: { matchId: true, matId: true, plannedAt: true },
+      });
       if (touchedIds.size > 0) {
         await tx.matchSchedule.deleteMany({ where: { matchId: { in: [...touchedIds] } } });
         const toCreate = result.placements.filter((p) => touchedIds.has(p.matchId));
@@ -131,6 +138,15 @@ export class ScheduleService {
           });
         }
       }
+
+      // Генерация после публикации переставляет схватки — те же уведомления, что у ручной правки.
+      const regenerated = scheduleChanges(
+        new Map(replaced.map((r) => [r.matchId, r])),
+        result.placements
+          .filter((p) => touchedIds.has(p.matchId))
+          .map((p) => ({ matchId: p.matchId, matId: p.matId, plannedAt: toDate(p.plannedAt) })),
+      );
+      await this.notifyChanged(tx, competitionId, regenerated.changed, regenerated.noticeable);
 
       await this.audit.record(tx, {
         action: 'schedule.generated',
@@ -250,6 +266,18 @@ export class ScheduleService {
       if (timeline.warnings.length > 0 && !req.confirm)
         throw new DomainError('SCHEDULE_CONFIRM_REQUIRED', { warnings: timeline.warnings });
 
+      // Что изменилось на самом деле — у переставленных и у сдвинутых пересчётом (каскад на ковре): клубам — сводка
+      // по всем, семьям — «изменилось время», если сменился ковёр или время сдвинулось заметно (Phase 8b).
+      const placedIds = new Set(timeline.placements.map((p) => p.matchId));
+      const { changed, noticeable } = scheduleChanges(
+        new Map(existingItems.filter((r) => placedIds.has(r.matchId)).map((r) => [r.matchId, r])),
+        timeline.placements.map((p) => ({
+          matchId: p.matchId,
+          matId: p.matId,
+          plannedAt: toDate(p.plannedAt),
+        })),
+      );
+
       for (const p of timeline.placements) {
         const before = beforeById.get(p.matchId);
         const move = moveByMatch.get(p.matchId);
@@ -312,11 +340,7 @@ export class ScheduleService {
         platformIntervention: viaPlatform,
       });
 
-      await this.notifyChanged(
-        tx,
-        competitionId,
-        [...finalSlot.keys()].filter((id) => moveByMatch.has(id)),
-      );
+      await this.notifyChanged(tx, competitionId, changed, noticeable);
     });
 
     return this.queries.build(this.db, competitionId, allowedActions);
@@ -380,18 +404,33 @@ export class ScheduleService {
   }
 
   /**
-   * После публикации изменение мест схваток уходит клубам их участников одним событием на пакет
-   * (план §4: правки за 10 минут сливаются в одно уведомление — worker/notification.consumer.ts).
+   * Событие правки опубликованного расписания (ручная правка, генерация): `matchIds` — схватки, у которых сменились
+   * время или ковёр, — клубам их участников (план Phase 6, §4: правки за 10 минут сливаются в одно уведомление);
+   * `timeChangedMatchIds` — те из них, о которых сообщить семьям (Phase 8b). Больше 500 схваток — несколькими
+   * событиями. До публикации — ничего.
    */
-  private async notifyChanged(tx: Tx, competitionId: string, matchIds: string[]): Promise<void> {
+  private async notifyChanged(
+    tx: Tx,
+    competitionId: string,
+    matchIds: string[],
+    timeChangedMatchIds: string[],
+  ): Promise<void> {
     if (matchIds.length === 0) return;
     const schedule = await tx.schedule.findUnique({ where: { competitionId }, select: { status: true } });
     if (schedule?.status !== 'PUBLISHED') return;
-    await this.outbox.enqueue(tx, {
-      type: 'schedule.changed',
-      aggregate: { type: 'Schedule', id: competitionId },
-      payload: { competitionId, matchIds },
-      competitionId,
-    });
+    const notice = new Set(timeChangedMatchIds);
+    for (let i = 0; i < matchIds.length; i += SCHEDULE_CHANGED_MAX) {
+      const chunk = matchIds.slice(i, i + SCHEDULE_CHANGED_MAX);
+      await this.outbox.enqueue(tx, {
+        type: 'schedule.changed',
+        aggregate: { type: 'Schedule', id: competitionId },
+        payload: {
+          competitionId,
+          matchIds: chunk,
+          timeChangedMatchIds: chunk.filter((id) => notice.has(id)),
+        },
+        competitionId,
+      });
+    }
   }
 }

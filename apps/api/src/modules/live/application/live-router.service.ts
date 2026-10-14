@@ -2,7 +2,13 @@
 // получают «что изменилось» (экраны перечитывают данные по REST), публичные каналы ковров и схваток — состояние
 // для табло (ADR-15: публичная проекция), публичный канал турнира — темы изменений.
 import { Injectable, Logger } from '@nestjs/common';
-import { LIVE_LAST_RESULT_MS, LIVE_TOPICS, liveChannel, type LiveTopic } from '@sde/contracts';
+import {
+  LIVE_LAST_RESULT_MS,
+  LIVE_TOPICS,
+  liveChannel,
+  type LiveCompetitionChangedPayload,
+  type LiveTopic,
+} from '@sde/contracts';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { isPublicCompetition, ScoreboardService } from '../../refereeing';
 import {
@@ -32,6 +38,14 @@ const TOUCHED_SELECT = {
   finishedAt: true,
   schedule: { select: { matId: true } },
 } as const;
+
+/**
+ * Темы, меняющие кэшируемые публичные ответы турнира (страница турнира: данные, требования, статусы категорий;
+ * список турниров): сброс кэша сервера web. Схватки, расписание, итоги и участия — нет: участие меняется при каждом
+ * вызове и старте схватки (текущая схватка спортсмена), и сервер web перечитывал бы страницу турнира впустую; число
+ * участников на странице обновляется по сроку кэша (60 с), как до 0.11.0.
+ */
+const CACHE_TOPICS: readonly LiveTopic[] = ['competition', 'categories'];
 
 /** Схватка вызвана, идёт или на паузе. */
 const LIVE_MATCH_STATUSES = ['READY', 'IN_PROGRESS', 'PAUSED'] as const;
@@ -181,6 +195,15 @@ export class LiveRouterService {
         channel: liveChannel.publicCompetition(slug),
         type: 'changed',
         payload: { topics, categoryIds: [], matIds: [], matchIds: [] },
+      });
+    // Сервер web сбрасывает по нему кэш публичных ответов турнира (Phase 8b); страница турнира показывает и число
+    // участников категорий — изменения участий тоже.
+    const cacheTopics = [...g.topics].filter((t) => CACHE_TOPICS.includes(t));
+    if (cacheTopics.length > 0)
+      await this.publisher.publish({
+        channel: liveChannel.publicCompetitions,
+        type: 'changed',
+        payload: { slug, topics: cacheTopics } satisfies LiveCompetitionChangedPayload,
       });
     for (const matId of mats)
       await this.safely(async () => {

@@ -8,6 +8,9 @@ paths = [
   '''\.env\.example$''',
   '''apps/api/test/.*''',
   '''packages/server-kit/src/.*\.test\.ts$''',
+  # Unit-тесты web и worker: открытые ключи VAPID и учебные ключи устройств (Phase 8b) — не секреты.
+  '''apps/(web|worker)/src/.*\.test\.ts$''',
+  '''apps/worker/test/.*''',
   '''docker-compose\.yml$''',
   '''\.github/workflows/ci\.yml$''',
   '''pnpm-lock\.yaml$''',

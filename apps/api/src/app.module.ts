@@ -30,6 +30,7 @@ import { DictionariesModule } from './modules/dictionaries';
 import { DocumentsModule } from './modules/documents';
 import { DrawsModule } from './modules/draws';
 import { FilesModule } from './modules/files';
+import { FollowsModule } from './modules/follows';
 import { HealthModule } from './modules/health';
 import { LiveModule } from './modules/live';
 import { MedicalModule } from './modules/medical';
@@ -111,6 +112,7 @@ import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
     RefereeingModule,
     MedicalModule,
     NotificationsModule,
+    FollowsModule,
     PublicModule,
     LiveModule,
     AdminModule,

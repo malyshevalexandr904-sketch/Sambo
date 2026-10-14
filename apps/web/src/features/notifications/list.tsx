@@ -1,7 +1,9 @@
 'use client';
 // Уведомления пользователя (API.md, 5.8): лента с текстом по типу (шаблоны — в словарях приложения), отметка
-// прочтения, настройки писем по видам. Имена и причины сервер подставляет из исходных записей при чтении.
+// прочтения, настройки писем и push по видам, push на этом устройстве (Phase 8b). Имена и причины сервер
+// подставляет из исходных записей при чтении.
 import {
+  CONFIGURABLE_CHANNELS,
   type DataEnvelope,
   type NotificationDto,
   type NotificationPreferenceDto,
@@ -16,12 +18,37 @@ import { useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { useAction } from '@/lib/use-action';
+import { PushDeviceCard } from './push-device';
 
 const key = (type: string): string => type.replace('.', '_');
+
+/** Время схватки в поясе турнира; другой день — с датой. */
+export function matchTime(
+  iso: string | undefined,
+  timezone: string | undefined,
+  locale: string,
+): string | null {
+  if (!iso) return null;
+  try {
+    const at = new Date(iso);
+    const day = (d: Date) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: timezone, dateStyle: 'short' }).format(d);
+    const sameDay = day(at) === day(new Date());
+    return new Intl.DateTimeFormat(locale, {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      ...(sameDay ? {} : { day: 'numeric', month: 'short' }),
+    }).format(at);
+  } catch {
+    return null;
+  }
+}
 
 function useNotificationText(): (n: NotificationDto) => { title: string; body: string } {
   const t = useTranslations('notifications');
   const statuses = useTranslations('applications.statuses');
+  const locale = useLocale();
   return (n) => {
     const none = t('noValue');
     const values = {
@@ -32,8 +59,18 @@ function useNotificationText(): (n: NotificationDto) => { title: string; body: s
       documentType: n.context.documentType ?? none,
       reason: n.context.reason ?? none,
       status: n.context.status && statuses.has(n.context.status) ? statuses(n.context.status) : none,
+      matNumber: n.context.matNumber ?? none,
+      matchNumber: n.context.matchNumber ?? none,
+      time: matchTime(n.context.plannedAt, n.context.timezone, locale) ?? none,
+      ahead: Number(n.params.ahead ?? 0),
     };
-    return { title: t(`types.${key(n.type)}.title`, values), body: t(`types.${key(n.type)}.body`, values) };
+    const k = key(n.type);
+    // Схватка двух своих спортсменов или нет доступа к карточке — заголовок без имени.
+    const title =
+      !n.context.athleteName && t.has(`types.${k}.titleNoName`)
+        ? t(`types.${k}.titleNoName`)
+        : t(`types.${k}.title`, values);
+    return { title, body: t(`types.${k}.body`, values) };
   };
 }
 
@@ -46,40 +83,74 @@ function Preferences() {
     queryFn: async () =>
       (await api<DataEnvelope<NotificationPreferenceDto[]>>('/me/notification-preferences')).data,
   });
+  const rows = prefs.data ?? [];
+  const types = [...new Set(rows.map((p) => p.type))];
+  const PREFS = ['me', 'notification-preferences'];
+  // Отметка меняется сразу; ответ сервера — итоговое состояние, ошибка — возврат к сохранённому.
+  const save = (p: NotificationPreferenceDto, enabled: boolean): void => {
+    queryClient.setQueryData<NotificationPreferenceDto[]>(PREFS, (old) =>
+      old?.map((x) => (x.type === p.type && x.channel === p.channel ? { ...x, enabled } : x)),
+    );
+    void action
+      .run(async () => {
+        const r = await api<DataEnvelope<NotificationPreferenceDto[]>>('/me/notification-preferences', {
+          method: 'PUT',
+          body: { preferences: [{ type: p.type, channel: p.channel, enabled }] },
+        });
+        queryClient.setQueryData(PREFS, r.data);
+        return true;
+      })
+      .then((ok) => {
+        if (!ok) void queryClient.invalidateQueries({ queryKey: PREFS });
+      });
+  };
   return (
     <Card>
       <CardTitle>{t('preferencesTitle')}</CardTitle>
       <p className="mb-3 text-sm text-slate-600">{t('preferencesHint')}</p>
       {action.error ? <Alert tone="danger">{action.error}</Alert> : null}
-      <ul className="space-y-1">
-        {(prefs.data ?? []).map((p) => (
-          <li key={`${p.type}:${p.channel}`}>
-            <label className="flex min-h-11 items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="h-5 w-5"
-                checked={p.enabled}
-                disabled={action.busy}
-                onChange={(e) =>
-                  void action.run(async () => {
-                    const r = await api<DataEnvelope<NotificationPreferenceDto[]>>(
-                      '/me/notification-preferences',
-                      {
-                        method: 'PUT',
-                        body: {
-                          preferences: [{ type: p.type, channel: p.channel, enabled: e.target.checked }],
-                        },
-                      },
-                    );
-                    queryClient.setQueryData(['me', 'notification-preferences'], r.data);
-                  })
-                }
-              />
-              {t(`prefs.${key(p.type)}`)}
-            </label>
-          </li>
-        ))}
-      </ul>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left text-xs text-slate-500">
+            <th scope="col" className="py-1 font-medium">
+              {t('kind')}
+            </th>
+            {CONFIGURABLE_CHANNELS.map((c) => (
+              <th key={c} scope="col" className="w-16 py-1 text-center font-medium">
+                {t(`channels.${c}`)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {types.map((type) => (
+            <tr key={type} className="border-t border-slate-100">
+              <th scope="row" className="py-1 pr-2 text-left font-normal">
+                {t(`prefs.${key(type)}`)}
+              </th>
+              {CONFIGURABLE_CHANNELS.map((channel) => {
+                const p = rows.find((r) => r.type === type && r.channel === channel);
+                return (
+                  <td key={channel} className="text-center">
+                    {p ? (
+                      <label className="inline-flex min-h-11 min-w-11 items-center justify-center">
+                        <input
+                          type="checkbox"
+                          className="h-5 w-5"
+                          checked={p.enabled}
+                          disabled={action.busy}
+                          aria-label={`${t(`prefs.${key(type)}`)}: ${t(`channels.${channel}`)}`}
+                          onChange={(e) => save(p, e.target.checked)}
+                        />
+                      </label>
+                    ) : null}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </Card>
   );
 }
@@ -177,7 +248,10 @@ export function NotificationsPage() {
             </Button>
           ) : null}
         </div>
-        <Preferences />
+        <div className="space-y-6">
+          <PushDeviceCard />
+          <Preferences />
+        </div>
       </div>
     </>
   );

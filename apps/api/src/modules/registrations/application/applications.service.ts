@@ -87,6 +87,8 @@ export class ApplicationsService {
         continue;
       actions.push(`transition:${t.to}`);
     }
+    // Уведомления о схватках всех спортсменов заявки (Phase 8b) — клубу заявки при любом статусе.
+    if (role.owner) actions.push('application.follow');
     if (role.owner && isEditableByOwner(a.status)) {
       actions.push('application.update');
       if (window === 'OPEN') actions.push('entry.create');

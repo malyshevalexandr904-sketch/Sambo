@@ -170,8 +170,9 @@ describe('notifications', () => {
     const deliveries = Object.fromEntries(
       rows.map((r) => [r.userId, r.deliveries.map((d) => `${d.channel}:${d.status}`).sort()]),
     );
-    expect(deliveries[submitter]).toEqual(['EMAIL:PENDING', 'IN_APP:SENT']);
-    expect(deliveries[creator]).toEqual(['EMAIL:SKIPPED', 'IN_APP:SENT']);
+    // Push (Phase 8b) — канал есть всегда; без устройств и ключей VAPID — пропущен.
+    expect(deliveries[submitter]).toEqual(['EMAIL:PENDING', 'IN_APP:SENT', 'PUSH:SKIPPED']);
+    expect(deliveries[creator]).toEqual(['EMAIL:SKIPPED', 'IN_APP:SENT', 'PUSH:SKIPPED']);
     expect(queue.jobs).toHaveLength(1);
 
     await consumer.handle(job(queue.jobs[0] as DeliveryJob));
@@ -289,6 +290,7 @@ describe('notifications', () => {
     expect(deliveries.map((d) => `${d.channel}:${d.status}`).sort()).toEqual([
       'EMAIL:SKIPPED',
       'IN_APP:SENT',
+      'PUSH:SKIPPED',
     ]);
     expect(queue.jobs).toEqual([]);
   });

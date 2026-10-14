@@ -40,7 +40,8 @@ ALTER ROLE sde_app LOGIN PASSWORD '<секрет>';
 | Секрет | Как сгенерировать | Ротация (SECURITY.md, 8) |
 |---|---|---|
 | `JWT_SECRET` + `JWT_KID` | `openssl rand -base64 48` | Раз в квартал: новый ключ в `JWT_SECRET`/`JWT_KID`, старый — в `JWT_PREVIOUS_SECRET`/`JWT_PREVIOUS_KID` на 15 минут (время жизни access token) |
-| `AUTH_SECRET` | `openssl rand -base64 48` | Раз в год. От него производятся ключи CSRF и шифрования параметров писем в outbox: после смены письма из очереди, созданные до смены, не расшифруются — сменяйте при пустой очереди |
+| `AUTH_SECRET` | `openssl rand -base64 48` | Раз в год. От него производятся ключи CSRF и шифрования параметров писем в outbox: после смены письма из очереди, созданные до смены, не расшифруются — сменяйте при пустой очереди. Если ключи VAPID не заданы, из него же выводятся и они: смена отключает push на всех устройствах (пользователи включают push заново в «Уведомлениях») |
+| `WEB_PUSH_VAPID_PUBLIC_KEY` + `WEB_PUSH_VAPID_PRIVATE_KEY` (необязательно) | `npx web-push generate-vapid-keys` | Не ротируются без нужды: новая пара отключает push на всех устройствах. Не заданы — выводятся из `AUTH_SECRET`; задаются обе или ни одной. `WEB_PUSH_SUBJECT` — контакт для push-служб (`mailto:` или `https://`), по умолчанию — адрес из `EMAIL_FROM` |
 | `TOTP_ENCRYPTION_KEY` | `openssl rand -base64 32` | Только с перешифрованием секретов TOTP |
 
 ## Миграции
@@ -146,3 +147,4 @@ docker compose start api worker web
 ```
 
 - **Журналы:** `docker compose -f /opt/sambo/deploy/server/compose.yml logs --tail 100 api` (ротация — 5 файлов по 10 МБ на сервис).
+- **Push-уведомления (с 0.11.0)** работают без настройки: ключи VAPID выводятся из `AUTH_SECRET`, контакт для push-служб — адрес из `EMAIL_FROM`. Нужен HTTPS (на сервере он есть). worker отправляет push на адреса Google (FCM), Mozilla, Apple, Microsoft — исходящий HTTPS с сервера должен быть открыт. На iPhone и iPad push работает только у сайта, добавленного на экран «Домой» (iOS 16.4+). Нагрузка и запас по зрителям табло — [LOAD_TEST.md](LOAD_TEST.md).

@@ -10,6 +10,7 @@ import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { hasAnywhere, platformHas } from '@/lib/access';
 import { closeLive } from '@/lib/live';
+import { disablePushForLogout, syncPush } from '@/lib/push';
 import { useMe, useMyAthletes } from '@/lib/queries';
 import { NotificationBell } from '@/features/notifications/bell';
 import { Brand } from './brand';
@@ -44,6 +45,12 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
   }, [me.error, pathname, router]);
 
   useEffect(() => setOpen(false), [pathname]);
+
+  // Push этого устройства (Phase 8b): после нового входа — привязка к текущей сессии; ошибки не мешают работе.
+  const userId = me.data?.id;
+  useEffect(() => {
+    if (userId) void syncPush(userId).catch(() => undefined);
+  }, [userId]);
 
   if (me.isPending || (me.error instanceof ApiError && me.error.status === 401)) {
     return (
@@ -113,6 +120,8 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
 
   const logout = async (): Promise<void> => {
     try {
+      // Push на это устройство после выхода не приходит: подписка снимается, пока сессия ещё действует.
+      await disablePushForLogout(user.id);
       await api('/auth/logout', { method: 'POST', noRefresh: true });
     } finally {
       // Соединение живых данных — от имени вышедшего пользователя: закрыть, а не оставлять следующему.

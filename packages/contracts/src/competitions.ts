@@ -93,6 +93,8 @@ const CompetitionFields = {
   descriptionMd: MarkdownText.optional(),
   logoFileId: Uuid.nullable().optional(),
   contactInfo: CompetitionContactInfo.optional(),
+  /** «Скоро выступает» (Phase 8b): за сколько схваток до схватки спортсмена уведомлять; 0 — не уведомлять. */
+  notifyMatchesAhead: z.number().int().min(0).max(10).optional(),
 };
 
 interface Schedule {
@@ -244,6 +246,8 @@ export interface Competition extends CompetitionSummary {
   counters: CompetitionCountersDto;
   /** Исход неудачного официального взвешивания по положению (D-06). */
   weighInFailureOutcome: WeighInFailureOutcome;
+  /** «Скоро выступает»: за сколько схваток уведомлять (0 — не уведомлять). */
+  notifyMatchesAhead: number;
   writeAuthority: WriteAuthority;
   /** Роли пользователя в турнире и отношение к нему (для кабинетов). */
   viewer: { roles: RoleCode[]; staff: boolean };

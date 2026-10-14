@@ -24,7 +24,7 @@ export type RecipientsReader = Pick<
 >;
 
 /** Организационные роли с правом подавать заявки: получатели уведомлений о заявке — только они. */
-const APPLICANT_ROLES = ROLE_CODES.filter(
+export const APPLICANT_ROLES = ROLE_CODES.filter(
   (r) => ROLE_PERMISSIONS[r]['registration.create'] !== undefined && r !== 'SUPER_ADMIN',
 );
 

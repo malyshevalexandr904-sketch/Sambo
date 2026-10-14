@@ -36,6 +36,11 @@ export const liveChannel = {
   publicMat: (competitionSlug: string, matNumber: number) => `public:mat:${competitionSlug}:${matNumber}`,
   publicMatch: (matchPublicId: string) => `public:match:${matchPublicId}`,
   publicCompetition: (competitionSlug: string) => `public:competition:${competitionSlug}`,
+  /**
+   * Изменения всех опубликованных турниров (Phase 8b): slug и темы — сервер web сбрасывает по ним кэш публичных
+   * ответов. Только публичные темы, без внутренних идентификаторов.
+   */
+  publicCompetitions: 'public:competitions',
   opsCompetition: (competitionId: string) => `ops:competition:${competitionId}`,
   opsMat: (matId: string) => `ops:mat:${matId}`,
   opsMatch: (matchId: string) => `ops:match:${matchId}`,
@@ -51,6 +56,7 @@ export type ParsedLiveChannel =
   | { kind: 'public:mat'; slug: string; matNumber: number }
   | { kind: 'public:match'; publicId: string }
   | { kind: 'public:competition'; slug: string }
+  | { kind: 'public:competitions' }
   | { kind: 'ops:competition'; competitionId: string }
   | { kind: 'ops:mat'; matId: string }
   | { kind: 'ops:match'; matchId: string }
@@ -63,6 +69,7 @@ const PATTERNS: [RegExp, (m: RegExpExecArray) => ParsedLiveChannel | null][] = [
     (m) => ({ kind: 'public:mat', slug: m[1] as string, matNumber: Number(m[2]) }),
   ],
   [new RegExp(`^public:match:(${PUBLIC_ID})$`), (m) => ({ kind: 'public:match', publicId: m[1] as string })],
+  [/^public:competitions$/, () => ({ kind: 'public:competitions' })],
   [
     new RegExp(`^public:competition:(${SLUG})$`),
     (m) => ({ kind: 'public:competition', slug: m[1] as string }),
@@ -132,6 +139,12 @@ export interface LiveChangedPayload {
   categoryIds: string[];
   matIds: string[];
   matchIds: string[];
+}
+
+/** Изменился опубликованный турнир (канал `public:competitions`): сбросить кэш его публичных ответов. */
+export interface LiveCompetitionChangedPayload {
+  slug: string;
+  topics: LiveTopic[];
 }
 
 /** Новое уведомление пользователя (канал `user`): клиент обновляет колокольчик и ленту. */

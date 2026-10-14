@@ -17,10 +17,15 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'common' });
-  return { title: { default: t('appName'), template: `%s — ${t('appName')}` }, description: t('tagline') };
+  return {
+    title: { default: t('appName'), template: `%s — ${t('appName')}` },
+    description: t('tagline'),
+    // Сайт на экране «Домой» iPhone/iPad открывается как приложение — так на iOS работает Web Push (Phase 8b).
+    appleWebApp: { capable: true, title: t('appName'), statusBarStyle: 'default' },
+  };
 }
 
-export const viewport: Viewport = { width: 'device-width', initialScale: 1 };
+export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#1d4ed8' };
 
 export default async function LocaleLayout({
   children,

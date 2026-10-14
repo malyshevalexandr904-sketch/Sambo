@@ -139,6 +139,8 @@ model User {
   revokedClearances         MedicalClearance[]       @relation("ClearanceRevoker")
   notifications             Notification[]
   notificationPreferences   NotificationPreference[]
+  pushSubscriptions         PushSubscription[]
+  follows                   Follow[]
   createdDraws              Draw[]                   @relation("DrawCreator")
   publishedDraws            Draw[]                   @relation("DrawPublisher")
   supersededDraws           Draw[]                   @relation("DrawSuperseder")
@@ -1303,6 +1305,9 @@ model Competition {
   cancelReason            String?               @map("cancel_reason")
   /// Исход неудачного официального взвешивания по положению (D-06).
   weighInFailureOutcome   WeighInFailureOutcome @default(RECHECK) @map("weigh_in_failure_outcome")
+  /// «Скоро выступает» (Phase 8b): уведомлять, когда перед схваткой спортсмена на ковре осталось не больше N
+  /// схваток; 0 — не уведомлять. CHECK 0–10.
+  notifyMatchesAhead      Int                   @default(3) @map("notify_matches_ahead")
   createdAt               DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt               DateTime?             @map("deleted_at") @db.Timestamptz(3)
@@ -1939,7 +1944,8 @@ model NotificationDelivery {
   @@map("notification_delivery")
 }
 
-/// Настройка канала для типа уведомления; строки нет — действует значение по умолчанию (включено).
+/// Настройка канала для типа уведомления; строки нет — действует значение по умолчанию (contracts:
+/// `notificationChannelDefault`: всё включено, кроме писем уведомлений дня соревнований — Phase 8b).
 model NotificationPreference {
   userId    String              @map("user_id") @db.Uuid
   type      String
@@ -1951,6 +1957,49 @@ model NotificationPreference {
 
   @@id([userId, type, channel])
   @@map("notification_preference")
+}
+
+/// Устройство пользователя для Web Push (Phase 8b; DATABASE.md, 3.8). Подписка браузера привязана к сессии входа
+/// (`sessionId` — семейство refresh token): после выхода или окончания сессии на устройство ничего не уходит, а
+/// при следующем входе браузер подписывает себя заново. Один `endpoint` — одно устройство одного пользователя.
+model PushSubscription {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  sessionId   String    @map("session_id") @db.Uuid
+  endpoint    String    @unique
+  p256dh      String
+  auth        String
+  /// Браузер и система кратко (для списка устройств в настройках).
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+  @@map("push_subscription")
+}
+
+enum FollowTarget {
+  ATHLETE
+}
+
+/// Подписка пользователя на спортсмена (Phase 8b; DATABASE.md, 3.8): уведомления дня соревнований о его схватках
+/// приходят, пока у подписавшегося есть доступ к спортсмену (представитель, сам, клуб заявки).
+model Follow {
+  id         String       @id @default(uuid(7)) @db.Uuid
+  userId     String       @map("user_id") @db.Uuid
+  targetType FollowTarget @map("target_type")
+  targetId   String       @map("target_id") @db.Uuid
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, targetType, targetId])
+  @@index([targetType, targetId])
+  @@map("follow")
 }
 
 // ============================================================

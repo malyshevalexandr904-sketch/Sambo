@@ -676,7 +676,114 @@ describe('changing the schedule after publication', () => {
     });
     expect(events).toHaveLength(1);
     const payload = events[0]!.payload as { competitionId: string; matchIds: string[] };
-    expect(new Set(payload.matchIds)).toEqual(new Set([a!.matchId, b!.matchId]));
+    expect(payload.matchIds).toEqual(expect.arrayContaining([a!.matchId, b!.matchId]));
+  });
+
+  it('reports the bouts shifted along the mat too, families only about noticeable shifts, nothing for a no-op', async () => {
+    const { w, session, cat2 } = await readyWorld();
+    await generate(w.staff.manager, w.competitionId, {});
+    const draft = await getSchedule(w.staff.manager, w.competitionId);
+    await send(
+      w.staff.manager,
+      'post',
+      `/api/v1/competitions/${w.competitionId}/schedule/publish`,
+      {},
+      draft.version,
+    );
+    const published = await getSchedule(w.staff.manager, w.competitionId);
+    const [a, b] = published.items
+      .filter((i) => i.categoryId === cat2.categoryId)
+      .sort((x, y) => x.orderInMat - y.orderInMat);
+    const move = await send(
+      w.staff.secretary,
+      'patch',
+      `/api/v1/competitions/${w.competitionId}/schedule/items`,
+      {
+        moves: [
+          { matchId: a!.matchId, sessionId: session.id, matId: a!.matId, orderInMat: b!.orderInMat },
+          { matchId: b!.matchId, sessionId: session.id, matId: a!.matId, orderInMat: a!.orderInMat },
+        ],
+        confirm: true,
+      },
+      published.version,
+    );
+    expect(move.status, JSON.stringify(move.body)).toBe(200);
+    // Перестановка двух схваток сдвигает и другие (отдых спортсменов, очередь ковра) — их тоже в событие.
+    const after = await getSchedule(w.staff.manager, w.competitionId);
+    const was = new Map(published.items.map((i) => [i.matchId, i]));
+    const shifted = after.items.filter((i) => {
+      const prev = was.get(i.matchId)!;
+      return prev.matId !== i.matId || prev.plannedAt !== i.plannedAt;
+    });
+    const noticeable = shifted.filter((i) => {
+      const prev = was.get(i.matchId)!;
+      return (
+        prev.matId !== i.matId ||
+        Math.abs(Date.parse(i.plannedAt) - Date.parse(prev.plannedAt)) >= 10 * 60_000
+      );
+    });
+    expect(shifted.length).toBeGreaterThan(2);
+    const [event] = await t.admin.outboxEvent.findMany({
+      where: { competitionId: w.competitionId, type: 'schedule.changed' },
+    });
+    const payload = event!.payload as { matchIds: string[]; timeChangedMatchIds: string[] };
+    expect(new Set(payload.matchIds)).toEqual(new Set(shifted.map((i) => i.matchId)));
+    expect(new Set(payload.timeChangedMatchIds)).toEqual(new Set(noticeable.map((i) => i.matchId)));
+
+    // Перестановка на то же место — ничего не изменилось, события нет.
+    const same = after.items.find((i) => i.matchId === a!.matchId)!;
+    const noop = await send(
+      w.staff.secretary,
+      'patch',
+      `/api/v1/competitions/${w.competitionId}/schedule/items`,
+      {
+        moves: [
+          { matchId: same.matchId, sessionId: session.id, matId: same.matId, orderInMat: same.orderInMat },
+        ],
+        confirm: true,
+      },
+      after.version,
+    );
+    expect(noop.status, JSON.stringify(noop.body)).toBe(200);
+    expect(
+      await t.admin.outboxEvent.count({
+        where: { competitionId: w.competitionId, type: 'schedule.changed' },
+      }),
+    ).toBe(1);
+  });
+});
+
+describe('regenerating a published schedule', () => {
+  it('tells clubs and families about the bouts it moved; the same schedule again changes nothing', async () => {
+    const { w, mats, cat1 } = await readyWorld();
+    await generate(w.staff.manager, w.competitionId, {});
+    const draft = await getSchedule(w.staff.manager, w.competitionId);
+    await send(
+      w.staff.manager,
+      'post',
+      `/api/v1/competitions/${w.competitionId}/schedule/publish`,
+      {},
+      draft.version,
+    );
+    const published = await getSchedule(w.staff.manager, w.competitionId);
+    const count = () =>
+      t.admin.outboxEvent.findMany({ where: { competitionId: w.competitionId, type: 'schedule.changed' } });
+    // Та же расстановка — событий нет.
+    await generate(w.staff.manager, w.competitionId, {});
+    expect(await count()).toEqual([]);
+    // Категория 1 — на ковёр 2: её схватки меняют ковёр.
+    const after = await generate(w.staff.manager, w.competitionId, {
+      categoryPins: [{ categoryId: cat1.categoryId, matId: mats[1]!.id }],
+    });
+    const was = new Map(published.items.map((i) => [i.matchId, i]));
+    const movedMat = after.items.filter((i) => was.get(i.matchId) && was.get(i.matchId)!.matId !== i.matId);
+    expect(movedMat.length).toBeGreaterThan(0);
+    const events = await count();
+    expect(events.length).toBeGreaterThan(0);
+    const payload = events.flatMap(
+      (e) => (e.payload as { timeChangedMatchIds: string[] }).timeChangedMatchIds,
+    );
+    expect(payload).toEqual(expect.arrayContaining(movedMat.map((i) => i.matchId)));
   });
 });
 
