@@ -3,7 +3,7 @@
 // участник». Проверяющие: платформа (действующие платформенные роли с TOTP — без него прав нет) или организация
 // (руководитель клуба, администратор федерации; тренер — только с назначенным правом и только для спортсмена,
 // выбравшего его).
-import { EVENT_SCHEMAS, ROLE_CODES, ROLE_PERMISSIONS } from '@sde/contracts';
+import { EVENT_SCHEMAS, ROLE_CODES, ROLE_PERMISSIONS, type RoleCode } from '@sde/contracts';
 import type { PrismaClient } from '@sde/db';
 import type { PlannedNotification } from './recipients';
 
@@ -14,7 +14,9 @@ export type OnboardingReader = Pick<
 
 /** Роли с правом проверять заявки: платформенные и организационные. */
 const REVIEWER_ROLES = ROLE_CODES.filter((r) => ROLE_PERMISSIONS[r]['onboarding.review'] !== undefined);
-const PLATFORM_REVIEWER_ROLES = REVIEWER_ROLES.filter((r) => r === 'SUPER_ADMIN' || r === 'PLATFORM_ADMIN');
+const PLATFORM_REVIEWER_ROLES: RoleCode[] = REVIEWER_ROLES.filter(
+  (r) => r === 'SUPER_ADMIN' || r === 'PLATFORM_ADMIN',
+);
 const ORGANIZATION_REVIEWER_ROLES = REVIEWER_ROLES.filter((r) => !PLATFORM_REVIEWER_ROLES.includes(r));
 
 const today = (): Date => new Date(new Date().toISOString().slice(0, 10));

@@ -47,7 +47,7 @@ export class OnboardingAccessService {
   async isCoachReviewer(user: AuthUser, r: RequestRef): Promise<boolean> {
     if (r.role !== 'ATHLETE' || !r.coachId || !r.organizationId) return false;
     const coachId = await this.coaches.coachIdOfUser(user);
-    if (coachId !== r.coachId) return false;
+    if (!coachId || coachId !== r.coachId) return false;
     return this.coaches.canReviewAthletes(this.db, coachId, r.organizationId);
   }
 

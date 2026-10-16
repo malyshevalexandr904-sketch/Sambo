@@ -62,19 +62,28 @@ const Telegram = z
   .transform((v) => v.replace(/^@/, ''))
   .pipe(z.string().regex(/^[A-Za-z][A-Za-z0-9_]{4,31}$/, { error: 'invalid_telegram' }));
 
-/** Данные регистрируемой организации (заявка руководителя). Все поля — черновик; обязательность — при отправке. */
+/**
+ * Данные регистрируемой организации (заявка руководителя). Все поля — черновик (можно не передавать или передать
+ * `null`); обязательность — при отправке.
+ */
 export const OnboardingOrganizationInput = z.object({
-  name: z.string().trim().min(2, { error: 'too_short' }).max(200, { error: 'too_long' }).nullable(),
-  shortName: z.string().trim().min(1).max(60, { error: 'too_long' }).nullable(),
-  type: z.enum(ONBOARDING_ORGANIZATION_TYPES).nullable(),
-  legalForm: z.enum(ORGANIZATION_LEGAL_FORMS).nullable(),
-  countryCode: CountryCode.nullable(),
-  regionId: Uuid.nullable(),
-  city: z.string().trim().max(100, { error: 'too_long' }).nullable(),
-  inn: Inn.nullable(),
-  ogrn: Ogrn.nullable(),
-  legalName: z.string().trim().min(2).max(300, { error: 'too_long' }).nullable(),
-  legalAddress: z.string().trim().min(5).max(500, { error: 'too_long' }).nullable(),
+  name: z
+    .string()
+    .trim()
+    .min(2, { error: 'too_short' })
+    .max(200, { error: 'too_long' })
+    .nullable()
+    .optional(),
+  shortName: z.string().trim().min(1).max(60, { error: 'too_long' }).nullable().optional(),
+  type: z.enum(ONBOARDING_ORGANIZATION_TYPES).nullable().optional(),
+  legalForm: z.enum(ORGANIZATION_LEGAL_FORMS).nullable().optional(),
+  countryCode: CountryCode.nullable().optional(),
+  regionId: Uuid.nullable().optional(),
+  city: z.string().trim().max(100, { error: 'too_long' }).nullable().optional(),
+  inn: Inn.nullable().optional(),
+  ogrn: Ogrn.nullable().optional(),
+  legalName: z.string().trim().min(2).max(300, { error: 'too_long' }).nullable().optional(),
+  legalAddress: z.string().trim().min(5).max(500, { error: 'too_long' }).nullable().optional(),
 });
 export type OnboardingOrganizationInput = z.infer<typeof OnboardingOrganizationInput>;
 

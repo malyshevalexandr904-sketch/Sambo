@@ -37,8 +37,8 @@ export class OnboardingApprovalService {
     if (!o?.name) return;
     const norm = normalizeOrganizationName(o.name);
     const existing = await this.organizations.candidates(tx, {
-      nameNorm: o.name.toLowerCase().replaceAll('ё', 'е').trim(),
-      inn: o.inn,
+      nameNorm: norm,
+      inn: o.inn ?? null,
     });
     const clash = existing.find(
       (c) => (o.inn && c.inn === o.inn) || normalizeOrganizationName(c.name) === norm,
@@ -117,13 +117,13 @@ export class OnboardingApprovalService {
             name: o.name,
             shortName: o.shortName ?? o.name.slice(0, 60),
             countryCode: o.countryCode,
-            regionId: o.regionId,
-            city: o.city,
+            regionId: o.regionId ?? null,
+            city: o.city ?? null,
             contactEmail: s.contactEmail,
             contactPhone: s.phone,
             legal:
               o.legalForm === 'RU_LEGAL_ENTITY' && o.inn && o.legalName && o.legalAddress
-                ? { legalName: o.legalName, inn: o.inn, ogrn: o.ogrn, legalAddress: o.legalAddress }
+                ? { legalName: o.legalName, inn: o.inn, ogrn: o.ogrn ?? null, legalAddress: o.legalAddress }
                 : null,
           },
           r.userId,
