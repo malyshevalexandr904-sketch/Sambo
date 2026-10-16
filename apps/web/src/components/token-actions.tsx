@@ -26,7 +26,8 @@ export function VerifyEmail() {
     api<DataEnvelope<Me>>('/auth/verify-email', { method: 'POST', body: { token }, noRefresh: true })
       .then((res) => {
         queryClient.setQueryData(qk.me, res.data);
-        router.replace('/admin');
+        // После подтверждения email — регистрация в системе: выбор роли и заявка (Phase 9a).
+        router.replace('/onboarding');
       })
       .catch(() => setFailed(true));
   }, [token, router, queryClient]);

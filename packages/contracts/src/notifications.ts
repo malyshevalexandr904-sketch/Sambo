@@ -14,6 +14,12 @@ export const NOTIFICATION_TYPES = [
   'match.soon',
   'match.started',
   'match.time_changed',
+  'onboarding.submitted',
+  'onboarding.forwarded',
+  'onboarding.awaiting_review',
+  'onboarding.changes_requested',
+  'onboarding.decided',
+  'onboarding.linked',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -82,6 +88,8 @@ export interface NotificationContext {
   matchNumber?: string;
   plannedAt?: string;
   timezone?: string;
+  /** Заявка на регистрацию (Phase 9a): роль заявки. */
+  onboardingRole?: string;
 }
 
 export interface NotificationDto {
@@ -109,7 +117,23 @@ export interface NotificationPreferenceDto {
  * Ссылка из уведомления: заявка, раздел документов, турнир; «опубликованы результаты» и уведомления дня
  * соревнований — карточка спортсмена, если у получателя один спортсмен, иначе турнир.
  */
+/** Уведомления о заявках на регистрацию в системе (Phase 9a). */
+export const ONBOARDING_NOTIFICATION_TYPES = [
+  'onboarding.submitted',
+  'onboarding.forwarded',
+  'onboarding.awaiting_review',
+  'onboarding.changes_requested',
+  'onboarding.decided',
+  'onboarding.linked',
+] as const satisfies readonly NotificationType[];
+
+export const isOnboardingNotification = (type: string): boolean =>
+  (ONBOARDING_NOTIFICATION_TYPES as readonly string[]).includes(type);
+
 export function notificationLink(type: NotificationType, params: Record<string, string>): string | null {
+  if (type === 'onboarding.awaiting_review')
+    return params.requestId ? `/onboarding/review/${params.requestId}` : '/onboarding/review';
+  if (isOnboardingNotification(type)) return '/onboarding';
   if (type === 'document.rejected') return '/documents';
   if (isMatchDayNotification(type)) {
     if (params.athleteId) return `/athletes/${params.athleteId}`;

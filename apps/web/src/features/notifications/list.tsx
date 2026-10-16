@@ -48,9 +48,16 @@ export function matchTime(
 function useNotificationText(): (n: NotificationDto) => { title: string; body: string } {
   const t = useTranslations('notifications');
   const statuses = useTranslations('applications.statuses');
+  const onboarding = useTranslations('onboarding');
   const locale = useLocale();
   return (n) => {
     const none = t('noValue');
+    // Статус заявки на турнир или заявки на регистрацию в системе (Phase 9a) — из своего словаря.
+    const statusText = (status: string | undefined, isOnboarding: boolean): string => {
+      if (!status) return none;
+      if (isOnboarding) return onboarding.has(`statuses.${status}`) ? onboarding(`statuses.${status}`) : none;
+      return statuses.has(status) ? statuses(status) : none;
+    };
     const values = {
       competitionName: n.context.competitionName ?? none,
       organizationName: n.context.organizationName ?? none,
@@ -58,7 +65,11 @@ function useNotificationText(): (n: NotificationDto) => { title: string; body: s
       categoryName: n.context.categoryName ?? none,
       documentType: n.context.documentType ?? none,
       reason: n.context.reason ?? none,
-      status: n.context.status && statuses.has(n.context.status) ? statuses(n.context.status) : none,
+      status: statusText(n.context.status, n.type.startsWith('onboarding.')),
+      role:
+        n.context.onboardingRole && onboarding.has(`roles.${n.context.onboardingRole}`)
+          ? onboarding(`roles.${n.context.onboardingRole}`)
+          : none,
       matNumber: n.context.matNumber ?? none,
       matchNumber: n.context.matchNumber ?? none,
       time: matchTime(n.context.plannedAt, n.context.timezone, locale) ?? none,

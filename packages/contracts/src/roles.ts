@@ -152,6 +152,7 @@ const MATRIX: Record<PermissionCode, string> = {
   'consent.record':               'x........px',
   'coach.manage':                 'x.........x',
   'referee.manage':               'x.x........',
+  'onboarding.review':            'xxx.......x',
   'document.upload':              'x........xx',
   'document.view':                'x..ixx...px',
   'document.verify':              'x..ixx.....',

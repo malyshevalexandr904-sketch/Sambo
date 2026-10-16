@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { CountryCode, type LocalizedText, PageQuery, Reason } from './common.js';
 import { USER_STATUSES, type UserStatus } from './auth.js';
+import { DEFAULT_ONBOARDING_DOCUMENT_RULES, OnboardingDocumentRules } from './onboarding.js';
 import { ROLE_CODES, type GrantMode, type RoleCode } from './roles.js';
 import type { PermissionCode, PermissionScope } from './permissions.js';
 
@@ -129,6 +130,8 @@ export const SYSTEM_SETTINGS = {
   'support.contactEmail': z.email().nullable(),
   'ui.maintenanceBanner': z.object({ ru: z.string().max(500), en: z.string().max(500) }).nullable(),
   'auth.leakedPasswordCheckEnabled': z.boolean(),
+  /** Документы заявок на регистрацию по ролям и сценариям (Phase 9a): какие обязательны, какие можно приложить. */
+  'onboarding.documentRules': OnboardingDocumentRules,
 } as const;
 
 export type SystemSettingKey = keyof typeof SYSTEM_SETTINGS;
@@ -138,6 +141,7 @@ export const SYSTEM_SETTING_DEFAULTS: { [K in SystemSettingKey]: z.infer<(typeof
   'support.contactEmail': null,
   'ui.maintenanceBanner': null,
   'auth.leakedPasswordCheckEnabled': true,
+  'onboarding.documentRules': DEFAULT_ONBOARDING_DOCUMENT_RULES,
 };
 
 export function isSystemSettingKey(value: string): value is SystemSettingKey {

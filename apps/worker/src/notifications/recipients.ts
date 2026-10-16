@@ -9,6 +9,11 @@ export interface PlannedNotification {
   type: NotificationType;
   params: Record<string, string>;
   competitionId: string | null;
+  /**
+   * Получатель сам выбрал способы связи и не выбрал email (заявка на регистрацию, Phase 9a): письмо не отправляется
+   * независимо от настройки по умолчанию; лента и push — как обычно.
+   */
+  noEmail?: boolean;
 }
 
 export type RecipientsReader = Pick<

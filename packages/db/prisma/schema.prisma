@@ -152,6 +152,10 @@ model User {
   medicalIncidents          MedicalIncident[]        @relation("MedicalIncidentRecorder")
   proposedMatchResults      MatchResult[]            @relation("MatchResultProposer")
   confirmedMatchResults     MatchResult[]            @relation("MatchResultConfirmer")
+  onboardingRequests        OnboardingRequest[]      @relation("OnboardingApplicant")
+  decidedOnboardingRequests OnboardingRequest[]      @relation("OnboardingDecider")
+  onboardingStatusChanges   OnboardingStatusChange[] @relation("OnboardingStatusActor")
+  onboardingDocuments       OnboardingDocument[]     @relation("OnboardingDocumentUploader")
 
   @@index([status, createdAt])
   @@map("user")
@@ -408,6 +412,7 @@ model Region {
   representedApps    Application[]  @relation("ApplicationRegion")
   entrySnapRegions   Entry[]        @relation("EntrySnapRegion")
   representedEntries Entry[]        @relation("EntryRepresentationRegion")
+  onboardingRequests OnboardingRequest[] @relation("OnboardingOrgRegion")
 
   @@unique([countryCode, code])
   @@unique([code])
@@ -461,6 +466,8 @@ model Organization {
   representedApps    Application[]       @relation("ApplicationRepresentation")
   entrySnapClubs     Entry[]             @relation("EntrySnapClub")
   representedEntries Entry[]             @relation("EntryRepresentation")
+  onboardingRequests OnboardingRequest[] @relation("OnboardingOrganization")
+  onboardingResults  OnboardingRequest[] @relation("OnboardingResultOrganization")
 
   @@index([parentId])
   @@index([regionId, type, status])
@@ -521,7 +528,8 @@ model RefereeCategory {
   nameEn    String @map("name_en")
   rankOrder Int    @unique @map("rank_order")
 
-  referees RefereeProfile[]
+  referees           RefereeProfile[]
+  onboardingRequests OnboardingRequest[]
 
   @@map("referee_category")
 }
@@ -548,8 +556,9 @@ model DocumentType {
   maxSizeBytes  Int         @map("max_size_bytes")
   retentionDays Int         @map("retention_days")
 
-  documents    Document[]
-  requirements CompetitionRequirement[]
+  documents           Document[]
+  requirements        CompetitionRequirement[]
+  onboardingDocuments OnboardingDocument[]
 
   @@map("document_type")
 }
@@ -611,6 +620,7 @@ model StoredFile {
   importJobs        ImportJob[]    @relation("ImportFile")
   competitionLogos  Competition[]  @relation("CompetitionLogo")
   regulations       Competition[]  @relation("CompetitionRegulation")
+  onboardingDocument OnboardingDocument? @relation("OnboardingDocumentFile")
 
   @@index([status, createdAt])
   @@map("stored_file")
@@ -777,8 +787,9 @@ model CoachProfile {
   person       Person            @relation(fields: [personId], references: [id], onDelete: Restrict)
   createdBy    User?             @relation("CoachCreator", fields: [createdById], references: [id], onDelete: Restrict)
   memberships  CoachMembership[]
-  athletes     AthleteCoach[]
-  applications Application[]
+  athletes           AthleteCoach[]
+  applications       Application[]
+  onboardingRequests OnboardingRequest[]
 
   @@map("coach_profile")
 }
@@ -791,6 +802,8 @@ model CoachMembership {
   organizationId String    @map("organization_id") @db.Uuid
   validFrom      DateTime  @map("valid_from") @db.Date
   validTo        DateTime? @map("valid_to") @db.Date
+  /// Тренер рассматривает заявки спортсменов, выбравших его (Phase 9a). Назначает руководитель организации.
+  canReviewAthletes Boolean @default(false) @map("can_review_athletes")
   createdById    String?   @map("created_by_id") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
@@ -922,8 +935,9 @@ model ConsentTemplate {
   createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  createdBy User?     @relation("ConsentTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  consents  Consent[]
+  createdBy          User?               @relation("ConsentTemplateCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  consents           Consent[]
+  onboardingRequests OnboardingRequest[]
 
   @@unique([kind, version, locale])
   @@map("consent_template")
@@ -2619,4 +2633,137 @@ model MatAssignment {
   @@unique([sessionId, matId, role])
   @@index([sessionId, userId])
   @@map("mat_assignment")
+}
+
+// ============================================================
+// Регистрация в системе по ролям (Phase 9a; DATABASE.md, 3.10): заявка руководителя организации, тренера,
+// спортсмена, судьи; присоединение к организации позже; документы заявки и история статусов.
+// Заявка — анкета до проверки: профиль, членства и роли создаются только при одобрении.
+// ============================================================
+
+enum OnboardingRole {
+  ORGANIZATION_HEAD
+  COACH
+  ATHLETE
+  REFEREE
+}
+
+enum OnboardingKind {
+  REGISTRATION
+  JOIN_ORGANIZATION
+}
+
+enum OnboardingStatus {
+  DRAFT
+  PENDING_REVIEW
+  PENDING_ORGANIZATION_APPROVAL
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  CANCELLED
+}
+
+enum OrganizationLegalForm {
+  RU_LEGAL_ENTITY
+  FOREIGN
+  OTHER
+}
+
+/// Не больше одной незавершённой заявки пользователя на роль (partial unique, миграция). Переходы статуса — только
+/// сервером (OnboardingService), каждый переход — строка истории.
+model OnboardingRequest {
+  id                  String           @id @default(uuid(7)) @db.Uuid
+  userId              String           @map("user_id") @db.Uuid
+  role                OnboardingRole
+  kind                OnboardingKind   @default(REGISTRATION)
+  status              OnboardingStatus @default(DRAFT)
+  inOrganization      Boolean?         @map("in_organization")
+  organizationId      String?          @map("organization_id") @db.Uuid
+  coachId             String?          @map("coach_id") @db.Uuid
+  lastName            String?          @map("last_name")
+  firstName           String?          @map("first_name")
+  middleName          String?          @map("middle_name")
+  birthDate           DateTime?        @map("birth_date") @db.Date
+  gender              Gender?
+  phone               String?
+  contactEmail        String?          @map("contact_email") @db.Citext
+  telegram            String?
+  contactChannels     String[]         @default([]) @map("contact_channels")
+  coachQualification  String?          @map("coach_qualification")
+  refereeCategoryCode String?          @map("referee_category_code")
+  orgName             String?          @map("org_name")
+  orgShortName        String?          @map("org_short_name")
+  orgType             OrganizationType? @map("org_type")
+  orgLegalForm        OrganizationLegalForm? @map("org_legal_form")
+  orgCountryCode      String?          @map("org_country_code") @db.Char(2)
+  orgRegionId         String?          @map("org_region_id") @db.Uuid
+  orgCity             String?          @map("org_city")
+  orgInn              String?          @map("org_inn")
+  orgOgrn             String?          @map("org_ogrn")
+  orgLegalName        String?          @map("org_legal_name")
+  orgLegalAddress     String?          @map("org_legal_address")
+  consentTemplateId   String?          @map("consent_template_id") @db.Uuid
+  consentGivenAt      DateTime?        @map("consent_given_at") @db.Timestamptz(3)
+  decisionReason      String?          @map("decision_reason")
+  decidedById         String?          @map("decided_by_id") @db.Uuid
+  decidedAt           DateTime?        @map("decided_at") @db.Timestamptz(3)
+  submittedAt         DateTime?        @map("submitted_at") @db.Timestamptz(3)
+  resultOrganizationId String?         @map("result_organization_id") @db.Uuid
+  version             Int              @default(1)
+  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user               User                     @relation("OnboardingApplicant", fields: [userId], references: [id], onDelete: Restrict)
+  organization       Organization?            @relation("OnboardingOrganization", fields: [organizationId], references: [id], onDelete: Restrict)
+  coach              CoachProfile?            @relation(fields: [coachId], references: [id], onDelete: Restrict)
+  refereeCategory    RefereeCategory?         @relation(fields: [refereeCategoryCode], references: [code], onDelete: Restrict)
+  orgRegion          Region?                  @relation("OnboardingOrgRegion", fields: [orgRegionId], references: [id], onDelete: Restrict)
+  consentTemplate    ConsentTemplate?         @relation(fields: [consentTemplateId], references: [id], onDelete: Restrict)
+  decidedBy          User?                    @relation("OnboardingDecider", fields: [decidedById], references: [id], onDelete: Restrict)
+  resultOrganization Organization?            @relation("OnboardingResultOrganization", fields: [resultOrganizationId], references: [id], onDelete: Restrict)
+  documents          OnboardingDocument[]
+  history            OnboardingStatusChange[]
+
+  @@index([userId, status])
+  @@index([status, role, submittedAt])
+  @@index([organizationId, status])
+  @@index([coachId, status])
+  @@map("onboarding_request")
+}
+
+/// Документ заявки: файл в приватном хранилище (цель ONBOARDING_DOCUMENT), тип — из справочника document_type.
+/// Выдаётся только по временной ссылке заявителю и проверяющему, каждое скачивание — в журнал доступа.
+model OnboardingDocument {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  requestId    String    @map("request_id") @db.Uuid
+  typeCode     String    @map("type_code")
+  fileId       String    @unique @map("file_id") @db.Uuid
+  uploadedById String    @map("uploaded_by_id") @db.Uuid
+  uploadedAt   DateTime  @default(now()) @map("uploaded_at") @db.Timestamptz(3)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  request    OnboardingRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  type       DocumentType      @relation(fields: [typeCode], references: [code], onDelete: Restrict)
+  file       StoredFile        @relation("OnboardingDocumentFile", fields: [fileId], references: [id], onDelete: Restrict)
+  uploadedBy User              @relation("OnboardingDocumentUploader", fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([requestId])
+  @@map("onboarding_document")
+}
+
+/// История статусов заявки: кто, когда, из какого статуса в какой и почему. Только добавление.
+model OnboardingStatusChange {
+  id          String            @id @default(uuid(7)) @db.Uuid
+  requestId   String            @map("request_id") @db.Uuid
+  fromStatus  OnboardingStatus? @map("from_status")
+  toStatus    OnboardingStatus  @map("to_status")
+  actorUserId String?           @map("actor_user_id") @db.Uuid
+  reason      String?
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  request OnboardingRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  actor   User?             @relation("OnboardingStatusActor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([requestId, createdAt])
+  @@map("onboarding_status_change")
 }

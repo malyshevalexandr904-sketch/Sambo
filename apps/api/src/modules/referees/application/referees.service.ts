@@ -188,4 +188,52 @@ export class RefereesService {
     });
     return toDto(await this.db.refereeProfile.findUniqueOrThrow({ where: { id }, include: INCLUDE }));
   }
+
+  /**
+   * Судья по одобренной заявке (Phase 9a): профиль на записи «человек» заявителя с подтверждённой категорией. Профиль
+   * уже есть (внесён федерацией) — обновляется категория, если она выше; иначе профиль не меняется.
+   */
+  async registerApproved(tx: Tx, personId: string, categoryCode: string, actorId: string): Promise<string> {
+    await this.assertCategory(tx, categoryCode);
+    const existing = await tx.refereeProfile.findUnique({ where: { personId }, include: { category: true } });
+    if (existing) {
+      const next = await tx.refereeCategory.findUniqueOrThrow({ where: { code: categoryCode } });
+      if (next.rankOrder > existing.category.rankOrder || existing.status !== 'ACTIVE') {
+        await tx.refereeProfile.update({
+          where: { id: existing.id },
+          data: {
+            refereeCategoryCode:
+              next.rankOrder > existing.category.rankOrder ? categoryCode : existing.refereeCategoryCode,
+            status: 'ACTIVE',
+            version: { increment: 1 },
+          },
+        });
+        await this.audit.record(tx, {
+          action: 'referee.updated',
+          entityType: 'RefereeProfile',
+          entityId: existing.id,
+          before: { refereeCategoryCode: existing.refereeCategoryCode, status: existing.status },
+          after: { refereeCategoryCode: categoryCode, status: 'ACTIVE', via: 'onboarding' },
+        });
+      }
+      return existing.id;
+    }
+    const id = uuidv7();
+    await tx.refereeProfile.create({
+      data: { id, personId, refereeCategoryCode: categoryCode, createdById: actorId },
+    });
+    await this.audit.record(tx, {
+      action: 'referee.created',
+      entityType: 'RefereeProfile',
+      entityId: id,
+      after: { personId, refereeCategoryCode: categoryCode, via: 'onboarding' },
+    });
+    return id;
+  }
+
+  /** Профиль судьи человека, если есть. */
+  async profileOf(tx: Tx, personId: string): Promise<string | null> {
+    const row = await tx.refereeProfile.findUnique({ where: { personId }, select: { id: true } });
+    return row?.id ?? null;
+  }
 }

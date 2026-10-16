@@ -30,3 +30,4 @@ export * from './scoring.js';
 export * from './matches.js';
 export * from './results.js';
 export * from './live.js';
+export * from './onboarding.js';

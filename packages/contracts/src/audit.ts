@@ -175,5 +175,16 @@ export const AUDIT_ACTIONS = [
   'category.results_computed',
   'category.results_published',
   'category.results_amended',
+  // Phase 9a — регистрация в системе по ролям: заявки, документы заявок, решения, право тренера рассматривать заявки.
+  'onboarding.created',
+  'onboarding.updated',
+  'onboarding.document_attached',
+  'onboarding.document_removed',
+  'onboarding.submitted',
+  'onboarding.cancelled',
+  'onboarding.changes_requested',
+  'onboarding.approved',
+  'onboarding.rejected',
+  'coach.review_rights_changed',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

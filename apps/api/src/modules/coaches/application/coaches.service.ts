@@ -7,6 +7,7 @@ import {
   type CoachPatch,
   type CoachSummary,
   fullName,
+  type OnboardingCoachOption,
   type Page,
   publicName,
 } from '@sde/contracts';
@@ -70,6 +71,7 @@ export class CoachesService implements OnModuleInit {
       organizations: c.memberships.map((m) => ({
         id: m.organization.id,
         shortName: m.organization.shortName,
+        canReviewAthletes: m.canReviewAthletes,
       })),
       version: c.version,
     };
@@ -308,5 +310,104 @@ export class CoachesService implements OnModuleInit {
       });
     });
     return this.get(id);
+  }
+
+  // ---------- Регистрация по заявкам (Phase 9a) ----------
+
+  /** Профиль тренера человека (создаётся, если его ещё нет): одобрение заявки тренера. */
+  async ensureProfileForPerson(tx: Tx, personId: string, actorId: string): Promise<string> {
+    return (await this.ensureProfile(tx, personId, actorId)).id;
+  }
+
+  /** Работа тренера в организации с сегодняшнего дня; если уже работает — ничего не меняется. */
+  async joinOrganization(tx: Tx, coachId: string, organizationId: string, actorId: string): Promise<void> {
+    const open = await tx.coachMembership.findFirst({ where: { coachId, organizationId, validTo: null } });
+    if (!open) await this.addMembership(tx, coachId, organizationId, actorId);
+  }
+
+  /**
+   * Тренеры, которых спортсмен может выбрать в заявке: действующий профиль, сейчас работают в организации и
+   * являются её подтверждёнными участниками с ролью «Тренер» (учётная запись с одобренной ролью).
+   */
+  private selectableWhere(organizationId: string): Prisma.CoachProfileWhereInput {
+    const current = { OR: [{ validTo: null }, { validTo: { gte: todayDate() } }] };
+    return {
+      status: 'ACTIVE',
+      memberships: { some: { organizationId, ...current } },
+      person: {
+        user: {
+          status: 'ACTIVE',
+          organizationMemberships: {
+            some: { organizationId, status: 'ACTIVE', role: { code: 'COACH' }, ...current },
+          },
+        },
+      },
+    };
+  }
+
+  async selectableIn(organizationId: string): Promise<OnboardingCoachOption[]> {
+    const rows = await this.db.coachProfile.findMany({
+      where: this.selectableWhere(organizationId),
+      include: { person: true },
+      orderBy: [{ person: { lastName: 'asc' } }, { id: 'asc' }],
+      take: 200,
+    });
+    return rows.map((r) => ({ id: r.id, publicName: publicName(r.person.lastName, r.person.firstName) }));
+  }
+
+  async isSelectableIn(tx: Tx, coachId: string, organizationId: string): Promise<boolean> {
+    const row = await tx.coachProfile.findFirst({
+      where: { id: coachId, ...this.selectableWhere(organizationId) },
+      select: { id: true },
+    });
+    return row !== null;
+  }
+
+  /** Тренер с правом рассматривать заявки спортсменов, выбравших его, в организации (назначено руководителем). */
+  async canReviewAthletes(tx: Tx, coachId: string, organizationId: string): Promise<boolean> {
+    const m = await tx.coachMembership.findFirst({
+      where: { coachId, organizationId, validTo: null, canReviewAthletes: true },
+      select: { id: true },
+    });
+    return m !== null;
+  }
+
+  /** Организации, где тренер — пользователь рассматривает заявки своих спортсменов. */
+  async reviewingOrganizations(
+    user: AuthUser,
+  ): Promise<{ coachId: string; organizationIds: string[] } | null> {
+    const coachId = await this.coachIdOfUser(user);
+    if (!coachId) return null;
+    const rows = await this.db.coachMembership.findMany({
+      where: { coachId, validTo: null, canReviewAthletes: true },
+      select: { organizationId: true },
+    });
+    return { coachId, organizationIds: rows.map((r) => r.organizationId) };
+  }
+
+  /** Право тренера рассматривать заявки спортсменов в организации: даёт и снимает руководитель (`coach.manage`). */
+  async setAthleteReviewRight(
+    user: AuthUser,
+    organizationId: string,
+    coachId: string,
+    enabled: boolean,
+  ): Promise<CoachSummary> {
+    const scope = await this.orgScopes.scopeOf(organizationId);
+    await this.policy.assert(user, 'coach.manage', scope);
+    await this.db.tx(async (tx) => {
+      const open = await tx.coachMembership.findFirst({ where: { coachId, organizationId, validTo: null } });
+      if (!open) throw new DomainError('NOT_FOUND', { resource: 'coach_membership' });
+      if (open.canReviewAthletes === enabled) return;
+      await tx.coachMembership.update({ where: { id: open.id }, data: { canReviewAthletes: enabled } });
+      await this.audit.record(tx, {
+        action: 'coach.review_rights_changed',
+        entityType: 'CoachProfile',
+        entityId: coachId,
+        organizationId,
+        before: { canReviewAthletes: open.canReviewAthletes },
+        after: { canReviewAthletes: enabled },
+      });
+    });
+    return this.get(coachId);
   }
 }

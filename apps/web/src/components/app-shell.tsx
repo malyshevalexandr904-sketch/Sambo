@@ -81,6 +81,14 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
   }
   const nav: NavItem[] = [
     { href: '/admin', label: t('nav.dashboard'), visible: true },
+    { href: '/onboarding', label: t('nav.onboarding'), visible: true },
+    {
+      href: '/onboarding/review',
+      label: t('nav.onboardingReview'),
+      visible:
+        hasAnywhere(user, 'onboarding.review') ||
+        user.grants.organizations.some((g) => g.roles.includes('COACH')),
+    },
     { href: '/competitions', label: t('nav.competitions'), visible: true },
     {
       href: '/referee',
@@ -116,7 +124,11 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
     { href: '/account', label: t('nav.account'), visible: true },
   ];
   const isActive = (href: string): boolean =>
-    href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
+    href === '/admin'
+      ? pathname === '/admin'
+      : href === '/onboarding'
+        ? pathname.startsWith('/onboarding') && !pathname.startsWith('/onboarding/review')
+        : pathname.startsWith(href);
 
   const logout = async (): Promise<void> => {
     try {

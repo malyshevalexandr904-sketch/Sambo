@@ -26,6 +26,10 @@ export const CONSUMERS: Partial<Record<EventType, readonly string[]>> = {
   // Phase 8b: «началась схватка»; подтверждённый результат сдвигает очередь ковра — проверка «скоро выступает».
   'match.started': ['notifications'],
   'match.result_confirmed': ['notifications'],
+  // Phase 9a: заявки на регистрацию в системе — заявителю, проверяющим, организации.
+  'onboarding.submitted': ['notifications'],
+  'onboarding.changes_requested': ['notifications'],
+  'onboarding.decided': ['notifications'],
 };
 
 /** Очередь потребителя: достаточно постановки задачи (очередь может принимать и другие задачи). */

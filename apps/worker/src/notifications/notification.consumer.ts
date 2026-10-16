@@ -26,6 +26,7 @@ import {
   type RecipientsReader,
   resultsRecipients,
 } from './recipients';
+import { type OnboardingReader, planOnboardingNotifications } from './onboarding';
 import { renderNotificationEmail } from './templates';
 import { NotificationWriter, type PlannedFromSource } from './writer';
 
@@ -88,10 +89,11 @@ export interface NotificationConsumerOptions {
  * отклонён», «опубликованы результаты».
  */
 export async function planNotifications(
-  db: RecipientsReader,
+  db: RecipientsReader & OnboardingReader,
   type: string,
   payload: unknown,
 ): Promise<PlannedNotification[]> {
+  if (type.startsWith('onboarding.')) return planOnboardingNotifications(db, type, payload);
   const forApplication = async (
     applicationId: string,
     t: NotificationType,

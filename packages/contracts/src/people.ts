@@ -152,7 +152,8 @@ export interface CoachSummary {
   publicName: string;
   userId: string | null;
   status: ProfileStatus;
-  organizations: { id: string; shortName: string }[];
+  /** `canReviewAthletes` — тренер рассматривает заявки спортсменов, выбравших его (Phase 9a). */
+  organizations: { id: string; shortName: string; canReviewAthletes: boolean }[];
   version: number;
 }
 

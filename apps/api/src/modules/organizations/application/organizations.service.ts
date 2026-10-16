@@ -143,12 +143,8 @@ export class OrganizationsService {
     });
   }
 
-  private async uniqueSlug(
-    tx: Tx,
-    requested: string | undefined,
-    name: string,
-    excludeId?: string,
-  ): Promise<string> {
+  /** Свободный slug: запрошенный или из названия с номером. Используется и реестром (регистрация по заявке). */
+  async uniqueSlug(tx: Tx, requested: string | undefined, name: string, excludeId?: string): Promise<string> {
     const taken = async (slug: string): Promise<boolean> =>
       (await tx.organization.findFirst({
         where: { slug, id: excludeId ? { not: excludeId } : undefined },
