@@ -188,4 +188,24 @@ export const DOCUMENT_TYPES: [
     1825,
   ],
   ['OTHER', 'Иной документ', 'Other document', 'GENERAL', DOC_MIME, 10 * MB, 365],
+  // Phase 9a — документы заявок на регистрацию в системе.
+  [
+    'EGRUL_EXTRACT',
+    'Выписка из ЕГРЮЛ',
+    'Extract from the Unified State Register of Legal Entities',
+    'GENERAL',
+    DOC_MIME,
+    10 * MB,
+    1095,
+  ],
+  ['REFEREE_BOOK', 'Судейская книжка', 'Referee record book', 'IDENTITY', DOC_MIME, 10 * MB, 1095],
+  [
+    'COACH_QUALIFICATION',
+    'Документ о квалификации тренера',
+    'Coach qualification document',
+    'GENERAL',
+    DOC_MIME,
+    10 * MB,
+    1095,
+  ],
 ];

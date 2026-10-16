@@ -1,7 +1,7 @@
 // Проверка словарей в CI (ARCHITECTURE.md, 19): ключи ru и en совпадают, у каждого кода ошибки,
 // роли, типа и статуса организации, статусов и видов из справочников Phase 3, турниров Phase 4a и допуска,
 // прибытия, взвешивания, медицины и уведомлений Phase 4b, жеребьёвки и сеток Phase 5a, судейства Phase 7a, итогов
-// Phase 7b есть перевод.
+// Phase 7b, регистрации в системе Phase 9a есть перевод.
 import {
   ADMISSION_CHECK_KINDS,
   ADMISSION_CHECK_STATUSES,
@@ -17,6 +17,7 @@ import {
   COMPETITION_LEVELS,
   COMPETITION_STATUSES,
   CONSENT_KINDS,
+  CONTACT_CHANNELS,
   DOCUMENT_STATUSES,
   DRAW_STATUSES,
   ELIGIBILITY_REASONS,
@@ -34,6 +35,10 @@ import {
   MEDICAL_INCIDENT_KINDS,
   MEDICAL_STATES,
   NOTIFICATION_TYPES,
+  ONBOARDING_ORGANIZATION_TYPES,
+  ONBOARDING_ROLES,
+  ONBOARDING_STATUSES,
+  ORGANIZATION_LEGAL_FORMS,
   ORGANIZATION_STATUSES,
   ORGANIZATION_TYPES,
   PROFILE_STATUSES,
@@ -125,6 +130,11 @@ describe('i18n dictionaries', () => {
       ...CATEGORY_RESULT_STATUSES.map((s) => `results.statuses.${s}`),
       ...MEDICAL_INCIDENT_KINDS.map((k) => `referee.doctor.kinds.${k}`),
       ...MEDICAL_INCIDENT_DECISIONS.map((d) => `referee.doctor.decisions.${d}`),
+      ...ONBOARDING_ROLES.flatMap((r) => [`onboarding.roles.${r}`, `onboarding.roleHints.${r}`]),
+      ...ONBOARDING_STATUSES.flatMap((s) => [`onboarding.statuses.${s}`, `onboarding.statusMessages.${s}`]),
+      ...CONTACT_CHANNELS.map((c) => `onboarding.channels.${c}`),
+      ...ONBOARDING_ORGANIZATION_TYPES.map((x) => `onboarding.orgTypes.${x}`),
+      ...ORGANIZATION_LEGAL_FORMS.map((x) => `onboarding.legalForms.${x}`),
       ...NOTIFICATION_TYPES.flatMap((n) => [
         `notifications.types.${n.replace('.', '_')}.title`,
         `notifications.prefs.${n.replace('.', '_')}`,

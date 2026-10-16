@@ -67,6 +67,21 @@ const TEXTS: Record<Locale, Record<NotificationType, Texts>> = {
       title: 'Изменилось время схватки',
       body: (s) => join(mat(s), time(s) && `около ${time(s)}`, bout(s), s.competitionName),
     },
+    'onboarding.submitted': { title: 'Заявка на регистрацию отправлена', body: () => 'Ожидайте проверки' },
+    'onboarding.forwarded': {
+      title: 'Заявка передана на проверку организации',
+      body: (s) => join(s.organizationName),
+    },
+    'onboarding.awaiting_review': { title: 'Новая заявка ждёт проверки', body: () => 'SAMBO Digital' },
+    'onboarding.changes_requested': {
+      title: 'Нужно исправить заявку',
+      body: () => 'Подробности — в приложении',
+    },
+    'onboarding.decided': {
+      title: 'Решение по заявке на регистрацию',
+      body: (s) => (s.status === 'APPROVED' ? 'Заявка одобрена' : 'Заявка отклонена'),
+    },
+    'onboarding.linked': { title: 'В организации новый участник', body: (s) => join(s.organizationName) },
   },
   en: {
     'application.returned': {
@@ -86,6 +101,24 @@ const TEXTS: Record<Locale, Record<NotificationType, Texts>> = {
     'match.time_changed': {
       title: 'Bout time changed',
       body: (s) => join(mat(s), time(s) && `about ${time(s)}`, bout(s), s.competitionName),
+    },
+    'onboarding.submitted': { title: 'Registration request submitted', body: () => 'Awaiting review' },
+    'onboarding.forwarded': {
+      title: 'Request forwarded to the organization',
+      body: (s) => join(s.organizationName),
+    },
+    'onboarding.awaiting_review': { title: 'A new request awaits review', body: () => 'SAMBO Digital' },
+    'onboarding.changes_requested': {
+      title: 'Please correct your request',
+      body: () => 'Details are in the app',
+    },
+    'onboarding.decided': {
+      title: 'Registration request decided',
+      body: (s) => (s.status === 'APPROVED' ? 'Request approved' : 'Request rejected'),
+    },
+    'onboarding.linked': {
+      title: 'A new member in your organization',
+      body: (s) => join(s.organizationName),
     },
   },
 };

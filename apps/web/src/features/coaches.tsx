@@ -117,10 +117,17 @@ function CoachRow({ coach: c, organizationId }: { coach: CoachSummary; organizat
   const queryClient = useQueryClient();
   const action = useAction();
   const refresh = (): Promise<void> => queryClient.invalidateQueries({ queryKey: ['coaches'] });
+  // Право рассматривать заявки спортсменов, выбравших тренера (Phase 9a), — по организации.
+  const membership = c.organizations.find((o) => o.id === organizationId);
   return (
     <tr>
       <Td className="font-medium">{c.name}</Td>
-      <Td>{c.organizations.map((o) => o.shortName).join(', ') || '—'}</Td>
+      <Td>
+        {c.organizations.map((o) => o.shortName).join(', ') || '—'}
+        {membership?.canReviewAthletes ? (
+          <span className="mt-1 block text-xs text-green-800">{t('coaches.reviewsAthletes')}</span>
+        ) : null}
+      </Td>
       <Td>{c.userId ? t('common.yes') : t('common.no')}</Td>
       <Td>
         <StatusBadge status={c.status} />
@@ -140,6 +147,25 @@ function CoachRow({ coach: c, organizationId }: { coach: CoachSummary; organizat
               }
             >
               {t('coaches.endMembership')}
+            </Button>
+          ) : null}
+          {c.userId && membership ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              loading={action.busy}
+              aria-pressed={membership.canReviewAthletes}
+              onClick={() =>
+                void action.run(async () => {
+                  await api(`/organizations/${organizationId}/coaches/${c.id}/athlete-review`, {
+                    method: 'PUT',
+                    body: { enabled: !membership.canReviewAthletes },
+                  });
+                  await refresh();
+                })
+              }
+            >
+              {membership.canReviewAthletes ? t('coaches.revokeReview') : t('coaches.grantReview')}
             </Button>
           ) : null}
           <Button

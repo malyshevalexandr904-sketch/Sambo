@@ -11,6 +11,7 @@ import { ImportsController } from './api/imports.controller';
 import { AthleteAccessService } from './application/athlete-access.service';
 import { AthleteExtensions } from './application/athlete-extensions';
 import { AthleteLinksService } from './application/athlete-links.service';
+import { AthleteRegistryService } from './application/athlete-registry.service';
 import { AthletesService } from './application/athletes.service';
 import { GuardiansService } from './application/guardians.service';
 import { ImportsService } from './application/imports.service';
@@ -34,10 +35,11 @@ import { AthleteMergeService } from './application/merge.service';
     AthleteExtensions,
     AthletesService,
     AthleteLinksService,
+    AthleteRegistryService,
     GuardiansService,
     ImportsService,
     AthleteMergeService,
   ],
-  exports: [AthleteAccessService, AthleteExtensions, AthletesService],
+  exports: [AthleteAccessService, AthleteExtensions, AthletesService, AthleteRegistryService],
 })
 export class AthletesModule {}

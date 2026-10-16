@@ -4,7 +4,7 @@ import type { Prisma } from '../generated/client/index.js';
 
 type Reader = Pick<
   Prisma.TransactionClient,
-  'application' | 'entry' | 'document' | 'competition' | 'competitionCategory' | 'match'
+  'application' | 'entry' | 'document' | 'competition' | 'competitionCategory' | 'match' | 'onboardingRequest'
 >;
 
 export interface NotificationSource {
@@ -23,6 +23,33 @@ export interface NotificationSource {
   matchNumber?: string;
   plannedAt?: string;
   timezone?: string;
+  /** Заявка на регистрацию в системе (Phase 9a): роль заявки. */
+  onboardingRole?: string;
+}
+
+/**
+ * Заявка на регистрацию (Phase 9a): роль, статус (из уведомления — на момент решения), причина решения и организация
+ * (выбранная или регистрируемая). Уведомления получают заявитель и проверяющие — им заявка видна.
+ */
+async function onboardingSource(db: Reader, params: Record<string, string>): Promise<NotificationSource> {
+  if (!params.requestId) return {};
+  const r = await db.onboardingRequest.findUnique({
+    where: { id: params.requestId },
+    select: {
+      role: true,
+      status: true,
+      decisionReason: true,
+      orgName: true,
+      organization: { select: { name: true } },
+    },
+  });
+  if (!r) return {};
+  return {
+    onboardingRole: r.role,
+    status: params.status ?? r.status,
+    reason: r.decisionReason ?? undefined,
+    organizationName: r.organization?.name ?? r.orgName ?? undefined,
+  };
 }
 
 async function applicationSource(db: Reader, applicationId: string | undefined): Promise<NotificationSource> {
@@ -126,6 +153,7 @@ export async function notificationSource(
       reason: doc.rejectReason ?? undefined,
     };
   }
+  if (type.startsWith('onboarding.')) return onboardingSource(db, params);
   if (type === 'results.published') return resultsSource(db, params, locale);
   if (MATCH_TYPES.has(type)) return matchSource(db, params);
   const app = await applicationSource(db, params.applicationId);

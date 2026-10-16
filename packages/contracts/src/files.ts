@@ -14,6 +14,7 @@ export const UPLOAD_PURPOSES = [
   'DOCUMENT',
   'CONSENT_SCAN',
   'IMPORT',
+  'ONBOARDING_DOCUMENT',
 ] as const;
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 
@@ -47,6 +48,12 @@ export const UPLOAD_POLICIES: Record<UploadPurpose, UploadPolicy> = {
     maxSizeBytes: 10 * MB,
   },
   CONSENT_SCAN: {
+    bucket: 'PRIVATE_DOCUMENTS',
+    mimeTypes: ['application/pdf', 'image/jpeg', 'image/png'],
+    maxSizeBytes: 10 * MB,
+  },
+  /** Документы заявки на регистрацию (паспорт, выписка ЕГРЮЛ, судейская книжка): только приватное хранилище. */
+  ONBOARDING_DOCUMENT: {
     bucket: 'PRIVATE_DOCUMENTS',
     mimeTypes: ['application/pdf', 'image/jpeg', 'image/png'],
     maxSizeBytes: 10 * MB,

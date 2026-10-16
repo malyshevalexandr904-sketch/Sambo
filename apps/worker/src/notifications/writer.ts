@@ -63,7 +63,10 @@ export class NotificationWriter {
       select: { email: true, emailVerifiedAt: true, _count: { select: { pushSubscriptions: true } } },
     });
     const email =
-      !!user?.email && !!user.emailVerifiedAt && (await this.channelOn(tx, p.userId, p.type, 'EMAIL'));
+      !p.noEmail &&
+      !!user?.email &&
+      !!user.emailVerifiedAt &&
+      (await this.channelOn(tx, p.userId, p.type, 'EMAIL'));
     const push =
       this.pushEnabled &&
       (user?._count.pushSubscriptions ?? 0) > 0 &&

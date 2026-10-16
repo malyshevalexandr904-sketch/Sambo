@@ -38,7 +38,13 @@
     "login": "Sign in",
     "register": "Sign up",
     "openAdmin": "Open dashboard",
-    "tournaments": "Competitions"
+    "tournaments": "Competitions",
+    "loginTitle": "Already registered",
+    "loginHint": "Sign in to open your account: applications, athletes, refereeing and notifications.",
+    "registerTitle": "New user",
+    "registerHint": "Create an account and apply as a head of a sports organization, coach, athlete or referee. Role features open after the request is reviewed.",
+    "guestTitle": "Without signing in",
+    "guestHint": "Browse tournaments, schedules, brackets and results. Guests cannot open the personal account, personal data, documents or perform any actions — sign in for that."
   },
   "nav": {
     "dashboard": "Overview",
@@ -58,7 +64,9 @@
     "competitions": "Competitions",
     "applications": "My applications",
     "notifications": "Notifications",
-    "referee": "Refereeing"
+    "referee": "Refereeing",
+    "onboarding": "Registration",
+    "onboardingReview": "Review requests"
   },
   "auth": {
     "email": "Email",
@@ -220,7 +228,8 @@
       "registration_selfSignupEnabled": "Self sign-up",
       "support_contactEmail": "Support email",
       "ui_maintenanceBanner": "Maintenance banner",
-      "auth_leakedPasswordCheckEnabled": "Leaked password check"
+      "auth_leakedPasswordCheckEnabled": "Leaked password check",
+      "onboarding_documentRules": "Registration request documents (by role and scenario)"
     },
     "bannerRu": "Text in Russian",
     "bannerEn": "Text in English",
@@ -435,7 +444,8 @@
     "MATCH_NOT_IN_PROGRESS": "The match is not in progress: events are recorded only during the match.",
     "EVENT_NOT_ALLOWED_BY_RULESET": "This action is not allowed by the competition rules in the current state of the match.",
     "MATCH_RESULT_INCOMPLETE": "Record the result of the match first: the winner and the method.",
-    "RESULT_NOT_CONFIRMED": "Some matches in the category have no confirmed result — the results cannot be published."
+    "RESULT_NOT_CONFIRMED": "Some matches in the category have no confirmed result — the results cannot be published.",
+    "ORGANIZATION_ALREADY_REGISTERED": "This organization is already registered or its registration is under review by the platform team. If you are its head, please contact support."
   },
   "people": {
     "lastName": "Last name",
@@ -705,7 +715,10 @@
     "member": "Member",
     "memberHint": "The member must fill in their details (name, date of birth) in their account.",
     "duplicate": "A person with the same name and date of birth already exists. Check whether it is them.",
-    "createAnyway": "It is a different person — create"
+    "createAnyway": "It is a different person — create",
+    "grantReview": "Allow reviewing athlete requests",
+    "revokeReview": "Disallow reviewing athlete requests",
+    "reviewsAthletes": "reviews requests of their athletes"
   },
   "referees": {
     "title": "Referees",
@@ -1540,6 +1553,30 @@
         "title": "Bout time changed: {athleteName}",
         "titleNoName": "Bout time changed",
         "body": "Now about {time} · mat {matNumber} · bout № {matchNumber} · “{competitionName}”"
+      },
+      "onboarding_submitted": {
+        "title": "Registration request submitted",
+        "body": "Role: {role}. Awaiting review by the platform team."
+      },
+      "onboarding_forwarded": {
+        "title": "Request forwarded to the organization",
+        "body": "Role: {role}. Organization: {organizationName}."
+      },
+      "onboarding_awaiting_review": {
+        "title": "A new request awaits review",
+        "body": "Role: {role}. Open the request to decide."
+      },
+      "onboarding_changes_requested": {
+        "title": "Please correct your request",
+        "body": "Role: {role}. Comment: {reason}"
+      },
+      "onboarding_decided": {
+        "title": "Registration request decision: {status}",
+        "body": "Role: {role}. Comment: {reason}"
+      },
+      "onboarding_linked": {
+        "title": "A new member in your organization",
+        "body": "Role: {role}. Organization: {organizationName}."
       }
     },
     "preferencesTitle": "Email and push",
@@ -1553,7 +1590,13 @@
       "results_published": "Results published",
       "match_soon": "Bout coming up",
       "match_started": "Bout started",
-      "match_time_changed": "Bout time changed"
+      "match_time_changed": "Bout time changed",
+      "onboarding_submitted": "Registration request submitted",
+      "onboarding_forwarded": "Request forwarded to the organization",
+      "onboarding_awaiting_review": "A request awaits my review",
+      "onboarding_changes_requested": "Request needs corrections",
+      "onboarding_decided": "Registration request decision",
+      "onboarding_linked": "New organization member"
     },
     "saved": "Saved",
     "noValue": "—",
@@ -2277,5 +2320,230 @@
       "NEXT": "Next bout"
     },
     "holdLabel": "Hold"
+  },
+  "onboarding": {
+    "cabinet": {
+      "title": "Registration",
+      "lead": "Choose a role and submit a request. Role features stay unavailable until approval; the request status is shown here.",
+      "joinTitle": "Join an organization",
+      "joinHint": "You are registered without an organization. Submit a request to join — no new account is needed. The same way you change your club or coach.",
+      "join": {
+        "COACH": "Coach — join an organization",
+        "ATHLETE": "Athlete — join an organization and a coach"
+      },
+      "past": "Completed requests",
+      "submittedAt": "Submitted {at}",
+      "createdAt": "Created {at}",
+      "fix": "Correct the request",
+      "continue": "Continue filling in",
+      "open": "Open request",
+      "toCabinet": "Go to your account",
+      "cancel": "Cancel request",
+      "profiles": "Confirmed roles",
+      "chooseRole": "Step 1. Choose a role",
+      "anotherRole": "Apply for another role",
+      "chooseRoleHint": "Questions and documents depend on the role. The platform administrator role is never granted through registration.",
+      "noRoles": "All roles are already chosen"
+    },
+    "roles": {
+      "ORGANIZATION_HEAD": "Head of a sports organization",
+      "COACH": "Coach",
+      "ATHLETE": "Athlete",
+      "REFEREE": "Referee"
+    },
+    "roleHints": {
+      "ORGANIZATION_HEAD": "Register a club, sports school or another organization. Reviewed by the platform team.",
+      "COACH": "In an organization — reviewed by its head; without one — by the platform team.",
+      "ATHLETE": "In an organization — choose a coach, reviewed by the organization; without one — by the platform team.",
+      "REFEREE": "Referee category and record book. Reviewed by the platform team."
+    },
+    "kinds": {
+      "REGISTRATION": "registration",
+      "JOIN_ORGANIZATION": "joining an organization"
+    },
+    "statuses": {
+      "DRAFT": "Draft",
+      "PENDING_REVIEW": "Under platform review",
+      "PENDING_ORGANIZATION_APPROVAL": "Under organization review",
+      "APPROVED": "Approved",
+      "REJECTED": "Rejected",
+      "CHANGES_REQUESTED": "Changes requested",
+      "CANCELLED": "Cancelled"
+    },
+    "statusMessages": {
+      "DRAFT": "The draft is saved. Continue filling it in and submit the request.",
+      "PENDING_REVIEW": "The request has been submitted. Please wait for the review.",
+      "PENDING_ORGANIZATION_APPROVAL": "The request awaits approval by the sports organization “{organization}”.",
+      "APPROVED": "The request has been approved. Your account is available.",
+      "REJECTED": "The request has been rejected. Reason: {reason}",
+      "CHANGES_REQUESTED": "Please correct the data. Comment: {reason}",
+      "CANCELLED": "The request has been cancelled."
+    },
+    "fields": {
+      "role": "Role",
+      "fullName": "Full name",
+      "inOrganization": "Are you a member of a sports organization?",
+      "organization": "Sports organization",
+      "organizationSelect": "Choose the organization",
+      "independent": "No organization",
+      "coach": "Coach",
+      "refereeCategory": "Referee category",
+      "choose": "— choose —",
+      "orgType": "Organization type",
+      "legalForm": "Legal status",
+      "middleName": "Middle name (if any)",
+      "phone": "Phone",
+      "email": "Email",
+      "coachQualification": "Coach qualification category (if any)",
+      "organizationData": "Organization details",
+      "orgName": "Full name",
+      "orgShortName": "Short name",
+      "country": "Country",
+      "region": "Region",
+      "city": "City",
+      "inn": "INN (tax number)",
+      "ogrn": "OGRN",
+      "legalName": "Legal entity name",
+      "legalAddress": "Legal address",
+      "contactChannels": "How to contact you",
+      "telegram": "Telegram username",
+      "documents": "Documents",
+      "applicant": "Applicant"
+    },
+    "hints": {
+      "independent": {
+        "COACH": "The platform team will review the request. After approval you can join an organization without creating a new account.",
+        "ATHLETE": "The platform team will review the request. You can join an organization and a coach later from your account."
+      },
+      "refereeCategory": "The category from your referee record book; required documents may depend on it.",
+      "legalForm": "A Russian legal entity attaches an extract from the Unified State Register of Legal Entities. Foreign organizations or other statuses attach other documents.",
+      "organization": "Only organizations registered and confirmed on the platform are shown.",
+      "coach": "Coaches confirmed in the chosen organization are shown.",
+      "phone": "International format, e.g. +79991234567",
+      "coachQualification": "E.g. highest, first, second category. If set, attach the qualification document.",
+      "foreignOrganization": "Russian legal entity details are not needed. You can attach a registration document at the next step.",
+      "channels": "You can choose several. Notifications appear in the feed on the site and, if email is chosen, by email; by phone and in Telegram the reviewer may contact you if needed (automatic Telegram messages are not available yet).",
+      "telegram": "E.g. @ivan_petrov"
+    },
+    "orgTypes": {
+      "CLUB": "Sports club",
+      "SPORTS_SCHOOL": "Sports school",
+      "REGIONAL_FEDERATION": "Regional federation",
+      "ORGANIZER": "Event organizer",
+      "OTHER": "Other organization"
+    },
+    "legalForms": {
+      "RU_LEGAL_ENTITY": "Russian legal entity",
+      "FOREIGN": "Foreign organization",
+      "OTHER": "Other legal status"
+    },
+    "empty": {
+      "organizations": "Organization not found",
+      "organizationsHint": "If your organization is not on the platform, continue without it — you can join later. An organization is never created just from a typed name.",
+      "continueIndependent": "Continue without an organization",
+      "coaches": "The organization has no confirmed coaches yet",
+      "coachesHint": "Continue without an organization and join it and a coach later."
+    },
+    "channels": {
+      "EMAIL": "Email",
+      "PHONE": "Phone",
+      "TELEGRAM": "Telegram"
+    },
+    "documents": {
+      "hint": "PDF, JPG or PNG, up to {mb} MB. Files are stored privately: only you and the reviewer can see them.",
+      "none": "No documents are needed for this scenario.",
+      "required": "required",
+      "optional": "optional",
+      "attached": "attached",
+      "or": " or ",
+      "upload": "Upload file",
+      "uploadType": "Upload: {type}",
+      "uploading": "Uploading…",
+      "remove": "Remove",
+      "download": "Open",
+      "wrongType": "Only PDF, JPG and PNG are accepted.",
+      "tooLarge": "The file is larger than {mb} MB."
+    },
+    "history": {
+      "title": "Request history",
+      "reason": "Comment: {reason}"
+    },
+    "status": {
+      "title": "Registration request",
+      "back": "To my requests",
+      "data": "Request details"
+    },
+    "steps": {
+      "role": "Role",
+      "scenario": "Questions",
+      "personal": "Personal data",
+      "documents": "Documents",
+      "contacts": "Contact methods",
+      "review": "Review and submit"
+    },
+    "wizard": {
+      "progress": "Request steps",
+      "stepOf": "Step {step} of {total}",
+      "title": {
+        "REGISTRATION": "Request: {role}",
+        "JOIN_ORGANIZATION": "Joining an organization: {role}"
+      },
+      "lead": "Data is saved at every step — you can come back later and continue.",
+      "changesRequested": "The reviewer asks to correct the data: {reason}",
+      "fixErrors": "Check the highlighted fields.",
+      "back": "Back",
+      "next": "Continue",
+      "submit": "Submit request",
+      "autosave": "The draft is saved when you move between steps.",
+      "incomplete": "The request is incomplete",
+      "fixStep": "Fix: {step}"
+    },
+    "consent": {
+      "text": "Personal data from the request (name, date of birth, contacts, documents) is needed to review the request and register you on SAMBO Digital. Only reviewers can see it: the platform team or the head of the chosen organization. You can withdraw consent by contacting support.",
+      "checkbox": "I consent to the processing of my personal data for these purposes (Federal Law 152-FZ) and confirm the data is correct."
+    },
+    "review": {
+      "title": "Review requests",
+      "lead": "Registration and joining requests you are allowed to review.",
+      "awaiting": "Awaiting decision",
+      "from": "Submitted from",
+      "to": "to",
+      "empty": "No requests",
+      "emptyHint": "New requests will appear here; you will be notified about each one.",
+      "submittedAt": "Submitted",
+      "cardTitle": "Request: {role}",
+      "back": "Back to requests",
+      "account": "Account: {name}, {email}",
+      "duplicates": "{count, plural, one {# person} other {# people}} with the same name and date of birth found — check whether the person has registered before.",
+      "decision": "Decision",
+      "comment": "Approval comment (optional)",
+      "commentHint": "The applicant will see the comment.",
+      "approve": "Approve",
+      "requestChanges": "Request changes",
+      "requestChangesTitle": "What needs to be corrected?",
+      "reject": "Reject",
+      "rejectTitle": "Rejection reason"
+    },
+    "fieldErrors": {
+      "required": "Required field",
+      "document_required": "Attach this document",
+      "not_allowed": "Not applicable to the chosen role and answers",
+      "profile_required": "Register in this role first",
+      "must_be_ru": "A Russian legal entity must have country Russia",
+      "invalid_telegram": "Telegram username: Latin letters, digits and “_”, 5–32 characters",
+      "duplicate_channel": "Contact method chosen twice",
+      "birth_date_out_of_range": "Age does not fit the role: head and coach — 18+, referee — 14+, athlete — 5 to 25",
+      "too_many_documents": "Too many documents in the request",
+      "consent_required": "Consent to personal data processing is required",
+      "not_found": "Not found or not available for selection",
+      "invalid_file": "The file does not fit: please upload it again"
+    },
+    "preconditions": {
+      "coach_not_available": "The coach no longer works in this organization — ask the applicant to choose another coach.",
+      "person_incomplete": "The request lacks personal data.",
+      "person_required": "The applicant has no person record.",
+      "organization_incomplete": "The request lacks organization details.",
+      "referee_category_required": "The referee category is missing."
+    }
   }
 }

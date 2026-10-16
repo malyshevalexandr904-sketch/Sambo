@@ -17,6 +17,135 @@ const STATUS: Record<Locale, Record<string, string>> = {
   en: { APPROVED: 'approved', REJECTED: 'rejected' },
 };
 
+/** Роль заявки на регистрацию (Phase 9a) — в тексте письма. */
+const ONBOARDING_ROLE: Record<Locale, Record<string, string>> = {
+  ru: {
+    ORGANIZATION_HEAD: 'руководитель спортивной организации',
+    COACH: 'тренер',
+    ATHLETE: 'спортсмен',
+    REFEREE: 'судья',
+  },
+  en: {
+    ORGANIZATION_HEAD: 'head of a sports organization',
+    COACH: 'coach',
+    ATHLETE: 'athlete',
+    REFEREE: 'referee',
+  },
+};
+
+/** Письма о заявках на регистрацию: без ФИО заявителя (SECURITY.md, 3.7) — подробности в приложении. */
+const ONBOARDING_RU: Record<
+  | 'onboarding.submitted'
+  | 'onboarding.forwarded'
+  | 'onboarding.awaiting_review'
+  | 'onboarding.changes_requested'
+  | 'onboarding.decided'
+  | 'onboarding.linked',
+  TemplateDef
+> = {
+  'onboarding.submitted': {
+    subject: 'Заявка на регистрацию отправлена — SAMBO Digital',
+    lines: [
+      'Ваша заявка на регистрацию (роль: {roleText}) отправлена и ожидает проверки командой платформы.',
+      'О решении мы сообщим отдельно.',
+    ],
+    action: { label: 'Открыть заявку', param: 'url' },
+    required: ['roleText', 'url'],
+  },
+  'onboarding.forwarded': {
+    subject: 'Заявка передана на проверку организации — SAMBO Digital',
+    lines: [
+      'Ваша заявка (роль: {roleText}) передана на проверку организации «{organizationName}».',
+      'О решении мы сообщим отдельно.',
+    ],
+    action: { label: 'Открыть заявку', param: 'url' },
+    required: ['roleText', 'organizationName', 'url'],
+  },
+  'onboarding.awaiting_review': {
+    subject: 'Новая заявка ждёт проверки — SAMBO Digital',
+    lines: [
+      'Поступила заявка на регистрацию (роль: {roleText}).',
+      'Откройте её, чтобы одобрить, отклонить или запросить исправления.',
+    ],
+    action: { label: 'Открыть заявку', param: 'url' },
+    required: ['roleText', 'url'],
+  },
+  'onboarding.changes_requested': {
+    subject: 'Нужно исправить заявку — SAMBO Digital',
+    lines: [
+      'Проверяющий просит исправить вашу заявку на регистрацию (роль: {roleText}).',
+      'Комментарий: {reason}',
+      'Исправьте данные и отправьте заявку снова — заполнять её заново не нужно.',
+    ],
+    action: { label: 'Исправить заявку', param: 'url' },
+    required: ['roleText', 'url'],
+  },
+  'onboarding.decided': {
+    subject: 'Заявка на регистрацию {statusText} — SAMBO Digital',
+    lines: ['Ваша заявка на регистрацию (роль: {roleText}) {statusText}.', 'Комментарий: {reason}'],
+    action: { label: 'Открыть личный кабинет', param: 'url' },
+    required: ['roleText', 'statusText', 'url'],
+  },
+  'onboarding.linked': {
+    subject: 'В организации новый участник — SAMBO Digital',
+    lines: ['Заявка (роль: {roleText}) одобрена: участник присоединён к организации «{organizationName}».'],
+    action: { label: 'Открыть', param: 'url' },
+    required: ['roleText', 'organizationName', 'url'],
+  },
+};
+
+const ONBOARDING_EN: typeof ONBOARDING_RU = {
+  'onboarding.submitted': {
+    subject: 'Registration request submitted — SAMBO Digital',
+    lines: [
+      'Your registration request (role: {roleText}) has been submitted and awaits review by the platform team.',
+      'We will let you know about the decision.',
+    ],
+    action: { label: 'Open request', param: 'url' },
+    required: ['roleText', 'url'],
+  },
+  'onboarding.forwarded': {
+    subject: 'Request forwarded to the organization — SAMBO Digital',
+    lines: [
+      'Your request (role: {roleText}) has been forwarded to “{organizationName}” for review.',
+      'We will let you know about the decision.',
+    ],
+    action: { label: 'Open request', param: 'url' },
+    required: ['roleText', 'organizationName', 'url'],
+  },
+  'onboarding.awaiting_review': {
+    subject: 'A new request awaits review — SAMBO Digital',
+    lines: [
+      'A new registration request (role: {roleText}) has arrived.',
+      'Open it to approve, reject or request changes.',
+    ],
+    action: { label: 'Open request', param: 'url' },
+    required: ['roleText', 'url'],
+  },
+  'onboarding.changes_requested': {
+    subject: 'Please correct your request — SAMBO Digital',
+    lines: [
+      'The reviewer asks you to correct your registration request (role: {roleText}).',
+      'Comment: {reason}',
+      'Correct the data and submit the request again — no need to fill it in from scratch.',
+    ],
+    action: { label: 'Correct request', param: 'url' },
+    required: ['roleText', 'url'],
+  },
+  'onboarding.decided': {
+    subject: 'Registration request {statusText} — SAMBO Digital',
+    lines: ['Your registration request (role: {roleText}) has been {statusText}.', 'Comment: {reason}'],
+    action: { label: 'Open your account', param: 'url' },
+    required: ['roleText', 'statusText', 'url'],
+  },
+  'onboarding.linked': {
+    subject: 'A new member in your organization — SAMBO Digital',
+    lines: ['A request (role: {roleText}) has been approved: the member joined “{organizationName}”.'],
+    action: { label: 'Open', param: 'url' },
+    required: ['roleText', 'organizationName', 'url'],
+  },
+};
+
 const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
   ru: {
     'application.returned': {
@@ -78,6 +207,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
     'match.soon': matchDay('Скоро схватка', 'Подробности — в приложении.', 'Открыть'),
     'match.started': matchDay('Схватка началась', 'Подробности — в приложении.', 'Открыть'),
     'match.time_changed': matchDay('Изменилось время схватки', 'Подробности — в приложении.', 'Открыть'),
+    ...ONBOARDING_RU,
   },
   en: {
     'application.returned': {
@@ -139,6 +269,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
     'match.soon': matchDay('Bout coming up', 'Details are in the app.', 'Open'),
     'match.started': matchDay('Bout started', 'Details are in the app.', 'Open'),
     'match.time_changed': matchDay('Bout time changed', 'Details are in the app.', 'Open'),
+    ...ONBOARDING_EN,
   },
 };
 
@@ -149,9 +280,11 @@ export function renderNotificationEmail(
 ): RenderedEmail {
   const statusText = params.status ? (STATUS[locale][params.status] ?? params.status) : '';
   const details = isMatchDayNotification(type) ? renderPush(type, { ...params, locale }).body : '';
+  const roleText = params.onboardingRole ? (ONBOARDING_ROLE[locale][params.onboardingRole] ?? '') : '';
   return renderDefinition(TEMPLATES[locale][type], `notification:${type}`, locale, {
     ...params,
     statusText,
     details,
+    roleText,
   });
 }

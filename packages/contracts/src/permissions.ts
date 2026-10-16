@@ -35,6 +35,10 @@ export const PERMISSIONS = {
   'consent.record': { scopes: [O], description: 'Внесение бумажного согласия (скан)' },
   'coach.manage': { scopes: [O], description: 'Тренеры организации' },
   'referee.manage': { scopes: [O], description: 'Судьи и судейские категории' },
+  'onboarding.review': {
+    scopes: [P, O],
+    description: 'Проверка заявок на регистрацию в системе и на вступление в организацию',
+  },
   'document.upload': { scopes: [O], description: 'Загрузка документов спортсмена' },
   'document.view': { scopes: [O, C], description: 'Просмотр документов' },
   'document.verify': { scopes: [C], description: 'Проверка документов' },

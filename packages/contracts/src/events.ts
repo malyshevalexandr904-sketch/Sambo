@@ -86,6 +86,11 @@ export const EVENT_SCHEMAS = {
   'category.results_published': z.object({ categoryId: Uuid, competitionId: Uuid }),
   'category.results_amended': z.object({ categoryId: Uuid, competitionId: Uuid }),
   'medical.incident_recorded': z.object({ matchId: Uuid, entryId: Uuid, withdrawn: z.boolean() }),
+  // Phase 9a — регистрация в системе по ролям: заявки и их решения. Payload — только идентификаторы и коды.
+  'onboarding.submitted': z.object({ requestId: Uuid, status: z.string() }),
+  'onboarding.changes_requested': z.object({ requestId: Uuid }),
+  'onboarding.decided': z.object({ requestId: Uuid, status: z.string() }),
+  'onboarding.cancelled': z.object({ requestId: Uuid }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

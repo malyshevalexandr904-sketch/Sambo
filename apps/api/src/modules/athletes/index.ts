@@ -11,4 +11,5 @@ export {
   type MergeSide,
 } from './application/athlete-extensions';
 export { AthletesService } from './application/athletes.service';
+export { AthleteRegistryService } from './application/athlete-registry.service';
 export { electronicConsentDecision } from './domain/athlete-rules';

@@ -35,6 +35,7 @@ import { HealthModule } from './modules/health';
 import { LiveModule } from './modules/live';
 import { MedicalModule } from './modules/medical';
 import { NotificationsModule } from './modules/notifications';
+import { OnboardingModule } from './modules/onboarding';
 import { OrganizationsModule } from './modules/organizations';
 import { OutboxModule } from './modules/outbox';
 import { PeopleModule } from './modules/people';
@@ -112,6 +113,7 @@ import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
     RefereeingModule,
     MedicalModule,
     NotificationsModule,
+    OnboardingModule,
     FollowsModule,
     PublicModule,
     LiveModule,

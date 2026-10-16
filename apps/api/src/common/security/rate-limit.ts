@@ -27,6 +27,8 @@ export const RATE_LIMITS = {
   upload: { limit: 30, windowSeconds: 60 },
   /** Публичный API только для чтения: по IP (API.md, 1.7). */
   public: { limit: 120, windowSeconds: 60 },
+  /** Создание и отправка заявок на регистрацию (Phase 9a): по пользователю. */
+  onboarding: { limit: 10, windowSeconds: 60 },
 } as const;
 
 export type RateLimitGroup = keyof typeof RATE_LIMITS;
