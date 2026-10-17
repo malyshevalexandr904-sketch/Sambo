@@ -9,6 +9,7 @@ import {
   type DataEnvelope,
   lastVoidableEvent,
   type MatchDetailDto,
+  type Me,
   type MatchEventResultDto,
   type MatchState,
   replayEvents,
@@ -42,7 +43,8 @@ export type { EventInput, Pending } from './scoring-queue';
 export { commandRequest, isTransient, planUndo, relink, uuid } from './scoring-queue';
 
 export interface ScoringNotice {
-  kind: 'reset' | 'rejected';
+  /** `role` (0.13.1): в этой сессии выбрана другая роль кабинета — очередь не сбрасывается, а ждёт возврата. */
+  kind: 'reset' | 'rejected' | 'role';
   count?: number;
   reason?: unknown;
   error?: unknown;
@@ -129,6 +131,20 @@ interface QueueDeps {
   onChanged: () => void;
 }
 
+/**
+ * Отказ (403/404) — из-за смены роли кабинета в этой сессии (например, во второй вкладке выбрали «Представитель»)?
+ * Тогда оценки не теряются: очередь ждёт возврата в роль «Судья» (0.13.1).
+ */
+async function roleSwitchedAway(e: unknown): Promise<boolean> {
+  if (!(e instanceof ApiError) || (e.status !== 403 && e.status !== 404)) return false;
+  try {
+    const me = (await api<DataEnvelope<Me>>('/me')).data;
+    return me.activeRole !== 'REFEREE' && me.availableRoles.includes('REFEREE');
+  } catch {
+    return false;
+  }
+}
+
 /** Отправка одной команды; итог — продолжать ли очередь. */
 function useSendHead(
   { matchId, pendingRef, events }: QueueDeps,
@@ -136,6 +152,7 @@ function useSendHead(
   setOffline: (v: boolean) => void,
   drop: (n: ScoringNotice) => void,
   scheduleRetry: () => void,
+  pause: (n: ScoringNotice) => void,
 ) {
   const { logRef, setConfirmed, ready, nudge } = events;
   return useCallback(
@@ -173,12 +190,26 @@ function useSendHead(
           scheduleRetry();
         } else if (e instanceof ApiError && e.code === 'EXPECTED_SEQ_MISMATCH') {
           drop({ kind: 'reset', count: pendingRef.current.length });
+        } else if (await roleSwitchedAway(e)) {
+          pause({ kind: 'role', count: pendingRef.current.length });
         } else
           drop({ kind: 'rejected', reason: e instanceof ApiError ? e.details?.reason : undefined, error: e });
         return false;
       }
     },
-    [matchId, pendingRef, logRef, setConfirmed, ready, nudge, setQueue, setOffline, drop, scheduleRetry],
+    [
+      matchId,
+      pendingRef,
+      logRef,
+      setConfirmed,
+      ready,
+      nudge,
+      setQueue,
+      setOffline,
+      drop,
+      scheduleRetry,
+      pause,
+    ],
   );
 }
 
@@ -216,7 +247,7 @@ function useCommandQueue(deps: QueueDeps) {
     retry.current = setTimeout(() => void pumpRef.current(), backoff.current);
     backoff.current = Math.min(10_000, backoff.current * 2);
   }, []);
-  const sendHead = useSendHead(deps, setQueue, setOffline, drop, scheduleRetry);
+  const sendHead = useSendHead(deps, setQueue, setOffline, drop, scheduleRetry, setNotice);
   const pump = useCallback(async () => {
     if (busy.current) return;
     busy.current = true;

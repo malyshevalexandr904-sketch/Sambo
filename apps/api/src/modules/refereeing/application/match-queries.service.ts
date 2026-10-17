@@ -338,9 +338,12 @@ export class MatchQueriesService {
     const scope = await this.competitions.scopeFor(competition);
     await this.policy.assert(user, 'competition.view', scope);
     const session = await this.crews.currentSession(competition.id);
-    const myRoles: MatCrewRole[] = session
-      ? ((await this.crews.rolesInSession(user.id, session.id)).get(matId) ?? [])
-      : [];
+    // Должности в бригаде действуют только в роли кабинета «Судья» (0.13.1): в другой роли планшет не обещает того,
+    // чего сервер не разрешит.
+    const myRoles: MatCrewRole[] =
+      session && user.activeRole === 'REFEREE'
+        ? ((await this.crews.rolesInSession(user.id, session.id)).get(matId) ?? [])
+        : [];
     const matches = await this.slotsOfMat(matId);
     const queue = matches.filter((m) => m.status !== 'FINISHED');
     const current = currentOf(queue);
@@ -369,9 +372,10 @@ export class MatchQueriesService {
       this.crews.currentSession(competitionId),
       this.db.mat.findMany({ where: { competitionId }, orderBy: { number: 'asc' } }),
     ]);
-    const roles = session
-      ? await this.crews.rolesInSession(user.id, session.id)
-      : new Map<string, MatCrewRole[]>();
+    const roles =
+      session && user.activeRole === 'REFEREE'
+        ? await this.crews.rolesInSession(user.id, session.id)
+        : new Map<string, MatCrewRole[]>();
     const rows = await this.db.matchSchedule.findMany({
       where: {
         competitionId,

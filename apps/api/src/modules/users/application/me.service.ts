@@ -18,10 +18,14 @@ import { CabinetRolesService } from '../../access';
 import { AuditService } from '../../audit';
 import { PeopleService, personAudit, personDto } from '../../people';
 
-/** Пользователь и его сессия входа: от сессии зависит выбранная роль кабинета (0.13.0). */
+/**
+ * Пользователь и его сессия входа: от сессии зависит выбранная роль кабинета (0.13.0). `activeRole` — уже
+ * определённая для запроса (`AuthUser`); не передана (вход, подтверждение email) — определяется здесь.
+ */
 export interface MeRef {
   userId: string;
   sessionId: string;
+  activeRole?: CabinetRole | null;
 }
 
 @Injectable()
@@ -37,7 +41,7 @@ export class MeService {
    * Профиль «я». Роли доступа — только выбранной роли кабинета (в этой сессии другие не действуют); выбранная роль
    * проверяется: если её у пользователя больше нет, выбирается роль по умолчанию.
    */
-  async get({ userId, sessionId }: MeRef): Promise<Me> {
+  async get({ userId, sessionId, activeRole }: MeRef): Promise<Me> {
     const today = new Date(new Date().toISOString().slice(0, 10));
     const user = await this.db.user.findUniqueOrThrow({
       where: { id: userId },
@@ -62,7 +66,7 @@ export class MeService {
       user.organizationMemberships.map((m) => ({ id: m.organizationId, code: m.role.code })),
     );
     const comps = group(user.competitionMemberships.map((m) => ({ id: m.competitionId, code: m.role.code })));
-    const resolved = await this.cabinetRoles.resolve(user, sessionId);
+    const resolved = activeRole !== undefined ? activeRole : await this.cabinetRoles.resolve(user, sessionId);
     const { active, available } = await this.cabinetRoles.state({ ...user, activeRole: resolved }, sessionId);
     const keep = (r: RoleCode): boolean => roleActiveIn(active, r);
     const inRole = <T extends { roles: RoleCode[] }>(rows: T[]): T[] =>
@@ -94,7 +98,7 @@ export class MeService {
   /** Переключение роли кабинета в этой сессии (0.13.0). */
   async selectRole(ref: MeRef, role: CabinetRole): Promise<Me> {
     await this.cabinetRoles.select(ref.userId, ref.sessionId, role);
-    return this.get(ref);
+    return this.get({ ...ref, activeRole: role });
   }
 
   async update(ref: MeRef, patch: UpdateMeRequest): Promise<Me> {

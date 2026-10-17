@@ -3,30 +3,72 @@
 // действуют только для неё. Переключатель — в боковой панели; выбор хранится на сервере на сессию входа, поэтому
 // после переключения страница загружается заново (кэш запросов, соединение живых данных, другие вкладки).
 import { type CabinetRole, type DataEnvelope, type Me } from '@sde/contracts';
-import { Alert, Button, Select } from '@sde/ui';
-import { useQueryClient } from '@tanstack/react-query';
+import { Alert, Button, cn } from '@sde/ui';
+import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useId, useState } from 'react';
 import { Link } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
+import { closeLive } from '@/lib/live';
 import { qk } from '@/lib/queries';
 import { useErrorMessage } from '@/lib/errors';
 
 const CHANNEL = 'sde-cabinet-role';
+/** Вкладка-отправитель: BroadcastChannel доставляет сообщение и другим объектам канала этой же вкладки. */
+const TAB_ID =
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Math.random());
 
 interface RoleMessage {
   userId: string;
-  role: CabinetRole;
+  role: CabinetRole | null;
+  tabId: string;
 }
 
-function announce(msg: RoleMessage): void {
+function announce(msg: Omit<RoleMessage, 'tabId'>): void {
   try {
     const ch = new BroadcastChannel(CHANNEL);
-    ch.postMessage(msg);
+    ch.postMessage({ ...msg, tabId: TAB_ID } satisfies RoleMessage);
     ch.close();
   } catch {
     // BroadcastChannel недоступен (старый браузер) — другие вкладки узнают о смене при следующем запросе.
   }
+}
+
+/**
+ * Роль сессии до действия, которое может её сменить на сервере (принять приглашение, создать организацию):
+ * из кэша «я» или запросом; не вошёл — undefined.
+ */
+export async function roleBefore(queryClient: QueryClient): Promise<CabinetRole | null | undefined> {
+  const cached = queryClient.getQueryData<Me>(qk.me);
+  if (cached) return cached.activeRole;
+  try {
+    return (await api<DataEnvelope<Me>>('/me')).data.activeRole;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * После такого действия (0.13.1): если сервер перевёл сессию в другую роль, данные прежней роли из кэша убираются,
+ * живое соединение открывается заново, другие вкладки получают предупреждение. Возвращает новое «я».
+ */
+export async function afterServerRoleChange(
+  queryClient: QueryClient,
+  before: CabinetRole | null | undefined,
+): Promise<Me | null> {
+  let fresh: Me;
+  try {
+    fresh = (await api<DataEnvelope<Me>>('/me')).data;
+  } catch {
+    return null;
+  }
+  if (before !== undefined && before !== fresh.activeRole) {
+    closeLive();
+    queryClient.clear();
+    announce({ userId: fresh.id, role: fresh.activeRole });
+  }
+  queryClient.setQueryData(qk.me, fresh);
+  return fresh;
 }
 
 /**
@@ -61,13 +103,13 @@ export function useSwitchRole(): {
 /** Роль сменили в другой вкладке этого браузера: здесь она уже действует — предлагаем обновить страницу. */
 export function RoleChangedElsewhere({ userId }: { userId: string }) {
   const t = useTranslations('cabinetRole');
-  const [role, setRole] = useState<CabinetRole | null>(null);
+  const [role, setRole] = useState<CabinetRole | 'none' | null>(null);
   useEffect(() => {
     let ch: BroadcastChannel | null = null;
     try {
       ch = new BroadcastChannel(CHANNEL);
       ch.onmessage = (e: MessageEvent<RoleMessage>) => {
-        if (e.data?.userId === userId) setRole(e.data.role);
+        if (e.data?.userId === userId && e.data.tabId !== TAB_ID) setRole(e.data.role ?? 'none');
       };
     } catch {
       ch = null;
@@ -81,7 +123,7 @@ export function RoleChangedElsewhere({ userId }: { userId: string }) {
       className="fixed inset-x-0 top-0 z-50 border-b border-amber-300 bg-amber-50 px-4 py-3 text-sm"
     >
       <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2">
-        <span>{t('changedElsewhere', { role: t(`roles.${role}`) })}</span>
+        <span>{t('changedElsewhere', { role: role === 'none' ? t('noRole') : t(`roles.${role}`) })}</span>
         <Button size="sm" onClick={() => window.location.reload()}>
           {t('reload')}
         </Button>
@@ -110,24 +152,38 @@ export function RoleSwitcher({ me }: { me: Me }) {
         </>
       ) : (
         <>
-          <label htmlFor={id} className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          {/* Кнопки, а не выпадающий список (0.13.1): роль меняется только явным нажатием — стрелка клавиатуры на
+              закрытом списке не должна переключать права и перезагружать страницу; длинные названия переносятся. */}
+          <p id={id} className="text-xs font-medium uppercase tracking-wide text-slate-500">
             {t('label')}
-          </label>
-          <Select
-            id={id}
-            className="mt-1 w-full pl-2 pr-7 text-[13px]"
-            value={me.activeRole ?? ''}
-            disabled={busy}
-            aria-describedby={`${id}-hint`}
-            onChange={(e) => void switchTo(e.target.value as CabinetRole)}
-          >
-            {me.activeRole === null ? <option value="">{t('choose')}</option> : null}
-            {roles.map((r) => (
-              <option key={r} value={r}>
-                {t(`roles.${r}`)}
-              </option>
-            ))}
-          </Select>
+          </p>
+          <ul className="mt-1 space-y-1" role="group" aria-labelledby={id} aria-describedby={`${id}-hint`}>
+            {roles.map((r) => {
+              const current = r === me.activeRole;
+              return (
+                <li key={r}>
+                  <button
+                    type="button"
+                    aria-pressed={current}
+                    disabled={busy}
+                    onClick={() => (current ? undefined : void switchTo(r))}
+                    className={cn(
+                      'flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm',
+                      'focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600',
+                      current
+                        ? 'bg-white font-semibold text-slate-900 shadow-sm ring-1 ring-blue-600'
+                        : 'text-slate-700 hover:bg-white disabled:text-slate-400',
+                    )}
+                  >
+                    <span aria-hidden="true" className={current ? 'text-blue-700' : 'text-slate-400'}>
+                      {current ? '●' : '○'}
+                    </span>
+                    {t(`roles.${r}`)}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
           <p id={`${id}-hint`} className="mt-1 text-xs text-slate-500">
             {t('hint')}
           </p>
@@ -177,5 +233,28 @@ export function OtherRolesHint({ error }: { error: unknown }) {
         ))}
       </div>
     </Alert>
+  );
+}
+
+/**
+ * Полноэкранные экраны без меню (планшет ковра, протоколы; 0.13.1): у кого несколько ролей — узкая строка с текущей
+ * ролью и переходом в другие (переключателя меню здесь нет). Печать её не показывает.
+ */
+export function ConsoleRoleBar({ me }: { me: Me }) {
+  const t = useTranslations('cabinetRole');
+  const { switchTo, busy } = useSwitchRole();
+  if (me.availableRoles.length < 2) return null;
+  const others = me.availableRoles.filter((r) => r !== me.activeRole);
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 text-sm print:hidden">
+      <span>
+        {t('label')}: <strong>{me.activeRole ? t(`roles.${me.activeRole}`) : t('noRole')}</strong>
+      </span>
+      {others.map((r) => (
+        <Button key={r} size="sm" variant="secondary" loading={busy} onClick={() => void switchTo(r, 'stay')}>
+          {t('openAs', { role: t(`roles.${r}`) })}
+        </Button>
+      ))}
+    </div>
   );
 }

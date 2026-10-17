@@ -11,10 +11,11 @@ import {
   zonedToInstant,
 } from '@sde/contracts';
 import { Alert, Button, Card, CardTitle, Field, Input, PageHeader, Select } from '@sde/ui';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { OrganizationPicker } from '@/components/organization-picker';
+import { afterServerRoleChange, roleBefore } from '@/features/cabinet-role';
 import { useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useFieldMessage } from '@/lib/errors';
@@ -62,6 +63,7 @@ export function CompetitionCreateForm() {
   const router = useRouter();
   const tf = useFieldMessage();
   const action = useAction();
+  const queryClient = useQueryClient();
   const disciplines = useDisciplines();
   const [v, setV] = useState<FormValues>({
     organizerOrganizationId: '',
@@ -122,7 +124,10 @@ export function CompetitionCreateForm() {
     if (Object.keys(local).length > 0) return;
     void action.run(async () => {
       try {
+        const before = await roleBefore(queryClient);
         const res = await api<DataEnvelope<Competition>>('/competitions', { method: 'POST', body });
+        // Федерация, создавшая турнир, переходит в роль «Персонал турнира» (0.13.1).
+        await afterServerRoleChange(queryClient, before);
         router.push(`/competitions/${res.data.id}`);
       } catch (e) {
         if (e instanceof ApiError && e.fields.length > 0) {

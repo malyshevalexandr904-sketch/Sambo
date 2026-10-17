@@ -212,6 +212,8 @@ model SessionRole {
   userId             String   @map("user_id") @db.Uuid
   role               String?
   permissionsVersion Int      @map("permissions_version")
+  /// Версия выбора (0.13.1): каждая запись +1; автоматическая проверка пишет, только если версия не изменилась.
+  rev                Int      @default(0)
   updatedAt          DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

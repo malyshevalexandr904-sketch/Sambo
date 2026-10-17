@@ -25,7 +25,12 @@ import {
   LiveUnsubscribeRequest,
   parseLiveChannel,
 } from '@sde/contracts';
-import { type Env, LIVE_REDIS_CHANNEL, parseLiveRedisMessage } from '@sde/server-kit';
+import {
+  type Env,
+  LIVE_CONTROL_REDIS_CHANNEL,
+  LIVE_REDIS_CHANNEL,
+  parseLiveRedisMessage,
+} from '@sde/server-kit';
 import type { Server as HttpServer } from 'node:http';
 import { Redis } from 'ioredis';
 import { type Namespace, Server, type Socket } from 'socket.io';
@@ -139,9 +144,11 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     this.nsp = nsp;
 
     const subscriber = new Redis(this.env.REDIS_URL, { maxRetriesPerRequest: null });
-    subscriber.on('message', (_channel: string, raw: string) => this.deliver(raw));
+    subscriber.on('message', (channel: string, raw: string) =>
+      channel === LIVE_CONTROL_REDIS_CHANNEL ? this.control(raw) : this.deliver(raw),
+    );
     subscriber.on('error', (err) => this.logger.warn({ err }, 'Live subscriber: Redis error'));
-    void subscriber.subscribe(LIVE_REDIS_CHANNEL).catch((err: unknown) => {
+    void subscriber.subscribe(LIVE_REDIS_CHANNEL, LIVE_CONTROL_REDIS_CHANNEL).catch((err: unknown) => {
       this.logger.error({ err }, 'Live subscriber: subscribe failed');
     });
     this.subscriber = subscriber;
@@ -170,6 +177,25 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
       this.nsp.to(parsed.room).emit(LIVE_EVENTS.message, JSON.parse(parsed.json));
     } catch (err) {
       this.logger.warn({ err }, 'Live message dropped: invalid JSON');
+    }
+  }
+
+  /**
+   * Служебное сообщение узлам (0.13.1): в сессии сменили роль кабинета — служебные подписки её соединений выданы по
+   * прежней роли. Соединение получает `expired`, как при истечении входа: клиент обновит сессию и подпишется заново
+   * уже с новой ролью (то, что в ней не положено, получит отказ).
+   */
+  private control(raw: string): void {
+    let msg: { type?: unknown; sessionId?: unknown };
+    try {
+      msg = JSON.parse(raw) as { type?: unknown; sessionId?: unknown };
+    } catch {
+      return;
+    }
+    if (msg.type !== 'session-role' || typeof msg.sessionId !== 'string' || !this.nsp) return;
+    for (const socket of this.nsp.sockets.values()) {
+      const state = socket.data as SocketState | undefined;
+      if (state?.user?.sessionId === msg.sessionId) this.expire(socket);
     }
   }
 

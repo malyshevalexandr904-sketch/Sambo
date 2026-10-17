@@ -6,6 +6,11 @@ import type { LiveMessageType } from '@sde/contracts';
 
 /** Канал Redis pub/sub, по которому сообщения уходят узлам api. Тело: `<комната>\n<JSON сообщения>`. */
 export const LIVE_REDIS_CHANNEL = 'sde:live';
+/**
+ * Служебные сообщения узлам api (0.13.1): `{"type":"session-role","sessionId":…}` — в сессии сменили роль кабинета;
+ * узлы снимают служебные подписки соединений этой сессии, клиент подключается заново уже с новой ролью.
+ */
+export const LIVE_CONTROL_REDIS_CHANNEL = 'sde:live:control';
 export const liveSeqKey = (room: string): string => `sde:live:seq:${room}`;
 export const liveLastKey = (room: string): string => `sde:live:last:${room}`;
 

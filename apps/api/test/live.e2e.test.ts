@@ -21,7 +21,7 @@ import type { AddressInfo } from 'node:net';
 import { io, type Socket } from 'socket.io-client';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { ChangeFeedService, LivePublisherService } from '../src/modules/live';
-import { createTestApp, createUser, PASSWORD, resetData, type TestApp } from './helpers/app';
+import { createOrg, createTestApp, createUser, PASSWORD, resetData, type TestApp } from './helpers/app';
 import { send } from './helpers/phase3';
 import {
   event,
@@ -394,6 +394,50 @@ describe('live channels', () => {
       ok: false,
       error: { code: 'FORBIDDEN' },
     });
+  });
+
+  it('switching the cabinet role drops the service subscriptions of that session (0.13.1)', async () => {
+    // Судья турнира и руководитель стороннего клуба: две роли кабинета.
+    const ref = await official(t, w.competitionId);
+    const club = await createOrg(t);
+    const manager = await t.admin.role.findUniqueOrThrow({ where: { code: 'CLUB_MANAGER' } });
+    await t.admin.organizationMembership.create({
+      data: {
+        id: uuidv7(),
+        organizationId: club,
+        userId: ref.id,
+        roleId: manager.id,
+        status: 'ACTIVE',
+        validFrom: new Date(),
+      },
+    });
+    await t.admin.user.update({
+      where: { id: ref.id },
+      data: { permissionsVersion: { increment: 1 }, preferredRole: 'REFEREE' },
+    });
+    const { cookie } = await credentials(await emailOf(ref.id));
+    const s = await connect({ cookie });
+    expect(await subscribe(s, liveChannel.opsCompetition(w.competitionId))).toMatchObject({ ok: true });
+    let expired = false;
+    s.on(LIVE_EVENTS.expired, () => {
+      expired = true;
+    });
+    const csrf = decodeURIComponent(
+      cookie
+        .split('; ')
+        .find((c) => c.startsWith('sde_csrf='))
+        ?.slice('sde_csrf='.length) ?? '',
+    );
+    const switched = await fetch(`${base}/api/v1/me/role`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-csrf-token': csrf, cookie },
+      body: JSON.stringify({ role: 'ORGANIZATION_HEAD' }),
+    });
+    expect(switched.status).toBe(200);
+    await waitFor(() => (expired ? true : undefined));
+    // Новое соединение той же сессии — уже в роли руководителя: служебный канал турнира не положен.
+    const again = await connect({ cookie });
+    expect(await subscribe(again, liveChannel.opsCompetition(w.competitionId))).toMatchObject({ ok: false });
   });
 
   it('an unsubscribe sent while the subscription is still being checked wins', async () => {

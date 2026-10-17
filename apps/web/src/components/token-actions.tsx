@@ -16,6 +16,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useErrorMessage } from '@/lib/errors';
+import { afterServerRoleChange, roleBefore } from '@/features/cabinet-role';
 import { qk } from '@/lib/queries';
 
 export function VerifyEmail() {
@@ -92,9 +93,14 @@ export function AcceptInvite() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    api<DataEnvelope<Membership>>('/invites/accept', { method: 'POST', body: { token } })
-      .then((res) => {
-        void queryClient.invalidateQueries({ queryKey: qk.me });
+    // Принятое приглашение переводит сессию в роль приглашения (0.13.0): кэш прежней роли — сбросить.
+    void roleBefore(queryClient)
+      .then(async (before) => {
+        const res = await api<DataEnvelope<Membership>>('/invites/accept', {
+          method: 'POST',
+          body: { token },
+        });
+        await afterServerRoleChange(queryClient, before);
         setState({ kind: 'done', organizationId: res.data.organizationId });
       })
       .catch((e: unknown) => {
@@ -153,9 +159,13 @@ export function AcceptCompetitionInvite() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    api<DataEnvelope<CompetitionMember>>('/competition-invites/accept', { method: 'POST', body: { token } })
-      .then((res) => {
-        void queryClient.invalidateQueries({ queryKey: qk.me });
+    void roleBefore(queryClient)
+      .then(async (before) => {
+        const res = await api<DataEnvelope<CompetitionMember>>('/competition-invites/accept', {
+          method: 'POST',
+          body: { token },
+        });
+        await afterServerRoleChange(queryClient, before);
         setState({ kind: 'done', competitionId: res.data.competitionId });
       })
       .catch((e: unknown) => {

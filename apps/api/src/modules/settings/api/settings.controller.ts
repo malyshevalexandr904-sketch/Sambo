@@ -27,7 +27,8 @@ export class SettingsController {
   @Get('email-delivery')
   @RequirePermission('platform.settings.manage', PLATFORM_SCOPE)
   emailDelivery(): DataEnvelope<EmailDeliveryStatus> {
-    const host = this.env.EMAIL_PROVIDER === 'smtp' ? (this.env.SMTP_HOST ?? null) : null;
+    // Без SMTP_HOST nodemailer отправляет на localhost — это тоже «письма не покидают сервер».
+    const host = this.env.EMAIL_PROVIDER === 'smtp' ? (this.env.SMTP_HOST ?? 'localhost') : null;
     const internal =
       this.env.EMAIL_PROVIDER === 'log' || ['mailpit', 'localhost', '127.0.0.1', '::1'].includes(host ?? '');
     return ok({

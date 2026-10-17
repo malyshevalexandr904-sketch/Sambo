@@ -56,6 +56,17 @@ export class ImportsService implements OnModuleInit {
   onModuleInit(): void {
     // Файл импорта загружает тот, у кого есть право импорта хотя бы в одной организации.
     this.files.registerUploadPolicy('IMPORT', (user) => this.policy.holdsAnywhere(user, 'athlete.import'));
+    // Исходный файл (ФИО, даты рождения) скачивает только загрузивший — и только пока у него есть право импорта в
+    // организации задания в выбранной роли кабинета (0.13.1); файл ещё без задания — право импорта где-либо.
+    this.files.registerAccessPolicy('IMPORT', async (user, file) => {
+      if (file.uploadedById !== user.id) return false;
+      const job = await this.db.importJob.findFirst({
+        where: { fileId: file.id },
+        select: { organizationId: true },
+      });
+      if (!job) return this.policy.holdsAnywhere(user, 'athlete.import');
+      return this.policy.can(user, 'athlete.import', await this.orgScopes.scopeOf(job.organizationId));
+    });
   }
 
   async create(user: AuthUser, input: ImportCreate): Promise<ImportJobDto> {
@@ -87,13 +98,21 @@ export class ImportsService implements OnModuleInit {
     return this.get(user, id);
   }
 
-  /** Задание видит только его создатель. */
+  /**
+   * Задание видит только его создатель — пока у него есть право импорта в организации задания (в отчёте — ФИО и
+   * даты рождения): в другой роли кабинета или после ухода из клуба — 404 (0.13.1).
+   */
   async get(user: AuthUser, id: string): Promise<ImportJobDto> {
     const job = await this.db.importJob.findUnique({
       where: { id },
       include: { file: { select: { originalName: true } } },
     });
-    if (!job || job.createdById !== user.id) throw new DomainError('NOT_FOUND', { resource: 'import' });
+    if (
+      !job ||
+      job.createdById !== user.id ||
+      !(await this.policy.can(user, 'athlete.import', await this.orgScopes.scopeOf(job.organizationId)))
+    )
+      throw new DomainError('NOT_FOUND', { resource: 'import' });
     return toDto(job);
   }
 
