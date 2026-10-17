@@ -115,7 +115,7 @@ export function RoleSwitcher({ me }: { me: Me }) {
           </label>
           <Select
             id={id}
-            className="mt-1 w-full"
+            className="mt-1 w-full pl-2 pr-7 text-[13px]"
             value={me.activeRole ?? ''}
             disabled={busy}
             aria-describedby={`${id}-hint`}
