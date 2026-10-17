@@ -9,6 +9,7 @@ import type { ReactNode } from 'react';
 import { formatDates } from '@/features/competitions/shared';
 import { ApiError } from '@/lib/api';
 import { pickName } from '@/lib/queries';
+import { OtherRolesHint } from '@/features/cabinet-role';
 
 /**
  * Стили листа — по согласованному макету; на странице протокола @page переопределяет общую альбомную печать.
@@ -153,7 +154,9 @@ export function useNotFound(error: unknown): ReactNode {
   if (error instanceof ApiError && (error.code === 'NOT_FOUND' || error.code === 'FORBIDDEN'))
     return (
       <div className="p-4">
-        <EmptyState title={error.code === 'FORBIDDEN' ? t('forbidden') : t('notFound')} />
+        <EmptyState title={error.code === 'FORBIDDEN' ? t('forbidden') : t('notFound')}>
+          <OtherRolesHint error={error} />
+        </EmptyState>
       </div>
     );
   return null;

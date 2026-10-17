@@ -46,6 +46,21 @@ function WorkCard() {
     },
     { href: '/children', label: t('dashboard.links.children'), visible: (mine.data?.length ?? 0) > 0 },
     {
+      href: '/referee',
+      label: t('dashboard.links.referee'),
+      visible: (me?.grants.competitions.length ?? 0) > 0,
+    },
+    {
+      href: '/applications',
+      label: t('dashboard.links.applications'),
+      visible: hasAnywhere(me, 'registration.create'),
+    },
+    {
+      href: '/onboarding/review',
+      label: t('dashboard.links.review'),
+      visible: hasAnywhere(me, 'onboarding.review'),
+    },
+    {
       href: '/documents',
       label: t('dashboard.links.documents'),
       visible: hasAnywhere(me, 'document.verify'),
@@ -73,12 +88,28 @@ export function Dashboard() {
   const t = useTranslations();
   const { data: me } = useMe();
   if (!me) return null;
+  const role = me.activeRole;
+  // «Мои организации» — там, где роль связана с организацией; администратор регистрирует организации сам.
+  const showOrganizations =
+    me.grants.organizations.length > 0 || role === 'ORGANIZATION_HEAD' || role === 'ADMIN';
   return (
     <>
       <PageHeader
         title={t('dashboard.title')}
-        description={t('dashboard.welcome', { name: me.displayName })}
+        description={
+          role
+            ? t('dashboard.welcomeRole', { name: me.displayName, role: t(`cabinetRole.roles.${role}`) })
+            : t('dashboard.welcome', { name: me.displayName })
+        }
       />
+      {role === null ? (
+        <Alert tone="info" className="mb-6" title={t('dashboard.noRoleTitle')}>
+          {t('dashboard.noRole')}{' '}
+          <Link href="/onboarding" className="font-medium underline">
+            {t('cabinetRole.chooseRole')}
+          </Link>
+        </Alert>
+      ) : null}
       {me.grants.platform.length > 0 && !me.totpEnabled ? (
         <Alert tone="warning" className="mb-6">
           {t('dashboard.totpWarning')}{' '}
@@ -89,24 +120,26 @@ export function Dashboard() {
       ) : null}
       <div className="grid gap-6 xl:grid-cols-2">
         <WorkCard />
-        <Card>
-          <CardTitle>{t('dashboard.myOrganizations')}</CardTitle>
-          {me.grants.organizations.length === 0 ? (
-            <p className="text-sm text-slate-600">{t('dashboard.noOrganizations')}</p>
-          ) : (
-            <ul>
-              {me.grants.organizations.map((o) => (
-                <OrganizationRow key={o.organizationId} id={o.organizationId} roles={o.roles} />
-              ))}
-            </ul>
-          )}
-          <Link
-            href="/admin/organizations/new"
-            className="mt-4 inline-flex min-h-11 items-center rounded-md border border-slate-300 px-4 text-sm font-medium hover:bg-slate-50"
-          >
-            {t('dashboard.createOrganization')}
-          </Link>
-        </Card>
+        {showOrganizations ? (
+          <Card>
+            <CardTitle>{t('dashboard.myOrganizations')}</CardTitle>
+            {me.grants.organizations.length === 0 ? (
+              <p className="text-sm text-slate-600">{t('dashboard.noOrganizations')}</p>
+            ) : (
+              <ul>
+                {me.grants.organizations.map((o) => (
+                  <OrganizationRow key={o.organizationId} id={o.organizationId} roles={o.roles} />
+                ))}
+              </ul>
+            )}
+            <Link
+              href="/admin/organizations/new"
+              className="mt-4 inline-flex min-h-11 items-center rounded-md border border-slate-300 px-4 text-sm font-medium hover:bg-slate-50"
+            >
+              {t('dashboard.createOrganization')}
+            </Link>
+          </Card>
+        ) : null}
         {me.grants.platform.length > 0 ? (
           <Card>
             <CardTitle>{t('dashboard.platformRoles')}</CardTitle>
@@ -114,7 +147,6 @@ export function Dashboard() {
           </Card>
         ) : null}
       </div>
-      <p className="mt-8 text-sm text-slate-500">{t('dashboard.nextPhases')}</p>
     </>
   );
 }

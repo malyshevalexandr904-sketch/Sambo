@@ -72,8 +72,12 @@ export class Maintenance {
     const push = await this.db.$executeRaw`DELETE FROM push_subscription ps WHERE NOT EXISTS (
       SELECT 1 FROM refresh_token rt WHERE rt.family_id = ps.session_id AND rt.revoked_at IS NULL
         AND rt.replaced_by_id IS NULL)`;
+    // Роль кабинета сессии (0.13.0) — по тем же правилам, что и push-подписки.
+    const sessionRoles = await this.db.$executeRaw`DELETE FROM session_role sr WHERE NOT EXISTS (
+      SELECT 1 FROM refresh_token rt WHERE rt.family_id = sr.session_id AND rt.revoked_at IS NULL
+        AND rt.replaced_by_id IS NULL)`;
     this.logger.info(
-      { refresh: refresh.count, verification: verification.count, pushSubscriptions: push },
+      { refresh: refresh.count, verification: verification.count, pushSubscriptions: push, sessionRoles },
       'Expired tokens removed',
     );
   }

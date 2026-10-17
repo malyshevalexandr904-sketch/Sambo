@@ -5,8 +5,8 @@ import type { MetadataRoute } from 'next';
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: '/',
-    name: 'SAMBO Digital',
-    short_name: 'SAMBO',
+    name: 'Digital Sambo',
+    short_name: 'Digital Sambo',
     description: 'Турниры по самбо: заявки, жеребьёвка, табло, результаты',
     start_url: '/',
     scope: '/',

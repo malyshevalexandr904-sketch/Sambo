@@ -18,7 +18,7 @@ export function Brand({ className, logoClassName }: { className?: string; logoCl
         priority
         className={cn('h-8 w-auto mix-blend-multiply', logoClassName)}
       />
-      <span>SAMBO Digital</span>
+      <span>Digital Sambo</span>
     </span>
   );
 }

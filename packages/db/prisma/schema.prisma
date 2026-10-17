@@ -79,6 +79,9 @@ model User {
   totpEnabledAt          DateTime?  @map("totp_enabled_at") @db.Timestamptz(3)
   totpRecoveryCodeHashes String[]   @default([]) @map("totp_recovery_code_hashes")
   permissionsVersion     Int        @default(1) @map("permissions_version")
+  /// Последняя выбранная роль в кабинете (0.13.0): с неё начинается новая сессия. При регистрации — роль, выбранная
+  /// до заполнения формы (после подтверждения email сразу открывается анкета этой роли).
+  preferredRole          String?    @map("preferred_role")
   lastLoginAt            DateTime?  @map("last_login_at") @db.Timestamptz(3)
   createdAt              DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -87,6 +90,7 @@ model User {
   person                    Person?                  @relation("UserPerson", fields: [personId], references: [id], onDelete: Restrict)
   identities                AuthIdentity[]
   refreshTokens             RefreshToken[]
+  sessionRoles              SessionRole[]
   verificationTokens        VerificationToken[]
   platformRoles             PlatformRoleAssignment[] @relation("PlatformRoleUser")
   grantedPlatformRoles      PlatformRoleAssignment[] @relation("PlatformRoleGrantor")
@@ -199,6 +203,21 @@ model RefreshToken {
   @@index([userId, revokedAt])
   @@index([expiresAt])
   @@map("refresh_token")
+}
+
+/// Роль в кабинете для сессии входа (0.13.0): права действуют только для неё. `sessionId` — семейство refresh token.
+/// `role` NULL — ролей пока нет. `permissionsVersion` — версия прав на момент выбора: изменились — выбор проверяется.
+model SessionRole {
+  sessionId          String   @id @map("session_id") @db.Uuid
+  userId             String   @map("user_id") @db.Uuid
+  role               String?
+  permissionsVersion Int      @map("permissions_version")
+  updatedAt          DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session_role")
 }
 
 model VerificationToken {

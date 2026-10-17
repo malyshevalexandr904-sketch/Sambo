@@ -92,6 +92,8 @@ export class AuthService {
             displayName: input.displayName,
             locale: input.locale,
             status: 'PENDING_VERIFICATION',
+            // Роль, выбранная до формы (0.13.0): после подтверждения сразу открывается её анкета.
+            preferredRole: input.role ?? null,
           },
         });
         await tx.authIdentity.create({
@@ -158,7 +160,7 @@ export class AuthService {
       });
       return { userId: user.id, session: await this.sessions.create(tx, updated) };
     });
-    return { me: await this.me.get(userId), session };
+    return { me: await this.me.get({ userId, sessionId: session.sessionId }), session };
   }
 
   async login(input: LoginRequest): Promise<LoginResult> {
@@ -203,12 +205,40 @@ export class AuthService {
       }
       return this.sessions.create(tx, user);
     });
-    return { me: await this.me.get(user.id), session };
+    return { me: await this.me.get({ userId: user.id, sessionId: session.sessionId }), session };
   }
 
   async logout(sessionId: string): Promise<void> {
     await this.db.tx((tx) => this.sessions.revoke(tx, sessionId, 'logout'));
     await this.sessions.blockSessions([sessionId]);
+  }
+
+  /**
+   * Повторное письмо для подтверждения email (0.13.0). Всегда 202: существование адреса не раскрывается. Письмо
+   * уходит, только если учётная запись ждёт подтверждения; прежние ссылки гаснут.
+   */
+  async resendVerification(email: string, locale: Locale): Promise<void> {
+    await this.limiter.hit('verifyResend', `resend:${email}`);
+    await this.db.tx(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { email },
+        select: { id: true, status: true, locale: true, displayName: true },
+      });
+      if (!user || user.status !== 'PENDING_VERIFICATION') return;
+      const userLocale: Locale = user.locale === 'en' ? 'en' : user.locale === 'ru' ? 'ru' : locale;
+      await this.tokens.invalidateAll(tx, user.id, 'EMAIL_VERIFY');
+      const token = await this.tokens.issue(tx, 'EMAIL_VERIFY', {
+        userId: user.id,
+        ttlSeconds: EMAIL_VERIFY_TTL_SECONDS,
+      });
+      await this.emails.request(tx, {
+        template: 'auth.verify_email',
+        to: email,
+        userId: user.id,
+        locale: userLocale,
+        params: { verifyUrl: this.link(userLocale, '/verify-email', token), displayName: user.displayName },
+      });
+    });
   }
 
   /** Всегда 202: существование email не раскрывается. Старые ссылки сброса гасятся. */

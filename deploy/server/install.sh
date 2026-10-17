@@ -190,13 +190,15 @@ MAILPIT_PASSWORD=$(openssl rand -hex 8)
 SEED_PASSWORD=Sambo-$(openssl rand -hex 3)-$(openssl rand -hex 3)-$(openssl rand -hex 3)
 SEED_ADMIN_TOTP_SECRET=$(head -c 20 /dev/urandom | base32 | tr -d '=')
 
-# Настоящая почта вместо Mailpit — раскомментируйте и заполните (пример — Яндекс 360), затем update.sh:
+# Настоящая почта вместо Mailpit — раскомментируйте и заполните (пример — Яндекс 360; почта reg.ru —
+# mail.hosting.reg.ru, 465, пароль ящика; SPF, DKIM и DMARC — docs/DEPLOYMENT.md), затем update.sh --no-pull.
+# Пароль — в одинарных кавычках, если в нём есть спецсимволы:
 # SMTP_HOST=smtp.yandex.ru
 # SMTP_PORT=465
 # SMTP_SECURE=true
 # SMTP_USER=no-reply@$DOMAIN
-# SMTP_PASSWORD=пароль-приложения
-# EMAIL_FROM=SAMBO Digital <no-reply@$DOMAIN>
+# SMTP_PASSWORD='пароль-приложения'
+# EMAIL_FROM=Digital Sambo <no-reply@$DOMAIN>
 EOF
 else
   if [ "$(env_get DOMAIN)" != "$DOMAIN" ]; then

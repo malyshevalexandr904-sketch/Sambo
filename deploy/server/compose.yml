@@ -42,7 +42,7 @@ x-app-env: &app-env
   STORAGE_FORCE_PATH_STYLE: 'true'
   # По умолчанию письма попадают в Mailpit на этом же сервере. Настоящая почта — SMTP_* в .env и update.sh.
   EMAIL_PROVIDER: smtp
-  EMAIL_FROM: ${EMAIL_FROM:-SAMBO Digital <no-reply@${DOMAIN}>}
+  EMAIL_FROM: ${EMAIL_FROM:-Digital Sambo <no-reply@${DOMAIN}>}
   SMTP_HOST: ${SMTP_HOST:-mailpit}
   SMTP_PORT: ${SMTP_PORT:-1025}
   SMTP_SECURE: ${SMTP_SECURE:-false}

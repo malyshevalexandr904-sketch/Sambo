@@ -157,3 +157,14 @@ export interface SystemSettingDto {
   updatedAt: string | null;
   updatedById: string | null;
 }
+
+/**
+ * Куда уходят письма (0.13.0) — для предупреждения в «Настройках системы»: `internal` — письма не покидают сервер
+ * (журнал или почтовый ящик для разработки Mailpit), пользователи их не получат.
+ */
+export interface EmailDeliveryStatus {
+  mode: 'SMTP' | 'LOG';
+  internal: boolean;
+  host: string | null;
+  from: string;
+}

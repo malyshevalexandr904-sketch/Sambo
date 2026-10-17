@@ -17,7 +17,7 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { RedisService } from '../../../infrastructure/redis/redis.module';
 import { AuditService } from '../../audit';
 
-const ISSUER = 'SAMBO Digital';
+const ISSUER = 'Digital Sambo';
 authenticator.options = { window: 1, step: 30, digits: 6 };
 
 interface TotpUser {

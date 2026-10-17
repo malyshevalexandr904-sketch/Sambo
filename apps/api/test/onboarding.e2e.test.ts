@@ -138,7 +138,7 @@ describe('1. руководитель спортивной организаци�
     const a = await applicant();
     let r = await draft(a.s, { role: 'ORGANIZATION_HEAD', ...adult(), organization: headOrganization() });
     expect(r.status).toBe('DRAFT');
-    expect(r.documentRules.map((x) => x.typeCodes[0])).toEqual(['PASSPORT', 'EGRUL_EXTRACT']);
+    expect(r.documentRules.map((x) => x.typeCodes[0])).toEqual(['PASSPORT', 'EGRUL_EXTRACT', 'OTHER']);
 
     const incomplete = await submit(a.s, r);
     expect(incomplete.status).toBe(400);
@@ -298,6 +298,7 @@ describe('4–5. спортсмен', () => {
     expect(r.coachQualification).toBeNull();
     expect(r.documentRules).toEqual([
       { role: 'ATHLETE', typeCodes: ['PASSPORT', 'BIRTH_CERTIFICATE'], required: false },
+      { role: 'ATHLETE', typeCodes: ['OTHER'], required: false },
     ]);
     const wrongType = await send(a.s, 'post', `${BASE}/requests/${r.id}/documents`, {
       typeCode: 'COACH_QUALIFICATION',
@@ -607,7 +608,11 @@ describe('13–14. присоединение позже и решение бе�
       coachId: coach.coachId,
     });
     expect(join.inOrganization).toBe(true);
-    expect(join.documentRules).toEqual([]);
+    // При присоединении документы можно приложить, но ни один не обязателен (0.13.0).
+    expect(join.documentRules).toEqual([
+      { role: 'ATHLETE', typeCodes: ['PASSPORT', 'BIRTH_CERTIFICATE'], required: false },
+      { role: 'ATHLETE', typeCodes: ['OTHER'], required: false },
+    ]);
     join = await submitted(a.s, join);
     expect(join.status).toBe('PENDING_ORGANIZATION_APPROVAL');
     expect((await decide(manager, await reviewed(manager, join.id), 'approve')).status).toBe(200);

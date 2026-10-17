@@ -154,7 +154,19 @@ describe('document rules', () => {
       refereeCategoryCode: null,
     };
     expect(allowedDocumentTypes(rules, s)).toEqual(['PASSPORT', 'OTHER']);
-    expect(documentRulesFor(rules, { ...s, kind: 'JOIN_ORGANIZATION' })).toEqual([]);
+    expect(allowedDocumentTypes(rules, { ...s, legalForm: 'RU_LEGAL_ENTITY' })).toEqual([
+      'PASSPORT',
+      'EGRUL_EXTRACT',
+      'OTHER',
+    ]);
+    // 0.13.0: у каждой роли можно приложить документ (PDF или фото), в том числе при присоединении к организации —
+    // там все документы по желанию.
+    for (const role of ['ORGANIZATION_HEAD', 'COACH', 'ATHLETE', 'REFEREE'] as const) {
+      expect(allowedDocumentTypes(rules, { ...s, role }), role).toContain('OTHER');
+    }
+    const joinCoach = documentRulesFor(rules, { ...s, role: 'COACH', kind: 'JOIN_ORGANIZATION' });
+    expect(joinCoach.map((r) => r.typeCodes[0])).toEqual(['PASSPORT', 'OTHER']);
+    expect(joinCoach.every((r) => !r.required)).toBe(true);
     const custom = [
       {
         role: 'REFEREE' as const,

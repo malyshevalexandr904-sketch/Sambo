@@ -6,6 +6,7 @@ import {
   type CompetitionMemberInvite,
   type CompetitionMemberPatch,
   type CompetitionMembersQuery,
+  cabinetRoleOf,
   isRoleCode,
   type Locale,
   type Page,
@@ -18,6 +19,7 @@ import { DomainError, versionConflict } from '../../../common/errors/domain-erro
 import { decodeCursor, toPage } from '../../../common/http/http';
 import { ENV } from '../../../config/config.module';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { CabinetRolesService } from '../../access';
 import { AuditService } from '../../audit';
 import { INVITE_TTL_SECONDS, VerificationTokenService } from '../../auth';
 import { EmailRequestService } from '../../outbox';
@@ -52,6 +54,7 @@ export class StaffService {
     private readonly tokens: VerificationTokenService,
     private readonly emails: EmailRequestService,
     @Inject(ENV) private readonly env: Env,
+    private readonly cabinetRoles: CabinetRolesService,
   ) {}
 
   async list(competitionId: string, q: CompetitionMembersQuery): Promise<Page<CompetitionMember>> {
@@ -212,6 +215,9 @@ export class StaffService {
       });
       return updated;
     });
+    // Принял приглашение — сессия переходит в роль кабинета этой роли (0.13.0): сразу открывается то, куда звали.
+    if (isRoleCode(accepted.role.code))
+      await this.cabinetRoles.selectIfHeld(user.id, user.sessionId, cabinetRoleOf(accepted.role.code));
     return toDto(accepted);
   }
 

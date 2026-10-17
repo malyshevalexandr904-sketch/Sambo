@@ -1,6 +1,7 @@
 'use client';
 // Адаптивный каркас кабинета и админ-панели (раздел 33 ТЗ; ARCHITECTURE.md, 23.3): боковое меню
-// на широких экранах, выдвижное — на телефоне. Пункты меню — по правам (скрытие — удобство, не защита).
+// на широких экранах, выдвижное — на телефоне. Пункты меню — по правам выбранной роли кабинета (0.13.0; права
+// приходят в /me уже для неё; скрытие — удобство, не защита). Переключатель роли — вверху меню.
 import type { Me, PermissionCode } from '@sde/contracts';
 import { Alert, Button, cn, Spinner } from '@sde/ui';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,6 +13,7 @@ import { hasAnywhere, platformHas } from '@/lib/access';
 import { closeLive } from '@/lib/live';
 import { disablePushForLogout, syncPush } from '@/lib/push';
 import { useMe, useMyAthletes } from '@/lib/queries';
+import { RoleChangedElsewhere, RoleSwitcher } from '@/features/cabinet-role';
 import { NotificationBell } from '@/features/notifications/bell';
 import { Brand } from './brand';
 import { LocaleSwitcher } from './locale-switcher';
@@ -145,6 +147,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
 
   return (
     <div className="min-h-screen lg:flex">
+      <RoleChangedElsewhere userId={user.id} />
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:p-2"
@@ -155,6 +158,11 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
         <Link href="/admin" className="font-bold">
           <Brand />
         </Link>
+        {user.activeRole ? (
+          <span className="ml-3 hidden truncate text-sm text-slate-600 sm:inline">
+            {t(`cabinetRole.roles.${user.activeRole}`)}
+          </span>
+        ) : null}
         <span className="ml-auto mr-1">
           <NotificationBell />
         </span>
@@ -180,6 +188,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
           </Link>
           <NotificationBell />
         </div>
+        <RoleSwitcher me={user} />
         <nav aria-label={t('common.menu')}>
           <ul className="space-y-1">
             {nav

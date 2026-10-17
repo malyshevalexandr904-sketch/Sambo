@@ -5,6 +5,7 @@ import type { Locale } from '@sde/contracts';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { CabinetRolesService } from '../../access';
 import { JwtService } from '../infrastructure/jwt.service';
 import { SessionService } from './session.service';
 
@@ -21,6 +22,7 @@ export class AccessTokenAuthenticator {
     private readonly jwt: JwtService,
     private readonly sessions: SessionService,
     private readonly db: PrismaService,
+    private readonly cabinetRoles: CabinetRolesService,
   ) {}
 
   /** Ошибки — DomainError: TOKEN_EXPIRED, UNAUTHENTICATED, ACCOUNT_BLOCKED. */
@@ -44,21 +46,27 @@ export class AccessTokenAuthenticator {
     via: AuthUser['via'],
   ): Promise<{ user: AuthUser; locale: Locale }> {
     if (!(await this.sessions.isActive(sessionId))) throw new DomainError('UNAUTHENTICATED');
-    const user = await this.db.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        status: true,
-        permissionsVersion: true,
-        totpEnabledAt: true,
-        personId: true,
-        email: true,
-        emailVerifiedAt: true,
-        locale: true,
-      },
-    });
+    const [user, roleRow] = await Promise.all([
+      this.db.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          status: true,
+          permissionsVersion: true,
+          totpEnabledAt: true,
+          personId: true,
+          email: true,
+          emailVerifiedAt: true,
+          locale: true,
+          preferredRole: true,
+        },
+      }),
+      this.cabinetRoles.read(sessionId),
+    ]);
     if (!user || user.status === 'PENDING_VERIFICATION') throw new DomainError('UNAUTHENTICATED');
     if (user.status === 'BLOCKED') throw new DomainError('ACCOUNT_BLOCKED');
+    // Роль кабинета сессии (0.13.0): права действуют только для неё.
+    const activeRole = await this.cabinetRoles.resolve(user, sessionId, roleRow);
     return {
       user: {
         id: user.id,
@@ -69,6 +77,7 @@ export class AccessTokenAuthenticator {
         email: user.email,
         emailVerified: user.emailVerifiedAt !== null,
         via,
+        activeRole,
       },
       locale: user.locale === 'en' ? 'en' : 'ru',
     };

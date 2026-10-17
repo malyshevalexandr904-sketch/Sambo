@@ -2,6 +2,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import {
   type InviteMemberRequest,
+  cabinetRoleOf,
   isRoleCode,
   type Locale,
   type MembersQuery,
@@ -18,7 +19,12 @@ import { DomainError, versionConflict } from '../../../common/errors/domain-erro
 import { decodeCursor, toPage } from '../../../common/http/http';
 import { ENV } from '../../../config/config.module';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { grantablePermissions, missingPermissionsForRole, PolicyService } from '../../access';
+import {
+  CabinetRolesService,
+  grantablePermissions,
+  missingPermissionsForRole,
+  PolicyService,
+} from '../../access';
 import { AuditService } from '../../audit';
 import { INVITE_TTL_SECONDS, VerificationTokenService } from '../../auth';
 import { EmailRequestService } from '../../outbox';
@@ -62,6 +68,7 @@ export class MembersService {
     private readonly tokens: VerificationTokenService,
     private readonly emails: EmailRequestService,
     @Inject(ENV) private readonly env: Env,
+    private readonly cabinetRoles: CabinetRolesService,
   ) {}
 
   async list(organizationId: string, q: MembersQuery): Promise<Page<Membership>> {
@@ -238,6 +245,9 @@ export class MembersService {
       });
       return updated;
     });
+    // Принял приглашение — сессия переходит в роль кабинета этой роли (0.13.0): сразу открывается то, куда звали.
+    if (isRoleCode(accepted.role.code))
+      await this.cabinetRoles.selectIfHeld(user.id, user.sessionId, cabinetRoleOf(accepted.role.code));
     return toDto(accepted);
   }
 

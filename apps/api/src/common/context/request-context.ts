@@ -1,6 +1,6 @@
 // Контекст запроса: traceId, IP, User-Agent, локаль, пользователь (ARCHITECTURE.md, 5).
 import { AsyncLocalStorage } from 'node:async_hooks';
-import type { Locale } from '@sde/contracts';
+import type { CabinetRole, Locale } from '@sde/contracts';
 
 export interface AuthUser {
   id: string;
@@ -12,6 +12,11 @@ export interface AuthUser {
   emailVerified: boolean;
   /** Как пришла аутентификация: cookie (веб) или Bearer (мини-приложения, мобильное приложение). */
   via: 'cookie' | 'bearer';
+  /**
+   * Выбранная роль кабинета этой сессии (0.13.0): права и связи действуют только для неё. null — ролей нет:
+   * доступно только то, что не требует роли (свой профиль, уведомления, заявка на роль, публичные турниры).
+   */
+  activeRole: CabinetRole | null;
 }
 
 export interface RequestContext {

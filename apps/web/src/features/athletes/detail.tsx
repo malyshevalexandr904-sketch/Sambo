@@ -16,6 +16,7 @@ import { api, ApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { pickName, qk } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
+import { OtherRolesHint } from '@/features/cabinet-role';
 import { ConsentsPanel } from './consents';
 import { FollowButton } from './follow';
 import { GuardiansPanel } from './guardians';
@@ -37,6 +38,7 @@ export function AthleteDetail({ id }: { id: string }) {
         <Link href="/athletes" className="mt-3 inline-block font-medium text-blue-700 hover:underline">
           {t('athletes.backToList')}
         </Link>
+        <OtherRolesHint error={query.error} />
       </EmptyState>
     );
   }

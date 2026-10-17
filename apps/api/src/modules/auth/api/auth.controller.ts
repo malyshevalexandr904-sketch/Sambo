@@ -10,6 +10,7 @@ import {
   type Me,
   RefreshRequest,
   RegisterRequest,
+  ResendVerificationRequest,
   ResetPasswordRequest,
   type SessionDto,
   type TokenPair,
@@ -84,6 +85,17 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<DataEnvelope<Me | BearerLoginResponse>> {
     return this.respond(req, res, await this.auth.verifyEmail(body.token));
+  }
+
+  /** Повторное письмо подтверждения email (0.13.0): ответ одинаковый для любого адреса. */
+  @Post('verify-email/resend')
+  @Public()
+  @RateLimit('auth')
+  @HttpCode(202)
+  async resendVerification(
+    @ValidBody(ResendVerificationRequest) body: ResendVerificationRequest,
+  ): Promise<void> {
+    await this.auth.resendVerification(body.email, body.locale);
   }
 
   @Post('login')

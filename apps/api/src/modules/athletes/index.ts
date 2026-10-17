@@ -4,6 +4,7 @@ export {
   AthleteAccessService,
   type AthleteRegistrationInfo,
   type RelationInfo,
+  relationActive,
 } from './application/athlete-access.service';
 export {
   AthleteExtensions,

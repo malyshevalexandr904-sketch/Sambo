@@ -1,7 +1,7 @@
 'use client';
 // Системные настройки (API.md, 3.7): значения проверяются схемами на сервере.
 // У известных настроек — обычные поля; JSON — только для настроек без своего редактора.
-import type { DataEnvelope, SystemSettingDto } from '@sde/contracts';
+import type { DataEnvelope, EmailDeliveryStatus, SystemSettingDto } from '@sde/contracts';
 import { Alert, Badge, Button, Card, Field, Input, PageHeader, Textarea } from '@sde/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
@@ -140,6 +140,31 @@ function SettingRow({ setting }: { setting: SystemSettingDto }) {
   );
 }
 
+/**
+ * Письма не покидают сервер (0.13.0): по умолчанию установка пишет их в почтовый ящик для разработки Mailpit —
+ * подтверждение email и уведомления по почте пользователям не дойдут, пока не подключена почта домена.
+ */
+function EmailDeliveryWarning() {
+  const t = useTranslations('settings.email');
+  const status = useQuery({
+    queryKey: ['admin', 'settings', 'email-delivery'],
+    queryFn: async () =>
+      (await api<DataEnvelope<EmailDeliveryStatus>>('/admin/settings/email-delivery')).data,
+  });
+  if (!status.data) return null;
+  if (!status.data.internal)
+    return (
+      <p className="mb-4 text-sm text-slate-600">
+        {t('ok', { from: status.data.from, host: status.data.host ?? '—' })}
+      </p>
+    );
+  return (
+    <Alert tone="warning" title={t('internalTitle')} className="mb-6">
+      {t('internal')}
+    </Alert>
+  );
+}
+
 export function SystemSettings() {
   const t = useTranslations('settings');
   const settings = useQuery({
@@ -149,6 +174,7 @@ export function SystemSettings() {
   return (
     <>
       <PageHeader title={t('title')} />
+      <EmailDeliveryWarning />
       <QueryState isPending={settings.isPending} error={settings.error}>
         {() => (
           <div className="grid gap-4 xl:grid-cols-2">

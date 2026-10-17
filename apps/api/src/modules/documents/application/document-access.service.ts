@@ -7,7 +7,7 @@ import type { Document, Prisma } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { PolicyService, type ResourceScope } from '../../access';
-import { AthleteAccessService } from '../../athletes';
+import { AthleteAccessService, relationActive } from '../../athletes';
 import { CompetitionScopeService } from '../../competitions';
 import { CoachesService } from '../../coaches';
 import { OrganizationScopeService } from '../../organizations';
@@ -100,8 +100,9 @@ export class DocumentAccessService {
       .filter((g) => g.roles.some((r) => ROLE_PERMISSIONS[r]['document.view'] !== undefined))
       .map((g) => g.competitionId);
     if (competitions.length > 0) or.push({ competitionId: { in: competitions } });
-    if (user.personId) {
-      or.push({ athlete: { personId: user.personId } });
+    // Свои документы — в роли «Спортсмен», документы детей — в роли «Представитель спортсмена» (0.13.0).
+    if (user.personId && relationActive(user, 'SELF')) or.push({ athlete: { personId: user.personId } });
+    if (user.personId && relationActive(user, 'GUARDIAN')) {
       or.push({
         athlete: {
           guardians: { some: { guardianPersonId: user.personId, endedAt: null, verifiedAt: { not: null } } },

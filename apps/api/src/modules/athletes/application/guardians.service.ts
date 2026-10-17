@@ -15,11 +15,12 @@ import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
 import { ENV } from '../../../config/config.module';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { CabinetRolesService } from '../../access';
 import { AuditService } from '../../audit';
 import { INVITE_TTL_SECONDS, VerificationTokenService } from '../../auth';
 import { EmailRequestService } from '../../outbox';
 import { PeopleService, personAudit } from '../../people';
-import { currentPeriod } from './athlete-access.service';
+import { currentPeriod, relationActive } from './athlete-access.service';
 import { AthleteExtensions } from './athlete-extensions';
 import { guardianDto } from './athlete-mapper';
 
@@ -45,6 +46,7 @@ export class GuardiansService implements OnModuleInit {
     private readonly tokens: VerificationTokenService,
     private readonly emails: EmailRequestService,
     private readonly extensions: AthleteExtensions,
+    private readonly cabinetRoles: CabinetRolesService,
     @Inject(ENV) private readonly env: Env,
   ) {}
 
@@ -230,13 +232,24 @@ export class GuardiansService implements OnModuleInit {
         after: { userId: user.id, personId: linked.personId, mergedPersonId: linked.mergedFrom },
       });
     });
-    const personId = (await this.db.user.findUniqueOrThrow({ where: { id: user.id } })).personId;
-    return this.myAthletes({ ...user, personId });
+    // Принял приглашение представителя — сессия переходит в роль «Представитель спортсмена» (0.13.0): сразу видно
+    // ребёнка. Привязка к записи «человек» могла поменять версию прав — берём текущую.
+    const switched = await this.cabinetRoles.selectIfHeld(user.id, user.sessionId, 'GUARDIAN');
+    const linked = await this.db.user.findUniqueOrThrow({
+      where: { id: user.id },
+      select: { personId: true, permissionsVersion: true },
+    });
+    return this.myAthletes({ ...user, ...linked, activeRole: switched ? 'GUARDIAN' : user.activeRole });
   }
 
-  /** «Мои спортсмены»: сам пользователь-спортсмен (SELF) и дети, где он представитель. */
+  /**
+   * «Мои спортсмены»: в роли «Спортсмен» — сам пользователь (SELF), в роли «Представитель спортсмена» — дети, где он
+   * представитель (0.13.0). В других ролях список пуст.
+   */
   async myAthletes(user: AuthUser): Promise<MyAthlete[]> {
-    if (!user.personId) return [];
+    const self = relationActive(user, 'SELF');
+    const guardian = relationActive(user, 'GUARDIAN');
+    if (!user.personId || (!self && !guardian)) return [];
     const include = {
       person: true,
       memberships: {
@@ -245,16 +258,22 @@ export class GuardiansService implements OnModuleInit {
         include: { organization: { select: { shortName: true } } },
       },
     };
-    const [self, guardianOf] = await Promise.all([
-      this.db.athleteProfile.findUnique({ where: { personId: user.personId }, include }),
-      this.db.guardian.findMany({
-        where: { guardianPersonId: user.personId, endedAt: null, athlete: { status: { not: 'ARCHIVED' } } },
-        include: { athlete: { include } },
-        orderBy: { createdAt: 'asc' },
-      }),
+    const [own, guardianOf] = await Promise.all([
+      self ? this.db.athleteProfile.findUnique({ where: { personId: user.personId }, include }) : null,
+      guardian
+        ? this.db.guardian.findMany({
+            where: {
+              guardianPersonId: user.personId,
+              endedAt: null,
+              athlete: { status: { not: 'ARCHIVED' } },
+            },
+            include: { athlete: { include } },
+            orderBy: { createdAt: 'asc' },
+          })
+        : [],
     ]);
     const rows = [
-      ...(self ? [{ relation: 'SELF' as const, verified: true, athlete: self }] : []),
+      ...(own ? [{ relation: 'SELF' as const, verified: true, athlete: own }] : []),
       ...guardianOf.map((g) => ({
         relation: 'GUARDIAN' as const,
         verified: g.verifiedAt !== null,

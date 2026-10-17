@@ -3,6 +3,12 @@ export { AccessModule } from './access.module';
 export { PolicyService, type RelationshipPolicy } from './application/policy.service';
 export { GrantsService } from './application/grants.service';
 export {
+  CabinetRolesService,
+  type CabinetRoleHolder,
+  type CabinetUser,
+  type SessionRoleRow,
+} from './application/cabinet-roles.service';
+export {
   asResolution,
   ScopeResolverRegistry,
   type ScopeResolution,
@@ -22,6 +28,7 @@ export {
   canSee,
   decide,
   grantablePermissions,
+  grantsForRole,
   holdsAnywhere,
   missingPermissionsForRole,
   NOWHERE_SCOPE,

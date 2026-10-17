@@ -10,6 +10,9 @@ import { fullYearsOn } from './people.js';
 export const ONBOARDING_ROLES = ['ORGANIZATION_HEAD', 'COACH', 'ATHLETE', 'REFEREE'] as const;
 export type OnboardingRole = (typeof ONBOARDING_ROLES)[number];
 
+export const isOnboardingRole = (v: unknown): v is OnboardingRole =>
+  typeof v === 'string' && (ONBOARDING_ROLES as readonly string[]).includes(v);
+
 /** Первичная регистрация или присоединение к организации уже зарегистрированного тренера или спортсмена. */
 export const ONBOARDING_KINDS = ['REGISTRATION', 'JOIN_ORGANIZATION'] as const;
 export type OnboardingKind = (typeof ONBOARDING_KINDS)[number];
@@ -174,7 +177,8 @@ export const ONBOARDING_DOCUMENT_TYPES = {
 /**
  * Правило: в заявке роли должен быть (`required`) или может быть хотя бы один документ из `typeCodes`. `when` —
  * условие сценария: ответ «состою в организации», правовой статус организации, указана ли квалификация, категории
- * судьи. Правила применяются к первичной регистрации; присоединение к организации документов не требует.
+ * судьи. При первичной регистрации действуют как есть; при присоединении к организации (0.13.0) — все правила роли
+ * по желанию: приложить можно, обязательных нет.
  */
 export const OnboardingDocumentRule = z.object({
   role: z.enum(ONBOARDING_ROLES),
@@ -193,6 +197,7 @@ export type OnboardingDocumentRule = z.infer<typeof OnboardingDocumentRule>;
 
 export const OnboardingDocumentRules = z.array(OnboardingDocumentRule).max(50);
 
+/** По умолчанию (0.13.0): у каждой роли, кроме обязательных, — «Иной документ» по желанию (PDF или фото). */
 export const DEFAULT_ONBOARDING_DOCUMENT_RULES: OnboardingDocumentRule[] = [
   { role: 'ORGANIZATION_HEAD', typeCodes: ['PASSPORT'], required: true },
   {
@@ -201,17 +206,15 @@ export const DEFAULT_ONBOARDING_DOCUMENT_RULES: OnboardingDocumentRule[] = [
     required: true,
     when: { legalForms: ['RU_LEGAL_ENTITY'] },
   },
-  {
-    role: 'ORGANIZATION_HEAD',
-    typeCodes: ['OTHER'],
-    required: false,
-    when: { legalForms: ['FOREIGN', 'OTHER'] },
-  },
+  { role: 'ORGANIZATION_HEAD', typeCodes: ['OTHER'], required: false },
   { role: 'COACH', typeCodes: ['PASSPORT'], required: true },
   { role: 'COACH', typeCodes: ['COACH_QUALIFICATION'], required: true, when: { hasQualification: true } },
+  { role: 'COACH', typeCodes: ['OTHER'], required: false },
   { role: 'REFEREE', typeCodes: ['PASSPORT'], required: true },
   { role: 'REFEREE', typeCodes: ['REFEREE_BOOK'], required: true },
+  { role: 'REFEREE', typeCodes: ['OTHER'], required: false },
   { role: 'ATHLETE', typeCodes: ['PASSPORT', 'BIRTH_CERTIFICATE'], required: false },
+  { role: 'ATHLETE', typeCodes: ['OTHER'], required: false },
 ];
 
 export interface OnboardingScenario {
@@ -228,8 +231,7 @@ export function documentRulesFor(
   rules: readonly OnboardingDocumentRule[],
   s: OnboardingScenario,
 ): OnboardingDocumentRule[] {
-  if (s.kind !== 'REGISTRATION') return [];
-  return rules.filter((r) => {
+  const matching = rules.filter((r) => {
     if (r.role !== s.role) return false;
     const w = r.when;
     if (!w) return true;
@@ -243,6 +245,7 @@ export function documentRulesFor(
       return false;
     return true;
   });
+  return s.kind === 'REGISTRATION' ? matching : matching.map((r) => ({ ...r, required: false }));
 }
 
 /** Типы документов, которые можно приложить к заявке сценария. */
