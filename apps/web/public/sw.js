@@ -1,4 +1,4 @@
-// Service worker SAMBO Digital (Phase 8b): показ push-уведомлений и переход по нажатию. Офлайн-кэша нет —
+// Service worker Digital Sambo (Phase 8b): показ push-уведомлений и переход по нажатию. Офлайн-кэша нет —
 // запросы страниц он не перехватывает. Сообщение (contracts: PushMessage) — заголовок и текст без имён детей,
 // путь в приложении с локалью и метка (новое уведомление о той же схватке заменяет прежнее).
 'use strict';
@@ -51,7 +51,7 @@ function parse(event) {
 self.addEventListener('push', (event) => {
   const m = parse(event);
   // Подписка с userVisibleOnly: каждое push-сообщение показывается, даже непонятное.
-  const title = m ? m.title : 'SAMBO Digital';
+  const title = m ? m.title : 'Digital Sambo';
   const tag = m && typeof m.tag === 'string' ? m.tag.slice(0, 200) : undefined;
   const options = {
     body: m ? m.body : '',

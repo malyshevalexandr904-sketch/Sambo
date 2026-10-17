@@ -1,4 +1,5 @@
-// Integration: rate limit на входе (API.md, 1.7): 10 в минуту по IP, 5 в минуту по email.
+// Integration: rate limit на входе (API.md, 1.7): 10 в минуту по IP, 5 в минуту по email; повторное письмо
+// подтверждения — 3 за 15 минут по адресу (0.13.0).
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createTestApp, createUser, csrfAgent, resetData, type TestApp } from './helpers/app';
 
@@ -46,5 +47,18 @@ describe('rate limiting', () => {
     }
     expect(statuses.slice(0, 10).every((x) => x === 401)).toBe(true);
     expect(statuses[10]).toBe(429);
+  });
+
+  it('limits verification email resends to 3 per 15 minutes per address', async () => {
+    const s = await csrfAgent(t);
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const res = await s.agent
+        .post('/api/v1/auth/verify-email/resend')
+        .set('x-csrf-token', s.csrf)
+        .send({ email: 'resend@test.local', locale: 'ru' });
+      statuses.push(res.status);
+    }
+    expect(statuses).toEqual([202, 202, 202, 429]);
   });
 });

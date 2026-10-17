@@ -1,6 +1,6 @@
 // Судьи и судейские категории (API.md, 4.3). Реестр судей общий: судья работает на турнирах разных
 // организаций, поэтому ведёт его любой, у кого есть `referee.manage` (администратор федерации, платформа).
-import { Injectable } from '@nestjs/common';
+import { Injectable, type OnModuleInit } from '@nestjs/common';
 import {
   fullName,
   type Page,
@@ -14,7 +14,7 @@ import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
 import { decodeCursor, toPage } from '../../../common/http/http';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { PolicyService } from '../../access';
+import { CabinetRolesService, PolicyService } from '../../access';
 import { AuditService } from '../../audit';
 import { PeopleService } from '../../people';
 
@@ -43,13 +43,26 @@ function toDto(r: Row): RefereeSummary {
 }
 
 @Injectable()
-export class RefereesService {
+export class RefereesService implements OnModuleInit {
   constructor(
     private readonly db: PrismaService,
     private readonly policy: PolicyService,
     private readonly people: PeopleService,
     private readonly audit: AuditService,
+    private readonly cabinetRoles: CabinetRolesService,
   ) {}
+
+  onModuleInit(): void {
+    // Роль кабинета «Судья» (0.13.0) — и без назначения на турнир: профиль судьи есть.
+    this.cabinetRoles.registerHolder('REFEREE', async (u) =>
+      u.personId
+        ? (await this.db.refereeProfile.findUnique({
+            where: { personId: u.personId },
+            select: { id: true },
+          })) !== null
+        : false,
+    );
+  }
 
   private async assertManager(user: AuthUser): Promise<void> {
     if (!(await this.policy.holdsAnywhere(user, 'referee.manage')))

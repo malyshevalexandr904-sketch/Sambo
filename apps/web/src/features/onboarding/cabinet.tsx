@@ -17,7 +17,8 @@ import { QueryState } from '@/components/common';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
-import { qk } from '@/lib/queries';
+import { qk, useMe } from '@/lib/queries';
+import { useSwitchRole } from '@/features/cabinet-role';
 import { useAction } from '@/lib/use-action';
 import { onboardingKeys, OnboardingStatusBadge, useOnboardingOverview } from './shared';
 
@@ -139,14 +140,7 @@ function RequestCard({ request: r, compact = false }: { request: OnboardingReque
               {t('cabinet.open')}
             </Link>
           )}
-          {r.status === 'APPROVED' ? (
-            <Link
-              href="/admin"
-              className="inline-flex min-h-11 items-center rounded-md bg-blue-700 px-4 text-sm font-medium text-white hover:bg-blue-800"
-            >
-              {t('cabinet.toCabinet')}
-            </Link>
-          ) : null}
+          {r.status === 'APPROVED' ? <ToCabinet role={r.role} /> : null}
           {r.allowedActions.includes('cancel') ? (
             <Button variant="ghost" loading={action.busy} onClick={() => void cancel()}>
               {t('cabinet.cancel')}
@@ -155,6 +149,37 @@ function RequestCard({ request: r, compact = false }: { request: OnboardingReque
         </div>
       ) : null}
     </Card>
+  );
+}
+
+/**
+ * Одобренная роль — сразу в кабинет этой роли (0.13.0): если сейчас выбрана другая, сессия переключается на неё.
+ * Роли заявки и роли кабинета называются одинаково.
+ */
+function ToCabinet({ role }: { role: OnboardingRole }) {
+  const t = useTranslations('onboarding');
+  const me = useMe();
+  const { switchTo, busy, error } = useSwitchRole();
+  const className =
+    'inline-flex min-h-11 items-center rounded-md bg-blue-700 px-4 text-sm font-medium text-white hover:bg-blue-800';
+  if (me.data?.activeRole === role || !me.data?.availableRoles.includes(role)) {
+    return (
+      <Link href="/admin" className={className}>
+        {t('cabinet.toCabinet')}
+      </Link>
+    );
+  }
+  return (
+    <>
+      <Button loading={busy} onClick={() => void switchTo(role)}>
+        {t('cabinet.toCabinetAs', { role: t(`roles.${role}`) })}
+      </Button>
+      {error ? (
+        <p role="alert" className="basis-full text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
+    </>
   );
 }
 

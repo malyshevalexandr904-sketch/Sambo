@@ -1,18 +1,28 @@
 // Профиль «я» (API.md, 3.2).
 import { Injectable } from '@nestjs/common';
 import {
+  type CabinetRole,
   type Grants,
+  isCabinetRole,
   type Me,
   type PersonDto,
   type RoleCode,
+  roleActiveIn,
   type UpdateMeRequest,
   type UpsertMyPersonRequest,
   isRoleCode,
 } from '@sde/contracts';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { CabinetRolesService } from '../../access';
 import { AuditService } from '../../audit';
 import { PeopleService, personAudit, personDto } from '../../people';
+
+/** Пользователь и его сессия входа: от сессии зависит выбранная роль кабинета (0.13.0). */
+export interface MeRef {
+  userId: string;
+  sessionId: string;
+}
 
 @Injectable()
 export class MeService {
@@ -20,9 +30,14 @@ export class MeService {
     private readonly db: PrismaService,
     private readonly audit: AuditService,
     private readonly people: PeopleService,
+    private readonly cabinetRoles: CabinetRolesService,
   ) {}
 
-  async get(userId: string): Promise<Me> {
+  /**
+   * Профиль «я». Роли доступа — только выбранной роли кабинета (в этой сессии другие не действуют); выбранная роль
+   * проверяется: если её у пользователя больше нет, выбирается роль по умолчанию.
+   */
+  async get({ userId, sessionId }: MeRef): Promise<Me> {
     const today = new Date(new Date().toISOString().slice(0, 10));
     const user = await this.db.user.findUniqueOrThrow({
       where: { id: userId },
@@ -47,10 +62,18 @@ export class MeService {
       user.organizationMemberships.map((m) => ({ id: m.organizationId, code: m.role.code })),
     );
     const comps = group(user.competitionMemberships.map((m) => ({ id: m.competitionId, code: m.role.code })));
+    const resolved = await this.cabinetRoles.resolve(user, sessionId);
+    const { active, available } = await this.cabinetRoles.state({ ...user, activeRole: resolved }, sessionId);
+    const keep = (r: RoleCode): boolean => roleActiveIn(active, r);
+    const inRole = <T extends { roles: RoleCode[] }>(rows: T[]): T[] =>
+      rows.map((g) => ({ ...g, roles: g.roles.filter(keep) })).filter((g) => g.roles.length > 0);
     const grants: Grants = {
-      platform: user.platformRoles.map((p) => p.role.code).filter(isRoleCode),
-      organizations: [...orgs].map(([organizationId, roles]) => ({ organizationId, roles })),
-      competitions: [...comps].map(([competitionId, roles]) => ({ competitionId, roles })),
+      platform: user.platformRoles
+        .map((p) => p.role.code)
+        .filter(isRoleCode)
+        .filter(keep),
+      organizations: inRole([...orgs].map(([organizationId, roles]) => ({ organizationId, roles }))),
+      competitions: inRole([...comps].map(([competitionId, roles]) => ({ competitionId, roles }))),
     };
     return {
       id: user.id,
@@ -62,10 +85,20 @@ export class MeService {
       personId: user.personId,
       totpEnabled: user.totpEnabledAt !== null,
       grants,
+      activeRole: active,
+      availableRoles: available,
+      preferredRole: isCabinetRole(user.preferredRole) ? user.preferredRole : null,
     };
   }
 
-  async update(userId: string, patch: UpdateMeRequest): Promise<Me> {
+  /** Переключение роли кабинета в этой сессии (0.13.0). */
+  async selectRole(ref: MeRef, role: CabinetRole): Promise<Me> {
+    await this.cabinetRoles.select(ref.userId, ref.sessionId, role);
+    return this.get(ref);
+  }
+
+  async update(ref: MeRef, patch: UpdateMeRequest): Promise<Me> {
+    const userId = ref.userId;
     await this.db.tx(async (tx) => {
       const before = await tx.user.findUniqueOrThrow({ where: { id: userId } });
       const after = await tx.user.update({
@@ -80,7 +113,7 @@ export class MeService {
         after: { displayName: after.displayName, locale: after.locale, timezone: after.timezone },
       });
     });
-    return this.get(userId);
+    return this.get(ref);
   }
 
   async getPerson(userId: string): Promise<PersonDto | null> {

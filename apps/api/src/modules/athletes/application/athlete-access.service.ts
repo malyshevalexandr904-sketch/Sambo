@@ -6,7 +6,7 @@ import type { Tx } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { PolicyService, type ResourceScope, ScopeResolverRegistry } from '../../access';
+import { CabinetRolesService, PolicyService, type ResourceScope, ScopeResolverRegistry } from '../../access';
 import { CoachesService } from '../../coaches';
 import { OrganizationScopeService } from '../../organizations';
 
@@ -65,6 +65,15 @@ export interface AthleteResourceRef {
   athleteId: string;
 }
 
+/**
+ * Связь действует только в своей роли кабинета (0.13.0): «сам спортсмен» — в роли «Спортсмен», представитель — в
+ * роли «Представитель спортсмена». Тренер, который сам выступает или растит своего ребёнка, видит их как тренер
+ * только по правам тренера.
+ */
+export function relationActive(user: AuthUser, relation: AthleteRelation): boolean {
+  return relation === 'SELF' ? user.activeRole === 'ATHLETE' : user.activeRole === 'GUARDIAN';
+}
+
 @Injectable()
 export class AthleteAccessService implements OnModuleInit {
   constructor(
@@ -73,9 +82,28 @@ export class AthleteAccessService implements OnModuleInit {
     private readonly registry: ScopeResolverRegistry,
     private readonly orgScopes: OrganizationScopeService,
     private readonly coaches: CoachesService,
+    private readonly cabinetRoles: CabinetRolesService,
   ) {}
 
   onModuleInit(): void {
+    // Роли кабинета по связям (0.13.0): спортсмен — свой профиль; представитель — действующая связь с ребёнком
+    // (в том числе ещё не подтверждённая: в роли видно, что связь ждёт подтверждения).
+    this.cabinetRoles.registerHolder('ATHLETE', async (u) =>
+      u.personId
+        ? (await this.db.athleteProfile.findUnique({
+            where: { personId: u.personId },
+            select: { id: true },
+          })) !== null
+        : false,
+    );
+    this.cabinetRoles.registerHolder('GUARDIAN', async (u) =>
+      u.personId
+        ? (await this.db.guardian.findFirst({
+            where: { guardianPersonId: u.personId, endedAt: null },
+            select: { id: true },
+          })) !== null
+        : false,
+    );
     this.registry.register('athlete', async (id) => ({
       scopes: await this.scopesOf(id),
       resource: { athleteId: id } satisfies Partial<AthleteResourceRef>,
@@ -112,22 +140,28 @@ export class AthleteAccessService implements OnModuleInit {
     return link !== null;
   }
 
-  /** SELF — это сам спортсмен; GUARDIAN — действующий законный представитель. */
+  /**
+   * SELF — это сам спортсмен; GUARDIAN — действующий законный представитель. Связь учитывается только в своей роли
+   * кабинета (`relationActive`), иначе — как будто связи нет.
+   */
   async relation(user: AuthUser, athleteId: string): Promise<RelationInfo> {
-    if (!user.personId) return { relation: null, verified: false, guardianId: null };
+    const none: RelationInfo = { relation: null, verified: false, guardianId: null };
+    if (!user.personId || (!relationActive(user, 'SELF') && !relationActive(user, 'GUARDIAN'))) return none;
     const athlete = await this.db.athleteProfile.findUnique({
       where: { id: athleteId },
       select: { personId: true },
     });
-    if (!athlete) return { relation: null, verified: false, guardianId: null };
-    if (athlete.personId === user.personId) return { relation: 'SELF', verified: true, guardianId: null };
+    if (!athlete) return none;
+    if (athlete.personId === user.personId)
+      return relationActive(user, 'SELF') ? { relation: 'SELF', verified: true, guardianId: null } : none;
+    if (!relationActive(user, 'GUARDIAN')) return none;
     const guardian = await this.db.guardian.findFirst({
       where: { athleteId, guardianPersonId: user.personId, endedAt: null },
       select: { id: true, verifiedAt: true },
     });
     return guardian
       ? { relation: 'GUARDIAN', verified: guardian.verifiedAt !== null, guardianId: guardian.id }
-      : { relation: null, verified: false, guardianId: null };
+      : none;
   }
 
   /** Основные сведения спортсмена для соседних модулей (согласия, документы). */
@@ -200,17 +234,24 @@ export class AthleteAccessService implements OnModuleInit {
     return g ? { personId: g.guardianPersonId, verified: g.verifiedAt !== null } : null;
   }
 
-  /** У пользователя есть спортсмены по связи: он сам или подтверждённый представитель. */
+  /** У пользователя есть спортсмены по связи в выбранной роли: он сам или подтверждённый представитель. */
   async hasRelations(user: AuthUser): Promise<boolean> {
     if (!user.personId) return false;
-    const [self, guardian] = await Promise.all([
-      this.db.athleteProfile.findUnique({ where: { personId: user.personId }, select: { id: true } }),
-      this.db.guardian.findFirst({
-        where: { guardianPersonId: user.personId, endedAt: null, verifiedAt: { not: null } },
-        select: { id: true },
-      }),
-    ]);
-    return self !== null || guardian !== null;
+    if (relationActive(user, 'SELF'))
+      return (
+        (await this.db.athleteProfile.findUnique({
+          where: { personId: user.personId },
+          select: { id: true },
+        })) !== null
+      );
+    if (relationActive(user, 'GUARDIAN'))
+      return (
+        (await this.db.guardian.findFirst({
+          where: { guardianPersonId: user.personId, endedAt: null, verifiedAt: { not: null } },
+          select: { id: true },
+        })) !== null
+      );
+    return false;
   }
 
   /** Право на спортсмена в любой из его организаций (с политиками), иначе 403 / 404. */

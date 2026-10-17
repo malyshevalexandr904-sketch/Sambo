@@ -7,6 +7,7 @@ import {
   canSee,
   decide,
   type EffectiveGrants,
+  grantsForRole,
   holdsAnywhere,
   NOWHERE_SCOPE,
   organizationReach,
@@ -43,10 +44,13 @@ export class PolicyService {
     this.policies.set(permission, policy);
   }
 
+  /** Права в выбранной роли кабинета (0.13.0): роли доступа других ролей кабинета в этой сессии не действуют. */
   grants(user: AuthUser): Promise<EffectiveGrants> {
     let pending = this.perRequest.get(user);
     if (!pending) {
-      pending = this.grantsService.forUser(user.id, user.permissionsVersion);
+      pending = this.grantsService
+        .forUser(user.id, user.permissionsVersion)
+        .then((all) => grantsForRole(all, user.activeRole));
       this.perRequest.set(user, pending);
       pending.catch(() => this.perRequest.delete(user));
     }

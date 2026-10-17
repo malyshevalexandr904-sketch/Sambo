@@ -18,6 +18,7 @@ import { DrawsTab } from '@/features/draws/draws-tab';
 import { CrewsTab } from '@/features/scheduling/crews-tab';
 import { ResultsTab } from '@/features/results/results-tab';
 import { ScheduleTab } from '@/features/scheduling/schedule-tab';
+import { OtherRolesHint } from '@/features/cabinet-role';
 import { ApplicationsTab, EntriesTab } from './registrations-tabs';
 import { CategoriesTab } from './categories';
 import { OverviewTab } from './overview';
@@ -78,6 +79,7 @@ export function CompetitionPage({ id }: { id: string }) {
         <Link href="/competitions" className="font-medium text-blue-700 hover:underline">
           {t('backToList')}
         </Link>
+        <OtherRolesHint error={query.error} />
       </EmptyState>
     );
   }

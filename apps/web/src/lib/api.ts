@@ -156,7 +156,9 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
   }
   if (!res.ok) throw await toError(res);
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  // 202 без тела («письмо отправлено»: восстановление пароля, повторное письмо подтверждения) — не JSON.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 /** Загрузка файла напрямую в хранилище по presigned POST (ADR-14). */

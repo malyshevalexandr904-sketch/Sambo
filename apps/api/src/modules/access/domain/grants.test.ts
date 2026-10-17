@@ -4,6 +4,7 @@ import {
   decide,
   type EffectiveGrants,
   grantablePermissions,
+  grantsForRole,
   holdsAnywhere,
   missingPermissionsForRole,
   NOWHERE_SCOPE,
@@ -232,5 +233,42 @@ describe('organization reach for list filters (PERMISSIONS.md, 6)', () => {
     expect(canSee(coach, NOWHERE_SCOPE)).toBe(false);
     expect(decide(coach, 'athlete.view', NOWHERE_SCOPE).allowed).toBe(false);
     expect(decide({ ...base, platform: ['SUPER_ADMIN'] }, 'athlete.view', NOWHERE_SCOPE).allowed).toBe(true);
+  });
+});
+
+describe('права в выбранной роли кабинета (0.13.0)', () => {
+  const many: EffectiveGrants = {
+    ...base,
+    platform: ['PLATFORM_ADMIN'],
+    organizations: [
+      { organizationId: CLUB, organizationStatus: 'ACTIVE', roles: ['CLUB_MANAGER', 'COACH'] },
+      { organizationId: OTHER_CLUB, organizationStatus: 'ACTIVE', roles: ['COACH'] },
+    ],
+    competitions: [{ competitionId: 'comp', roles: ['CHIEF_REFEREE', 'SECRETARY'] }],
+  };
+
+  it('остаются только роли выбранной роли; организации и турниры без них выпадают целиком', () => {
+    expect(grantsForRole(many, 'ORGANIZATION_HEAD')).toEqual({
+      ...base,
+      organizations: [{ organizationId: CLUB, organizationStatus: 'ACTIVE', roles: ['CLUB_MANAGER'] }],
+    });
+    expect(grantsForRole(many, 'COACH').organizations.map((g) => g.organizationId)).toEqual([
+      CLUB,
+      OTHER_CLUB,
+    ]);
+    expect(grantsForRole(many, 'REFEREE').competitions).toEqual([
+      { competitionId: 'comp', roles: ['CHIEF_REFEREE'] },
+    ]);
+    expect(grantsForRole(many, 'ADMIN').platform).toEqual(['PLATFORM_ADMIN']);
+    expect(grantsForRole(many, null)).toEqual(base);
+  });
+
+  it('решение о праве — по отфильтрованным правам: в роли тренера руководитель не управляет клубом', () => {
+    const scope = orgScope(CLUB, []);
+    expect(decide(many, 'organization.members.manage', scope).allowed).toBe(true);
+    expect(decide(grantsForRole(many, 'COACH'), 'organization.members.manage', scope).allowed).toBe(false);
+    expect(decide(grantsForRole(many, 'COACH'), 'athlete.view', scope).allowed).toBe(true);
+    expect(decide(grantsForRole(many, 'GUARDIAN'), 'athlete.view', scope).allowed).toBe(false);
+    expect(canSee(grantsForRole(many, 'GUARDIAN'), orgScope(CLUB, [], false))).toBe(false);
   });
 });

@@ -344,7 +344,7 @@ describe('results published', () => {
     expect(queue.jobs).toHaveLength(4);
     for (const d of queue.jobs) await consumer.handle(job(d));
     const toCoach = mailer.sent.find((m) => m.to === 'coach@club.test');
-    expect(toCoach?.email.subject).toBe('Опубликованы результаты — SAMBO Digital');
+    expect(toCoach?.email.subject).toBe('Опубликованы результаты — Digital Sambo');
     expect(toCoach?.email.text).toContain(
       'Опубликованы результаты категории «Юноши до 46 кг» турнира «Первенство города»',
     );

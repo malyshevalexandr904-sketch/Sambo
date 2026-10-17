@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "SAMBO Digital",
+    "appName": "Digital Sambo",
     "tagline": "Digital ecosystem for sambo tournaments",
     "loading": "Loading…",
     "save": "Save",
@@ -33,18 +33,18 @@
     "searchOrganization": "Search organisation"
   },
   "home": {
-    "title": "SAMBO Digital",
-    "lead": "The whole tournament in one system: from regulations to the results archive.",
+    "title": "Digital Sambo",
+    "lead": "A single digital ecosystem for sambo",
     "login": "Sign in",
     "register": "Sign up",
-    "openAdmin": "Open dashboard",
-    "tournaments": "Competitions",
     "loginTitle": "Already registered",
-    "loginHint": "Sign in to open your account: applications, athletes, refereeing and notifications.",
+    "loginHint": "Applications, athletes, refereeing and notifications — in your account.",
     "registerTitle": "New user",
-    "registerHint": "Create an account and apply as a head of a sports organization, coach, athlete or referee. Role features open after the request is reviewed.",
+    "registerHint": "Choose a role: head of organization, coach, athlete or referee. Access opens after review.",
     "guestTitle": "Without signing in",
-    "guestHint": "Browse tournaments, schedules, brackets and results. Guests cannot open the personal account, personal data, documents or perform any actions — sign in for that."
+    "guestHint": "Tournaments, schedules, brackets and results — open to everyone.",
+    "continue": "Continue",
+    "openCabinet": "Open my account"
   },
   "nav": {
     "dashboard": "Overview",
@@ -88,12 +88,28 @@
       "submit": "Sign up",
       "haveAccount": "Already have an account?",
       "sentTitle": "Check your inbox",
-      "sentBody": "If the address can be used, we have sent a confirmation link. It is valid for 24 hours."
+      "sentBody": "We have sent a confirmation link to {email}. It is valid for 24 hours.",
+      "notReceived": "No email? Check your spam folder or send it again.",
+      "roleStep": "Step 1 of 2: role",
+      "accountStep": "Step 2 of 2: account",
+      "whoAreYou": "What will you be in the system?",
+      "roleHints": {
+        "ORGANIZATION_HEAD": "Club, sports school, federation or tournament organizer: athletes, coaches, entries.",
+        "COACH": "Your athletes, tournament entries, match notifications.",
+        "ATHLETE": "Your tournaments, match schedule and results.",
+        "REFEREE": "Refereeing on the mat when assigned to a tournament."
+      },
+      "guardianHint": "A parent of an athlete? The coach or club links you to your child by invitation.",
+      "withoutRole": "Sign up without a role",
+      "login": "Sign in",
+      "role": "role",
+      "changeRole": "Change"
     },
     "verify": {
       "title": "Email confirmation",
       "verifying": "Confirming your address…",
-      "failed": "The link is invalid or expired. Sign up again or reset your password."
+      "failed": "The link is invalid or expired: the address may already be confirmed, or a newer email was sent. Sign in — if the address is not confirmed yet, you can send the email again there.",
+      "toLogin": "Sign in"
     },
     "forgot": {
       "title": "Password recovery",
@@ -113,6 +129,11 @@
       "success": "You have joined the organization.",
       "needLogin": "Sign in with the email address the invitation was sent to and open the link again.",
       "goToOrganization": "Open organization"
+    },
+    "resend": {
+      "button": "Send the email again",
+      "wait": "You can send again in {seconds} s",
+      "sent": "The email has been sent again. The link from the previous email no longer works."
     }
   },
   "dashboard": {
@@ -123,7 +144,6 @@
     "createOrganization": "Register an organization",
     "platformRoles": "Platform roles",
     "totpWarning": "Platform roles require two-factor authentication. Enable it in your profile — without it administrator rights do not apply.",
-    "nextPhases": "Next phases: competitions and entries, weigh-in, draw, refereeing.",
     "work": "Work",
     "links": {
       "athletes": "Athletes",
@@ -131,8 +151,14 @@
       "import": "Import from file",
       "children": "My athletes and consents",
       "documents": "Documents to review",
-      "person": "Fill in your details"
-    }
+      "person": "Fill in your details",
+      "referee": "Refereeing",
+      "applications": "Tournament applications",
+      "review": "Registration requests to review"
+    },
+    "welcomeRole": "Hello, {name}! You are working as “{role}”.",
+    "noRoleTitle": "No role yet",
+    "noRole": "Choose a role and apply — its features open after the review."
   },
   "users": {
     "title": "Users",
@@ -234,7 +260,12 @@
     "bannerRu": "Text in Russian",
     "bannerEn": "Text in English",
     "bannerHint": "Leave both fields empty to remove the banner.",
-    "emptyMeansNone": "Leave empty if there is no address."
+    "emptyMeansNone": "Leave empty if there is no address.",
+    "email": {
+      "internalTitle": "Emails do not reach users",
+      "internal": "The server sends emails to the internal mailbox (Mailpit) or to the log: users will not receive email confirmation, password reset or email notifications. Connect domain mail — docs/DEPLOYMENT.md, “Server”.",
+      "ok": "Emails are sent from “{from}” via {host}."
+    }
   },
   "account": {
     "title": "My profile",
@@ -2262,7 +2293,7 @@
     "noChanges": "No amendments.",
     "referee": "Referee",
     "matChief": "Mat chief",
-    "footMatch": "SAMBO Digital · match {publicId} · generated {at}",
+    "footMatch": "Digital Sambo · match {publicId} · generated {at}",
     "notHeld": "Not held",
     "notFinished": "Not finished",
     "categoryTitle": "Category results protocol",
@@ -2287,7 +2318,7 @@
     "amendedRow": "No. {number}: the result was amended by the chief referee {at}, previous version — {previous}; reason: {reason}.",
     "chiefReferee": "Chief referee",
     "chiefSecretary": "Chief secretary",
-    "footCategory": "SAMBO Digital · category {code}",
+    "footCategory": "Digital Sambo · category {code}",
     "footPublished": "results published {at}",
     "footGenerated": "generated {at}",
     "forbidden": "Protocols are printed by the secretary, the chief referee and the tournament manager.",
@@ -2343,7 +2374,8 @@
       "chooseRole": "Step 1. Choose a role",
       "anotherRole": "Apply for another role",
       "chooseRoleHint": "Questions and documents depend on the role. The platform administrator role is never granted through registration.",
-      "noRoles": "All roles are already chosen"
+      "noRoles": "All roles are already chosen",
+      "toCabinetAs": "Open account: {role}"
     },
     "roles": {
       "ORGANIZATION_HEAD": "Head of a sports organization",
@@ -2450,7 +2482,7 @@
       "TELEGRAM": "Telegram"
     },
     "documents": {
-      "hint": "PDF, JPG or PNG, up to {mb} MB. Files are stored privately: only you and the reviewer can see them.",
+      "hint": "PDF or a photo (JPG, PNG), up to {mb} MB. Files are stored privately: only you and the reviewer can see them.",
       "none": "No documents are needed for this scenario.",
       "required": "required",
       "optional": "optional",
@@ -2461,7 +2493,7 @@
       "uploading": "Uploading…",
       "remove": "Remove",
       "download": "Open",
-      "wrongType": "Only PDF, JPG and PNG are accepted.",
+      "wrongType": "Only PDF and JPG or PNG photos are accepted.",
       "tooLarge": "The file is larger than {mb} MB."
     },
     "history": {
@@ -2499,7 +2531,7 @@
       "fixStep": "Fix: {step}"
     },
     "consent": {
-      "text": "Personal data from the request (name, date of birth, contacts, documents) is needed to review the request and register you on SAMBO Digital. Only reviewers can see it: the platform team or the head of the chosen organization. You can withdraw consent by contacting support.",
+      "text": "Personal data from the request (name, date of birth, contacts, documents) is needed to review the request and register you on Digital Sambo. Only reviewers can see it: the platform team or the head of the chosen organization. You can withdraw consent by contacting support.",
       "checkbox": "I consent to the processing of my personal data for these purposes (Federal Law 152-FZ) and confirm the data is correct."
     },
     "review": {
@@ -2544,6 +2576,29 @@
       "person_required": "The applicant has no person record.",
       "organization_incomplete": "The request lacks organization details.",
       "referee_category_required": "The referee category is missing."
+    }
+  },
+  "cabinetRole": {
+    "label": "Role",
+    "none": "No role yet",
+    "choose": "Choose a role",
+    "hint": "Rights and menu are for the selected role only.",
+    "chooseRole": "Choose a role and apply",
+    "addRole": "+ Add a role",
+    "changedElsewhere": "The role “{role}” was selected in another tab — it applies here too.",
+    "reload": "Reload page",
+    "otherRoles": "The current role is “{role}”. This page may be available in another of your roles:",
+    "noRole": "no role",
+    "openAs": "Open as “{role}”",
+    "roles": {
+      "ADMIN": "Platform administrator",
+      "ORGANIZATION_HEAD": "Head of organization",
+      "TOURNAMENT_STAFF": "Tournament staff",
+      "REFEREE": "Referee",
+      "MEDICAL": "Tournament doctor",
+      "COACH": "Coach",
+      "ATHLETE": "Athlete",
+      "GUARDIAN": "Athlete’s representative"
     }
   }
 }

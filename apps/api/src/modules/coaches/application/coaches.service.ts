@@ -16,7 +16,7 @@ import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
 import { decodeCursor, toPage } from '../../../common/http/http';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { PolicyService, type ResourceScope, ScopeResolverRegistry } from '../../access';
+import { CabinetRolesService, PolicyService, type ResourceScope, ScopeResolverRegistry } from '../../access';
 import { AuditService } from '../../audit';
 import { OrganizationScopeService } from '../../organizations';
 import { PeopleService } from '../../people';
@@ -42,10 +42,20 @@ export class CoachesService implements OnModuleInit {
     private readonly registry: ScopeResolverRegistry,
     private readonly people: PeopleService,
     private readonly audit: AuditService,
+    private readonly cabinetRoles: CabinetRolesService,
   ) {}
 
   onModuleInit(): void {
     this.registry.register('coach', async (id) => ({ scopes: await this.scopesOf(id) }));
+    // Роль кабинета «Тренер» (0.13.0) — и у тренера без организации: профиль тренера есть.
+    this.cabinetRoles.registerHolder('COACH', async (u) =>
+      u.personId
+        ? (await this.db.coachProfile.findUnique({
+            where: { personId: u.personId },
+            select: { id: true },
+          })) !== null
+        : false,
+    );
   }
 
   /** Области тренера — организации, где он сейчас работает. */
@@ -239,9 +249,12 @@ export class CoachesService implements OnModuleInit {
     return coach.id;
   }
 
-  /** Профиль тренера текущего пользователя (по его записи «человек»). */
+  /**
+   * Профиль тренера текущего пользователя (по его записи «человек») — только в роли кабинета «Тренер» (0.13.0): в
+   * других ролях пользователь не действует как тренер (свои спортсмены, заявки по умолчанию, проверка заявок).
+   */
   async coachIdOfUser(user: AuthUser): Promise<string | null> {
-    if (!user.personId) return null;
+    if (!user.personId || user.activeRole !== 'COACH') return null;
     const coach = await this.db.coachProfile.findUnique({
       where: { personId: user.personId },
       select: { id: true },

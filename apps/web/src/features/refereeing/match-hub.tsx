@@ -16,6 +16,7 @@ import { Link } from '@/i18n/navigation';
 import { ApiError } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
 import { pickName } from '@/lib/queries';
+import { OtherRolesHint } from '@/features/cabinet-role';
 import { AmendForm } from './amend-form';
 import { confirmResult, transitionMatch } from './api';
 import { DoctorPanel, IncidentList } from './doctor-panel';
@@ -332,7 +333,11 @@ export function MatchHub({ competitionId, matchId }: { competitionId: string; ma
   const query = useMatch(matchId);
   const competition = useCompetition(competitionId);
   if (query.error instanceof ApiError && query.error.code === 'NOT_FOUND')
-    return <EmptyState title={t('hub.notFound')} />;
+    return (
+      <EmptyState title={t('hub.notFound')}>
+        <OtherRolesHint error={query.error} />
+      </EmptyState>
+    );
   return (
     <QueryState isPending={query.isPending} error={query.data ? null : query.error}>
       {() => <Hub match={query.data as MatchDetailDto} competition={competition.data} />}

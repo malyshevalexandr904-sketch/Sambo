@@ -1,6 +1,8 @@
 // auth и me (API.md, 3.1–3.2).
 import { z } from 'zod';
+import type { CabinetRole } from './cabinet-roles.js';
 import { Email, Locale, Password, Timezone } from './common.js';
+import { ONBOARDING_ROLES } from './onboarding.js';
 import type { RoleCode } from './roles.js';
 
 export const USER_STATUSES = ['PENDING_VERIFICATION', 'ACTIVE', 'BLOCKED'] as const;
@@ -12,8 +14,17 @@ export const RegisterRequest = z.object({
   displayName: z.string().trim().min(1).max(100),
   locale: Locale,
   acceptTerms: z.literal(true, { error: 'terms_not_accepted' }),
+  /**
+   * Роль, выбранная до заполнения формы (0.13.0): после подтверждения email сразу открывается анкета этой роли.
+   * Ничего не выдаёт — роль появляется только после одобрения заявки.
+   */
+  role: z.enum(ONBOARDING_ROLES).optional(),
 });
 export type RegisterRequest = z.infer<typeof RegisterRequest>;
+
+/** Повторное письмо для подтверждения email (0.13.0). Ответ всегда одинаковый — занятость адреса не раскрывается. */
+export const ResendVerificationRequest = z.object({ email: Email, locale: Locale });
+export type ResendVerificationRequest = z.infer<typeof ResendVerificationRequest>;
 
 export const TotpCode = z.string().regex(/^\d{6}$/, { error: 'invalid_totp' });
 export const RecoveryCode = z.string().regex(/^[A-Z0-9]{5}-[A-Z0-9]{5}$/, { error: 'invalid_recovery_code' });
@@ -72,7 +83,17 @@ export interface Me {
   status: UserStatus;
   personId: string | null;
   totpEnabled: boolean;
+  /**
+   * Роли доступа, которые действуют в выбранной роли кабинета (0.13.0). Роли других ролей кабинета сюда не входят:
+   * на сервере они в этой сессии не действуют.
+   */
   grants: Grants;
+  /** Выбранная роль кабинета этой сессии; null — у пользователя пока нет ролей. */
+  activeRole: CabinetRole | null;
+  /** Все роли кабинета пользователя — для переключателя. */
+  availableRoles: CabinetRole[];
+  /** Последняя выбранная роль (при регистрации — выбранная до заполнения формы). */
+  preferredRole: CabinetRole | null;
 }
 
 export const UpdateMeRequest = z.object({

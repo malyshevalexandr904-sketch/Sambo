@@ -1,5 +1,6 @@
 // Разрешение прав с областями и наследованием (PERMISSIONS.md, 1, 5, 6). Чистые функции без NestJS и Prisma.
 import {
+  type CabinetRole,
   type GrantMode,
   type OrganizationStatus,
   PERMISSIONS,
@@ -8,6 +9,7 @@ import {
   ROLE_PERMISSIONS,
   ROLES,
   type RoleCode,
+  roleActiveIn,
 } from '@sde/contracts';
 
 export interface OrganizationGrant {
@@ -29,6 +31,25 @@ export interface EffectiveGrants {
   platform: RoleCode[];
   organizations: OrganizationGrant[];
   competitions: CompetitionGrant[];
+}
+
+/**
+ * Права в выбранной роли кабинета (0.13.0): остаются только роли доступа этой роли; организации и турниры, где
+ * у пользователя нет ролей этой роли, исчезают целиком (их ресурсы ему в этой роли не видны). Кэш хранит полные
+ * права — фильтр применяется к каждому запросу.
+ */
+export function grantsForRole(grants: EffectiveGrants, active: CabinetRole | null): EffectiveGrants {
+  const keep = (r: RoleCode): boolean => roleActiveIn(active, r);
+  return {
+    ...grants,
+    platform: grants.platform.filter(keep),
+    organizations: grants.organizations
+      .map((g) => ({ ...g, roles: g.roles.filter(keep) }))
+      .filter((g) => g.roles.length > 0),
+    competitions: grants.competitions
+      .map((g) => ({ ...g, roles: g.roles.filter(keep) }))
+      .filter((g) => g.roles.length > 0),
+  };
 }
 
 export type ResourceScope =

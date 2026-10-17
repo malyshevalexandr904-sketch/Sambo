@@ -3,6 +3,7 @@
 import { Alert, Badge, Button, Field, Spinner, Textarea } from '@sde/ui';
 import { useTranslations } from 'next-intl';
 import { type ReactNode, useState } from 'react';
+import { OtherRolesHint } from '@/features/cabinet-role';
 import { useErrorMessage } from '@/lib/errors';
 
 export function QueryState({
@@ -23,7 +24,13 @@ export function QueryState({
       </p>
     );
   }
-  if (error) return <Alert tone="danger">{errorMessage(error)}</Alert>;
+  if (error)
+    return (
+      <>
+        <Alert tone="danger">{errorMessage(error)}</Alert>
+        <OtherRolesHint error={error} />
+      </>
+    );
   return <>{children()}</>;
 }
 

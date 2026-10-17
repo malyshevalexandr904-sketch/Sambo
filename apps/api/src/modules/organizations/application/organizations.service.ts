@@ -1,6 +1,7 @@
 // Организации: список, карточка, создание, изменение, переходы статуса (API.md, 3.4).
 import { Injectable } from '@nestjs/common';
 import {
+  cabinetRoleOf,
   type Organization as OrganizationDto,
   type OrganizationInput,
   type OrganizationPatch,
@@ -16,7 +17,7 @@ import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
 import { decodeCursor, toPage } from '../../../common/http/http';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { PolicyService, type ResourceScope } from '../../access';
+import { CabinetRolesService, PolicyService, type ResourceScope } from '../../access';
 import { AuditService } from '../../audit';
 import { FilesService } from '../../files';
 import { OutboxService } from '../../outbox';
@@ -75,6 +76,7 @@ export class OrganizationsService {
     private readonly outbox: OutboxService,
     private readonly files: FilesService,
     private readonly members: MembersService,
+    private readonly cabinetRoles: CabinetRolesService,
   ) {}
 
   private publicUrl = (key: string): string => this.files.publicUrl(key);
@@ -285,8 +287,18 @@ export class OrganizationsService {
       });
       return orgId;
     });
-    const fresh = hasAuthority ? user : { ...user, permissionsVersion: user.permissionsVersion + 1 };
-    return this.get(fresh, id);
+    if (hasAuthority) return this.get(user, id);
+    // Создатель без полномочий стал руководителем — сессия переходит в роль «Руководитель организации» (0.13.0).
+    const role = cabinetRoleOf(creatorRole(input.type));
+    const switched = await this.cabinetRoles.selectIfHeld(user.id, user.sessionId, role);
+    return this.get(
+      {
+        ...user,
+        permissionsVersion: user.permissionsVersion + 1,
+        activeRole: switched ? role : user.activeRole,
+      },
+      id,
+    );
   }
 
   async update(

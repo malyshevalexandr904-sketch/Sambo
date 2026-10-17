@@ -3,6 +3,7 @@ import {
   type DataEnvelope,
   type Me,
   type PersonDto,
+  SelectCabinetRoleRequest,
   UpdateMeRequest,
   UpsertMyPersonRequest,
 } from '@sde/contracts';
@@ -20,7 +21,17 @@ export class MeController {
   @Get()
   @Authenticated()
   async get(@CurrentUser() user: AuthUser): Promise<DataEnvelope<Me>> {
-    return ok(await this.me.get(user.id));
+    return ok(await this.me.get({ userId: user.id, sessionId: user.sessionId }));
+  }
+
+  /** Роль кабинета этой сессии (0.13.0): права и меню — только для неё. */
+  @Put('role')
+  @Authenticated()
+  async selectRole(
+    @CurrentUser() user: AuthUser,
+    @ValidBody(SelectCabinetRoleRequest) body: SelectCabinetRoleRequest,
+  ): Promise<DataEnvelope<Me>> {
+    return ok(await this.me.selectRole({ userId: user.id, sessionId: user.sessionId }, body.role));
   }
 
   @Patch()
@@ -29,7 +40,7 @@ export class MeController {
     @CurrentUser() user: AuthUser,
     @ValidBody(UpdateMeRequest) body: UpdateMeRequest,
   ): Promise<DataEnvelope<Me>> {
-    return ok(await this.me.update(user.id, body));
+    return ok(await this.me.update({ userId: user.id, sessionId: user.sessionId }, body));
   }
 
   @Get('person')

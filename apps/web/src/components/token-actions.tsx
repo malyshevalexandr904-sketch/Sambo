@@ -1,6 +1,13 @@
 'use client';
 // Действия по ссылке из письма: подтверждение email и принятие приглашения.
-import { type CompetitionMember, type DataEnvelope, type Me, type Membership } from '@sde/contracts';
+import {
+  type CompetitionMember,
+  type DataEnvelope,
+  isOnboardingRole,
+  type Me,
+  type Membership,
+  type OnboardingRequestDto,
+} from '@sde/contracts';
 import { Alert, Card, Spinner } from '@sde/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
@@ -24,9 +31,22 @@ export function VerifyEmail() {
     if (started.current) return;
     started.current = true;
     api<DataEnvelope<Me>>('/auth/verify-email', { method: 'POST', body: { token }, noRefresh: true })
-      .then((res) => {
+      .then(async (res) => {
         queryClient.setQueryData(qk.me, res.data);
-        // После подтверждения email — регистрация в системе: выбор роли и заявка (Phase 9a).
+        // Роль выбрана при регистрации (0.13.0) — сразу её анкета; иначе — выбор роли (Phase 9a).
+        const role = res.data.preferredRole;
+        if (res.data.availableRoles.length === 0 && isOnboardingRole(role)) {
+          try {
+            const created = await api<DataEnvelope<OnboardingRequestDto>>('/onboarding/requests', {
+              method: 'POST',
+              body: { role, kind: 'REGISTRATION' },
+            });
+            router.replace(`/onboarding/${created.data.id}`);
+            return;
+          } catch {
+            // Заявка на эту роль уже есть (ссылку открыли повторно) — её видно в кабинете регистрации.
+          }
+        }
         router.replace('/onboarding');
       })
       .catch(() => setFailed(true));
@@ -36,7 +56,15 @@ export function VerifyEmail() {
     <Card>
       <h1 className="mb-4 text-2xl font-semibold">{t('title')}</h1>
       {failed ? (
-        <Alert tone="danger">{t('failed')}</Alert>
+        <>
+          <Alert tone="danger">{t('failed')}</Alert>
+          <Link
+            href="/login"
+            className="mt-4 inline-flex min-h-11 items-center rounded-md bg-blue-700 px-5 font-medium text-white hover:bg-blue-800"
+          >
+            {t('toLogin')}
+          </Link>
+        </>
       ) : (
         <p className="flex items-center gap-2 text-slate-700">
           <Spinner /> {t('verifying')}

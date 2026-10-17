@@ -322,7 +322,7 @@ describe('schedule change digest', () => {
     await consumer2.handle(job(deliveryJob as DeliveryJob));
     const mail = mailer.sent[0];
     expect(mail?.to).toBe('coach-a@club.test');
-    expect(mail?.email.subject).toBe('Расписание турнира изменилось — SAMBO Digital');
+    expect(mail?.email.subject).toBe('Расписание турнира изменилось — Digital Sambo');
     expect(mail?.email.text).toContain('«Открытый ковёр»');
     expect(mail?.email.text).toContain(`https://sambo.test/ru/competitions/${competitionId}`);
   });
