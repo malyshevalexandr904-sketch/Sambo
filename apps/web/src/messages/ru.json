@@ -2027,7 +2027,9 @@
       "LAST_TECHNICAL_ACTION": "по последней оценке",
       "FEWER_PENALTIES": "меньше наказаний",
       "MORE_HIGH_SCORES": "больше высших оценок",
-      "REFEREE_DECISION": "решение судей"
+      "REFEREE_DECISION": "решение судей",
+      "TECHNICAL_POINTS": "больше баллов за технику",
+      "LAST_PENALTY": "по последнему предупреждению"
     },
     "codes": {
       "THROW_TOTAL": "Бросок",
@@ -2038,6 +2040,8 @@
       "REMARK": "Замечание",
       "WARNING_1": "Предупреждение",
       "WARNING_2": "Второе предупреждение",
+      "WARNING_3": "Третье предупреждение",
+      "WARNING_4_REMOVAL": "Снятие со схватки",
       "DISQUALIFICATION": "Дисквалификация",
       "WITHDRAWN_BY_DOCTOR": "снят врачом"
     },

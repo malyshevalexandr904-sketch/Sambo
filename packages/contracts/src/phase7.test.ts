@@ -120,20 +120,22 @@ describe('scoring: points come from the rules', () => {
 });
 
 describe('scoring: penalties go in order', () => {
-  it('remark, warning (1 point), second warning (2 points), disqualification', () => {
+  it('first warning (0), second and third (1 point each), the fourth removes from the bout (art. 35, 37)', () => {
     const log = new Log();
     log.start();
     log.penalty('RED');
-    log.penalty('RED');
     let s = log.state();
-    expect(s.red.penalties).toEqual(['REMARK', 'WARNING_1']);
+    expect(s.blue.points).toBe(0);
+    log.penalty('RED');
+    s = log.state();
+    expect(s.red.penalties).toEqual(['WARNING_1', 'WARNING_2']);
     expect(s.blue.points).toBe(1);
     log.penalty('RED');
     s = log.state();
-    expect(s.blue.points).toBe(3);
+    expect(s.blue.points).toBe(2);
     log.penalty('RED');
     s = log.state();
-    expect(s.decision).toEqual({ kind: 'DISQUALIFICATION', winner: 'BLUE', detail: 'DISQUALIFICATION' });
+    expect(s.decision).toEqual({ kind: 'DISQUALIFICATION', winner: 'BLUE', detail: 'WARNING_4_REMOVAL' });
     expect(determineOutcome(s, RULES)?.method).toBe('DISQUALIFICATION');
   });
 
@@ -145,7 +147,7 @@ describe('scoring: penalties go in order', () => {
         seq: 1,
         type: 'PENALTY',
         side: 'BLUE',
-        actionCode: 'WARNING_1',
+        actionCode: 'WARNING_2',
         value: null,
         matchClockMs: 0,
         deviceTime: new Date(T0).toISOString(),
@@ -272,11 +274,11 @@ describe('scoring: voiding is a compensating event', () => {
   it('re-derives later penalties by order after an earlier one is voided', () => {
     const log = new Log();
     log.start();
-    const remark = log.penalty('RED');
+    const first = log.penalty('RED');
     log.penalty('RED');
-    log.void(remark);
+    log.void(first);
     const s = log.state();
-    expect(s.red.penalties).toEqual(['REMARK']);
+    expect(s.red.penalties).toEqual(['WARNING_1']);
     expect(s.blue.points).toBe(0);
   });
 
@@ -312,7 +314,7 @@ describe('outcome after the time is over', () => {
     expect(determineOutcome(s, RULES)).toMatchObject({ winnerSide: 'BLUE', basis: 'POINTS' });
   });
 
-  it('uses the tie-breakers of the rules in order: last technical action first', () => {
+  it('uses the tie-breakers of the rules in order: the last technical action after equal technique', () => {
     const s = finished((log) => {
       log.score('BLUE', 'THROW_2');
       log.score('RED', 'THROW_2');
@@ -350,6 +352,49 @@ describe('outcome after the time is over', () => {
     expect(determineOutcome(tied, { tieBreakers: ['FEWER_PENALTIES', 'REFEREE_DECISION'] })).toMatchObject({
       winnerSide: 'BLUE',
       methodDetail: 'FEWER_PENALTIES',
+    });
+  });
+
+  it('first compares points for technique without warning points (art. 34 p. 2)', () => {
+    const s = finished((log) => {
+      log.score('RED', 'THROW_2');
+      log.score('BLUE', 'THROW_1');
+      log.penalty('RED');
+      log.penalty('RED');
+    });
+    expect([s.red.points, s.blue.points]).toEqual([2, 2]);
+    expect(determineOutcome(s, RULES)).toEqual({
+      winnerSide: 'RED',
+      method: 'POINTS',
+      methodDetail: 'TECHNICAL_POINTS',
+      basis: 'TIE_BREAKER',
+    });
+  });
+
+  it('gives the bout to the opponent of a single warning without technical points (art. 34 p. 8)', () => {
+    const s = finished((log) => log.penalty('BLUE'));
+    expect([s.red.points, s.blue.points]).toEqual([0, 0]);
+    expect(determineOutcome(s, RULES)).toMatchObject({ winnerSide: 'RED', methodDetail: 'FEWER_PENALTIES' });
+  });
+
+  it('with equal warnings loses the side warned last, then compares earlier ones (art. 34 pp. 7, 9)', () => {
+    const s = finished((log) => {
+      log.penalty('RED', 10_000);
+      log.penalty('BLUE', 20_000);
+      log.penalty('BLUE', 30_000);
+      log.penalty('RED', 50_000);
+    });
+    expect([s.red.points, s.blue.points]).toEqual([1, 1]);
+    expect(determineOutcome(s, RULES)).toMatchObject({ winnerSide: 'BLUE', methodDetail: 'LAST_PENALTY' });
+    const together = finished((log) => {
+      log.penalty('RED', 10_000);
+      log.penalty('BLUE', 20_000);
+      log.penalty('RED', 40_000);
+      log.penalty('BLUE', 40_000);
+    });
+    expect(determineOutcome(together, RULES)).toMatchObject({
+      winnerSide: 'RED',
+      methodDetail: 'LAST_PENALTY',
     });
   });
 
