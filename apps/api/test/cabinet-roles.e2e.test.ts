@@ -212,6 +212,49 @@ describe('роль в кабинете', () => {
     });
   });
 
+  it('федерация создала турнир — сессия в роли «Персонал турнира», им можно управлять сразу; организатор остаётся', async () => {
+    const start = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    const body = (organizerOrganizationId: string) => ({
+      name: 'Первенство федерации',
+      organizerOrganizationId,
+      level: 'REGIONAL',
+      disciplineCode: 'SPORT_SAMBO',
+      timezone: 'Europe/Moscow',
+      startDate: start,
+      endDate: start,
+      registrationStartsAt: new Date(Date.now() - 86_400_000).toISOString(),
+      registrationEndsAt: new Date(Date.now() + 20 * 86_400_000).toISOString(),
+    });
+    const fed = await createOrg(t, { type: 'REGIONAL_FEDERATION' });
+    const fa = await login(
+      t,
+      (await createUser(t, { orgs: [{ organizationId: fed, role: 'FEDERATION_ADMIN' }] })).email,
+    );
+    expect((await me(fa)).activeRole).toBe('ORGANIZATION_HEAD');
+    const created = await send(fa, 'post', '/api/v1/competitions', body(fed));
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    expect(created.body.data.allowedActions).toContain('competition.update');
+    expect(await me(fa)).toMatchObject({
+      activeRole: 'TOURNAMENT_STAFF',
+      availableRoles: ['ORGANIZATION_HEAD', 'TOURNAMENT_STAFF'],
+    });
+    const c = created.body.data as { id: string; version: number };
+    expect(
+      (await send(fa, 'patch', `/api/v1/competitions/${c.id}`, { name: 'Первенство' }, c.version)).status,
+    ).toBe(200);
+
+    // Организатор управляет турниром своей организации и в роли руководителя — роль не меняется.
+    const org = await createOrg(t, { type: 'ORGANIZER' });
+    const organizer = await login(
+      t,
+      (await createUser(t, { orgs: [{ organizationId: org, role: 'ORGANIZER' }] })).email,
+    );
+    const own = await send(organizer, 'post', '/api/v1/competitions', body(org));
+    expect(own.status).toBe(201);
+    expect(own.body.data.allowedActions).toContain('competition.update');
+    expect((await me(organizer)).activeRole).toBe('ORGANIZATION_HEAD');
+  });
+
   it('администратор платформы — только в роли «Администратор»', async () => {
     const club = await createOrg(t);
     const admin = await createUser(t, {
@@ -270,7 +313,7 @@ describe('регистрация с ролью и повторное письм�
     });
   });
 
-  it('повторное письмо: новая ссылка, прежняя гаснет; адрес не раскрывается', async () => {
+  it('повторное письмо: прежняя ссылка действует до подтверждения, после — гаснут все; адрес не раскрывается', async () => {
     const s = await csrfAgent(t);
     expect((await register(s, 'slow@test.local', 'ATHLETE')).status).toBe(202);
     const resend = (email: string) =>
@@ -278,15 +321,16 @@ describe('регистрация с ролью и повторное письм�
         .post('/api/v1/auth/verify-email/resend')
         .set('x-csrf-token', s.csrf)
         .send({ email, locale: 'ru' });
+    const verify = (url: string | undefined) =>
+      s.agent
+        .post('/api/v1/auth/verify-email')
+        .set('x-csrf-token', s.csrf)
+        .send({ token: tokenFromUrl(url) });
 
     expect((await resend('slow@test.local')).status).toBe(202);
     const [old, fresh] = await sentEmails(t, 'auth.verify_email');
     expect(fresh?.to).toBe('slow@test.local');
-    const stale = await s.agent
-      .post('/api/v1/auth/verify-email')
-      .set('x-csrf-token', s.csrf)
-      .send({ token: tokenFromUrl(old?.params.verifyUrl) });
-    expect(stale.body.error.code).toBe('TOKEN_EXPIRED');
+    expect(fresh?.params.verifyUrl).not.toBe(old?.params.verifyUrl);
 
     // Нет такого адреса или он уже подтверждён — ответ тот же, письма нет.
     const active = await createUser(t);
@@ -294,10 +338,14 @@ describe('регистрация с ролью и повторное письм�
     expect((await resend(active.email)).status).toBe(202);
     expect(await sentEmails(t, 'auth.verify_email')).toHaveLength(2);
 
-    const ok = await s.agent
+    // Повторная отправка (в том числе посторонним) не гасит ссылку из первого письма.
+    expect((await verify(old?.params.verifyUrl)).status).toBe(200);
+    // Адрес подтверждён — ссылка из второго письма больше не действует (новый браузер: у первого — новая сессия).
+    const other = await csrfAgent(t);
+    const second = await other.agent
       .post('/api/v1/auth/verify-email')
-      .set('x-csrf-token', s.csrf)
-      .send({ token: tokenFromUrl((await sentEmails(t, 'auth.verify_email')).at(-1)?.params.verifyUrl) });
-    expect(ok.status).toBe(200);
+      .set('x-csrf-token', other.csrf)
+      .send({ token: tokenFromUrl(fresh?.params.verifyUrl) });
+    expect(second.body.error.code).toBe('TOKEN_EXPIRED');
   });
 });

@@ -133,7 +133,10 @@
     "resend": {
       "button": "Send the email again",
       "wait": "You can send again in {seconds} s",
-      "sent": "The email has been sent again. The link from the previous email no longer works."
+      "sent": "The email has been sent again.",
+      "waitMinutes": "You can send again in {minutes} min",
+      "limited": "Several emails have already been sent — the next one can be sent later (see the button). Check your spam folder.",
+      "limitedShort": "Too many requests — try again a bit later."
     }
   },
   "dashboard": {
@@ -2178,7 +2181,10 @@
       "withdrawn_by_doctor": "withdrawn by the doctor"
     },
     "openScoreboard": "Scoreboard",
-    "liveOff": "Refresh every 5 s"
+    "liveOff": "Refresh every 5 s",
+    "rolePausedTitle": "Scores not sent",
+    "rolePaused": "Another role is selected in this browser — the server does not accept scores. Unsent actions: {count}; they are kept and will be sent after you return to the “{role}” role.",
+    "backToRole": "Return to the “{role}” role"
   },
   "results": {
     "medals": {
@@ -2581,7 +2587,6 @@
   "cabinetRole": {
     "label": "Role",
     "none": "No role yet",
-    "choose": "Choose a role",
     "hint": "Rights and menu are for the selected role only.",
     "chooseRole": "Choose a role and apply",
     "addRole": "+ Add a role",

@@ -168,4 +168,26 @@ describe('athlete import', () => {
       ).body.error.code,
     ).toBe('INVALID_TRANSITION');
   });
+
+  it('the job and its file are visible only in the role with the import right (0.13.1)', async () => {
+    // Руководитель клуба и тренер другого клуба: в роли «Тренер» права импорта в клубе задания нет.
+    const club = await createOrg(t, { type: 'CLUB' });
+    const other = await createOrg(t, { type: 'CLUB' });
+    const user = await createUser(t, {
+      orgs: [
+        { organizationId: club, role: 'CLUB_MANAGER' },
+        { organizationId: other, role: 'COACH' },
+      ],
+    });
+    const m = await login(t, user.email);
+    const fileId = await upload(t, m, 'IMPORT', CSV, 'text/csv', 'спортсмены.csv');
+    const job = await start(m, { organizationId: club, fileId }, randomUUID());
+    expect(job.status).toBe(202);
+    const id = job.body.data.id as string;
+    expect((await m.agent.get(`/api/v1/athletes/imports/${id}`)).status).toBe(200);
+    expect((await m.agent.get(`/api/v1/files/${fileId}/download-url`)).status).toBe(200);
+    expect((await send(m, 'put', '/api/v1/me/role', { role: 'COACH' })).status).toBe(200);
+    expect((await m.agent.get(`/api/v1/athletes/imports/${id}`)).status).toBe(404);
+    expect((await m.agent.get(`/api/v1/files/${fileId}/download-url`)).status).toBe(404);
+  });
 });

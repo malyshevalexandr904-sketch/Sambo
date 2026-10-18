@@ -13,7 +13,7 @@ import { hasAnywhere, platformHas } from '@/lib/access';
 import { closeLive } from '@/lib/live';
 import { disablePushForLogout, syncPush } from '@/lib/push';
 import { useMe, useMyAthletes } from '@/lib/queries';
-import { RoleChangedElsewhere, RoleSwitcher } from '@/features/cabinet-role';
+import { ConsoleRoleBar, RoleChangedElsewhere, RoleSwitcher } from '@/features/cabinet-role';
 import { NotificationBell } from '@/features/notifications/bell';
 import { Brand } from './brand';
 import { LocaleSwitcher } from './locale-switcher';
@@ -77,6 +77,8 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
   if (bare) {
     return (
       <main id="main" className="min-h-screen bg-slate-100">
+        <RoleChangedElsewhere userId={user.id} />
+        <ConsoleRoleBar me={user} />
         {children}
       </main>
     );

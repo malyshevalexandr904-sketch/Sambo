@@ -25,7 +25,12 @@ import {
   LiveUnsubscribeRequest,
   parseLiveChannel,
 } from '@sde/contracts';
-import { type Env, LIVE_REDIS_CHANNEL, parseLiveRedisMessage } from '@sde/server-kit';
+import {
+  type Env,
+  LIVE_CONTROL_REDIS_CHANNEL,
+  LIVE_REDIS_CHANNEL,
+  parseLiveRedisMessage,
+} from '@sde/server-kit';
 import type { Server as HttpServer } from 'node:http';
 import { Redis } from 'ioredis';
 import { type Namespace, Server, type Socket } from 'socket.io';
@@ -97,6 +102,8 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
   private subscriber: Redis | null = null;
   private readonly allowedOrigins: Set<string>;
   private readonly perIp = new Map<string, number>();
+  /** Соединения по сессии входа — для служебных сообщений о сессии (смена роли кабинета, 0.13.1). */
+  private readonly bySession = new Map<string, Set<Socket>>();
 
   constructor(
     private readonly adapterHost: HttpAdapterHost,
@@ -139,9 +146,11 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     this.nsp = nsp;
 
     const subscriber = new Redis(this.env.REDIS_URL, { maxRetriesPerRequest: null });
-    subscriber.on('message', (_channel: string, raw: string) => this.deliver(raw));
+    subscriber.on('message', (channel: string, raw: string) =>
+      channel === LIVE_CONTROL_REDIS_CHANNEL ? this.control(raw) : this.deliver(raw),
+    );
     subscriber.on('error', (err) => this.logger.warn({ err }, 'Live subscriber: Redis error'));
-    void subscriber.subscribe(LIVE_REDIS_CHANNEL).catch((err: unknown) => {
+    void subscriber.subscribe(LIVE_REDIS_CHANNEL, LIVE_CONTROL_REDIS_CHANNEL).catch((err: unknown) => {
       this.logger.error({ err }, 'Live subscriber: subscribe failed');
     });
     this.subscriber = subscriber;
@@ -170,6 +179,25 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
       this.nsp.to(parsed.room).emit(LIVE_EVENTS.message, JSON.parse(parsed.json));
     } catch (err) {
       this.logger.warn({ err }, 'Live message dropped: invalid JSON');
+    }
+  }
+
+  /**
+   * Служебное сообщение узлам (0.13.1): в сессии сменили роль кабинета — служебные подписки её соединений выданы по
+   * прежней роли. Соединение получает `expired`, как при истечении входа: клиент обновит сессию и подпишется заново
+   * уже с новой ролью (то, что в ней не положено, получит отказ).
+   */
+  private control(raw: string): void {
+    let msg: { type?: unknown; sessionId?: unknown };
+    try {
+      msg = JSON.parse(raw) as { type?: unknown; sessionId?: unknown };
+    } catch {
+      return;
+    }
+    if (msg.type !== 'session-role' || typeof msg.sessionId !== 'string') return;
+    for (const socket of [...(this.bySession.get(msg.sessionId) ?? [])]) {
+      const state = socket.data as SocketState | undefined;
+      if (state?.user?.sessionId === msg.sessionId) this.expire(socket);
     }
   }
 
@@ -263,6 +291,8 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     const state = socket.data as SocketState;
     // Принятые соединения с адреса (лимит проверяется в рукопожатии).
     this.perIp.set(state.ip, (this.perIp.get(state.ip) ?? 0) + 1);
+    const sessionId = state.user?.sessionId ?? null;
+    if (sessionId) this.bySession.set(sessionId, (this.bySession.get(sessionId) ?? new Set()).add(socket));
     socket.on(LIVE_EVENTS.subscribe, (raw: unknown, ack: unknown) => {
       if (!this.allow(state)) return reply(ack, fail('RATE_LIMITED'));
       void this.queued(state, raw, () => this.subscribe(socket, state, raw)).then((r) => reply(ack, r));
@@ -280,6 +310,11 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     socket.on('disconnect', () => {
       if (state.expiryTimer) clearTimeout(state.expiryTimer);
       state.subscriptions.clear();
+      if (sessionId) {
+        const set = this.bySession.get(sessionId);
+        set?.delete(socket);
+        if (set?.size === 0) this.bySession.delete(sessionId);
+      }
       const left = (this.perIp.get(state.ip) ?? 1) - 1;
       if (left > 0) this.perIp.set(state.ip, left);
       else this.perIp.delete(state.ip);

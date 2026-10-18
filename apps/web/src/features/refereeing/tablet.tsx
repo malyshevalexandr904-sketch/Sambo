@@ -15,6 +15,7 @@ import { timeInZone } from '@/features/scheduling/shared';
 import { refereeKeys, transitionMatch, useMatConsole } from './api';
 import { actionPoints, toScoringRules, useRefereeLabels } from './labels';
 import { ResultPanel } from './result-panel';
+import { RolePaused } from './role-paused';
 import { holdElapsedMs, maxHoldMs, Scoreboard } from './scoreboard';
 import {
   ConnectionBadge,
@@ -250,7 +251,17 @@ function MatchPanel({
           />
         ) : null}
       </div>
-      {notice ? (
+      {notice?.kind === 'role' && notice.role ? (
+        <RolePaused
+          count={notice.count ?? 0}
+          role={notice.role}
+          onResumed={() => {
+            scoring.resume();
+            onChanged();
+          }}
+        />
+      ) : null}
+      {notice && notice.kind !== 'role' ? (
         <Alert tone="warning">
           {notice.kind === 'reset'
             ? t('resetByServer', { count: notice.count ?? 0 })

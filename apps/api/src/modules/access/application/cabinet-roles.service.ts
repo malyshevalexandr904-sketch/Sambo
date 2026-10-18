@@ -2,7 +2,7 @@
 // Роли доступа (платформа, организация, турнир) группируются по ролям кабинета (`CABINET_ROLE_GRANTS`); роли-связи и
 // роли-профили (спортсмен, представитель, тренер и судья без назначений) сообщают модули-владельцы через
 // `registerHolder` — модуль access о спортсменах и тренерах не знает.
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   CABINET_ROLES,
   type CabinetRole,
@@ -10,8 +10,10 @@ import {
   defaultCabinetRole,
   isCabinetRole,
 } from '@sde/contracts';
+import { LIVE_CONTROL_REDIS_CHANNEL } from '@sde/server-kit';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { RedisService } from '../../../infrastructure/redis/redis.module';
 import { GrantsService } from './grants.service';
 
 /** Что нужно знать о пользователе, чтобы определить его роли. */
@@ -24,22 +26,24 @@ export interface CabinetUser {
 /** Есть ли у пользователя роль кабинета по связи или профилю (спортсмен, представитель, тренер, судья). */
 export type CabinetRoleHolder = (user: CabinetUser) => Promise<boolean>;
 
-/** Сохранённый выбор сессии. */
+/** Сохранённый выбор сессии; `rev` — версия записи (защита от одновременных записей). */
 export interface SessionRoleRow {
   role: string | null;
   permissionsVersion: number;
-  updatedAt: Date;
+  rev: number;
 }
 
 const asRole = (v: string | null | undefined): CabinetRole | null => (isCabinetRole(v) ? v : null);
 
 @Injectable()
 export class CabinetRolesService {
+  private readonly logger = new Logger(CabinetRolesService.name);
   private readonly holders = new Map<CabinetRole, CabinetRoleHolder[]>();
 
   constructor(
     private readonly db: PrismaService,
     private readonly grants: GrantsService,
+    private readonly redis: RedisService,
   ) {}
 
   registerHolder(role: CabinetRole, holder: CabinetRoleHolder): void {
@@ -71,7 +75,7 @@ export class CabinetRolesService {
   read(sessionId: string): Promise<SessionRoleRow | null> {
     return this.db.sessionRole.findUnique({
       where: { sessionId },
-      select: { role: true, permissionsVersion: true, updatedAt: true },
+      select: { role: true, permissionsVersion: true, rev: true },
     });
   }
 
@@ -94,7 +98,7 @@ export class CabinetRolesService {
       previous && available.includes(previous)
         ? previous
         : defaultCabinetRole(available, asRole(user.preferredRole));
-    return this.store(user, sessionId, role, current?.updatedAt ?? null);
+    return this.store(user, sessionId, role, current?.rev ?? null);
   }
 
   /**
@@ -106,11 +110,15 @@ export class CabinetRolesService {
     sessionId: string,
   ): Promise<{ active: CabinetRole | null; available: CabinetRole[] }> {
     const available = await this.available(user);
-    const valid = user.activeRole === null ? available.length === 0 : available.includes(user.activeRole);
-    if (valid) return { active: user.activeRole, available };
+    const valid = (role: CabinetRole | null): boolean =>
+      role === null ? available.length === 0 : available.includes(role);
+    if (valid(user.activeRole)) return { active: user.activeRole, available };
     const row = await this.read(sessionId);
+    // Пока шёл этот запрос, роль могли выбрать в соседнем (переключатель): действующий выбор не перезаписываем.
+    const stored = asRole(row?.role);
+    if (row && stored !== user.activeRole && valid(stored)) return { active: stored, available };
     const role = defaultCabinetRole(available, asRole(user.preferredRole));
-    return { active: await this.store(user, sessionId, role, row?.updatedAt ?? null), available };
+    return { active: await this.store(user, sessionId, role, row?.rev ?? null), available };
   }
 
   /**
@@ -120,10 +128,17 @@ export class CabinetRolesService {
   async select(userId: string, sessionId: string, role: CabinetRole): Promise<void> {
     const user = await this.db.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { id: true, personId: true, permissionsVersion: true },
+      select: { id: true, personId: true, permissionsVersion: true, preferredRole: true },
     });
     if (!(await this.available(user)).includes(role))
       throw new DomainError('FORBIDDEN', { reason: 'cabinet_role_not_held', role });
+    const current = await this.read(sessionId);
+    if (current?.role === role && current.permissionsVersion === user.permissionsVersion) {
+      // Роль уже выбрана (повторное нажатие, возврат роли из другой вкладки): соединения не трогаем (0.13.1).
+      if (user.preferredRole !== role)
+        await this.db.user.update({ where: { id: user.id }, data: { preferredRole: role } });
+      return;
+    }
     await this.db.tx(async (tx) => {
       await tx.$executeRaw`
         INSERT INTO session_role (session_id, user_id, role, permissions_version, updated_at)
@@ -131,9 +146,15 @@ export class CabinetRolesService {
         ON CONFLICT (session_id) DO UPDATE SET
           role = EXCLUDED.role,
           permissions_version = EXCLUDED.permissions_version,
+          rev = session_role.rev + 1,
           updated_at = EXCLUDED.updated_at`;
       await tx.user.update({ where: { id: user.id }, data: { preferredRole: role } });
     });
+    // Живые данные: служебные подписки этой сессии выданы по прежней роли — узлы api их снимают (0.13.1).
+    if (current?.role !== role)
+      await this.redis
+        .publish(LIVE_CONTROL_REDIS_CHANNEL, JSON.stringify({ type: 'session-role', sessionId }))
+        .catch((err: unknown) => this.logger.warn({ err }, 'Live control message not published'));
   }
 
   /**
@@ -145,20 +166,23 @@ export class CabinetRolesService {
       await this.select(userId, sessionId, role);
       return true;
     } catch (e) {
-      if (e instanceof DomainError) return false;
-      throw e;
+      // Действие уже выполнено (транзакция закрыта): сбой переключения не должен превращать его в ошибку для
+      // клиента — повтор создал бы вторую организацию, а погашенное приглашение не принять снова.
+      if (!(e instanceof DomainError)) this.logger.warn({ err: e, role }, 'Cabinet role switch failed');
+      return false;
     }
   }
 
   /**
-   * Запись выбора, если с момента чтения его никто не менял (`updated_at` тот же): одновременное переключение
-   * пользователем выигрывает у автоматической проверки. Проиграли — действует то, что записано.
+   * Запись выбора, если с момента чтения его никто не менял (та же версия `rev`; `null` — строки не было):
+   * одновременное переключение пользователем выигрывает у автоматической проверки. Проиграли — действует то, что
+   * записано.
    */
   private async store(
     user: CabinetUser,
     sessionId: string,
     role: CabinetRole | null,
-    expectedUpdatedAt: Date | null,
+    expectedRev: number | null,
   ): Promise<CabinetRole | null> {
     const rows = await this.db.$queryRaw<{ role: string | null }[]>`
       INSERT INTO session_role (session_id, user_id, role, permissions_version, updated_at)
@@ -166,8 +190,9 @@ export class CabinetRolesService {
       ON CONFLICT (session_id) DO UPDATE SET
         role = EXCLUDED.role,
         permissions_version = EXCLUDED.permissions_version,
+        rev = session_role.rev + 1,
         updated_at = EXCLUDED.updated_at
-      WHERE session_role.updated_at IS NOT DISTINCT FROM ${expectedUpdatedAt}::timestamptz
+      WHERE session_role.rev = ${expectedRev ?? -1}
       RETURNING role`;
     if (rows[0]) return asRole(rows[0].role);
     return asRole((await this.read(sessionId))?.role);

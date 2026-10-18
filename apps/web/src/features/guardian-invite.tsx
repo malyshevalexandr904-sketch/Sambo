@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useErrorMessage } from '@/lib/errors';
+import { afterServerRoleChange, roleBefore } from '@/features/cabinet-role';
 import { qk } from '@/lib/queries';
 
 export function AcceptGuardianInvite() {
@@ -27,9 +28,14 @@ export function AcceptGuardianInvite() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    api<DataEnvelope<MyAthlete[]>>('/guardian-invites/accept', { method: 'POST', body: { token } })
-      .then((res) => {
-        void queryClient.invalidateQueries({ queryKey: qk.me });
+    // Сессия переходит в роль «Представитель спортсмена» (0.13.0): кэш прежней роли — сбросить.
+    void roleBefore(queryClient)
+      .then(async (before) => {
+        const res = await api<DataEnvelope<MyAthlete[]>>('/guardian-invites/accept', {
+          method: 'POST',
+          body: { token },
+        });
+        await afterServerRoleChange(queryClient, before);
         void queryClient.invalidateQueries({ queryKey: qk.myAthletes });
         setState({ kind: 'done', count: res.data.length });
       })

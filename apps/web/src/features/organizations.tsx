@@ -27,6 +27,7 @@ import { type ReactNode, useState } from 'react';
 import { QueryState, ReasonAction, StatusBadge } from '@/components/common';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
+import { afterServerRoleChange, roleBefore } from '@/features/cabinet-role';
 import { qk, useCountries, useRegions } from '@/lib/queries';
 import { MembersPanel } from './members';
 import { OrganizationForm } from './organization-form';
@@ -169,12 +170,14 @@ export function OrganizationCreate() {
         mode="create"
         submitLabel={t('create')}
         onSubmit={async (payload) => {
+          const before = await roleBefore(queryClient);
           const res = await api<DataEnvelope<Organization>>('/organizations', {
             method: 'POST',
             body: payload,
           });
+          // Создатель без полномочий становится руководителем — сессия переходит в эту роль (0.13.0).
+          await afterServerRoleChange(queryClient, before);
           await queryClient.invalidateQueries({ queryKey: ['organizations'] });
-          await queryClient.invalidateQueries({ queryKey: qk.me });
           router.push(`/admin/organizations/${res.data.id}`);
         }}
       />

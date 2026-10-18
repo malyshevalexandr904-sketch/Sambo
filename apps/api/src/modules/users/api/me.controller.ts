@@ -21,7 +21,7 @@ export class MeController {
   @Get()
   @Authenticated()
   async get(@CurrentUser() user: AuthUser): Promise<DataEnvelope<Me>> {
-    return ok(await this.me.get({ userId: user.id, sessionId: user.sessionId }));
+    return ok(await this.me.get({ userId: user.id, sessionId: user.sessionId, activeRole: user.activeRole }));
   }
 
   /** Роль кабинета этой сессии (0.13.0): права и меню — только для неё. */
@@ -31,7 +31,12 @@ export class MeController {
     @CurrentUser() user: AuthUser,
     @ValidBody(SelectCabinetRoleRequest) body: SelectCabinetRoleRequest,
   ): Promise<DataEnvelope<Me>> {
-    return ok(await this.me.selectRole({ userId: user.id, sessionId: user.sessionId }, body.role));
+    return ok(
+      await this.me.selectRole(
+        { userId: user.id, sessionId: user.sessionId, activeRole: user.activeRole },
+        body.role,
+      ),
+    );
   }
 
   @Patch()
@@ -40,7 +45,9 @@ export class MeController {
     @CurrentUser() user: AuthUser,
     @ValidBody(UpdateMeRequest) body: UpdateMeRequest,
   ): Promise<DataEnvelope<Me>> {
-    return ok(await this.me.update({ userId: user.id, sessionId: user.sessionId }, body));
+    return ok(
+      await this.me.update({ userId: user.id, sessionId: user.sessionId, activeRole: user.activeRole }, body),
+    );
   }
 
   @Get('person')

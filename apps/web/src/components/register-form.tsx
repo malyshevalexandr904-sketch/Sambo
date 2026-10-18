@@ -10,11 +10,16 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { z } from 'zod';
 import { Link } from '@/i18n/navigation';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { applyFieldErrors, useErrorMessage, useFieldMessage } from '@/lib/errors';
 
+/** Как на сервере (лимит `verifyResend`): не больше 3 писем за 15 минут на адрес. */
+const RESEND_LIMIT = 3;
+const RESEND_WINDOW_SECONDS = 15 * 60;
+
 /**
- * Повторное письмо подтверждения (0.13.0): ответ сервера одинаковый для любого адреса; кнопка доступна раз в минуту.
+ * Повторное письмо подтверждения (0.13.0): ответ сервера одинаковый для любого адреса; кнопка доступна раз в минуту,
+ * после третьего письма — через 15 минут, как разрешает сервер (0.13.1).
  */
 export function ResendVerification({ email, className }: { email: string; className?: string }) {
   const t = useTranslations('auth.resend');
@@ -22,7 +27,7 @@ export function ResendVerification({ email, className }: { email: string; classN
   const errorMessage = useErrorMessage();
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(0);
-  const [sent, setSent] = useState(false);
+  const [sent, setSent] = useState(0);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (wait <= 0) return;
@@ -38,21 +43,30 @@ export function ResendVerification({ email, className }: { email: string; classN
         body: { email, locale: locale === 'en' ? 'en' : 'ru' },
         noRefresh: true,
       });
-      setSent(true);
-      setWait(60);
+      const count = sent + 1;
+      setSent(count);
+      setWait(count >= RESEND_LIMIT ? RESEND_WINDOW_SECONDS : 60);
     } catch (e) {
-      setError(errorMessage(e));
+      if (e instanceof ApiError && e.code === 'RATE_LIMITED') {
+        // Ждать столько, сколько сказал сервер: лимит мог быть общий по адресу сети (несколько попыток входа в зале),
+        // а не по письмам этого адреса (0.13.1).
+        const retry = Number(e.details?.retryAfterSeconds);
+        const seconds = Number.isFinite(retry) && retry > 0 ? Math.ceil(retry) : 60;
+        setError(seconds > 60 ? t('limited') : t('limitedShort'));
+        setWait(seconds);
+      } else setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
   };
+  const minutes = Math.ceil(wait / 60);
   return (
     <div className={className}>
       <Button variant="secondary" loading={busy} disabled={wait > 0} onClick={() => void resend()}>
-        {wait > 0 ? t('wait', { seconds: wait }) : t('button')}
+        {wait > 60 ? t('waitMinutes', { minutes }) : wait > 0 ? t('wait', { seconds: wait }) : t('button')}
       </Button>
       <p className="mt-2 text-sm text-slate-700" aria-live="polite">
-        {error ?? (sent ? t('sent') : null)}
+        {error ?? (sent > 0 ? t('sent') : null)}
       </p>
     </div>
   );

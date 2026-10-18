@@ -142,6 +142,8 @@ export class AuthService {
     const { userId, session } = await this.db.tx(async (tx) => {
       const consumed = await this.tokens.consume(tx, 'EMAIL_VERIFY', token);
       if (!consumed.userId) throw new DomainError('TOKEN_EXPIRED');
+      // Адрес подтверждён: остальные ссылки подтверждения (повторные письма) больше не нужны (0.13.1).
+      await this.tokens.invalidateAll(tx, consumed.userId, 'EMAIL_VERIFY');
       const user = await tx.user.findUniqueOrThrow({ where: { id: consumed.userId } });
       if (user.status === 'BLOCKED') throw new DomainError('ACCOUNT_BLOCKED');
       const updated = await tx.user.update({
@@ -215,7 +217,8 @@ export class AuthService {
 
   /**
    * Повторное письмо для подтверждения email (0.13.0). Всегда 202: существование адреса не раскрывается. Письмо
-   * уходит, только если учётная запись ждёт подтверждения; прежние ссылки гаснут.
+   * уходит, только если учётная запись ждёт подтверждения. Прежние ссылки действуют до своего срока (0.13.1): иначе
+   * посторонний, знающий адрес, гасил бы ссылку, по которой человек вот-вот перейдёт; после подтверждения гаснут все.
    */
   async resendVerification(email: string, locale: Locale): Promise<void> {
     await this.limiter.hit('verifyResend', `resend:${email}`);
@@ -226,7 +229,6 @@ export class AuthService {
       });
       if (!user || user.status !== 'PENDING_VERIFICATION') return;
       const userLocale: Locale = user.locale === 'en' ? 'en' : user.locale === 'ru' ? 'ru' : locale;
-      await this.tokens.invalidateAll(tx, user.id, 'EMAIL_VERIFY');
       const token = await this.tokens.issue(tx, 'EMAIL_VERIFY', {
         userId: user.id,
         ttlSeconds: EMAIL_VERIFY_TTL_SECONDS,

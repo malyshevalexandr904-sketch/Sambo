@@ -16,7 +16,7 @@ import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
 import { toPage } from '../../../common/http/http';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { PolicyService } from '../../access';
+import { CabinetRolesService, PolicyService } from '../../access';
 import { AuditService } from '../../audit';
 import { FilesService } from '../../files';
 import { OrganizationScopeService } from '../../organizations';
@@ -69,6 +69,7 @@ export class CompetitionsService {
     private readonly refs: CompetitionReferences,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly cabinetRoles: CabinetRolesService,
   ) {}
 
   // ---------- Чтение ----------
@@ -182,8 +183,15 @@ export class CompetitionsService {
       });
       return competitionId;
     });
+    if (access.viaPlatform) return this.toDto(user, await this.loadRow(id));
     // Роль руководителя турнира уже выдана: права пересчитываются по новой версии (новый объект пользователя).
-    const viewer = access.viaPlatform ? user : { ...user, permissionsVersion: user.permissionsVersion + 1 };
+    // Она действует в роли кабинета «Персонал турнира» (0.13.0): организатор управляет турниром и так (наследование
+    // на турниры своей организации), а федерация — нет; тогда сессия переходит в «Персонал турнира».
+    let viewer: AuthUser = { ...user, permissionsVersion: user.permissionsVersion + 1 };
+    if (!(await this.policy.can(viewer, 'competition.update', await this.scopes.scopeOf(id)))) {
+      const switched = await this.cabinetRoles.selectIfHeld(user.id, user.sessionId, 'TOURNAMENT_STAFF');
+      if (switched) viewer = { ...viewer, activeRole: 'TOURNAMENT_STAFF' };
+    }
     return this.toDto(viewer, await this.loadRow(id));
   }
 
