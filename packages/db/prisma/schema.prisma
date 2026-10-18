@@ -781,17 +781,20 @@ model AthleteProfile {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  person      Person              @relation(fields: [personId], references: [id], onDelete: Restrict)
-  createdBy   User?               @relation("AthleteCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  memberships AthleteMembership[]
-  coaches     AthleteCoach[]
-  ranks       AthleteRankRecord[]
-  guardians   Guardian[]
-  documents   Document[]
-  entries     Entry[]
-  results     AthleteResult[]
-  checkIns    CheckIn[]
-  clearances  MedicalClearance[]
+  person                Person              @relation(fields: [personId], references: [id], onDelete: Restrict)
+  createdBy             User?               @relation("AthleteCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  memberships           AthleteMembership[]
+  coaches               AthleteCoach[]
+  ranks                 AthleteRankRecord[]
+  guardians             Guardian[]
+  documents             Document[]
+  entries               Entry[]
+  results               AthleteResult[]
+  checkIns              CheckIn[]
+  clearances            MedicalClearance[]
+  rating                AthleteRating?
+  ratingHistory         RatingHistory[]     @relation("RatingHistoryAthlete")
+  ratingOpponentHistory RatingHistory[]     @relation("RatingHistoryOpponent")
 
   @@map("athlete_profile")
 }
@@ -1347,47 +1350,48 @@ model Competition {
   updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt               DateTime?             @map("deleted_at") @db.Timestamptz(3)
 
-  organizer         Organization             @relation("CompetitionOrganizer", fields: [organizerOrganizationId], references: [id], onDelete: Restrict)
-  venue             Venue?                   @relation(fields: [venueId], references: [id], onDelete: Restrict)
-  discipline        Discipline               @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
-  ruleSetVersion    RuleSetVersion?          @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
-  logo              StoredFile?              @relation("CompetitionLogo", fields: [logoFileId], references: [id], onDelete: Restrict)
-  regulation        StoredFile?              @relation("CompetitionRegulation", fields: [regulationFileId], references: [id], onDelete: Restrict)
-  createdBy         User?                    @relation("CompetitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy         User?                    @relation("CompetitionUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
-  staff             CompetitionMembership[]
-  categories        CompetitionCategory[]
-  categoryRules     CategoryRule[]
-  requirements      CompetitionRequirement[]
-  applications      Application[]
-  entries           Entry[]
-  writeLease        CompetitionWriteLease?
-  documents         Document[]
-  consents          Consent[]
-  admissions        Admission[]
-  checkIns          CheckIn[]
-  scales            Scale[]
-  weighInWindows    WeighInWindow[]
-  weighInRecords    WeighInRecord[]
-  clearances        MedicalClearance[]
-  draws             Draw[]
-  drawSlots         DrawSlot[]
-  brackets          Bracket[]
-  bracketNodes      BracketNode[]
-  matches           Match[]
-  matchParticipants MatchParticipant[]
-  mats              Mat[]
-  sessions          Session[]
-  schedule          Schedule?
-  matchSchedules    MatchSchedule[]
-  matAssignments    MatAssignment[]
-  matchEvents       MatchEvent[]
-  matchResults      MatchResult[]
-  matchRevisions    MatchResultRevision[]
-  categoryResults   CategoryResult[]
-  placements        Placement[]
-  athleteResults    AthleteResult[]
-  medicalIncidents  MedicalIncident[]
+  organizer          Organization             @relation("CompetitionOrganizer", fields: [organizerOrganizationId], references: [id], onDelete: Restrict)
+  venue              Venue?                   @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  discipline         Discipline               @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
+  ruleSetVersion     RuleSetVersion?          @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
+  logo               StoredFile?              @relation("CompetitionLogo", fields: [logoFileId], references: [id], onDelete: Restrict)
+  regulation         StoredFile?              @relation("CompetitionRegulation", fields: [regulationFileId], references: [id], onDelete: Restrict)
+  createdBy          User?                    @relation("CompetitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy          User?                    @relation("CompetitionUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+  staff              CompetitionMembership[]
+  categories         CompetitionCategory[]
+  categoryRules      CategoryRule[]
+  requirements       CompetitionRequirement[]
+  applications       Application[]
+  entries            Entry[]
+  writeLease         CompetitionWriteLease?
+  documents          Document[]
+  consents           Consent[]
+  admissions         Admission[]
+  checkIns           CheckIn[]
+  scales             Scale[]
+  weighInWindows     WeighInWindow[]
+  weighInRecords     WeighInRecord[]
+  clearances         MedicalClearance[]
+  draws              Draw[]
+  drawSlots          DrawSlot[]
+  brackets           Bracket[]
+  bracketNodes       BracketNode[]
+  matches            Match[]
+  matchParticipants  MatchParticipant[]
+  mats               Mat[]
+  sessions           Session[]
+  schedule           Schedule?
+  matchSchedules     MatchSchedule[]
+  matAssignments     MatAssignment[]
+  matchEvents        MatchEvent[]
+  matchResults       MatchResult[]
+  matchRevisions     MatchResultRevision[]
+  categoryResults    CategoryResult[]
+  placements         Placement[]
+  athleteResults     AthleteResult[]
+  medicalIncidents   MedicalIncident[]
+  ratingCalculations RatingCalculation[]
 
   @@index([status, startDate])
   @@index([organizerOrganizationId, startDate])
@@ -2256,17 +2260,18 @@ model Match {
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  competition   Competition           @relation(fields: [competitionId], references: [id], onDelete: Restrict)
-  category      CompetitionCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  bracketNode   BracketNode?          @relation(fields: [bracketNodeId], references: [id], onDelete: Restrict)
-  mat           Mat?                  @relation(fields: [matId], references: [id], onDelete: Restrict)
-  participants  MatchParticipant[]
-  schedule      MatchSchedule?
-  events        MatchEvent[]
-  result        MatchResult?
-  activeEntries Entry[]               @relation("EntryActiveMatch")
-  revisions     MatchResultRevision[]
-  incidents     MedicalIncident[]
+  competition        Competition           @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category           CompetitionCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  bracketNode        BracketNode?          @relation(fields: [bracketNodeId], references: [id], onDelete: Restrict)
+  mat                Mat?                  @relation(fields: [matId], references: [id], onDelete: Restrict)
+  participants       MatchParticipant[]
+  schedule           MatchSchedule?
+  events             MatchEvent[]
+  result             MatchResult?
+  activeEntries      Entry[]               @relation("EntryActiveMatch")
+  revisions          MatchResultRevision[]
+  incidents          MedicalIncident[]
+  ratingCalculations RatingCalculation[]
 
   @@unique([competitionId, matchNumber])
   @@index([competitionId, status])
@@ -2813,6 +2818,102 @@ model RatingRuleSet {
   createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt     DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
 
+  calculations RatingCalculation[]
+
   @@unique([code, version])
   @@map("rating_rule_set")
+}
+
+enum RatingStatus {
+  ACTIVE
+  FROZEN
+  SUSPENDED
+}
+
+enum RatingCalculationStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+  FAILED
+  SUPERSEDED
+}
+
+/// Текущий рейтинг спортсмена (docs/RATING_ARCHITECTURE.md, 5): read model и строка блокировки расчёта
+/// (FOR UPDATE в порядке athlete_id). Меняется только расчётом схватки и корректировками.
+model AthleteRating {
+  athleteId        String       @id @map("athlete_id") @db.Uuid
+  rating           Int
+  peakRating       Int          @map("peak_rating")
+  lowestRating     Int          @map("lowest_rating")
+  ratedMatches     Int          @default(0) @map("rated_matches")
+  wins             Int          @default(0)
+  losses           Int          @default(0)
+  status           RatingStatus @default(ACTIVE)
+  lastRatedMatchAt DateTime?    @map("last_rated_match_at") @db.Timestamptz(3)
+  version          Int          @default(1)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  athlete AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@map("athlete_rating")
+}
+
+/// Расчёт рейтинга по схватке (docs/RATING_ARCHITECTURE.md, 6.2): один на вариант результата и версию расчёта.
+/// `input` — снимок результата и участников, по которому считали.
+model RatingCalculation {
+  id                  String                  @id @default(uuid(7)) @db.Uuid
+  matchId             String                  @map("match_id") @db.Uuid
+  competitionId       String                  @map("competition_id") @db.Uuid
+  ruleSetId           String                  @map("rule_set_id") @db.Uuid
+  calculationVersion  String                  @map("calculation_version")
+  matchResultRevision Int                     @map("match_result_revision")
+  status              RatingCalculationStatus
+  statusReason        String?                 @map("status_reason")
+  input               Json
+  processedAt         DateTime?               @map("processed_at") @db.Timestamptz(3)
+  createdAt           DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  match       Match           @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  competition Competition     @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  ruleSet     RatingRuleSet   @relation(fields: [ruleSetId], references: [id], onDelete: Restrict)
+  history     RatingHistory[]
+
+  @@unique([matchId, calculationVersion, matchResultRevision])
+  @@index([competitionId, status])
+  @@map("rating_calculation")
+}
+
+/// История рейтинга (docs/RATING_ARCHITECTURE.md, 5): строка на спортсмена на расчёт. Только дополняется — у роли
+/// приложения нет UPDATE и DELETE; ошибки исправляются корректировками.
+model RatingHistory {
+  id                   String   @id @default(uuid(7)) @db.Uuid
+  calculationId        String   @map("calculation_id") @db.Uuid
+  athleteId            String   @map("athlete_id") @db.Uuid
+  competitionId        String   @map("competition_id") @db.Uuid
+  matchId              String   @map("match_id") @db.Uuid
+  ratingBefore         Int      @map("rating_before")
+  ratingAfter          Int      @map("rating_after")
+  ratingDelta          Int      @map("rating_delta")
+  ratingAfterExact     Decimal  @map("rating_after_exact") @db.Decimal(14, 6)
+  levelBefore          Int      @map("level_before")
+  levelAfter           Int      @map("level_after")
+  opponentAthleteId    String   @map("opponent_athlete_id") @db.Uuid
+  opponentRatingBefore Int      @map("opponent_rating_before")
+  outcome              String
+  actualScore          Decimal  @map("actual_score") @db.Decimal(5, 4)
+  expectedScore        Decimal  @map("expected_score") @db.Decimal(12, 10)
+  coefficientK         Int      @map("coefficient_k")
+  calculationVersion   String   @map("calculation_version")
+  matchFinishedAt      DateTime @map("match_finished_at") @db.Timestamptz(3)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  calculation RatingCalculation @relation(fields: [calculationId], references: [id], onDelete: Restrict)
+  athlete     AthleteProfile    @relation("RatingHistoryAthlete", fields: [athleteId], references: [id], onDelete: Restrict)
+  opponent    AthleteProfile    @relation("RatingHistoryOpponent", fields: [opponentAthleteId], references: [id], onDelete: Restrict)
+
+  @@unique([calculationId, athleteId])
+  @@index([athleteId, matchFinishedAt, id])
+  @@map("rating_history")
 }
