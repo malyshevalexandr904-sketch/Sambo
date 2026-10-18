@@ -32,3 +32,4 @@ export * from './matches.js';
 export * from './results.js';
 export * from './live.js';
 export * from './onboarding.js';
+export * from './rating.js';

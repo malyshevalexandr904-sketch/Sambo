@@ -426,13 +426,13 @@ model Region {
   nameRu      String @map("name_ru")
   nameEn      String @map("name_en")
 
-  country            Country        @relation(fields: [countryCode], references: [code], onDelete: Restrict)
+  country            Country             @relation(fields: [countryCode], references: [code], onDelete: Restrict)
   organizations      Organization[]
   persons            Person[]
   venues             Venue[]
-  representedApps    Application[]  @relation("ApplicationRegion")
-  entrySnapRegions   Entry[]        @relation("EntrySnapRegion")
-  representedEntries Entry[]        @relation("EntryRepresentationRegion")
+  representedApps    Application[]       @relation("ApplicationRegion")
+  entrySnapRegions   Entry[]             @relation("EntrySnapRegion")
+  representedEntries Entry[]             @relation("EntryRepresentationRegion")
   onboardingRequests OnboardingRequest[] @relation("OnboardingOrgRegion")
 
   @@unique([countryCode, code])
@@ -634,13 +634,13 @@ model StoredFile {
   verifiedAt   DateTime?  @map("verified_at") @db.Timestamptz(3)
   deletedAt    DateTime?  @map("deleted_at") @db.Timestamptz(3)
 
-  uploadedBy        User?          @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
-  organizationLogos Organization[] @relation("OrganizationLogo")
-  personPhotos      Person[]       @relation("PersonPhoto")
-  document          Document?      @relation("DocumentFile")
-  importJobs        ImportJob[]    @relation("ImportFile")
-  competitionLogos  Competition[]  @relation("CompetitionLogo")
-  regulations       Competition[]  @relation("CompetitionRegulation")
+  uploadedBy         User?               @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  organizationLogos  Organization[]      @relation("OrganizationLogo")
+  personPhotos       Person[]            @relation("PersonPhoto")
+  document           Document?           @relation("DocumentFile")
+  importJobs         ImportJob[]         @relation("ImportFile")
+  competitionLogos   Competition[]       @relation("CompetitionLogo")
+  regulations        Competition[]       @relation("CompetitionRegulation")
   onboardingDocument OnboardingDocument? @relation("OnboardingDocumentFile")
 
   @@index([status, createdAt])
@@ -805,9 +805,9 @@ model CoachProfile {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  person       Person            @relation(fields: [personId], references: [id], onDelete: Restrict)
-  createdBy    User?             @relation("CoachCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  memberships  CoachMembership[]
+  person             Person              @relation(fields: [personId], references: [id], onDelete: Restrict)
+  createdBy          User?               @relation("CoachCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  memberships        CoachMembership[]
   athletes           AthleteCoach[]
   applications       Application[]
   onboardingRequests OnboardingRequest[]
@@ -818,15 +818,15 @@ model CoachProfile {
 /// Тренер в организации (клубе, спортшколе) с периодом. Не зависит от аккаунта: тренер без входа в систему
 /// тоже бывает. Права тренера-пользователя даёт OrganizationMembership с ролью COACH.
 model CoachMembership {
-  id             String    @id @default(uuid(7)) @db.Uuid
-  coachId        String    @map("coach_id") @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  validFrom      DateTime  @map("valid_from") @db.Date
-  validTo        DateTime? @map("valid_to") @db.Date
+  id                String    @id @default(uuid(7)) @db.Uuid
+  coachId           String    @map("coach_id") @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  validFrom         DateTime  @map("valid_from") @db.Date
+  validTo           DateTime? @map("valid_to") @db.Date
   /// Тренер рассматривает заявки спортсменов, выбравших его (Phase 9a). Назначает руководитель организации.
-  canReviewAthletes Boolean @default(false) @map("can_review_athletes")
-  createdById    String?   @map("created_by_id") @db.Uuid
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  canReviewAthletes Boolean   @default(false) @map("can_review_athletes")
+  createdById       String?   @map("created_by_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
   coach        CoachProfile @relation(fields: [coachId], references: [id], onDelete: Restrict)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1998,17 +1998,17 @@ model NotificationPreference {
 /// (`sessionId` — семейство refresh token): после выхода или окончания сессии на устройство ничего не уходит, а
 /// при следующем входе браузер подписывает себя заново. Один `endpoint` — одно устройство одного пользователя.
 model PushSubscription {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  sessionId   String    @map("session_id") @db.Uuid
-  endpoint    String    @unique
-  p256dh      String
-  auth        String
+  id         String    @id @default(uuid(7)) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  sessionId  String    @map("session_id") @db.Uuid
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
   /// Браузер и система кратко (для списка устройств в настройках).
-  userAgent   String?   @map("user_agent")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
-  lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz(3)
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -2693,46 +2693,46 @@ enum OrganizationLegalForm {
 /// Не больше одной незавершённой заявки пользователя на роль (partial unique, миграция). Переходы статуса — только
 /// сервером (OnboardingService), каждый переход — строка истории.
 model OnboardingRequest {
-  id                  String           @id @default(uuid(7)) @db.Uuid
-  userId              String           @map("user_id") @db.Uuid
-  role                OnboardingRole
-  kind                OnboardingKind   @default(REGISTRATION)
-  status              OnboardingStatus @default(DRAFT)
-  inOrganization      Boolean?         @map("in_organization")
-  organizationId      String?          @map("organization_id") @db.Uuid
-  coachId             String?          @map("coach_id") @db.Uuid
-  lastName            String?          @map("last_name")
-  firstName           String?          @map("first_name")
-  middleName          String?          @map("middle_name")
-  birthDate           DateTime?        @map("birth_date") @db.Date
-  gender              Gender?
-  phone               String?
-  contactEmail        String?          @map("contact_email") @db.Citext
-  telegram            String?
-  contactChannels     String[]         @default([]) @map("contact_channels")
-  coachQualification  String?          @map("coach_qualification")
-  refereeCategoryCode String?          @map("referee_category_code")
-  orgName             String?          @map("org_name")
-  orgShortName        String?          @map("org_short_name")
-  orgType             OrganizationType? @map("org_type")
-  orgLegalForm        OrganizationLegalForm? @map("org_legal_form")
-  orgCountryCode      String?          @map("org_country_code") @db.Char(2)
-  orgRegionId         String?          @map("org_region_id") @db.Uuid
-  orgCity             String?          @map("org_city")
-  orgInn              String?          @map("org_inn")
-  orgOgrn             String?          @map("org_ogrn")
-  orgLegalName        String?          @map("org_legal_name")
-  orgLegalAddress     String?          @map("org_legal_address")
-  consentTemplateId   String?          @map("consent_template_id") @db.Uuid
-  consentGivenAt      DateTime?        @map("consent_given_at") @db.Timestamptz(3)
-  decisionReason      String?          @map("decision_reason")
-  decidedById         String?          @map("decided_by_id") @db.Uuid
-  decidedAt           DateTime?        @map("decided_at") @db.Timestamptz(3)
-  submittedAt         DateTime?        @map("submitted_at") @db.Timestamptz(3)
-  resultOrganizationId String?         @map("result_organization_id") @db.Uuid
-  version             Int              @default(1)
-  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                   String                 @id @default(uuid(7)) @db.Uuid
+  userId               String                 @map("user_id") @db.Uuid
+  role                 OnboardingRole
+  kind                 OnboardingKind         @default(REGISTRATION)
+  status               OnboardingStatus       @default(DRAFT)
+  inOrganization       Boolean?               @map("in_organization")
+  organizationId       String?                @map("organization_id") @db.Uuid
+  coachId              String?                @map("coach_id") @db.Uuid
+  lastName             String?                @map("last_name")
+  firstName            String?                @map("first_name")
+  middleName           String?                @map("middle_name")
+  birthDate            DateTime?              @map("birth_date") @db.Date
+  gender               Gender?
+  phone                String?
+  contactEmail         String?                @map("contact_email") @db.Citext
+  telegram             String?
+  contactChannels      String[]               @default([]) @map("contact_channels")
+  coachQualification   String?                @map("coach_qualification")
+  refereeCategoryCode  String?                @map("referee_category_code")
+  orgName              String?                @map("org_name")
+  orgShortName         String?                @map("org_short_name")
+  orgType              OrganizationType?      @map("org_type")
+  orgLegalForm         OrganizationLegalForm? @map("org_legal_form")
+  orgCountryCode       String?                @map("org_country_code") @db.Char(2)
+  orgRegionId          String?                @map("org_region_id") @db.Uuid
+  orgCity              String?                @map("org_city")
+  orgInn               String?                @map("org_inn")
+  orgOgrn              String?                @map("org_ogrn")
+  orgLegalName         String?                @map("org_legal_name")
+  orgLegalAddress      String?                @map("org_legal_address")
+  consentTemplateId    String?                @map("consent_template_id") @db.Uuid
+  consentGivenAt       DateTime?              @map("consent_given_at") @db.Timestamptz(3)
+  decisionReason       String?                @map("decision_reason")
+  decidedById          String?                @map("decided_by_id") @db.Uuid
+  decidedAt            DateTime?              @map("decided_at") @db.Timestamptz(3)
+  submittedAt          DateTime?              @map("submitted_at") @db.Timestamptz(3)
+  resultOrganizationId String?                @map("result_organization_id") @db.Uuid
+  version              Int                    @default(1)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user               User                     @relation("OnboardingApplicant", fields: [userId], references: [id], onDelete: Restrict)
   organization       Organization?            @relation("OnboardingOrganization", fields: [organizationId], references: [id], onDelete: Restrict)
@@ -2787,4 +2787,32 @@ model OnboardingStatusChange {
 
   @@index([requestId, createdAt])
   @@map("onboarding_status_change")
+}
+
+enum RatingRuleSetStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+/// Версия правил расчёта рейтинга спортсменов (docs/RATING_ARCHITECTURE.md, 4): K, S, уровни, классификатор
+/// исходов, округление — в `parameters` (RatingRuleParametersV1). После ACTIVE не меняется (триггер); турнир
+/// закрепляет версию, расчёт схватки ссылается на неё навсегда.
+model RatingRuleSet {
+  id            String              @id @default(uuid(7)) @db.Uuid
+  code          String
+  version       Int
+  name          String
+  schemaVersion Int                 @map("schema_version")
+  parameters    Json
+  checksum      String
+  engineVersion String              @map("engine_version")
+  status        RatingRuleSetStatus @default(DRAFT)
+  activeFrom    DateTime?           @map("active_from") @db.Timestamptz(3)
+  activeTo      DateTime?           @map("active_to") @db.Timestamptz(3)
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([code, version])
+  @@map("rating_rule_set")
 }
