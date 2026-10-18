@@ -2,7 +2,13 @@
 // десятичная арифметика без float; рейтинг после схватки — целое по правилу округления версии.
 import type { WinMethod } from '@sde/contracts';
 import Decimal from 'decimal.js';
-import type { RatingOutcome, RatingRules, RatingWinKind, RoundingRule } from './rules';
+import {
+  RATING_OUTCOMES,
+  type RatingOutcome,
+  type RatingRules,
+  type RatingWinKind,
+  type RoundingRule,
+} from './rules.js';
 
 /** Своя копия decimal.js: 34 значащих цифры, половина — от нуля; глобальные настройки не трогаются. */
 export const Dec = Decimal.clone({ precision: 34, rounding: Decimal.ROUND_HALF_UP });
@@ -127,4 +133,11 @@ export function rateMatch(
     winner: change(rules, input.winnerRating, input.loserRating, input.winner),
     loser: change(rules, input.loserRating, input.winnerRating, input.loser),
   };
+}
+
+/** Исход — победа: первая половина RATING_OUTCOMES (поражения зеркальны). */
+export function isWinOutcome(outcome: string): boolean {
+  const i = (RATING_OUTCOMES as readonly string[]).indexOf(outcome);
+  if (i < 0) throw new Error(`unknown rating outcome ${outcome}`);
+  return i < RATING_OUTCOMES.length / 2;
 }

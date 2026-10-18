@@ -39,6 +39,14 @@ export const RATING_CALCULATION_STATUSES = [
 ] as const;
 export type RatingCalculationStatus = (typeof RATING_CALCULATION_STATUSES)[number];
 
+/** Тип турнира (RATING_ARCHITECTURE.md, 3.1): RATED — подтверждённые схватки меняют рейтинг. */
+export const COMPETITION_TYPES = ['NON_RATED', 'RATED'] as const;
+export type CompetitionType = (typeof COMPETITION_TYPES)[number];
+
+/** Корректировка рейтинга: изменённый результат схватки (6.4) или ручная (фаза 14). */
+export const RATING_CORRECTION_KINDS = ['RESULT_AMENDED', 'MANUAL'] as const;
+export type RatingCorrectionKind = (typeof RATING_CORRECTION_KINDS)[number];
+
 const Code = z.string().regex(/^[A-Z][A-Z0-9_]{1,39}$/, { error: 'invalid_code' });
 /** S от 0 до 1, не больше 4 знаков после точки. */
 const Score = z.string().regex(/^(0(\.\d{1,4})?|1(\.0{1,4})?)$/, { error: 'invalid_score' });
