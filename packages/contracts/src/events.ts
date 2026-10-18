@@ -91,6 +91,13 @@ export const EVENT_SCHEMAS = {
   'onboarding.changes_requested': z.object({ requestId: Uuid }),
   'onboarding.decided': z.object({ requestId: Uuid, status: z.string() }),
   'onboarding.cancelled': z.object({ requestId: Uuid }),
+  // Рейтинг спортсменов (docs/RATING_ARCHITECTURE.md, 6.1): рейтинги обоих спортсменов схватки изменились.
+  // Потребители (лидерборд, живые обновления, уведомления) — фазы 7 и 13.
+  'rating.calculated': z.object({
+    calculationId: Uuid,
+    matchId: Uuid,
+    athleteIds: z.array(Uuid).length(2),
+  }),
 } as const;
 
 export type EventType = keyof typeof EVENT_SCHEMAS;

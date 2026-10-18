@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
+import { RatingCalculationService } from './application/rating-calculation.service';
 import { RatingRulesService } from './application/rating-rules.service';
 
 /** Рейтинг спортсменов (docs/RATING_ARCHITECTURE.md). */
 @Module({
-  providers: [RatingRulesService],
-  exports: [RatingRulesService],
+  providers: [RatingRulesService, RatingCalculationService],
+  exports: [RatingRulesService, RatingCalculationService],
 })
 export class RatingModule {}

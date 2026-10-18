@@ -26,6 +26,19 @@ export type RoundingRule = (typeof ROUNDING_RULES)[number];
 export const RATING_RULE_SET_STATUSES = ['DRAFT', 'ACTIVE', 'RETIRED'] as const;
 export type RatingRuleSetStatus = (typeof RATING_RULE_SET_STATUSES)[number];
 
+/** FROZEN, SUSPENDED — расчёт схваток спортсмена ждёт (docs/RATING_ARCHITECTURE.md, 6.2). */
+export const RATING_STATUSES = ['ACTIVE', 'FROZEN', 'SUSPENDED'] as const;
+export type RatingStatus = (typeof RATING_STATUSES)[number];
+
+export const RATING_CALCULATION_STATUSES = [
+  'PENDING',
+  'COMPLETED',
+  'SKIPPED',
+  'FAILED',
+  'SUPERSEDED',
+] as const;
+export type RatingCalculationStatus = (typeof RATING_CALCULATION_STATUSES)[number];
+
 const Code = z.string().regex(/^[A-Z][A-Z0-9_]{1,39}$/, { error: 'invalid_code' });
 /** S от 0 до 1, не больше 4 знаков после точки. */
 const Score = z.string().regex(/^(0(\.\d{1,4})?|1(\.0{1,4})?)$/, { error: 'invalid_score' });

@@ -186,5 +186,7 @@ export const AUDIT_ACTIONS = [
   'onboarding.approved',
   'onboarding.rejected',
   'coach.review_rights_changed',
+  // Рейтинг спортсменов (docs/RATING_ARCHITECTURE.md): расчёт по схватке.
+  'rating.calculated',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
