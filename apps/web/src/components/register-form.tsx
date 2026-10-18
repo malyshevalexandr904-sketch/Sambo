@@ -48,8 +48,12 @@ export function ResendVerification({ email, className }: { email: string; classN
       setWait(count >= RESEND_LIMIT ? RESEND_WINDOW_SECONDS : 60);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'RATE_LIMITED') {
-        setError(t('limited'));
-        setWait(RESEND_WINDOW_SECONDS);
+        // Ждать столько, сколько сказал сервер: лимит мог быть общий по адресу сети (несколько попыток входа в зале),
+        // а не по письмам этого адреса (0.13.1).
+        const retry = Number(e.details?.retryAfterSeconds);
+        const seconds = Number.isFinite(retry) && retry > 0 ? Math.ceil(retry) : 60;
+        setError(seconds > 60 ? t('limited') : t('limitedShort'));
+        setWait(seconds);
       } else setError(errorMessage(e));
     } finally {
       setBusy(false);

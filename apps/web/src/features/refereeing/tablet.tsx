@@ -11,11 +11,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { QueryState } from '@/components/common';
 import { Link } from '@/i18n/navigation';
 import { useChannelHealth } from '@/lib/live';
-import { useSwitchRole } from '@/features/cabinet-role';
 import { timeInZone } from '@/features/scheduling/shared';
 import { refereeKeys, transitionMatch, useMatConsole } from './api';
 import { actionPoints, toScoringRules, useRefereeLabels } from './labels';
 import { ResultPanel } from './result-panel';
+import { RolePaused } from './role-paused';
 import { holdElapsedMs, maxHoldMs, Scoreboard } from './scoreboard';
 import {
   ConnectionBadge,
@@ -251,7 +251,16 @@ function MatchPanel({
           />
         ) : null}
       </div>
-      {notice?.kind === 'role' ? <RolePaused count={notice.count ?? 0} /> : null}
+      {notice?.kind === 'role' && notice.role ? (
+        <RolePaused
+          count={notice.count ?? 0}
+          role={notice.role}
+          onResumed={() => {
+            scoring.resume();
+            onChanged();
+          }}
+        />
+      ) : null}
       {notice && notice.kind !== 'role' ? (
         <Alert tone="warning">
           {notice.kind === 'reset'
@@ -394,23 +403,5 @@ export function MatTablet({ matId }: { matId: string }) {
         }}
       </QueryState>
     </div>
-  );
-}
-
-/**
- * В этой сессии выбрали другую роль кабинета (0.13.1) — сервер не принимает оценки, но они не потеряны: очередь
- * сохранена и уйдёт после возврата в роль «Судья» (страница загрузится заново и отправит её).
- */
-function RolePaused({ count }: { count: number }) {
-  const t = useTranslations('referee');
-  const { switchTo, busy, error } = useSwitchRole();
-  return (
-    <Alert tone="danger" title={t('rolePausedTitle')}>
-      <p>{t('rolePaused', { count })}</p>
-      <Button className="mt-3" loading={busy} onClick={() => void switchTo('REFEREE', 'stay')}>
-        {t('backToReferee')}
-      </Button>
-      {error ? <p className="mt-2 text-sm">{error}</p> : null}
-    </Alert>
   );
 }

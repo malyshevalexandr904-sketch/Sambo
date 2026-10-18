@@ -435,6 +435,20 @@ describe('live channels', () => {
     });
     expect(switched.status).toBe(200);
     await waitFor(() => (expired ? true : undefined));
+    // Повторный выбор той же роли соединения не трогает (0.13.1).
+    const quiet = await connect({ cookie });
+    let quietExpired = false;
+    quiet.on(LIVE_EVENTS.expired, () => {
+      quietExpired = true;
+    });
+    const same = await fetch(`${base}/api/v1/me/role`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json', 'x-csrf-token': csrf, cookie },
+      body: JSON.stringify({ role: 'ORGANIZATION_HEAD' }),
+    });
+    expect(same.status).toBe(200);
+    await settle();
+    expect(quietExpired).toBe(false);
     // Новое соединение той же сессии — уже в роли руководителя: служебный канал турнира не положен.
     const again = await connect({ cookie });
     expect(await subscribe(again, liveChannel.opsCompetition(w.competitionId))).toMatchObject({ ok: false });

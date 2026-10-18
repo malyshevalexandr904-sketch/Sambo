@@ -23,6 +23,7 @@ import {
   confirm,
   event,
   getMatch,
+  official,
   playToResult,
   refereeWorld,
   type RefereeWorld,
@@ -614,6 +615,28 @@ describe('screens: mat console, officiating section, mats screen', () => {
     expect(c.current?.allowedActions).toContain('transition:READY');
     const q = await w.staff.chief.agent.get(`/api/v1/mats/${known.schedule!.matId}/queue`);
     expect((q.body.data as MatQueueDto).current?.matchId).toBe(known.id);
+  });
+
+  it('a secretary in the mat crew sees the post in the tournament staff role (0.13.1)', async () => {
+    const w = await refereeWorld(t, [{ admitted: 2 }]);
+    const sec = await official(t, w.competitionId, 'SECRETARY');
+    const put = await send(w.staff.chief, 'put', `/api/v1/competitions/${w.competitionId}/mat-assignments`, {
+      sessionId: w.session.id,
+      matId: w.mats[1]!.id,
+      assignments: [
+        { role: 'REFEREE', userId: w.refs.judge2.id },
+        { role: 'TECHNICAL_SECRETARY', userId: sec.id },
+      ],
+    });
+    expect(put.status, JSON.stringify(put.body)).toBe(200);
+    const con = await sec.s.agent.get(`/api/v1/mats/${w.mats[1]!.id}/console`);
+    expect(con.status, JSON.stringify(con.body)).toBe(200);
+    expect((con.body.data as MatConsoleDto).myRoles).toEqual(['TECHNICAL_SECRETARY']);
+    const off = await sec.s.agent.get(`/api/v1/competitions/${w.competitionId}/officiating`);
+    expect((off.body.data as OfficiatingDto).mats[0]).toMatchObject({
+      id: w.mats[1]!.id,
+      myRoles: ['TECHNICAL_SECRETARY'],
+    });
   });
 
   it('shows my mats first, the current match with its actions and the expected time of the next ones', async () => {

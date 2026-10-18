@@ -6,14 +6,15 @@ import { type CabinetRole, type DataEnvelope, type Me } from '@sde/contracts';
 import { Alert, Button, cn } from '@sde/ui';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
-import { closeLive } from '@/lib/live';
 import { qk } from '@/lib/queries';
 import { useErrorMessage } from '@/lib/errors';
 
 const CHANNEL = 'sde-cabinet-role';
+/** Эта вкладка сама выбрала роль без перезагрузки (планшет): сообщение о роли из другой вкладки устарело. */
+const LOCAL_SWITCH_EVENT = 'sde-cabinet-role-local';
 /** Вкладка-отправитель: BroadcastChannel доставляет сообщение и другим объектам канала этой же вкладки. */
 const TAB_ID =
   typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Math.random());
@@ -49,8 +50,9 @@ export async function roleBefore(queryClient: QueryClient): Promise<CabinetRole 
 }
 
 /**
- * После такого действия (0.13.1): если сервер перевёл сессию в другую роль, данные прежней роли из кэша убираются,
- * живое соединение открывается заново, другие вкладки получают предупреждение. Возвращает новое «я».
+ * После такого действия (0.13.1): если сервер перевёл сессию в другую роль, данные прежней роли из кэша убираются
+ * (открытые экраны загружают их заново), другие вкладки получают предупреждение. Живое соединение переподключится
+ * само: сервер шлёт соединениям сессии `expired`, клиент подписывается заново уже с новой ролью. Возвращает «я».
  */
 export async function afterServerRoleChange(
   queryClient: QueryClient,
@@ -63,8 +65,7 @@ export async function afterServerRoleChange(
     return null;
   }
   if (before !== undefined && before !== fresh.activeRole) {
-    closeLive();
-    queryClient.clear();
+    await queryClient.resetQueries();
     announce({ userId: fresh.id, role: fresh.activeRole });
   }
   queryClient.setQueryData(qk.me, fresh);
@@ -73,49 +74,70 @@ export async function afterServerRoleChange(
 
 /**
  * Переключение роли. `then`: `home` — открыть обзор новой роли, `stay` — перезагрузить текущую страницу (она могла
- * быть недоступна в прежней роли). Страница загружается заново целиком: права изменились у всей вкладки.
+ * быть недоступна в прежней роли): страница загружается заново целиком — права изменились у всей вкладки;
+ * `none` — без перезагрузки (планшет: очередь оценок продолжает отправку), «я» в кэше обновляется. Итог — удалось ли.
  */
 export function useSwitchRole(): {
-  switchTo: (role: CabinetRole, then?: 'home' | 'stay') => Promise<void>;
+  switchTo: (role: CabinetRole, then?: 'home' | 'stay' | 'none') => Promise<boolean>;
   busy: boolean;
   error: string | null;
 } {
   const locale = useLocale();
   const errorMessage = useErrorMessage();
+  const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const switchTo = async (role: CabinetRole, then: 'home' | 'stay' = 'home'): Promise<void> => {
+  const switchTo = async (role: CabinetRole, then: 'home' | 'stay' | 'none' = 'home'): Promise<boolean> => {
     setBusy(true);
     setError(null);
     try {
       const res = await api<DataEnvelope<Me>>('/me/role', { method: 'PUT', body: { role } });
       announce({ userId: res.data.id, role });
-      if (then === 'stay') window.location.reload();
+      if (then === 'none') {
+        queryClient.setQueryData(qk.me, res.data);
+        window.dispatchEvent(new Event(LOCAL_SWITCH_EVENT));
+        setBusy(false);
+      } else if (then === 'stay') window.location.reload();
       else window.location.assign(`/${locale}/admin`);
+      return true;
     } catch (e) {
       setError(errorMessage(e));
       setBusy(false);
+      return false;
     }
   };
   return { switchTo, busy, error };
 }
 
-/** Роль сменили в другой вкладке этого браузера: здесь она уже действует — предлагаем обновить страницу. */
-export function RoleChangedElsewhere({ userId }: { userId: string }) {
-  const t = useTranslations('cabinetRole');
-  const [role, setRole] = useState<CabinetRole | 'none' | null>(null);
+/** Смена роли в другой вкладке этого браузера (своя вкладка свои сообщения не получает). */
+export function useRoleBroadcast(userId: string | null, onRole: (role: CabinetRole | null) => void): void {
+  const handler = useRef(onRole);
+  handler.current = onRole;
   useEffect(() => {
+    if (!userId) return;
     let ch: BroadcastChannel | null = null;
     try {
       ch = new BroadcastChannel(CHANNEL);
       ch.onmessage = (e: MessageEvent<RoleMessage>) => {
-        if (e.data?.userId === userId && e.data.tabId !== TAB_ID) setRole(e.data.role ?? 'none');
+        if (e.data?.userId === userId && e.data.tabId !== TAB_ID) handler.current(e.data.role);
       };
     } catch {
       ch = null;
     }
     return () => ch?.close();
   }, [userId]);
+}
+
+/** Роль сменили в другой вкладке этого браузера: здесь она уже действует — предлагаем обновить страницу. */
+export function RoleChangedElsewhere({ userId }: { userId: string }) {
+  const t = useTranslations('cabinetRole');
+  const [role, setRole] = useState<CabinetRole | 'none' | null>(null);
+  useRoleBroadcast(userId, (r) => setRole(r ?? 'none'));
+  useEffect(() => {
+    const clear = (): void => setRole(null);
+    window.addEventListener(LOCAL_SWITCH_EVENT, clear);
+    return () => window.removeEventListener(LOCAL_SWITCH_EVENT, clear);
+  }, []);
   if (!role) return null;
   return (
     <div
@@ -157,33 +179,35 @@ export function RoleSwitcher({ me }: { me: Me }) {
           <p id={id} className="text-xs font-medium uppercase tracking-wide text-slate-500">
             {t('label')}
           </p>
-          <ul className="mt-1 space-y-1" role="group" aria-labelledby={id} aria-describedby={`${id}-hint`}>
-            {roles.map((r) => {
-              const current = r === me.activeRole;
-              return (
-                <li key={r}>
-                  <button
-                    type="button"
-                    aria-pressed={current}
-                    disabled={busy}
-                    onClick={() => (current ? undefined : void switchTo(r))}
-                    className={cn(
-                      'flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm',
-                      'focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600',
-                      current
-                        ? 'bg-white font-semibold text-slate-900 shadow-sm ring-1 ring-blue-600'
-                        : 'text-slate-700 hover:bg-white disabled:text-slate-400',
-                    )}
-                  >
-                    <span aria-hidden="true" className={current ? 'text-blue-700' : 'text-slate-400'}>
-                      {current ? '●' : '○'}
-                    </span>
-                    {t(`roles.${r}`)}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <div role="group" aria-labelledby={id} aria-describedby={`${id}-hint`}>
+            <ul className="mt-1 space-y-1">
+              {roles.map((r) => {
+                const current = r === me.activeRole;
+                return (
+                  <li key={r}>
+                    <button
+                      type="button"
+                      aria-pressed={current}
+                      disabled={busy}
+                      onClick={() => (current ? undefined : void switchTo(r))}
+                      className={cn(
+                        'flex min-h-11 w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm',
+                        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600',
+                        current
+                          ? 'bg-white font-semibold text-slate-900 shadow-sm ring-1 ring-blue-600'
+                          : 'text-slate-700 hover:bg-white disabled:text-slate-400',
+                      )}
+                    >
+                      <span aria-hidden="true" className={current ? 'text-blue-700' : 'text-slate-400'}>
+                        {current ? '●' : '○'}
+                      </span>
+                      {t(`roles.${r}`)}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
           <p id={`${id}-hint`} className="mt-1 text-xs text-slate-500">
             {t('hint')}
           </p>

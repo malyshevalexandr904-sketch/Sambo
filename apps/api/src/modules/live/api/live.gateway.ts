@@ -102,6 +102,8 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
   private subscriber: Redis | null = null;
   private readonly allowedOrigins: Set<string>;
   private readonly perIp = new Map<string, number>();
+  /** Соединения по сессии входа — для служебных сообщений о сессии (смена роли кабинета, 0.13.1). */
+  private readonly bySession = new Map<string, Set<Socket>>();
 
   constructor(
     private readonly adapterHost: HttpAdapterHost,
@@ -192,8 +194,8 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     } catch {
       return;
     }
-    if (msg.type !== 'session-role' || typeof msg.sessionId !== 'string' || !this.nsp) return;
-    for (const socket of this.nsp.sockets.values()) {
+    if (msg.type !== 'session-role' || typeof msg.sessionId !== 'string') return;
+    for (const socket of [...(this.bySession.get(msg.sessionId) ?? [])]) {
       const state = socket.data as SocketState | undefined;
       if (state?.user?.sessionId === msg.sessionId) this.expire(socket);
     }
@@ -289,6 +291,8 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     const state = socket.data as SocketState;
     // Принятые соединения с адреса (лимит проверяется в рукопожатии).
     this.perIp.set(state.ip, (this.perIp.get(state.ip) ?? 0) + 1);
+    const sessionId = state.user?.sessionId ?? null;
+    if (sessionId) this.bySession.set(sessionId, (this.bySession.get(sessionId) ?? new Set()).add(socket));
     socket.on(LIVE_EVENTS.subscribe, (raw: unknown, ack: unknown) => {
       if (!this.allow(state)) return reply(ack, fail('RATE_LIMITED'));
       void this.queued(state, raw, () => this.subscribe(socket, state, raw)).then((r) => reply(ack, r));
@@ -306,6 +310,11 @@ export class LiveGateway implements OnApplicationBootstrap, OnModuleDestroy {
     socket.on('disconnect', () => {
       if (state.expiryTimer) clearTimeout(state.expiryTimer);
       state.subscriptions.clear();
+      if (sessionId) {
+        const set = this.bySession.get(sessionId);
+        set?.delete(socket);
+        if (set?.size === 0) this.bySession.delete(sessionId);
+      }
       const left = (this.perIp.get(state.ip) ?? 1) - 1;
       if (left > 0) this.perIp.set(state.ip, left);
       else this.perIp.delete(state.ip);

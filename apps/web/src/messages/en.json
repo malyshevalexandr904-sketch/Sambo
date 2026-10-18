@@ -135,7 +135,8 @@
       "wait": "You can send again in {seconds} s",
       "sent": "The email has been sent again.",
       "waitMinutes": "You can send again in {minutes} min",
-      "limited": "Several emails have already been sent — the next one can be sent in 15 minutes. Check your spam folder."
+      "limited": "Several emails have already been sent — the next one can be sent later (see the button). Check your spam folder.",
+      "limitedShort": "Too many requests — try again a bit later."
     }
   },
   "dashboard": {
@@ -2182,8 +2183,8 @@
     "openScoreboard": "Scoreboard",
     "liveOff": "Refresh every 5 s",
     "rolePausedTitle": "Scores not sent",
-    "rolePaused": "Another role is selected in this browser — the server does not accept scores. Unsent actions: {count}; they are kept and will be sent after you return to the “Referee” role.",
-    "backToReferee": "Return to the “Referee” role"
+    "rolePaused": "Another role is selected in this browser — the server does not accept scores. Unsent actions: {count}; they are kept and will be sent after you return to the “{role}” role.",
+    "backToRole": "Return to the “{role}” role"
   },
   "results": {
     "medals": {

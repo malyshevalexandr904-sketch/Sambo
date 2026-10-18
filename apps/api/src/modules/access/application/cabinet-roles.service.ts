@@ -128,10 +128,17 @@ export class CabinetRolesService {
   async select(userId: string, sessionId: string, role: CabinetRole): Promise<void> {
     const user = await this.db.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { id: true, personId: true, permissionsVersion: true },
+      select: { id: true, personId: true, permissionsVersion: true, preferredRole: true },
     });
     if (!(await this.available(user)).includes(role))
       throw new DomainError('FORBIDDEN', { reason: 'cabinet_role_not_held', role });
+    const current = await this.read(sessionId);
+    if (current?.role === role && current.permissionsVersion === user.permissionsVersion) {
+      // Роль уже выбрана (повторное нажатие, возврат роли из другой вкладки): соединения не трогаем (0.13.1).
+      if (user.preferredRole !== role)
+        await this.db.user.update({ where: { id: user.id }, data: { preferredRole: role } });
+      return;
+    }
     await this.db.tx(async (tx) => {
       await tx.$executeRaw`
         INSERT INTO session_role (session_id, user_id, role, permissions_version, updated_at)
@@ -144,9 +151,10 @@ export class CabinetRolesService {
       await tx.user.update({ where: { id: user.id }, data: { preferredRole: role } });
     });
     // Живые данные: служебные подписки этой сессии выданы по прежней роли — узлы api их снимают (0.13.1).
-    await this.redis
-      .publish(LIVE_CONTROL_REDIS_CHANNEL, JSON.stringify({ type: 'session-role', sessionId }))
-      .catch((err: unknown) => this.logger.warn({ err }, 'Live control message not published'));
+    if (current?.role !== role)
+      await this.redis
+        .publish(LIVE_CONTROL_REDIS_CHANNEL, JSON.stringify({ type: 'session-role', sessionId }))
+        .catch((err: unknown) => this.logger.warn({ err }, 'Live control message not published'));
   }
 
   /**

@@ -3,6 +3,7 @@
 // действия — по правам, назначению на ковёр (MAT_ASSIGNED, MAT_CHIEF) и состоянию схватки.
 import { Injectable } from '@nestjs/common';
 import {
+  CREW_CANDIDATE_ROLES,
   determineOutcome,
   excludedEventIds,
   type LocalizedText,
@@ -330,6 +331,16 @@ export class MatchQueriesService {
       : null;
   }
 
+  /** В выбранной роли кабинета у пользователя есть роль бригады ковра в этом турнире (права уже отфильтрованы). */
+  private async crewRoleActive(user: AuthUser, competitionId: string): Promise<boolean> {
+    const grants = await this.policy.grants(user);
+    return grants.competitions.some(
+      (g) =>
+        g.competitionId === competitionId &&
+        g.roles.some((r) => (CREW_CANDIDATE_ROLES as readonly string[]).includes(r)),
+    );
+  }
+
   /** Планшет ковра: текущая схватка целиком, следующая, ждущие подтверждения; мои должности в текущей сессии. */
   async console(user: AuthUser, matId: string): Promise<MatConsoleDto> {
     const mat = await this.db.mat.findUnique({ where: { id: matId } });
@@ -338,10 +349,11 @@ export class MatchQueriesService {
     const scope = await this.competitions.scopeFor(competition);
     await this.policy.assert(user, 'competition.view', scope);
     const session = await this.crews.currentSession(competition.id);
-    // Должности в бригаде действуют только в роли кабинета «Судья» (0.13.1): в другой роли планшет не обещает того,
-    // чего сервер не разрешит.
+    // Должности в бригаде — только в роли кабинета, где у пользователя есть роль бригады в этом турнире (судья,
+    // главный судья — «Судья»; секретарь — «Персонал турнира»; 0.13.1): иначе экран не обещает того, чего сервер не
+    // разрешит.
     const myRoles: MatCrewRole[] =
-      session && user.activeRole === 'REFEREE'
+      session && (await this.crewRoleActive(user, competition.id))
         ? ((await this.crews.rolesInSession(user.id, session.id)).get(matId) ?? [])
         : [];
     const matches = await this.slotsOfMat(matId);
@@ -373,7 +385,7 @@ export class MatchQueriesService {
       this.db.mat.findMany({ where: { competitionId }, orderBy: { number: 'asc' } }),
     ]);
     const roles =
-      session && user.activeRole === 'REFEREE'
+      session && (await this.crewRoleActive(user, competitionId))
         ? await this.crews.rolesInSession(user.id, session.id)
         : new Map<string, MatCrewRole[]>();
     const rows = await this.db.matchSchedule.findMany({

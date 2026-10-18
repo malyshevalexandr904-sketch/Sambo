@@ -6,6 +6,7 @@
 // Отказ по правилам или чужое изменение (второй планшет) — очередь сбрасывается, журнал загружается заново.
 // Неотправленные команды переживают перезагрузку страницы (хранилище вкладки).
 import {
+  type CabinetRole,
   type DataEnvelope,
   lastVoidableEvent,
   type MatchDetailDto,
@@ -17,7 +18,9 @@ import {
   type ScoringRules,
 } from '@sde/contracts';
 import { type MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
+import { qk } from '@/lib/queries';
 import { fetchEvents } from './api';
 import {
   commandRequest,
@@ -45,6 +48,8 @@ export { commandRequest, isTransient, planUndo, relink, uuid } from './scoring-q
 export interface ScoringNotice {
   /** `role` (0.13.1): в этой сессии выбрана другая роль кабинета — очередь не сбрасывается, а ждёт возврата. */
   kind: 'reset' | 'rejected' | 'role';
+  /** Для `role`: роль, в которой открыт планшет (в неё вернуться). */
+  role?: CabinetRole;
   count?: number;
   reason?: unknown;
   error?: unknown;
@@ -129,30 +134,47 @@ interface QueueDeps {
   pendingRef: MutableRefObject<Pending[]>;
   events: EventLog;
   onChanged: () => void;
+  /** Роль кабинета сессии при открытии планшета (0.13.1). */
+  openedIn: CabinetRole | null;
 }
 
 /**
- * Отказ (403/404) — из-за смены роли кабинета в этой сессии (например, во второй вкладке выбрали «Представитель»)?
- * Тогда оценки не теряются: очередь ждёт возврата в роль «Судья» (0.13.1).
+ * Отказ (403/404) — из-за смены роли кабинета в этой сессии после открытия планшета (например, во второй вкладке
+ * выбрали «Представитель»)? Тогда оценки не теряются: очередь ждёт возврата в прежнюю роль (0.13.1).
  */
-async function roleSwitchedAway(e: unknown): Promise<boolean> {
-  if (!(e instanceof ApiError) || (e.status !== 403 && e.status !== 404)) return false;
+async function roleSwitchedAway(e: unknown, openedIn: CabinetRole | null): Promise<boolean> {
+  if (!openedIn || !(e instanceof ApiError) || (e.status !== 403 && e.status !== 404)) return false;
   try {
     const me = (await api<DataEnvelope<Me>>('/me')).data;
-    return me.activeRole !== 'REFEREE' && me.availableRoles.includes('REFEREE');
+    return me.activeRole !== openedIn && me.availableRoles.includes(openedIn);
   } catch {
     return false;
   }
 }
 
-/** Отправка одной команды; итог — продолжать ли очередь. */
+/**
+ * После ошибки отправки: `null` — повторить позже (нет связи); иначе — уведомление: сброс очереди (второй планшет
+ * записал раньше), пауза (в сессии выбрана другая роль кабинета — очередь цела) или отказ.
+ */
+async function afterFailure(
+  e: unknown,
+  pending: number,
+  openedIn: CabinetRole | null,
+): Promise<ScoringNotice | null> {
+  if (isTransient(e)) return null;
+  if (e instanceof ApiError && e.code === 'EXPECTED_SEQ_MISMATCH') return { kind: 'reset', count: pending };
+  if (openedIn && (await roleSwitchedAway(e, openedIn)))
+    return { kind: 'role', count: pending, role: openedIn };
+  return { kind: 'rejected', reason: e instanceof ApiError ? e.details?.reason : undefined, error: e };
+}
+
+/** Отправка одной команды; итог — продолжать ли очередь. `notify` — уведомление (пауза очередь не сбрасывает). */
 function useSendHead(
-  { matchId, pendingRef, events }: QueueDeps,
+  { matchId, pendingRef, events, openedIn }: QueueDeps,
   setQueue: (next: Pending[]) => void,
   setOffline: (v: boolean) => void,
-  drop: (n: ScoringNotice) => void,
+  notify: (n: ScoringNotice) => void,
   scheduleRetry: () => void,
-  pause: (n: ScoringNotice) => void,
 ) {
   const { logRef, setConfirmed, ready, nudge } = events;
   return useCallback(
@@ -165,7 +187,7 @@ function useSendHead(
         return false;
       }
       if (head.preview.voidsEventId && isTemp(head.preview.voidsEventId)) {
-        drop({ kind: 'rejected', reason: 'event_not_found' });
+        notify({ kind: 'rejected', reason: 'event_not_found' });
         return false;
       }
       if (head.sentSeq === null) {
@@ -185,15 +207,10 @@ function useSendHead(
         setQueue(relink(pendingRef.current.slice(1), head.preview.id, event.id));
         return true;
       } catch (e) {
-        if (isTransient(e)) {
-          setOffline(true);
-          scheduleRetry();
-        } else if (e instanceof ApiError && e.code === 'EXPECTED_SEQ_MISMATCH') {
-          drop({ kind: 'reset', count: pendingRef.current.length });
-        } else if (await roleSwitchedAway(e)) {
-          pause({ kind: 'role', count: pendingRef.current.length });
-        } else
-          drop({ kind: 'rejected', reason: e instanceof ApiError ? e.details?.reason : undefined, error: e });
+        const notice = await afterFailure(e, pendingRef.current.length, openedIn);
+        setOffline(notice === null); // ответ сервера был — связь есть
+        if (notice) notify(notice);
+        else scheduleRetry();
         return false;
       }
     },
@@ -206,14 +223,17 @@ function useSendHead(
       nudge,
       setQueue,
       setOffline,
-      drop,
+      notify,
       scheduleRetry,
-      pause,
+      openedIn,
     ],
   );
 }
 
-/** Последовательная отправка очереди с повтором при обрыве связи (пауза растёт до 10 с). */
+/**
+ * Последовательная отправка очереди с повтором при обрыве связи. `notify` — уведомление; кроме паузы (смена роли —
+ * очередь цела) — сброс очереди и перезагрузка журнала.
+ */
 function useCommandQueue(deps: QueueDeps) {
   const { matchId, pendingRef, events, onChanged } = deps;
   const { reload, afterDrain } = events;
@@ -222,9 +242,8 @@ function useCommandQueue(deps: QueueDeps) {
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<ScoringNotice | null>(null);
   const busy = useRef(false);
-  const retry = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const backoff = useRef(1000);
   const pumpRef = useRef<() => Promise<void>>(async () => undefined);
+  const { scheduleRetry, resetBackoff } = useRetry(pumpRef);
   const setQueue = useCallback(
     (next: Pending[]) => {
       pendingRef.current = next;
@@ -233,21 +252,17 @@ function useCommandQueue(deps: QueueDeps) {
     },
     [matchId, pendingRef],
   );
-  const drop = useCallback(
+  const notify = useCallback(
     (n: ScoringNotice) => {
-      setQueue([]);
       setNotice(n);
+      if (n.kind === 'role') return;
+      setQueue([]);
       reload();
       onChanged();
     },
     [onChanged, reload, setQueue],
   );
-  const scheduleRetry = useCallback(() => {
-    if (retry.current) clearTimeout(retry.current);
-    retry.current = setTimeout(() => void pumpRef.current(), backoff.current);
-    backoff.current = Math.min(10_000, backoff.current * 2);
-  }, []);
-  const sendHead = useSendHead(deps, setQueue, setOffline, drop, scheduleRetry, setNotice);
+  const sendHead = useSendHead(deps, setQueue, setOffline, notify, scheduleRetry);
   const pump = useCallback(async () => {
     if (busy.current) return;
     busy.current = true;
@@ -255,7 +270,7 @@ function useCommandQueue(deps: QueueDeps) {
     try {
       for (let head = pendingRef.current[0]; head; head = pendingRef.current[0]) {
         if (!(await sendHead(head))) return;
-        backoff.current = 1000;
+        resetBackoff();
       }
       afterDrain();
       onChanged();
@@ -263,16 +278,31 @@ function useCommandQueue(deps: QueueDeps) {
       busy.current = false;
       setSending(false);
     }
-  }, [afterDrain, onChanged, pendingRef, sendHead]);
+  }, [afterDrain, onChanged, pendingRef, sendHead, resetBackoff]);
   pumpRef.current = pump;
   useRestoreQueue(matchId, pendingRef, setQueue, pumpRef);
+  return { pending, setQueue, offline, sending, notice, setNotice, pump };
+}
+
+/** Повтор отправки очереди после обрыва связи: пауза растёт до 10 с, после удачной отправки — снова 1 с. */
+function useRetry(pumpRef: MutableRefObject<() => Promise<void>>) {
+  const retry = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const backoff = useRef(1000);
+  const scheduleRetry = useCallback(() => {
+    if (retry.current) clearTimeout(retry.current);
+    retry.current = setTimeout(() => void pumpRef.current(), backoff.current);
+    backoff.current = Math.min(10_000, backoff.current * 2);
+  }, [pumpRef]);
+  const resetBackoff = useCallback(() => {
+    backoff.current = 1000;
+  }, []);
   useEffect(
     () => () => {
       if (retry.current) clearTimeout(retry.current);
     },
     [],
   );
-  return { pending, setQueue, offline, sending, notice, setNotice, pump };
+  return { scheduleRetry, resetBackoff };
 }
 
 /** Команды, не отправленные до перезагрузки страницы, — снова в очередь с теми же ключами. */
@@ -355,7 +385,12 @@ export function useScoring(
   const pendingRef = useRef<Pending[]>([]);
   const events = useEventLog(match, pendingRef);
   const { logRef } = events;
-  const q = useCommandQueue({ matchId: match?.id ?? null, pendingRef, events, onChanged });
+  // Роль, в которой открыт планшет: «я» загружено каркасом до показа экрана.
+  const queryClient = useQueryClient();
+  const [openedIn] = useState<CabinetRole | null>(
+    () => queryClient.getQueryData<Me>(qk.me)?.activeRole ?? null,
+  );
+  const q = useCommandQueue({ matchId: match?.id ?? null, pendingRef, events, onChanged, openedIn });
   const { setNotice } = q;
   useLeaveGuard(q.pending.length > 0);
   const all = useMemo<ScoringEvent[]>(
@@ -383,6 +418,11 @@ export function useScoring(
     offline: q.offline,
     notice: q.notice,
     clearNotice: () => setNotice(null),
+    /** Роль вернули: убрать уведомление о паузе и продолжить отправку очереди (0.13.1). */
+    resume: () => {
+      setNotice(null);
+      void q.pump();
+    },
     enqueue,
     undo,
     isOwn,
