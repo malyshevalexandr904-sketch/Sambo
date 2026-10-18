@@ -1,4 +1,5 @@
 import fc from 'fast-check';
+import { RatingRuleParametersV1 } from '@sde/contracts';
 import { describe, expect, it } from 'vitest';
 import { classifyResult, Dec, expectedScore, kFactor, rateMatch, ratingLevel, roundRating } from './elo';
 import { RATING_OUTCOMES, type RatingOutcome, SAMBO_ELO_V1 } from './rules';
@@ -157,5 +158,43 @@ describe('properties', () => {
         }
       }),
     );
+  });
+});
+
+describe('rule set parameters schema', () => {
+  it('accepts sambo-elo@1', () => {
+    expect(RatingRuleParametersV1.safeParse(SAMBO_ELO_V1).success).toBe(true);
+  });
+
+  it.each([
+    ['asymmetric S', { scoreRules: { ...R.scoreRules, WIN_SMALL_ADVANTAGE: '0.8' } }, 'scores_not_symmetric'],
+    [
+      'K thresholds out of order',
+      {
+        kFactorRules: [
+          { maxRating: 300, k: 30 },
+          { maxRating: 100, k: 60 },
+          { maxRating: null, k: 10 },
+        ],
+      },
+      'thresholds_not_ascending',
+    ],
+    ['no open-ended K', { kFactorRules: [{ maxRating: 100, k: 60 }] }, 'thresholds_not_ascending'],
+    [
+      'level gap',
+      {
+        levelRules: [
+          { level: 1, from: null },
+          { level: 3, from: 400 },
+        ],
+      },
+      'levels_not_ascending',
+    ],
+    ['BYE in the classifier', { outcomeRules: [{ method: 'BYE', kind: 'CLEAN' }] }, undefined],
+    ['unknown field', { ratingFloor: 0 }, undefined],
+  ])('rejects %s', (_name, patch, code) => {
+    const r = RatingRuleParametersV1.safeParse({ ...R, ...patch });
+    expect(r.success).toBe(false);
+    if (code) expect(r.error?.issues.map((i) => i.message)).toContain(code);
   });
 });

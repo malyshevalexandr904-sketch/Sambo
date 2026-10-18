@@ -1,58 +1,19 @@
-// Правила расчёта рейтинга (docs/RATING_RULES.md). Версия правил — данные (RatingRuleSet), здесь — их форма
-// и первая версия «sambo-elo@1» (Приложение 5 + правила вида спорта «самбо», приказ Минспорта № 892).
-import type { WinMethod } from '@sde/contracts';
+// Правила расчёта рейтинга (docs/RATING_RULES.md). Версия правил — данные (RatingRuleSet); здесь — первая версия
+// «sambo-elo@1» (Приложение 5 + правила вида спорта «самбо», приказ Минспорта № 892).
+import type { RatingRuleParametersV1 } from '@sde/contracts';
 
-/** Вид победы для рейтинга (RATING_RULES.md, 3.1). */
-export const RATING_WIN_KINDS = ['CLEAN', 'POINTS', 'SMALL_ADVANTAGE', 'MINIMAL_ADVANTAGE'] as const;
-export type RatingWinKind = (typeof RATING_WIN_KINDS)[number];
+export {
+  RATING_OUTCOMES,
+  RATING_WIN_KINDS,
+  type RatingOutcome,
+  type RatingWinKind,
+  ROUNDING_RULES,
+  type RoundingRule,
+} from '@sde/contracts';
 
-/** Исход схватки для одного спортсмена (RATING_RULES.md, 3). */
-export const RATING_OUTCOMES = [
-  'CLEAN_WIN',
-  'WIN_ON_POINTS',
-  'WIN_SMALL_ADVANTAGE',
-  'WIN_MINIMAL_ADVANTAGE',
-  'LOSS_MINIMAL_ADVANTAGE',
-  'LOSS_SMALL_ADVANTAGE',
-  'LOSS_ON_POINTS',
-  'CLEAN_LOSS',
-] as const;
-export type RatingOutcome = (typeof RATING_OUTCOMES)[number];
-
-/** K до порога включительно; `maxRating: null` — без верхней границы (последняя строка). */
-export interface KFactorRule {
-  maxRating: number | null;
-  k: number;
-}
-
-/** Уровень с порога `from` включительно; `from: null` — нижний уровень. */
-export interface LevelRule {
-  level: number;
-  from: number | null;
-}
-
-/**
- * Строка классификатора: способ победы (+ код тай-брейка) → вид победы. `methodDetail` не задан — любой;
- * `null` — пустой. Первая подходящая строка решает.
- */
-export interface OutcomeRule {
-  method: WinMethod;
-  methodDetail?: string | null;
-  kind: RatingWinKind;
-}
-
-export const ROUNDING_RULES = ['INTEGER_HALF_UP'] as const;
-export type RoundingRule = (typeof ROUNDING_RULES)[number];
-
-export interface RatingRules {
-  initialRating: number;
-  kFactorRules: KFactorRule[];
-  /** Фактический результат S спортсмена, десятичной строкой («0.9»). */
-  scoreRules: Record<RatingOutcome, string>;
-  levelRules: LevelRule[];
-  outcomeRules: OutcomeRule[];
-  roundingRule: RoundingRule;
-}
+/** Параметры версии правил (RatingRuleSet.parameters), проверенные схемой RatingRuleParametersV1. */
+export type RatingRules = RatingRuleParametersV1;
+export type OutcomeRule = RatingRules['outcomeRules'][number];
 
 /** sambo-elo@1: решения заказчика 2026-10-18 (RATING_RULES.md, 8). */
 export const SAMBO_ELO_V1: RatingRules = {
@@ -97,3 +58,13 @@ export const SAMBO_ELO_V1: RatingRules = {
   ],
   roundingRule: 'INTEGER_HALF_UP',
 };
+
+/** Версия кода расчёта: меняется при изменении арифметики, входит в calculationVersion расчёта. */
+export const RATING_ENGINE_VERSION = 'elo-1';
+
+/** Версия расчёта схватки (RATING_ARCHITECTURE.md, 4): «{code}@{version}/{engineVersion}». */
+export const calculationVersion = (ruleSet: {
+  code: string;
+  version: number;
+  engineVersion: string;
+}): string => `${ruleSet.code}@${ruleSet.version}/${ruleSet.engineVersion}`;
