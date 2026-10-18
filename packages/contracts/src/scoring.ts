@@ -52,6 +52,11 @@ export interface SideScore {
   points: number;
   /** Наказания по порядку (коды правил). */
   penalties: string[];
+  /**
+   * Показание основного секундомера при каждом наказании, по порядку (тай-брейк LAST_PENALTY). В состояниях,
+   * записанных до этого поля, его нет — тай-брейк тогда не решает.
+   */
+  penaltyClocksMs?: number[];
   /** Удержания, принёсшие баллы (лимит — hold.maxPerMatch каждому спортсмену). */
   holds: number;
   /** Технические оценки по ценности: «4» → число оценок в 4 балла (тай-брейк «больше высших оценок»). */
@@ -140,7 +145,13 @@ export interface ProposedOutcome {
 
 const other = (side: Side): Side => (side === 'RED' ? 'BLUE' : 'RED');
 
-const emptySide = (): SideScore => ({ points: 0, penalties: [], holds: 0, technical: {} });
+const emptySide = (): SideScore => ({
+  points: 0,
+  penalties: [],
+  penaltyClocksMs: [],
+  holds: 0,
+  technical: {},
+});
 
 export function initialMatchState(durationMs: number): MatchState {
   return {
@@ -159,6 +170,7 @@ function cloneState(s: MatchState): MatchState {
   const side = (x: SideScore): SideScore => ({
     points: x.points,
     penalties: [...x.penalties],
+    penaltyClocksMs: [...(x.penaltyClocksMs ?? [])],
     holds: x.holds,
     technical: { ...x.technical },
   });
@@ -235,6 +247,7 @@ const applyPenalty: Apply = (s, e, rules, strict) => {
       rules.penalties.some((p) => p.code === e.actionCode) ? 'penalty_out_of_order' : 'unknown_penalty',
     );
   own.penalties.push(next.code);
+  own.penaltyClocksMs = [...(own.penaltyClocksMs ?? []), e.matchClockMs];
   if (next.kind === 'DISQUALIFICATION') {
     s.decision = { kind: 'DISQUALIFICATION', winner: other(e.side), detail: next.code };
   } else {
@@ -374,8 +387,39 @@ function compareHighScores(red: SideScore, blue: SideScore): number {
   return 0;
 }
 
+/** Сумма технических оценок (без баллов за наказания соперника). */
+const technicalPoints = (x: SideScore): number =>
+  Object.entries(x.technical).reduce((sum, [value, count]) => sum + Number(value) * count, 0);
+
+/**
+ * При равном числе наказаний проигрывает получивший последнее наказание; одновременные — сравниваются
+ * предыдущие (правила вида спорта «самбо», ст. 34 пп. 7, 9). Разное число наказаний или нет времени — null.
+ */
+function laterPenalty(red: SideScore, blue: SideScore): Side | null {
+  const r = red.penaltyClocksMs;
+  const b = blue.penaltyClocksMs;
+  if (!r || !b || r.length !== b.length || red.penalties.length !== blue.penalties.length) return null;
+  for (let i = r.length - 1; i >= 0; i--) {
+    const d = (r[i] ?? 0) - (b[i] ?? 0);
+    if (d !== 0) return d > 0 ? 'RED' : 'BLUE';
+  }
+  return null;
+}
+
 function tieBreak(s: MatchState, tb: TieBreaker): ProposedOutcome | null {
   switch (tb) {
+    case 'TECHNICAL_POINTS': {
+      const d = technicalPoints(s.red) - technicalPoints(s.blue);
+      return d === 0
+        ? null
+        : { winnerSide: d > 0 ? 'RED' : 'BLUE', method: 'POINTS', methodDetail: tb, basis: 'TIE_BREAKER' };
+    }
+    case 'LAST_PENALTY': {
+      const later = laterPenalty(s.red, s.blue);
+      return later
+        ? { winnerSide: other(later), method: 'POINTS', methodDetail: tb, basis: 'TIE_BREAKER' }
+        : null;
+    }
     case 'LAST_TECHNICAL_ACTION':
       return s.lastTechnical
         ? { winnerSide: s.lastTechnical, method: 'POINTS', methodDetail: tb, basis: 'TIE_BREAKER' }

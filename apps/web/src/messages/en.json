@@ -2027,7 +2027,9 @@
       "LAST_TECHNICAL_ACTION": "by the last score",
       "FEWER_PENALTIES": "fewer penalties",
       "MORE_HIGH_SCORES": "more high scores",
-      "REFEREE_DECISION": "referees’ decision"
+      "REFEREE_DECISION": "referees’ decision",
+      "TECHNICAL_POINTS": "more technical points",
+      "LAST_PENALTY": "by the last warning"
     },
     "codes": {
       "THROW_TOTAL": "Throw",
@@ -2038,6 +2040,8 @@
       "REMARK": "Remark",
       "WARNING_1": "Warning",
       "WARNING_2": "Second warning",
+      "WARNING_3": "Third warning",
+      "WARNING_4_REMOVAL": "Removal from the bout",
       "DISQUALIFICATION": "Disqualification",
       "WITHDRAWN_BY_DOCTOR": "withdrawn by the doctor"
     },
