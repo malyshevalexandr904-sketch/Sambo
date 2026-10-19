@@ -783,8 +783,8 @@ model AthleteProfile {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  person                Person              @relation(fields: [personId], references: [id], onDelete: Restrict)
-  createdBy             User?               @relation("AthleteCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  person                Person               @relation(fields: [personId], references: [id], onDelete: Restrict)
+  createdBy             User?                @relation("AthleteCreator", fields: [createdById], references: [id], onDelete: Restrict)
   memberships           AthleteMembership[]
   coaches               AthleteCoach[]
   ranks                 AthleteRankRecord[]
@@ -795,9 +795,10 @@ model AthleteProfile {
   checkIns              CheckIn[]
   clearances            MedicalClearance[]
   rating                AthleteRating?
-  ratingHistory         RatingHistory[]     @relation("RatingHistoryAthlete")
+  ratingHistory         RatingHistory[]      @relation("RatingHistoryAthlete")
   ratingCorrections     RatingCorrection[]
-  ratingOpponentHistory RatingHistory[]     @relation("RatingHistoryOpponent")
+  ratingRankSnapshots   RatingRankSnapshot[]
+  ratingOpponentHistory RatingHistory[]      @relation("RatingHistoryOpponent")
 
   @@map("athlete_profile")
 }
@@ -2982,4 +2983,20 @@ model RatingCorrection {
 
   @@index([athleteId, createdAt])
   @@map("rating_correction")
+}
+
+/// Ежедневный снимок мест таблицы рейтинга (docs/RATING_ARCHITECTURE.md, 10): «изменение позиции» — сравнение с
+/// последним снимком, а не пересчёт истории на запрос. Пишет worker; хранится год.
+model RatingRankSnapshot {
+  snapshotDate DateTime @map("snapshot_date") @db.Date
+  athleteId    String   @map("athlete_id") @db.Uuid
+  rank         Int
+  rating       Int
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  athlete AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@id([snapshotDate, athleteId])
+  @@index([athleteId, snapshotDate])
+  @@map("rating_rank_snapshot")
 }

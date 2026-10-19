@@ -6,12 +6,14 @@ import { PrismaClient, uuidv7 } from '@sde/db';
 import { createLogger } from '@sde/server-kit';
 import type { Job } from 'bullmq';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { Maintenance } from '../src/maintenance/maintenance';
 import { RATING_CONSUMER, RatingConsumer, type RatingJob } from '../src/rating/rating.consumer';
 import { TEST_DB } from './global-setup';
 import { finish, matchDayWorld, type MatchDayWorld, TRUNCATE_MATCH_DAY } from './match-day-world';
 
 const db = new PrismaClient({ datasourceUrl: TEST_DB.DATABASE_ADMIN_URL });
-const consumer = new RatingConsumer(db, createLogger('silent', 'worker-test'));
+const logger = createLogger('silent', 'worker-test');
+const consumer = new RatingConsumer(db, logger);
 
 beforeAll(async () => {
   await db.$connect();
@@ -137,5 +139,20 @@ describe('rating consumer', () => {
     await db.athleteRating.update({ where: { athleteId: w.athleteA }, data: { status: 'ACTIVE' } });
     await consumer.handle({ data: { kind: 'sweep' } } as Job<RatingJob>);
     expect((await calculationsOf(w.ab)).map((c) => c.status)).toEqual(['COMPLETED']);
+  });
+
+  it('takes the daily snapshot of table places once a day', async () => {
+    await run(await confirm(w.ab, { winnerSide: 'RED', method: 'POINTS' }));
+    // Хранилище файлов и настройки этой задаче не нужны.
+    const maintenance = new Maintenance(db, null as never, null as never, logger);
+    const day = new Date('2026-10-19T03:00:00Z');
+    expect(await maintenance.snapshotRatingRanks(day)).toBe(2);
+    expect(await maintenance.snapshotRatingRanks(new Date('2026-10-19T23:00:00Z'))).toBe(0);
+    const rows = await db.ratingRankSnapshot.findMany({ orderBy: { rank: 'asc' } });
+    expect(rows.map((r) => [r.athleteId, r.rank, r.rating])).toEqual([
+      [w.athleteA, 1, 212],
+      [w.athleteB, 2, 188],
+    ]);
+    expect(rows[0]!.snapshotDate.toISOString().slice(0, 10)).toBe('2026-10-19');
   });
 });
