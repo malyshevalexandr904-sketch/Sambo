@@ -21,6 +21,8 @@ export interface DrawParticipant {
   /** Регион представительства или регион спортсмена. */
   regionKey: string | null;
   seedNumber: number | null;
+  /** Рейтинг на момент жеребьёвки — только в рейтинговом формате (посев по рейтингу); иначе поля нет. */
+  rating?: number;
 }
 
 export interface DrawInput {
@@ -51,6 +53,8 @@ export function canonicalDrawInput(input: {
         organizationKey: p.organizationKey,
         regionKey: p.regionKey,
         seedNumber: p.seedNumber,
+        // Поле есть только у рейтингового формата: вход (и хеш) остальных форматов не меняется.
+        ...(p.rating === undefined ? {} : { rating: p.rating }),
       }))
       .sort((a, b) => (a.entryId < b.entryId ? -1 : a.entryId > b.entryId ? 1 : 0)),
   };

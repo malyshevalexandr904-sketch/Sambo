@@ -2,8 +2,16 @@
 // Общие для API (жеребьёвка, сетки) и веба (выбор формата, подписи): одна функция — один результат.
 import type { CompetitionFormatCode, RuleSetParametersV1 } from './rulesets.js';
 
-/** Форматы Phase 5a. Остальные коды каталога (5b) выбираются правилами, но жеребьёвка их пока не строит. */
-export const DRAW_FORMATS = ['ROUND_ROBIN', 'SINGLE_ELIMINATION', 'ELIMINATION_WITH_REPECHAGE'] as const;
+/**
+ * Форматы, которые строит жеребьёвка: Phase 5a и рейтинговый (подгруппы по рейтингу). Остальные коды каталога (5b)
+ * выбираются правилами, но жеребьёвка их пока не строит.
+ */
+export const DRAW_FORMATS = [
+  'ROUND_ROBIN',
+  'SINGLE_ELIMINATION',
+  'ELIMINATION_WITH_REPECHAGE',
+  'SPECIAL_GROUP_RATED',
+] as const;
 export type DrawFormat = (typeof DRAW_FORMATS)[number];
 
 export function isDrawFormat(code: string | null | undefined): code is DrawFormat {

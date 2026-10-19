@@ -6,6 +6,7 @@ import type {
   BracketStage,
   CompetitionFormatCode,
   Pool,
+  RatedGroupLetter,
   RoundLabel,
   Side,
   SlotSourceType,
@@ -32,6 +33,8 @@ export interface GraphNode {
   /** Устойчивый ключ узла в пределах сетки: «MAIN:2:1», «REPECHAGE:A:1», «POOL:3:2». */
   key: string;
   stage: BracketStage;
+  /** Подгруппа рейтингового формата: у каждой — свой этап сетки (Bracket POOL). */
+  group?: RatedGroupLetter;
   round: number;
   position: number;
   label: RoundLabel;

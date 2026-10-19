@@ -1,11 +1,13 @@
 // Представления жеребьёвки: версия (кратко и полностью), категория, участники и отчёт о разведении с названиями.
 import {
   type CategoryWeight,
+  type DrawPool,
   type DrawCategoryDto,
   type DrawParticipantDto,
   type DrawSlotDto,
   type DrawSummaryDto,
   type NamedRef,
+  RATED_GROUP_LETTERS,
   type SeparationReportDto,
   type UserRef,
 } from '@sde/contracts';
@@ -38,6 +40,7 @@ export const DRAW_FULL_INCLUDE = {
   createdBy: USER_REF,
   publishedBy: USER_REF,
   supersededBy: USER_REF,
+  seeds: { select: { entryId: true, ratingAtDraw: true } },
   _count: { select: { slots: { where: { entryId: { not: null } } } } },
 } satisfies Prisma.DrawInclude;
 
@@ -91,14 +94,19 @@ export const toSlotDto = (s: {
   position: s.position,
   entryId: s.entryId,
   seedNumber: s.seedNumber,
-  pool: s.pool === 'A' || s.pool === 'B' ? s.pool : null,
+  pool: (RATED_GROUP_LETTERS as readonly string[]).includes(s.pool ?? '') ? (s.pool as DrawPool) : null,
 });
 
-/** Участники версии жеребьёвки в порядке позиций; данные — из снимка участия (ADR-10). */
+/**
+ * Участники версии жеребьёвки в порядке позиций; данные — из снимка участия (ADR-10), рейтинг — из посева
+ * рейтингового формата.
+ */
 export function toParticipants(
   slots: DrawSlotDto[],
   infos: ReadonlyMap<string, ParticipantInfo>,
+  seeds: readonly { entryId: string; ratingAtDraw: number }[] = [],
 ): DrawParticipantDto[] {
+  const ratings = new Map(seeds.map((x) => [x.entryId, x.ratingAtDraw]));
   return slots
     .filter((s): s is DrawSlotDto & { entryId: string } => s.entryId !== null)
     .map((s) => {
@@ -110,6 +118,7 @@ export function toParticipants(
         organization: info?.organization ?? null,
         region: info?.region ?? null,
         seedNumber: s.seedNumber,
+        ratingAtDraw: ratings.get(s.entryId) ?? null,
         position: s.position,
         pool: s.pool,
         entryStatus: info?.entryStatus ?? 'APPROVED',

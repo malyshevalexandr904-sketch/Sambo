@@ -14,9 +14,9 @@ import { BracketsService, strategyFor } from '../../brackets';
 import { CategoryWorkflowService, type LockedCategory } from '../../categories';
 import { CompetitionScopeService } from '../../competitions';
 import { OutboxService } from '../../outbox';
-import { canonicalDrawInput, drawInputHash, seedingIssues } from '../domain/draw-input';
+import { canonicalDrawInput, type DrawInput, drawInputHash, seedingIssues } from '../domain/draw-input';
 import { inDrawPhase, MIN_DRAW_PARTICIPANTS } from '../domain/draw-rules';
-import { computeDrawLayout } from '../domain/layout';
+import { computeDrawLayout, type DrawLayout } from '../domain/layout';
 import { isValidRandomSeed } from '../domain/prng';
 import { DrawQueriesService } from './draw-queries';
 import {
@@ -75,21 +75,27 @@ export class DrawsService {
 
   private formatFor(req: DrawCreate, ctx: CategoryContext): NonNullable<DrawCreate['format']> {
     const format = req.format ?? ctx.suggestedFormat;
-    if (format === 'SPECIAL_GROUP_RATED') {
-      // Число участников — по правилам формата (ТЗ 36); построение сетки подгрупп — следующие фазы.
-      const plan = ratedFormatPlan(ctx.admitted.length);
-      if (!plan.ok)
-        throw new DomainError(plan.issue, {
-          admitted: ctx.admitted.length,
-          min: plan.minParticipants,
-          max: plan.maxParticipants,
-        });
-    }
+    if (format === 'SPECIAL_GROUP_RATED') this.assertRated(req, ctx);
     if (!isDrawFormat(format))
       throw invalid('format', 'format_not_available', { suggested: ctx.suggestedFormat });
     const issue = strategyFor(format)?.validate(ctx.admitted.length);
     if (issue) throw invalid('format', issue);
     return format;
+  }
+
+  /** Рейтинговый формат: число участников — по его правилам (ТЗ 36), посев — по рейтингу (ТЗ 27). */
+  private assertRated(req: DrawCreate, ctx: CategoryContext): void {
+    const plan = ratedFormatPlan(ctx.admitted.length);
+    if (!plan.ok)
+      throw new DomainError(plan.issue, {
+        admitted: ctx.admitted.length,
+        min: plan.minParticipants,
+        max: plan.maxParticipants,
+      });
+    // Ручной посев — только новой версией жеребьёвки с причиной (ТЗ 28; фаза 14).
+    if (req.seeding.length > 0) throw invalid('seeding', 'rated_seeding_by_rating');
+    if (ctx.admitted.some((p) => p.rating === null))
+      throw new DomainError('RATING_RULE_SET_UNAVAILABLE', { ruleSetId: null });
   }
 
   /** Черновик жеребьёвки: вход по допущенным участникам, расстановка по seed, отчёт о разведении. */
@@ -109,11 +115,13 @@ export class DrawsService {
       const seeds = new Map(req.seeding.map((s) => [s.entryId, s.seedNumber]));
       const input = canonicalDrawInput({
         format,
-        separation: req.separation.by,
-        participants: ctx.admitted.map((p) => toDrawParticipant(p, seeds.get(p.entryId) ?? null)),
+        // Рейтинговый формат не разводит клубы и регионы (docs/RATED_TOURNAMENT_FORMAT.md, Q-F7).
+        separation: format === 'SPECIAL_GROUP_RATED' ? [] : req.separation.by,
+        participants: ctx.admitted.map((p) => toDrawParticipant(p, seeds.get(p.entryId) ?? null, format)),
       });
       const seed = { value: req.randomSeed ?? newRandomSeed(), manual: req.randomSeed !== undefined };
-      return this.insertDraft(tx, locked, input, seed, user.id, viaPlatform);
+      const athletes = new Map(ctx.admitted.map((p) => [p.entryId, p.athleteId]));
+      return this.insertDraft(tx, locked, { input, athletes }, seed, user.id, viaPlatform);
     });
     return this.queries.get(user, id);
   }
@@ -121,7 +129,7 @@ export class DrawsService {
   private async insertDraft(
     tx: Tx,
     locked: LockedCategory,
-    input: ReturnType<typeof canonicalDrawInput>,
+    { input, athletes }: { input: DrawInput; athletes: ReadonlyMap<string, string> },
     seed: { value: string; manual: boolean },
     userId: string,
     viaPlatform: boolean,
@@ -156,6 +164,8 @@ export class DrawsService {
         ...s,
       })),
     });
+    if (input.format === 'SPECIAL_GROUP_RATED')
+      await this.insertSeeds(tx, id, category.competitionId, input, layout, athletes);
     await this.audit.record(tx, {
       action: 'draw.created',
       entityType: 'Draw',
@@ -173,6 +183,35 @@ export class DrawsService {
       platformIntervention: viaPlatform,
     });
     return id;
+  }
+
+  /** Посев рейтингового формата: номер посева и рейтинг на момент жеребьёвки (ТЗ 27). */
+  private async insertSeeds(
+    tx: Tx,
+    drawId: string,
+    competitionId: string,
+    input: DrawInput,
+    layout: DrawLayout,
+    athletes: ReadonlyMap<string, string>,
+  ): Promise<void> {
+    const ratings = new Map(input.participants.map((p) => [p.entryId, p.rating]));
+    await tx.tournamentSeed.createMany({
+      data: layout.slots.flatMap((s) =>
+        s.entryId && s.seedNumber !== null
+          ? [
+              {
+                id: uuidv7(),
+                competitionId,
+                drawId,
+                entryId: s.entryId,
+                athleteId: athletes.get(s.entryId) as string,
+                seedNumber: s.seedNumber,
+                ratingAtDraw: ratings.get(s.entryId) as number,
+              },
+            ]
+          : [],
+      ),
+    });
   }
 
   private async lockDraw(tx: Tx, drawId: string, version: number | null): Promise<DrawRow> {
