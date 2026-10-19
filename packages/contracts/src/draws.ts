@@ -4,6 +4,7 @@ import { Reason, Uuid } from './common.js';
 import type { CategoryRef, CategoryWeight } from './competition-categories.js';
 import type { CategoryStatus } from './competitions.js';
 import { DRAW_FORMATS, type Pool, type RoundLabel } from './formats.js';
+import type { RatedFormatPlanResult } from './rated-format.js';
 import type { Gender } from './people.js';
 import type { EntryStatus } from './registrations.js';
 import type { CompetitionFormatCode } from './rulesets.js';
@@ -252,6 +253,8 @@ export interface CategoryDrawsDto {
   /** Одобренные участия, допуск которых ещё не решён. */
   admissionPending: number;
   suggestedFormat: CompetitionFormatCode | null;
+  /** План рейтингового формата по числу допущенных (если предлагается SPECIAL_GROUP_RATED). */
+  ratedPlan: RatedFormatPlanResult | null;
   /** Допущенные участники (для посева в черновике): без позиции. */
   participants: DrawParticipantDto[];
   draws: DrawSummaryDto[];

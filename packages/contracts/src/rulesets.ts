@@ -13,6 +13,8 @@ export const COMPETITION_FORMAT_CODES = [
   'PENALTY_POINTS_ELIMINATION',
   'GROUP_STAGE',
   'GROUP_PLUS_PLAYOFF',
+  // Рейтинговый турнир: подгруппы по кругу и финальная часть (docs/RATED_TOURNAMENT_FORMAT.md).
+  'SPECIAL_GROUP_RATED',
 ] as const;
 export type CompetitionFormatCode = (typeof COMPETITION_FORMAT_CODES)[number];
 

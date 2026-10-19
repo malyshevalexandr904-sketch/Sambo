@@ -3,7 +3,7 @@
 // Блокировки: право записи → турнир FOR SHARE → категория FOR UPDATE → версия жеребьёвки FOR UPDATE.
 import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { type DrawCreate, type DrawDto, isDrawFormat } from '@sde/contracts';
+import { type DrawCreate, type DrawDto, isDrawFormat, ratedFormatPlan } from '@sde/contracts';
 import { type Draw, type Prisma, type Tx, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
@@ -75,6 +75,16 @@ export class DrawsService {
 
   private formatFor(req: DrawCreate, ctx: CategoryContext): NonNullable<DrawCreate['format']> {
     const format = req.format ?? ctx.suggestedFormat;
+    if (format === 'SPECIAL_GROUP_RATED') {
+      // Число участников — по правилам формата (ТЗ 36); построение сетки подгрупп — следующие фазы.
+      const plan = ratedFormatPlan(ctx.admitted.length);
+      if (!plan.ok)
+        throw new DomainError(plan.issue, {
+          admitted: ctx.admitted.length,
+          min: plan.minParticipants,
+          max: plan.maxParticipants,
+        });
+    }
     if (!isDrawFormat(format))
       throw invalid('format', 'format_not_available', { suggested: ctx.suggestedFormat });
     const issue = strategyFor(format)?.validate(ctx.admitted.length);

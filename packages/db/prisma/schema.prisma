@@ -1274,6 +1274,7 @@ enum CompetitionFormatCode {
   PENALTY_POINTS_ELIMINATION
   GROUP_STAGE
   GROUP_PLUS_PLAYOFF
+  SPECIAL_GROUP_RATED
 }
 
 enum CategoryRuleKind {

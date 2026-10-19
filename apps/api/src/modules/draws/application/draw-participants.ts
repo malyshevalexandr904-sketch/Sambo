@@ -142,7 +142,7 @@ export class DrawParticipantsService {
     });
     const competition = await db.competition.findUniqueOrThrow({
       where: { id: competitionId },
-      select: { startDate: true, ruleSetVersion: { select: { parameters: true } } },
+      select: { startDate: true, competitionType: true, ruleSetVersion: { select: { parameters: true } } },
     });
     const params = RuleSetParametersV1.safeParse(competition.ruleSetVersion?.parameters ?? null);
     return categories.map((category) => {
@@ -158,9 +158,14 @@ export class DrawParticipantsService {
         category,
         admitted,
         admissionPending: own.filter((r) => !r.admission || r.admission.status === 'PENDING').length,
+        // Рейтинговый турнир по умолчанию — свой формат (docs/RATED_TOURNAMENT_FORMAT.md); формат категории важнее.
         suggestedFormat:
           category.formatOverride ??
-          (params.success ? formatForCount(params.data.formatSelection, admitted.length) : null),
+          (competition.competitionType === 'RATED'
+            ? 'SPECIAL_GROUP_RATED'
+            : params.success
+              ? formatForCount(params.data.formatSelection, admitted.length)
+              : null),
         durations: params.success
           ? {
               main: matchDurationSeconds(params.data, age, false),
