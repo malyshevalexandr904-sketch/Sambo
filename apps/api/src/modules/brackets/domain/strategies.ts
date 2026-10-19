@@ -1,9 +1,10 @@
 // Реестр стратегий форматов (ARCHITECTURE.md, 14.4; точка расширения «Форматы»): 5a — круговая система,
-// олимпийская система и выбывание с утешительными схватками; форматы 5b добавляются новыми стратегиями без
-// изменения ядра (граф, разрешение состояния, хранение).
+// олимпийская система и выбывание с утешительными схватками; рейтинговый формат — подгруппы по рейтингу; форматы 5b
+// добавляются новыми стратегиями без изменения ядра (граф, разрешение состояния, хранение).
 import type { CompetitionFormatCode, DrawFormat } from '@sde/contracts';
 import { buildSingleElimination, singleEliminationPlacements } from './elimination';
 import type { BracketGraph, BracketState, Outcome, Placement } from './graph';
+import { buildRatedGroups, ratedPlacements, validateRated } from './rated-groups';
 import { buildRepechage, lostToPoolWinner, repechagePlacements } from './repechage';
 import { type DynamicResolver, resolveBracket, type SlotMap } from './resolve';
 import { buildRoundRobin, roundRobinPlacements } from './round-robin';
@@ -55,6 +56,12 @@ const STRATEGIES: Record<DrawFormat, FormatStrategy> = {
     build: buildRepechage,
     dynamic: lostToPoolWinner,
     placements: (graph, state) => repechagePlacements(graph, state),
+  },
+  SPECIAL_GROUP_RATED: {
+    code: 'SPECIAL_GROUP_RATED',
+    validate: validateRated,
+    build: buildRatedGroups,
+    placements: ratedPlacements,
   },
 };
 

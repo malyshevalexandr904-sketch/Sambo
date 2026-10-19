@@ -252,6 +252,27 @@ export type RatedFormatPlanResult =
   | { ok: true; plan: RatedFormatPlan }
   | { ok: false; issue: RatedFormatIssue; minParticipants: number; maxParticipants: number };
 
+/** Правило версии формата для числа участников; вне диапазонов — null. */
+export function ratedFormatRule(
+  participants: number,
+  config: RatedFormatConfig = RATED_GROUPS_V1,
+): RatedFormatRule | null {
+  return (
+    config.rules.find((r) => participants >= r.minParticipants && participants <= r.maxParticipants) ?? null
+  );
+}
+
+/** Схема кругов подгруппы размера `size`: пары позиций (1 — высший посев) по кругам. */
+export function ratedRoundSchedule(
+  size: number,
+  config: RatedFormatConfig = RATED_GROUPS_V1,
+): [number, number][][] {
+  const rounds = config.roundSchedules[String(size)];
+  // Версия формата проверена при загрузке: схема есть для каждого размера подгруппы её правил.
+  if (!rounds) throw new Error(`No round schedule for a group of ${size} in ${config.code}`);
+  return rounds;
+}
+
 /** План категории по числу участников: подгруппы, выход, финальная часть, число схваток. */
 export function ratedFormatPlan(
   participants: number,
@@ -259,9 +280,7 @@ export function ratedFormatPlan(
 ): RatedFormatPlanResult {
   const min = config.rules[0]!.minParticipants;
   const max = config.rules[config.rules.length - 1]!.maxParticipants;
-  const rule = config.rules.find(
-    (r) => participants >= r.minParticipants && participants <= r.maxParticipants,
-  );
+  const rule = ratedFormatRule(participants, config);
   if (!rule)
     return {
       ok: false,

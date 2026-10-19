@@ -146,6 +146,8 @@ export class DrawQueriesService {
         organization: p.organization,
         region: p.region,
         seedNumber: null,
+        // Рейтинг, по которому пройдёт посев рейтингового формата.
+        ratingAtDraw: ctx.suggestedFormat === 'SPECIAL_GROUP_RATED' ? p.rating : null,
         position: null,
         pool: null,
         entryStatus: p.entryStatus,
@@ -196,7 +198,7 @@ export class DrawQueriesService {
       null,
       slots.flatMap((s) => (s.entryId ? [s.entryId] : [])),
     );
-    const participants = toParticipants(slots, infos);
+    const participants = toParticipants(slots, infos, row.seeds);
     const nodes =
       (row.status === 'PUBLISHED' ? await this.brackets.view(row.id) : null) ??
       this.brackets.preview(row.format, row.slots);
@@ -232,7 +234,12 @@ export class DrawQueriesService {
     );
     const nodes = await this.brackets.view(row.id);
     const bracket: BracketViewDto | null = nodes
-      ? { format: row.format, size: slots.length, nodes, participants: toParticipants(slots, infos) }
+      ? {
+          format: row.format,
+          size: slots.length,
+          nodes,
+          participants: toParticipants(slots, infos, row.seeds),
+        }
       : null;
     return {
       category: toDrawCategory(category),

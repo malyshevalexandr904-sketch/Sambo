@@ -1,6 +1,6 @@
 'use client';
 // Визуализация сетки (IMPLEMENTATION_PLAN, Phase 5): участники, номера схваток, победители, переходы, BYE,
-// утешительные схватки, круговая таблица. На телефоне — вертикальный список кругов с переключателем
+// утешительные схватки, круговая таблица, подгруппы рейтингового формата. На телефоне — вертикальный список кругов с переключателем
 // (ARCHITECTURE.md, 23.3), на экране и в печати — дерево по кругам.
 import type {
   BracketNodeDto,
@@ -77,6 +77,7 @@ function SideRow({ node, side, ctx }: { node: BracketNodeDto; side: Side; ctx: C
           <span className="block truncate text-xs text-slate-500 print:ml-1 print:inline print:text-[9px]">
             {p.organization?.name ?? ''}
             {p.seedNumber ? ` · ${t('seed', { seed: p.seedNumber })}` : ''}
+            {p.ratingAtDraw !== null ? ` · ${t('rating', { rating: p.ratingAtDraw })}` : ''}
           </span>
         </span>
       ) : (
@@ -332,6 +333,34 @@ function RoundRobinView({ view, matchHref }: { view: BracketViewDto; matchHref?:
   );
 }
 
+/** Рейтинговый формат: каждая подгруппа — своя круговая таблица и свои круги. */
+function GroupsView({ view, matchHref }: { view: BracketViewDto; matchHref?: (id: string) => string }) {
+  const t = useTranslations('bracket');
+  const letters = useTranslations('draws.ratedPlan.letters');
+  const groups = [...new Set(view.nodes.map((n) => n.group).filter((g) => g !== null))].sort();
+  return (
+    <div className="space-y-8">
+      {groups.map((group) => (
+        <section
+          key={group}
+          aria-label={t('group', { group: letters(group) })}
+          className="break-inside-avoid"
+        >
+          <h3 className="mb-3 text-lg font-semibold">{t('group', { group: letters(group) })}</h3>
+          <RoundRobinView
+            view={{
+              ...view,
+              nodes: view.nodes.filter((n) => n.group === group),
+              participants: view.participants.filter((p) => p.pool === group),
+            }}
+            matchHref={matchHref}
+          />
+        </section>
+      ))}
+    </div>
+  );
+}
+
 export function BracketView({
   view,
   matchHref,
@@ -340,6 +369,7 @@ export function BracketView({
   /** Ссылка на страницу схватки: номер схватки в карточке становится ссылкой. */
   matchHref?: (matchId: string) => string;
 }) {
+  if (view.format === 'SPECIAL_GROUP_RATED') return <GroupsView view={view} matchHref={matchHref} />;
   return view.format === 'ROUND_ROBIN' ? (
     <RoundRobinView view={view} matchHref={matchHref} />
   ) : (

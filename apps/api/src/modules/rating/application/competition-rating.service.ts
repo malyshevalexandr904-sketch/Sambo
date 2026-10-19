@@ -44,6 +44,37 @@ export class CompetitionRatingService {
     return ruleSet;
   }
 
+  /**
+   * Рейтинг спортсменов для посева жеребьёвки (ТЗ 27): текущий рейтинг, у кого его ещё нет — начальный из версии
+   * правил турнира (действующей, если турнир не рейтинговый). Правил нет — у таких спортсменов рейтинга нет.
+   */
+  async seedRatings(
+    tx: Tx | null,
+    competitionId: string,
+    athleteIds: string[],
+  ): Promise<Map<string, number>> {
+    const db = tx ?? this.db;
+    const result = new Map<string, number>();
+    if (athleteIds.length === 0) return result;
+    const rows = await db.athleteRating.findMany({
+      where: { athleteId: { in: athleteIds } },
+      select: { athleteId: true, rating: true },
+    });
+    for (const r of rows) result.set(r.athleteId, r.rating);
+    if (result.size === athleteIds.length) return result;
+    const pinned = await db.competitionRatingConfig.findUnique({
+      where: { competitionId },
+      select: { ruleSet: true },
+    });
+    const row =
+      pinned?.ruleSet ??
+      (await db.ratingRuleSet.findFirst({ where: { code: SAMBO_ELO_CODE, status: 'ACTIVE' } }));
+    if (!row) return result;
+    const initial = toRuleSetInfo(row).rules.initialRating;
+    for (const id of athleteIds) if (!result.has(id)) result.set(id, initial);
+    return result;
+  }
+
   /** Есть ли расчёты рейтинга по турниру (любого статуса) — после них тип турнира не меняется. */
   async hasCalculations(tx: Tx, competitionId: string): Promise<boolean> {
     return (await tx.ratingCalculation.count({ where: { competitionId }, take: 1 })) > 0;

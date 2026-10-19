@@ -4,7 +4,7 @@ import { Reason, Uuid } from './common.js';
 import type { CategoryRef, CategoryWeight } from './competition-categories.js';
 import type { CategoryStatus } from './competitions.js';
 import { DRAW_FORMATS, type Pool, type RoundLabel } from './formats.js';
-import type { RatedFormatPlanResult } from './rated-format.js';
+import type { RatedFormatPlanResult, RatedGroupLetter } from './rated-format.js';
 import type { Gender } from './people.js';
 import type { EntryStatus } from './registrations.js';
 import type { CompetitionFormatCode } from './rulesets.js';
@@ -96,6 +96,9 @@ export type DrawSupersede = z.infer<typeof DrawSupersede>;
 
 // ---------- Ответы ----------
 
+/** Подгруппа позиции жеребьёвки: половина сетки с утешительными (A, B) или подгруппа рейтингового формата (A–H). */
+export type DrawPool = Pool | RatedGroupLetter;
+
 export interface NamedRef {
   id: string;
   name: string;
@@ -109,9 +112,11 @@ export interface DrawParticipantDto {
   organization: NamedRef | null;
   region: NamedRef | null;
   seedNumber: number | null;
-  /** Позиция в жеребьёвке и подгруппа. */
+  /** Рейтинг на момент жеребьёвки — по нему посев рейтингового формата; в других форматах — null. */
+  ratingAtDraw: number | null;
+  /** Позиция в жеребьёвке и подгруппа (A, B — выбывание с утешительными; A–H — рейтинговый формат). */
   position: number | null;
-  pool: Pool | null;
+  pool: DrawPool | null;
   /** Участие снято после жеребьёвки — отмечается в сетке (неявка — Phase 7). */
   entryStatus: EntryStatus;
 }
@@ -121,7 +126,7 @@ export interface DrawSlotDto {
   /** null — BYE. */
   entryId: string | null;
   seedNumber: number | null;
-  pool: Pool | null;
+  pool: DrawPool | null;
 }
 
 export interface SeparationGroupDto {
@@ -191,6 +196,8 @@ export interface BracketMatchDto {
 export interface BracketNodeDto {
   key: string;
   stage: BracketStage;
+  /** Подгруппа рейтингового формата; у остальных узлов — null. */
+  group: RatedGroupLetter | null;
   round: number;
   position: number;
   label: RoundLabel;

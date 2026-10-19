@@ -399,7 +399,8 @@
     "invalid_seed": "32 hexadecimal characters, not all zeros",
     "duplicate_key": "The separation key is given twice",
     "too_many_participants": "Too many participants for one bracket",
-    "not_enough_participants": "At least two participants are needed"
+    "not_enough_participants": "At least two participants are needed",
+    "rated_seeding_by_rating": "In the rated format seeding comes from ratings and cannot be set manually"
   },
   "errors": {
     "VALIDATION_FAILED": "Please check the form fields.",
@@ -1758,7 +1759,9 @@
       "randomSeed": "Seed",
       "randomSeedHint": "32 hexadecimal characters. Leave empty and the server creates a random one. The same seed with the same participants repeats the draw exactly.",
       "randomSeedInvalid": "32 characters 0–9 and a–f, not all zeros",
-      "submit": "Hold the draw"
+      "submit": "Hold the draw",
+      "ratedSeeding": "Seeding follows the athletes’ ratings at the time of the draw (1 is the highest); equal ratings are ordered by the draw seed. Groups are filled snake-wise; clubs and regions are not separated.",
+      "ratingColumn": "Rating"
     },
     "details": {
       "format": "Format",
@@ -1861,7 +1864,9 @@
     "blue": "Blue corner",
     "winner": "winner",
     "seed": "seed {seed}",
-    "withdrawn": "withdrawn"
+    "withdrawn": "withdrawn",
+    "group": "Group {group}",
+    "rating": "rating {rating}"
   },
   "scheduling": {
     "published": "Published",

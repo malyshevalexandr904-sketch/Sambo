@@ -3,7 +3,7 @@
 // Состояние сетки не хранится отдельно: оно пересчитывается из жеребьёвки и сыгранных схваток, а стороны схваток
 // приводятся к нему — так продвижение, BYE и утешительные схватки не расходятся с графом.
 import { Injectable } from '@nestjs/common';
-import type { BracketNodeDto, BracketStage, CompetitionFormatCode, DrawStatus } from '@sde/contracts';
+import type { BracketNodeDto, CompetitionFormatCode, DrawStatus } from '@sde/contracts';
 import { type Tx, uuidv7 } from '@sde/db';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -20,13 +20,13 @@ import type { BracketGraph, BracketState, Outcome, Placement } from '../domain/g
 import { isComplete } from '../domain/resolve';
 import { type FormatStrategy, resolveFormat, strategyFor } from '../domain/strategies';
 import {
+  bracketStages,
   type MatchDurations,
   matchSpec,
   nodeDtos,
   nodeRows,
   nodeState,
   numberingOrder,
-  STAGE_ORDER,
 } from './bracket-mapping';
 
 export interface SlotRow {
@@ -94,17 +94,18 @@ export class BracketsService {
   async createFromDraw(tx: Tx, src: BracketSource): Promise<void> {
     const strategy = requireStrategy(src.format);
     const graph = strategy.build(src.slots.length);
-    const stages = [...new Set(graph.nodes.map((n) => n.stage))];
-    const bracketIds = new Map<BracketStage, string>(stages.map((s) => [s, uuidv7()]));
+    const stages = bracketStages(graph);
+    const bracketIds = new Map(stages.map((s) => [s.key, uuidv7()]));
     await tx.bracket.createMany({
       data: stages.map((stage) => ({
-        id: bracketIds.get(stage) as string,
+        id: bracketIds.get(stage.key) as string,
         competitionId: src.competitionId,
         categoryId: src.categoryId,
         drawId: src.drawId,
-        kind: stage,
+        kind: stage.kind,
         format: src.format,
-        stageOrder: STAGE_ORDER[stage],
+        stageOrder: stage.stageOrder,
+        label: stage.label,
       })),
     });
     const ids = new Map(graph.nodes.map((n) => [n.key, uuidv7()]));

@@ -799,6 +799,7 @@ model AthleteProfile {
   ratingCorrections     RatingCorrection[]
   ratingRankSnapshots   RatingRankSnapshot[]
   ratingOpponentHistory RatingHistory[]      @relation("RatingHistoryOpponent")
+  tournamentSeeds       TournamentSeed[]
 
   @@map("athlete_profile")
 }
@@ -1399,6 +1400,7 @@ model Competition {
   athleteResults     AthleteResult[]
   medicalIncidents   MedicalIncident[]
   ratingCalculations RatingCalculation[]
+  tournamentSeeds    TournamentSeed[]
   ratingConfig       CompetitionRatingConfig?
 
   @@index([status, startDate])
@@ -1600,6 +1602,7 @@ model Entry {
   weighInAttempts      WeighInAttempt[]
   weighInRecord        WeighInRecord?
   drawSlots            DrawSlot[]
+  tournamentSeeds      TournamentSeed[]
   matchParticipations  MatchParticipant[]
   activeMatch          Match?              @relation("EntryActiveMatch", fields: [activeMatchId], references: [id], onDelete: Restrict)
   placements           Placement[]
@@ -2158,6 +2161,7 @@ model Draw {
   publishedBy  User?               @relation("DrawPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
   supersededBy User?               @relation("DrawSuperseder", fields: [supersededById], references: [id], onDelete: Restrict)
   slots        DrawSlot[]
+  seeds        TournamentSeed[]
   brackets     Bracket[]
 
   @@unique([categoryId, number])
@@ -2173,7 +2177,7 @@ model DrawSlot {
   position      Int
   entryId       String? @map("entry_id") @db.Uuid
   seedNumber    Int?    @map("seed_number")
-  /// Подгруппа A или B (выбывание с утешительными), иначе пусто.
+  /// Подгруппа: A или B (выбывание с утешительными), A–H (рейтинговый формат), иначе пусто.
   pool          String?
 
   competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
@@ -2182,6 +2186,29 @@ model DrawSlot {
 
   @@unique([drawId, position])
   @@map("draw_slot")
+}
+
+/// Посев рейтингового формата (ТЗ 27, 28): номер посева и рейтинг спортсмена на момент жеребьёвки — отдельно от
+/// текущего рейтинга. Пишется вместе со слотами черновика и больше не меняется: другой посев — новая версия жеребьёвки.
+model TournamentSeed {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  competitionId String   @map("competition_id") @db.Uuid
+  drawId        String   @map("draw_id") @db.Uuid
+  entryId       String   @map("entry_id") @db.Uuid
+  athleteId     String   @map("athlete_id") @db.Uuid
+  seedNumber    Int      @map("seed_number")
+  ratingAtDraw  Int      @map("rating_at_draw")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  competition Competition    @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  draw        Draw           @relation(fields: [drawId], references: [id], onDelete: Restrict)
+  entry       Entry          @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  athlete     AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@unique([drawId, entryId])
+  @@unique([drawId, seedNumber])
+  @@index([athleteId])
+  @@map("tournament_seed")
 }
 
 /// Этап сетки опубликованной жеребьёвки: основная сетка, утешительные схватки, круговая группа.

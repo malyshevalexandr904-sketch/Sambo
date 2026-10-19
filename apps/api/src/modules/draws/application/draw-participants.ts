@@ -14,6 +14,7 @@ import { z } from 'zod';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { type MatchDurations, matchDurationSeconds, youngestAge } from '../../brackets';
 import type { CategoryRow } from '../../categories';
+import { CompetitionRatingService } from '../../rating';
 import {
   canonicalDrawInput,
   type DrawInput,
@@ -23,6 +24,7 @@ import {
 
 const PARTICIPANT_SELECT = {
   id: true,
+  athleteId: true,
   status: true,
   publicName: true,
   snapBirthDate: true,
@@ -40,12 +42,15 @@ type ParticipantRow = Prisma.EntryGetPayload<{ select: typeof PARTICIPANT_SELECT
 
 export interface ParticipantInfo {
   entryId: string;
+  athleteId: string;
   entryStatus: EntryStatus;
   admitted: boolean;
   publicName: string;
   birthYear: number;
   organization: NamedRef | null;
   region: NamedRef | null;
+  /** Рейтинг для посева рейтингового формата: текущий или начальный; null — правил рейтинга нет. */
+  rating: number | null;
 }
 
 export interface CategoryContext {
@@ -67,6 +72,7 @@ export const StoredDrawInput = z.object({
       organizationKey: z.string().nullable(),
       regionKey: z.string().nullable(),
       seedNumber: z.number().int().nullable(),
+      rating: z.number().int().optional(),
     }),
   ),
 });
@@ -81,7 +87,7 @@ const named = (o: { id: string; name: string; shortName: string | null }): Named
   name: o.shortName || o.name,
 });
 
-function toInfo(e: ParticipantRow): ParticipantInfo {
+function toInfo(e: ParticipantRow, ratings: ReadonlyMap<string, number>): ParticipantInfo {
   const organization: NamedRef = e.representationOrg
     ? named(e.representationOrg)
     : e.snapClubId
@@ -94,25 +100,36 @@ function toInfo(e: ParticipantRow): ParticipantInfo {
       : null;
   return {
     entryId: e.id,
+    athleteId: e.athleteId,
     entryStatus: e.status,
     admitted: e.status === 'APPROVED' && e.admission?.status === 'ADMITTED',
     publicName: e.publicName,
     birthYear: e.snapBirthDate.getUTCFullYear(),
     organization,
     region,
+    rating: ratings.get(e.athleteId) ?? null,
   };
 }
 
-export const toDrawParticipant = (p: ParticipantInfo, seedNumber: number | null): DrawParticipant => ({
+/** Участник входа жеребьёвки; рейтинг — только в рейтинговом формате (посев по рейтингу). */
+export const toDrawParticipant = (
+  p: ParticipantInfo,
+  seedNumber: number | null,
+  format: CompetitionFormatCode,
+): DrawParticipant => ({
   entryId: p.entryId,
   organizationKey: p.organization?.id ?? null,
   regionKey: p.region?.id ?? null,
   seedNumber,
+  ...(format === 'SPECIAL_GROUP_RATED' && p.rating !== null ? { rating: p.rating } : {}),
 });
 
 @Injectable()
 export class DrawParticipantsService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly ratings: CompetitionRatingService,
+  ) {}
 
   /** Сведения об участиях по идентификаторам (для слотов версии жеребьёвки). */
   async infos(tx: Tx | null, entryIds: string[]): Promise<Map<string, ParticipantInfo>> {
@@ -121,7 +138,7 @@ export class DrawParticipantsService {
       where: { id: { in: entryIds } },
       select: PARTICIPANT_SELECT,
     });
-    return new Map(rows.map((r) => [r.id, toInfo(r)]));
+    return new Map(rows.map((r) => [r.id, toInfo(r, new Map())]));
   }
 
   async context(tx: Tx | null, category: CategoryRow): Promise<CategoryContext> {
@@ -145,9 +162,12 @@ export class DrawParticipantsService {
       select: { startDate: true, competitionType: true, ruleSetVersion: { select: { parameters: true } } },
     });
     const params = RuleSetParametersV1.safeParse(competition.ruleSetVersion?.parameters ?? null);
+    const ratings = await this.ratings.seedRatings(tx, competitionId, [
+      ...new Set(rows.map((r) => r.athleteId)),
+    ]);
     return categories.map((category) => {
       const own = rows.filter((r) => r.categoryId === category.id);
-      const admitted = own.map(toInfo).filter((p) => p.admitted);
+      const admitted = own.map((r) => toInfo(r, ratings)).filter((p) => p.admitted);
       const age = youngestAge({
         policy: category.agePolicy,
         ageFrom: category.ageFrom,
@@ -183,7 +203,9 @@ export class DrawParticipantsService {
       format: stored.format,
       separation: stored.separation,
       algorithmVersion: stored.algorithmVersion,
-      participants: ctx.admitted.map((p) => toDrawParticipant(p, seeds.get(p.entryId) ?? null)),
+      participants: ctx.admitted.map((p) =>
+        toDrawParticipant(p, seeds.get(p.entryId) ?? null, stored.format),
+      ),
     });
   }
 }
