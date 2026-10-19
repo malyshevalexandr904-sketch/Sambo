@@ -1,15 +1,16 @@
 // Чтение жеребьёвки (API.md, 6.1): обзор турнира, версии категории, версия со слотами и предпросмотром сетки,
 // опубликованная сетка категории, проверка повтора по seed.
 import { Injectable } from '@nestjs/common';
-import type {
-  BracketViewDto,
-  CategoryBracketDto,
-  CategoryDrawsDto,
-  CompetitionStatus,
-  DrawDto,
-  DrawOverviewRow,
-  DrawVerifyDto,
-  PermissionCode,
+import {
+  type BracketViewDto,
+  type CategoryBracketDto,
+  type CategoryDrawsDto,
+  type CompetitionStatus,
+  type DrawDto,
+  type DrawOverviewRow,
+  type DrawVerifyDto,
+  type PermissionCode,
+  ratedFormatPlan,
 } from '@sde/contracts';
 import type { Tx } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
@@ -137,6 +138,7 @@ export class DrawQueriesService {
       admitted: ctx.admitted.length,
       admissionPending: ctx.admissionPending,
       suggestedFormat: ctx.suggestedFormat,
+      ratedPlan: ctx.suggestedFormat === 'SPECIAL_GROUP_RATED' ? ratedFormatPlan(ctx.admitted.length) : null,
       participants: ctx.admitted.map((p) => ({
         entryId: p.entryId,
         publicName: p.publicName,

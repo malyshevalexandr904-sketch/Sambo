@@ -20,6 +20,7 @@ import { api, ApiError } from '@/lib/api';
 import { useFieldMessage } from '@/lib/errors';
 import { pickName } from '@/lib/queries';
 import { DrawView } from './draw-view';
+import { RatedPlanCard } from './rated-plan';
 import { DrawStatusBadge, useCommandError, useDraw, useFormatLabel, useInvalidateDraws } from './shared';
 
 const SEED_RE = /^[0-9a-f]{32}$/;
@@ -214,6 +215,7 @@ export function CategoryDraws({
           </Alert>
         ) : null}
       </Card>
+      {data.ratedPlan ? <RatedPlanCard result={data.ratedPlan} /> : null}
       {data.allowedActions.includes('draw.create') ? (
         <CreateDraft
           data={data}

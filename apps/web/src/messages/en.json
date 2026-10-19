@@ -484,7 +484,9 @@
     "COMPETITION_TYPE_LOCKED": "The type of a published competition can only be changed by an administrative procedure.",
     "COMPETITION_TYPE_UNCHANGED": "The competition already has this type.",
     "RATING_CALCULATIONS_EXIST": "Ratings have already been calculated for this competition, so its type cannot change. Use rating corrections instead.",
-    "RATING_RULE_SET_UNAVAILABLE": "There is no active rating calculation rules version."
+    "RATING_RULE_SET_UNAVAILABLE": "There is no active rating calculation rules version.",
+    "INSUFFICIENT_PARTICIPANTS": "Too few participants for the category format.",
+    "TOO_MANY_PARTICIPANTS": "Too many participants for the category format."
   },
   "people": {
     "lastName": "Last name",
@@ -1733,7 +1735,8 @@
       "DOUBLE_ELIMINATION": "Double elimination",
       "PENALTY_POINTS_ELIMINATION": "Penalty points elimination",
       "GROUP_STAGE": "Groups",
-      "GROUP_PLUS_PLAYOFF": "Groups and playoff"
+      "GROUP_PLUS_PLAYOFF": "Groups and playoff",
+      "SPECIAL_GROUP_RATED": "Rated: groups and final"
     },
     "create": {
       "title": "New draft",
@@ -1800,7 +1803,28 @@
     },
     "pendingBlocked": "Admission is not decided for every entry of the category. The draw becomes available once the check-in commission decides admission — otherwise an athlete would drop out of the bracket.",
     "notLatest": "This is not the latest draft of the category. Only the newest draft can be published, so a convenient bracket cannot be picked from several.",
-    "manualSeed": "seed set manually"
+    "manualSeed": "seed set manually",
+    "ratedPlan": {
+      "title": "Rated tournament format",
+      "roundRobin": "Round robin: each of the {count} participants meets every other. Places follow the sporting results of the round robin.",
+      "groups": "{groups} round-robin groups, {qualifiers} from each go to the final part; the final part is a knockout of {final}.",
+      "group": "Group {letter}: {size}",
+      "finalPairs": "First round of the final part: {pairs}.",
+      "matches": "Matches: {total} ({groups} in groups, {final} in the final part).",
+      "thirdPlace": "There is no bronze match: both losing semifinalists take 3rd place.",
+      "INSUFFICIENT_PARTICIPANTS": "The rated format needs at least {min} participants.",
+      "TOO_MANY_PARTICIPANTS": "The rated format currently supports up to {max} participants per category.",
+      "letters": {
+        "A": "A",
+        "B": "B",
+        "C": "C",
+        "D": "D",
+        "E": "E",
+        "F": "F",
+        "G": "G",
+        "H": "H"
+      }
+    }
   },
   "bracket": {
     "main": "Main bracket",
