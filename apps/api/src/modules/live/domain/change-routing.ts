@@ -16,8 +16,9 @@ export interface ChangeRow {
 }
 
 /**
- * Тема по таблице — ровно таблицы с триггером журнала синхронизации (миграции Phase 4a–7b): только они дают
- * уведомления `sde_live`. Заявки, требования положения, площадки и медицинские допуски в журнал не пишутся.
+ * Тема по таблице — ровно таблицы с триггером журнала синхронизации (миграции Phase 4a–7b) и расчёт рейтинга
+ * (собственный триггер, фаза 13): только они дают уведомления `sde_live`. Заявки, требования положения, площадки и
+ * медицинские допуски в журнал не пишутся.
  */
 export const TABLE_TOPICS: Readonly<Record<string, LiveTopic>> = {
   competition: 'competition',
@@ -50,6 +51,7 @@ export const TABLE_TOPICS: Readonly<Record<string, LiveTopic>> = {
   category_result: 'results',
   placement: 'results',
   athlete_result: 'results',
+  rating_calculation: 'rating',
 };
 
 /** Строки схватки: изменение касается схватки (её id — `m`, у самой схватки — `id`). */
@@ -73,6 +75,7 @@ export const PUBLIC_TOPICS: readonly LiveTopic[] = [
   'schedule',
   'matches',
   'results',
+  'rating',
 ];
 
 export interface CompetitionChanges {

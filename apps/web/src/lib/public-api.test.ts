@@ -50,6 +50,34 @@ describe('public api cache reset (Phase 8b)', () => {
   });
 });
 
+describe('public api cache reset after a rating calculation (rating phase 13)', () => {
+  const paths = [
+    '/competitions/cup-2026/rating-summary',
+    '/competitions/cup-2026x/rating-summary',
+    '/rankings',
+    '/rankings/abc123',
+    '/athletes/abc123/rating-history',
+  ];
+  beforeEach(async () => {
+    invalidatePublic(null, []);
+    await calls(paths);
+  });
+
+  it('resets the tournament, the rating table and athlete cards, not other tournaments', async () => {
+    invalidatePublic('cup-2026', ['rating']);
+    fetchMock.mockClear();
+    for (const p of paths) await publicApi(p);
+    expect(fetchMock.mock.calls.map((c) => String(c[0]).replace(/^.*\/api\/public\/v1/, ''))).toEqual([
+      '/competitions/cup-2026/rating-summary',
+      '/rankings',
+      '/rankings/abc123',
+      '/athletes/abc123/rating-history',
+    ]);
+    invalidatePublic('cup-2026', ['categories']);
+    expect(await calls(paths)).toBe(1);
+  });
+});
+
 describe('feed messages', () => {
   const msg = (seq: number, payload: unknown): LiveMessage =>
     ({ v: 1, channel: 'public:competitions', seq, type: 'changed', payload }) as LiveMessage;

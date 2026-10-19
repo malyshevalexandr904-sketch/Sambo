@@ -185,6 +185,60 @@ export interface PublicRatingHistoryItem {
   opponent: (PublicRatedAthlete & { ratingBefore: number }) | null;
 }
 
+// ---- Рейтинг на странице рейтингового турнира (docs/RATING_ARCHITECTURE.md, 8, 9; фаза 13) ----
+
+/**
+ * Сторона посчитанной схватки турнира: рейтинг до и после, уровни, исход для спортсмена. Значения — от сервера,
+ * фронтенд Elo не считает (ТЗ 71).
+ */
+export interface PublicRatedMatchSide {
+  athlete: PublicRatedAthlete;
+  ratingBefore: number;
+  ratingAfter: number;
+  delta: number;
+  levelBefore: number;
+  levelAfter: number;
+  outcome: RatingOutcome;
+}
+
+/** Посчитанная схватка рейтингового турнира (действующий расчёт), новые сверху. */
+export interface PublicRatedMatch {
+  matchPublicId: string;
+  matchNumber: number | null;
+  category: LocalizedText;
+  finishedAt: string;
+  red: PublicRatedMatchSide;
+  blue: PublicRatedMatchSide;
+}
+
+export const RatedMatchesQuery = PageQuery;
+export type RatedMatchesQuery = z.infer<typeof RatedMatchesQuery>;
+
+/**
+ * Изменение рейтинга спортсмена за турнир: рейтинг до первой посчитанной схватки, изменение — сумма изменений
+ * действующих расчётов, после — их сумма к рейтингу до.
+ */
+export interface PublicRatingSummaryRow {
+  athlete: PublicRatedAthlete;
+  ratingBefore: number;
+  ratingAfter: number;
+  delta: number;
+  levelBefore: number;
+  levelAfter: number;
+  matches: number;
+  wins: number;
+  losses: number;
+}
+
+export interface PublicCompetitionRatingSummary {
+  /** Версия расчёта турнира (закреплённая версия правил). */
+  calculationVersion: string;
+  /** Посчитанные схватки турнира. */
+  ratedMatches: number;
+  /** По изменению за турнир, от большего. */
+  athletes: PublicRatingSummaryRow[];
+}
+
 // ---- Рейтинговый турнир: включение и смена типа платформой (docs/RATING_ARCHITECTURE.md, 3.1) ----
 
 /**
