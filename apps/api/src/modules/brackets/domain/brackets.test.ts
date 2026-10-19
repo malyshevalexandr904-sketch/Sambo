@@ -63,7 +63,10 @@ function play(
 
 const statuses = (state: BracketState) => [...state.values()].map((s) => s.status);
 
-describe('bracket structure for N = 1…64', () => {
+/** Переборы всех размеров сетки: секунда локально, но на загруженном CI-раннере — дольше 5 с по умолчанию. */
+const HEAVY = 30_000;
+
+describe('bracket structure for N = 1…64', { timeout: HEAVY }, () => {
   it('single elimination: N − 1 matches, BYEs only in round 1, a final always', () => {
     for (let n = 2; n <= 64; n++) {
       const run = play('SINGLE_ELIMINATION', n, () => 'RED');
@@ -119,7 +122,7 @@ describe('bracket structure for N = 1…64', () => {
   });
 });
 
-describe('bracket invariants under random results (property)', () => {
+describe('bracket invariants under random results (property)', { timeout: HEAVY }, () => {
   for (const format of FORMATS)
     it(`${format}: no self-matches, a single champion, everybody placed`, () => {
       fc.assert(
@@ -404,7 +407,7 @@ describe('both participants lost (Phase 7a: both withdrawn after the draw)', () 
   });
 });
 
-describe('place floors keep normal brackets unchanged (property)', () => {
+describe('place floors keep normal brackets unchanged (property)', { timeout: HEAVY }, () => {
   it('places in a fully played bracket follow 1, 2, 3, 3, 5… for every size', () => {
     fc.assert(
       fc.property(

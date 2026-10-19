@@ -135,6 +135,16 @@ export function rateMatch(
   };
 }
 
+/** Новый рейтинг одного спортсмена по его исходу и рейтингу соперника до схватки (пересборка, 6.5). */
+export function rateAthlete(
+  rules: RatingRules,
+  input: { rating: number; opponentRating: number; outcome: RatingOutcome },
+): AthleteRatingChange {
+  for (const r of [input.rating, input.opponentRating])
+    if (!Number.isSafeInteger(r)) throw new Error(`rating must be an integer, got ${r}`);
+  return change(rules, input.rating, input.opponentRating, input.outcome);
+}
+
 /** Исход — победа: первая половина RATING_OUTCOMES (поражения зеркальны). */
 export function isWinOutcome(outcome: string): boolean {
   const i = (RATING_OUTCOMES as readonly string[]).indexOf(outcome);

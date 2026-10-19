@@ -6,3 +6,4 @@ export * from './rule-sets.js';
 export * from './calculate.js';
 export * from './sink.js';
 export * from './rankings.js';
+export * from './rebuild.js';

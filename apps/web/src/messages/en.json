@@ -488,7 +488,10 @@
     "RATING_RULE_SET_UNAVAILABLE": "There is no active rating calculation rules version.",
     "INSUFFICIENT_PARTICIPANTS": "Too few participants for the category format.",
     "TOO_MANY_PARTICIPANTS": "Too many participants for the category format.",
-    "GROUP_DECISION_MISMATCH": "The decision does not match the shared places of the group that are waiting for a decision: reload the page."
+    "GROUP_DECISION_MISMATCH": "The decision does not match the shared places of the group that are waiting for a decision: reload the page.",
+    "RATING_CHANGED": "The athlete's rating changed while you were looking: reload the page and check the value.",
+    "RATING_UNCHANGED": "The rating already has this value: nothing to correct.",
+    "COMPETITION_NOT_RATED": "The competition is not rated, so no rating is calculated for it."
   },
   "people": {
     "lastName": "Last name",

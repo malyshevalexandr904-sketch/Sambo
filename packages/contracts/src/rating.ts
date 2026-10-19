@@ -42,8 +42,11 @@ export const RATING_CALCULATION_STATUSES = [
 ] as const;
 export type RatingCalculationStatus = (typeof RATING_CALCULATION_STATUSES)[number];
 
-/** Корректировка рейтинга: изменённый результат схватки (6.4) или ручная (фаза 14). */
-export const RATING_CORRECTION_KINDS = ['RESULT_AMENDED', 'MANUAL'] as const;
+/**
+ * Корректировка рейтинга: изменённый результат схватки (6.4), ручная администратором или применённая пересборка
+ * (6.5; фаза 14).
+ */
+export const RATING_CORRECTION_KINDS = ['RESULT_AMENDED', 'MANUAL', 'REBUILD'] as const;
 export type RatingCorrectionKind = (typeof RATING_CORRECTION_KINDS)[number];
 
 const Code = z.string().regex(/^[A-Z][A-Z0-9_]{1,39}$/, { error: 'invalid_code' });
@@ -276,4 +279,124 @@ export interface RatingRuleSetSummary {
     RatingRuleParametersV1,
     'initialRating' | 'kFactorRules' | 'scoreRules' | 'levelRules' | 'roundingRule'
   >;
+}
+
+// ---- Корректирующие операции платформы (ТЗ 18, 65–67; docs/RATING_ARCHITECTURE.md, 6.5, 8; фаза 14) ----
+
+/** Рейтинг в БД — целое; границы только отсекают явную ошибку ввода. */
+const RatingValue = z.number().int().min(-100_000).max(100_000);
+
+/**
+ * Ручная корректировка (`rating.correct`): новый рейтинг с причиной. `expectedRating` — рейтинг, который видел
+ * администратор: если он успел измениться (посчитана схватка), корректировка не применяется.
+ */
+export const RatingCorrectionInput = z.object({
+  correctedRating: RatingValue,
+  expectedRating: RatingValue,
+  relatedMatchId: Uuid.optional(),
+  reason: Reason,
+});
+export type RatingCorrectionInput = z.infer<typeof RatingCorrectionInput>;
+
+/** Статус рейтинга (`rating.correct`): FROZEN, SUSPENDED — расчёты ждут; ACTIVE — ожидающие считаются сразу. */
+export const RatingStatusChange = z.object({
+  status: z.enum(RATING_STATUSES),
+  reason: Reason,
+});
+export type RatingStatusChange = z.infer<typeof RatingStatusChange>;
+
+/**
+ * Применение пересборки (`rating.rebuild_apply`): `expectedRating` — пересобранный рейтинг из отчёта, который видел
+ * администратор; если с тех пор он изменился, отчёт устарел и ничего не применяется.
+ */
+export const RatingRebuildApply = z.object({
+  expectedRating: RatingValue,
+  reason: Reason,
+});
+export type RatingRebuildApply = z.infer<typeof RatingRebuildApply>;
+
+/** Перерасчёт турнира (`competition.recalculate_rating`): досчитать то, что не посчитано. */
+export const RatingRecalculateInput = z.object({ reason: Reason });
+export type RatingRecalculateInput = z.infer<typeof RatingRecalculateInput>;
+
+export interface AdminAthleteRating {
+  athleteId: string;
+  rating: number;
+  level: number;
+  status: RatingStatus;
+  peakRating: number;
+  lowestRating: number;
+  ratedMatches: number;
+  wins: number;
+  losses: number;
+  /** Расчёты, которые ждут (порядок схваток, заморозка). */
+  pendingCalculations: number;
+  /** null — рейтинга ещё нет: показан начальный действующей версии правил. */
+  updatedAt: string | null;
+}
+
+export interface RatingCorrectionDto {
+  id: string;
+  athleteId: string;
+  kind: RatingCorrectionKind;
+  ratingBefore: number;
+  ratingAfter: number;
+  delta: number;
+  reason: string | null;
+  relatedMatchId: string | null;
+  createdById: string | null;
+  createdAt: string;
+}
+
+export const RatingCorrectionsQuery = PageQuery;
+export type RatingCorrectionsQuery = z.infer<typeof RatingCorrectionsQuery>;
+
+/** Рейтинг до и после шага, изменение. */
+export interface RatingStepValues {
+  before: number;
+  after: number;
+  delta: number;
+}
+
+/**
+ * Шаг пересборки: действующий расчёт схватки (пересчитан по своей закреплённой версии правил от пересобранного
+ * рейтинга; рейтинг соперника — записанный) или ручная корректировка (переносится той же разницей).
+ */
+export interface RatingRebuildStep {
+  kind: 'MATCH' | 'CORRECTION';
+  at: string;
+  calculationId: string | null;
+  correctionId: string | null;
+  matchId: string | null;
+  competitionId: string | null;
+  calculationVersion: string | null;
+  outcome: RatingOutcome | null;
+  opponentRatingBefore: number | null;
+  recorded: RatingStepValues;
+  rebuilt: RatingStepValues;
+}
+
+/** Отчёт о расхождении (ТЗ 18): пересобранный рейтинг против текущего; применённая корректировка, если была. */
+export interface RatingRebuildReport {
+  athleteId: string;
+  initialRating: number;
+  currentRating: number;
+  rebuiltRating: number;
+  /** Пересобранный минус текущий. */
+  discrepancy: number;
+  steps: RatingRebuildStep[];
+  applied: RatingCorrectionDto | null;
+}
+
+/** Итог перерасчёта турнира: сколько схваток проверено и чем закончились расчёты. */
+export interface RatingRecalculationReport {
+  competitionId: string;
+  /** Схватки с подтверждённым результатом. */
+  matches: number;
+  /** Уже были посчитаны — не тронуты. */
+  unchanged: number;
+  completed: number;
+  skipped: number;
+  pending: number;
+  failed: number;
 }
