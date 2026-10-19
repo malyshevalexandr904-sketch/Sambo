@@ -30,6 +30,7 @@ import {
   type DrawSummaryRow,
   toDrawCategory,
   toDrawSummary,
+  toGroupsDto,
   toParticipants,
   toSeparationDto,
   toSlotDto,
@@ -199,9 +200,12 @@ export class DrawQueriesService {
       slots.flatMap((s) => (s.entryId ? [s.entryId] : [])),
     );
     const participants = toParticipants(slots, infos, row.seeds);
+    const published = row.status === 'PUBLISHED';
     const nodes =
-      (row.status === 'PUBLISHED' ? await this.brackets.view(row.id) : null) ??
-      this.brackets.preview(row.format, row.slots);
+      (published ? await this.brackets.view(row.id) : null) ?? this.brackets.preview(row.format, row.slots);
+    const groups =
+      (published ? await this.brackets.groups(null, row.id) : null) ??
+      this.brackets.previewGroups(row.format, row.slots);
     return {
       ...toDrawSummary(row, stale, this.summaryActions(v, category, row, state)),
       competitionId: row.competitionId,
@@ -214,7 +218,13 @@ export class DrawQueriesService {
       publishedBy: toUserRef(row.publishedBy),
       supersededBy: toUserRef(row.supersededBy),
       supersedeReason: row.supersedeReason,
-      bracket: { format: row.format, size: slots.length, nodes, participants },
+      bracket: {
+        format: row.format,
+        size: slots.length,
+        nodes,
+        participants,
+        groups: toGroupsDto(groups, slots.length),
+      },
     };
   }
 
@@ -239,6 +249,7 @@ export class DrawQueriesService {
           size: slots.length,
           nodes,
           participants: toParticipants(slots, infos, row.seeds),
+          groups: toGroupsDto(await this.brackets.groups(null, row.id), slots.length),
         }
       : null;
     return {

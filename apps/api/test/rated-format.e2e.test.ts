@@ -1,12 +1,20 @@
-// Формат рейтингового турнира (фазы 9–10, docs/RATED_TOURNAMENT_FORMAT.md): категория рейтингового турнира по
+// Формат рейтингового турнира (фазы 9–11, docs/RATED_TOURNAMENT_FORMAT.md): категория рейтингового турнира по
 // умолчанию получает формат SPECIAL_GROUP_RATED и план подгрупп по числу допущенных; меньше 3 и больше 39 участников —
 // ошибка формата. Жеребьёвка сеет по рейтингу на момент жеребьёвки, раскладывает подгруппы змейкой и сохраняет посев;
-// публикация строит по сетке на каждую подгруппу. Нерейтинговый турнир выбирает формат по правилам, как раньше.
-import type { CategoryBracketDto, CategoryDrawsDto, DrawDto } from '@sde/contracts';
+// публикация строит по сетке на каждую подгруппу. Таблицы подгрупп — по критериям версии формата (пока не
+// подтверждены, Q-F4). Нерейтинговый турнир выбирает формат по правилам, как раньше.
+import type {
+  BracketViewDto,
+  CategoryBracketDto,
+  CategoryDrawsDto,
+  CategoryResultsDto,
+  DrawDto,
+} from '@sde/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTestApp, resetData, type TestApp } from './helpers/app';
 import { send } from './helpers/phase3';
 import { type DrawWorld, drawCategory, drawWorld, SEED_A } from './helpers/phase5';
+import { confirm, playToResult, refereeWorld, scheduledMatches } from './helpers/phase7';
 
 let t: TestApp;
 let rated: DrawWorld;
@@ -150,6 +158,23 @@ describe('rated group generation', () => {
     // Предпросмотр — круги каждой подгруппы по схеме формата.
     expect(draw.bracket.nodes).toHaveLength(15);
     expect(new Set(draw.bracket.nodes.map((n) => n.group))).toEqual(new Set(['A', 'B', 'C', 'D']));
+    // Таблицы подгрупп до схваток: критерии версии формата не подтверждены, выход ещё не решён.
+    expect(draw.bracket.groups).toMatchObject({
+      criteria: ['WINS', 'HEAD_TO_HEAD', 'CLEAN_WINS', 'SUPERIORITY_WINS'],
+      criteriaConfirmed: false,
+      qualifiersPerGroup: 2,
+    });
+    expect(draw.bracket.groups!.standings.map((g) => [g.group, g.complete, g.rows.length])).toEqual([
+      ['A', false, 3],
+      ['B', false, 3],
+      ['C', false, 3],
+      ['D', false, 4],
+    ]);
+    expect(
+      draw.bracket
+        .groups!.standings.flatMap((g) => g.rows)
+        .every((r) => r.matches === 0 && r.qualified === null),
+    ).toBe(true);
 
     const seeds = await t.admin.tournamentSeed.findMany({ where: { drawId: draw.id } });
     expect(seeds).toHaveLength(13);
@@ -204,6 +229,7 @@ describe('rated group generation', () => {
     const bracket = (view.body.data as CategoryBracketDto).bracket!;
     expect(bracket.format).toBe('SPECIAL_GROUP_RATED');
     expect(bracket.nodes.every((n) => n.group !== null && n.match !== null)).toBe(true);
+    expect(bracket.groups?.standings).toHaveLength(4);
     expect(bracket.participants.find((p) => p.seedNumber === 1)).toMatchObject({
       pool: 'A',
       ratingAtDraw: 300,
@@ -222,6 +248,7 @@ describe('rated group generation', () => {
     const draw = r.body.data as DrawDto;
     expect(new Set(draw.slots.map((s) => s.pool))).toEqual(new Set(['A']));
     expect(draw.bracket.nodes).toHaveLength(6);
+    expect(draw.bracket.groups).toMatchObject({ qualifiersPerGroup: 0, standings: [{ group: 'A' }] });
   });
 
   it('refuses manual seeding in the rated format', async () => {
@@ -229,5 +256,70 @@ describe('rated group generation', () => {
     const r = await createDraft(cat.categoryId, { seeding: [{ entryId: cat.entries[0], seedNumber: 1 }] });
     expect(r.status).toBe(400);
     expect(r.body.error.details.fields).toEqual([{ path: 'seeding', code: 'rated_seeding_by_rating' }]);
+  });
+});
+
+describe('rated group standings', () => {
+  it('ranks a refereed single group by its table and takes the places from it', async () => {
+    const w = await refereeWorld(t, [{ admitted: 4 }], async (world) => {
+      await t.admin.competition.update({
+        where: { id: world.competitionId },
+        data: { competitionType: 'RATED' },
+      });
+    });
+    const categoryId = w.categories[0]!.categoryId;
+    const chief = w.staff.chief;
+    const view = async (): Promise<BracketViewDto> => {
+      const r = await chief.agent.get(`/api/v1/categories/${categoryId}/brackets`);
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+      return (r.body.data as CategoryBracketDto).bracket!;
+    };
+    const before = await view();
+    expect(before.format).toBe('SPECIAL_GROUP_RATED');
+    expect(before.groups!.standings[0]).toMatchObject({
+      group: 'A',
+      complete: false,
+      decisionRequired: false,
+    });
+    // Побеждает меньший номер посева: 3, 2, 1 и 0 побед.
+    const seed = new Map(before.participants.map((p) => [p.entryId, p.seedNumber!]));
+    const matches = await scheduledMatches(t, categoryId);
+    expect(matches).toHaveLength(6);
+    for (const m of matches) {
+      const red = m.participants.find((p) => p.side === 'RED')!.entryId!;
+      const blue = m.participants.find((p) => p.side === 'BLUE')!.entryId!;
+      const played = await playToResult(chief, m.id, seed.get(red)! < seed.get(blue)! ? 'RED' : 'BLUE');
+      const c = await confirm(chief, played);
+      expect(c.status, JSON.stringify(c.body)).toBe(200);
+    }
+
+    const [group] = (await view()).groups!.standings;
+    expect(group).toMatchObject({ complete: true, decisionRequired: false });
+    expect(
+      group!.rows.map((r) => [
+        seed.get(r.entryId),
+        r.position,
+        r.matches,
+        r.wins,
+        r.losses,
+        r.points,
+        r.qualified,
+      ]),
+    ).toEqual([
+      [1, 1, 3, 3, 0, 12, null],
+      [2, 2, 3, 2, 1, 8, null],
+      [3, 3, 3, 1, 2, 4, null],
+      [4, 4, 3, 0, 3, 0, null],
+    ]);
+    const r = await chief.agent.get(`/api/v1/categories/${categoryId}/results`);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const results = r.body.data as CategoryResultsDto;
+    expect(results.status).toBe('PROVISIONAL');
+    expect(results.placements.map((p) => [seed.get(p.entryId), p.place, p.wins, p.losses])).toEqual([
+      [1, 1, 3, 0],
+      [2, 2, 2, 1],
+      [3, 3, 1, 2],
+      [4, 4, 0, 3],
+    ]);
   });
 });

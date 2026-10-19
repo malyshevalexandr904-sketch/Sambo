@@ -1,5 +1,6 @@
 // Представления жеребьёвки: версия (кратко и полностью), категория, участники и отчёт о разведении с названиями.
 import {
+  type BracketViewDto,
   type CategoryWeight,
   type DrawPool,
   type DrawCategoryDto,
@@ -8,10 +9,13 @@ import {
   type DrawSummaryDto,
   type NamedRef,
   RATED_GROUP_LETTERS,
+  RATED_GROUPS_V1,
+  ratedFormatRule,
   type SeparationReportDto,
   type UserRef,
 } from '@sde/contracts';
 import type { Prisma } from '@sde/db';
+import type { GroupStanding } from '../../brackets';
 import type { CategoryRow } from '../../categories';
 import type { SeparationReport } from '../domain/separation';
 import type { ParticipantInfo } from './draw-participants';
@@ -145,5 +149,35 @@ export function toSeparationDto(
     keys: r.keys,
     unmet: r.unmet,
     groups: r.groups.map((g) => ({ ...g, name: names.get(g.value) ?? null })),
+  };
+}
+
+/** Таблицы подгрупп рейтингового формата с критериями мест версии формата; другие форматы — null. */
+export function toGroupsDto(standings: GroupStanding[] | null, size: number): BracketViewDto['groups'] {
+  if (!standings) return null;
+  const rules = RATED_GROUPS_V1.groupStandingRules;
+  return {
+    criteria: [...rules.criteria],
+    criteriaConfirmed: rules.confirmed,
+    qualifiersPerGroup: ratedFormatRule(size)?.qualifiersPerGroup ?? 0,
+    standings: standings.map((g) => ({
+      group: g.group,
+      complete: g.complete,
+      decisionRequired: g.decisionRequired,
+      rows: g.rows.map((r) => ({
+        position: r.position,
+        entryId: r.entryId,
+        matches: r.matches,
+        wins: r.wins,
+        losses: r.losses,
+        points: r.points,
+        tiebreakers: {
+          headToHeadWins: r.headToHeadWins,
+          cleanWins: r.cleanWins,
+          superiorityWins: r.superiorityWins,
+        },
+        qualified: r.qualified,
+      })),
+    })),
   };
 }

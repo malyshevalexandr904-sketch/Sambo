@@ -72,6 +72,31 @@ function scheduleIssues(size: number, rounds: [number, number][][]): string[] {
   return seen.size === (size * (size - 1)) / 2 ? [] : ['schedule_incomplete'];
 }
 
+/**
+ * Критерии мест в подгруппе (ТЗ 31, GroupStandingRules), применяются по порядку к равным:
+ * - WINS — число побед в подгруппе;
+ * - HEAD_TO_HEAD — победы во встречах между равными (заново для каждой меньшей группы равных);
+ * - CLEAN_WINS — чистые победы: чистая победа, а также неявка, снятие, травма, дисквалификация соперника
+ *   (решение заказчика 2026-10-18);
+ * - SUPERIORITY_WINS — победы за явным преимуществом.
+ * Неразрешённое равенство — общее место.
+ */
+export const GROUP_STANDING_CRITERIA = ['WINS', 'HEAD_TO_HEAD', 'CLEAN_WINS', 'SUPERIORITY_WINS'] as const;
+export type GroupStandingCriterion = (typeof GROUP_STANDING_CRITERIA)[number];
+
+export const GroupStandingRules = z.strictObject({
+  criteria: z
+    .array(z.enum(GROUP_STANDING_CRITERIA))
+    .min(1)
+    .refine((c) => new Set(c).size === c.length, { error: 'duplicate_criterion' }),
+  /**
+   * Критерии подтверждены заказчиком. В источниках правила мест в подгруппе нет (docs/RATED_TOURNAMENT_FORMAT.md,
+   * 3; Q-F4): пока false — по умолчанию как места круговой системы, решение заказчика требуется.
+   */
+  confirmed: z.boolean(),
+});
+export type GroupStandingRules = z.infer<typeof GroupStandingRules>;
+
 /** Версия формата: правила по числу участников подряд, схемы кругов для всех возможных размеров подгрупп. */
 export const RatedFormatConfig = z
   .strictObject({
@@ -83,6 +108,7 @@ export const RatedFormatConfig = z
     distribution: z.literal('SNAKE'),
     /** Схватки за 3 место нет: оба проигравших полуфиналиста — 3 место. */
     thirdPlace: z.literal('BOTH_SEMIFINAL_LOSERS'),
+    groupStandingRules: GroupStandingRules,
   })
   .superRefine((cfg, ctx) => {
     cfg.rules.forEach((r, i) => {
@@ -217,6 +243,11 @@ export const RATED_GROUPS_V1: RatedFormatConfig = RatedFormatConfig.parse({
   },
   distribution: 'SNAKE',
   thirdPlace: 'BOTH_SEMIFINAL_LOSERS',
+  // TODO(Q-F4): решение заказчика — пока как места круговой системы платформы.
+  groupStandingRules: {
+    criteria: ['WINS', 'HEAD_TO_HEAD', 'CLEAN_WINS', 'SUPERIORITY_WINS'],
+    confirmed: false,
+  },
 });
 
 /**

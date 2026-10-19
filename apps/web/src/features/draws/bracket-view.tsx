@@ -13,6 +13,7 @@ import { Badge, cn } from '@sde/ui';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { Link } from '@/i18n/navigation';
+import { GroupStandingTable, StandingRules } from './group-standings';
 
 interface Ctx {
   participants: Map<string, DrawParticipantDto>;
@@ -338,8 +339,10 @@ function GroupsView({ view, matchHref }: { view: BracketViewDto; matchHref?: (id
   const t = useTranslations('bracket');
   const letters = useTranslations('draws.ratedPlan.letters');
   const groups = [...new Set(view.nodes.map((n) => n.group).filter((g) => g !== null))].sort();
+  const participants = new Map(view.participants.map((p) => [p.entryId, p]));
   return (
     <div className="space-y-8">
+      {view.groups ? <StandingRules groups={view.groups} /> : null}
       {groups.map((group) => (
         <section
           key={group}
@@ -347,6 +350,17 @@ function GroupsView({ view, matchHref }: { view: BracketViewDto; matchHref?: (id
           className="break-inside-avoid"
         >
           <h3 className="mb-3 text-lg font-semibold">{t('group', { group: letters(group) })}</h3>
+          {view.groups?.standings
+            .filter((s) => s.group === group)
+            .map((s) => (
+              <div key={s.group} className="mb-4">
+                <GroupStandingTable
+                  standing={s}
+                  participants={participants}
+                  qualifiers={view.groups?.qualifiersPerGroup ?? 0}
+                />
+              </div>
+            ))}
           <RoundRobinView
             view={{
               ...view,

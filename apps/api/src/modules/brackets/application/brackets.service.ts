@@ -17,6 +17,8 @@ import {
 } from '../../matches';
 import { nodeDependencies, participantsKnownAtPublish } from '../domain/dependencies';
 import type { BracketGraph, BracketState, Outcome, Placement } from '../domain/graph';
+import type { GroupStanding } from '../domain/group-standings';
+import { ratedGroupStandings } from '../domain/rated-groups';
 import { isComplete } from '../domain/resolve';
 import { type FormatStrategy, resolveFormat, strategyFor } from '../domain/strategies';
 import {
@@ -172,6 +174,21 @@ export class BracketsService {
       competitionId: draw.competitionId,
       categoryId: draw.categoryId,
     };
+  }
+
+  /** Таблицы подгрупп предпросмотра черновика (схваток ещё нет); не рейтинговый формат — null. */
+  previewGroups(format: CompetitionFormatCode, slots: SlotRow[]): GroupStanding[] | null {
+    if (format !== 'SPECIAL_GROUP_RATED') return null;
+    const strategy = requireStrategy(format);
+    const graph = strategy.build(slots.length);
+    return ratedGroupStandings(graph, resolveFormat(strategy, graph, slotMap(slots)), new Map());
+  }
+
+  /** Таблицы подгрупп опубликованной сетки по подтверждённым исходам (ТЗ 31); не рейтинговый формат — null. */
+  async groups(tx: Tx | null, drawId: string): Promise<GroupStanding[] | null> {
+    const live = await this.live(tx, drawId);
+    if (!live || live.graph.format !== 'SPECIAL_GROUP_RATED') return null;
+    return ratedGroupStandings(live.graph, live.state, live.outcomes);
   }
 
   /** Узлы опубликованной сетки со схватками; сетки нет — null. */

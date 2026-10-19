@@ -1,15 +1,17 @@
 // Рейтинговый формат SPECIAL_GROUP_RATED (docs/RATED_TOURNAMENT_FORMAT.md, 1, 6): подгруппы по кругу по схемам кругов
 // версии формата. Позиции жеребьёвки идут подгруппа за подгруппой (rated-groups жеребьёвки), поэтому граф зависит
-// только от числа участников. Финальная часть — фаза 12; места в подгруппах — фаза 11.
+// только от числа участников. Места в подгруппах — по критериям версии формата (group-standings); финальная часть —
+// фаза 12.
 import {
   RATED_GROUP_LETTERS,
+  RATED_GROUPS_V1,
   ratedFormatPlan,
   ratedFormatRule,
   ratedRoundSchedule,
   snakeGroups,
 } from '@sde/contracts';
 import type { BracketGraph, BracketState, GraphNode, Outcome, Placement } from './graph';
-import { roundRobinPlacements } from './round-robin';
+import { type GroupStanding, groupStandings } from './group-standings';
 
 export const groupKey = (group: string, round: number, position: number): string =>
   `GROUP:${group}:${round}:${position}`;
@@ -53,8 +55,21 @@ export function buildRatedGroups(size: number): BracketGraph {
   return { format: 'SPECIAL_GROUP_RATED', size, nodes };
 }
 
+/** Выходят из каждой подгруппы в финальную часть по правилу формата для размера сетки. */
+export const ratedQualifiers = (graph: BracketGraph): number =>
+  ratedFormatRule(graph.size)?.qualifiersPerGroup ?? 0;
+
+/** Таблицы подгрупп по критериям версии формата. */
+export function ratedGroupStandings(
+  graph: BracketGraph,
+  state: BracketState,
+  outcomes: ReadonlyMap<string, Outcome>,
+): GroupStanding[] {
+  return groupStandings(graph, state, outcomes, RATED_GROUPS_V1.groupStandingRules, ratedQualifiers(graph));
+}
+
 /**
- * Места: одна подгруппа (3–5 участников) — круговая система, места по её правилам. Несколько подгрупп — места
+ * Места: одна подгруппа (3–5 участников) — места её таблицы, когда все схватки решены. Несколько подгрупп — места
  * определяет финальная часть (фаза 12), до неё итогов категории нет.
  */
 export function ratedPlacements(
@@ -62,6 +77,8 @@ export function ratedPlacements(
   state: BracketState,
   outcomes: ReadonlyMap<string, Outcome>,
 ): Placement[] | null {
-  if (new Set(graph.nodes.map((n) => n.group)).size > 1) return null;
-  return roundRobinPlacements(graph, state, outcomes);
+  const standings = ratedGroupStandings(graph, state, outcomes);
+  const [only] = standings;
+  if (standings.length !== 1 || !only?.complete) return null;
+  return only.rows.map((r) => ({ entryId: r.entryId, place: r.position, wins: r.wins, losses: r.losses }));
 }
