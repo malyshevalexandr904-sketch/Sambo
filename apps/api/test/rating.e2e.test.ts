@@ -3,15 +3,11 @@
 // замороженного спортсмена, история только дополняется (фазы 3–5).
 import { canonicalJson, type WinMethod } from '@sde/contracts';
 import { uuidv7 } from '@sde/db';
+import { SAMBO_ELO_V1 } from '@sde/rating';
 import { sha256Hex } from '@sde/server-kit';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PrismaService } from '../src/infrastructure/prisma/prisma.service';
-import {
-  RatingCalculationService,
-  type RatingRuleSetInfo,
-  RatingRulesService,
-  SAMBO_ELO_V1,
-} from '../src/modules/rating';
+import { RatingCalculationService, RatingRulesService } from '../src/modules/rating';
 import { createTestApp, resetData, type TestApp } from './helpers/app';
 import {
   confirm,
@@ -106,7 +102,6 @@ describe('rating rule sets', () => {
 describe('rating calculation of a confirmed match', () => {
   let w: RefereeWorld;
   let calc: RatingCalculationService;
-  let elo: RatingRuleSetInfo;
   let matches: ScheduledMatch[];
 
   /** Подтверждённый результат без судейского планшета (сам расчёт читает только match_result). */
@@ -157,7 +152,11 @@ describe('rating calculation of a confirmed match', () => {
   beforeAll(async () => {
     w = await refereeWorld(t, [{ admitted: 5, format: 'ROUND_ROBIN' }]);
     calc = t.app.get(RatingCalculationService);
-    elo = (await rules.active())!;
+    // Рейтинговый турнир с закреплённой действующей версией правил (включение администратором — фаза 8).
+    await t.admin.competition.update({ where: { id: w.competitionId }, data: { competitionType: 'RATED' } });
+    await t.admin.competitionRatingConfig.create({
+      data: { competitionId: w.competitionId, ruleSetId: (await rules.active())!.id },
+    });
     // В круге из 5 у каждого участника есть отдых: схватки без BYE.
     matches = (await scheduledMatches(t, w.categories[0]!.categoryId)).filter((m) =>
       m.participants.every((p) => p.entryId && !p.isBye),
@@ -167,7 +166,7 @@ describe('rating calculation of a confirmed match', () => {
 
   it('does nothing before the result is confirmed', async () => {
     const m = matches[0]!;
-    expect(await calc.calculate(m.id, elo)).toEqual({
+    expect(await calc.calculate(m.id)).toMatchObject({
       calculationId: null,
       status: null,
       reason: 'RESULT_NOT_CONFIRMED',
@@ -183,7 +182,7 @@ describe('rating calculation of a confirmed match', () => {
     const red = await athleteOf(m, 'RED');
     const blue = await athleteOf(m, 'BLUE');
 
-    const first = await calc.calculate(m.id, elo);
+    const first = await calc.calculate(m.id);
     expect(first).toMatchObject({ status: 'COMPLETED', reason: null, replayed: false });
     // 200 / 200, победа по баллам (0.9 / 0.1), K = 30: +12 / −12 (RATING_RULES.md, C8).
     expect(await ratingOf(red)).toMatchObject({
@@ -236,11 +235,12 @@ describe('rating calculation of a confirmed match', () => {
     ]);
 
     // Повтор — тот же расчёт, ничего не начислено второй раз.
-    expect(await calc.calculate(m.id, elo)).toEqual({
+    expect(await calc.calculate(m.id)).toEqual({
       calculationId: first.calculationId,
       status: 'COMPLETED',
       reason: null,
       replayed: true,
+      athleteIds: expect.arrayContaining([red, blue]) as string[],
     });
     expect((await ratingOf(red))?.rating).toBe(212);
     expect(await t.admin.ratingHistory.count({ where: { matchId: m.id } })).toBe(2);
@@ -254,7 +254,7 @@ describe('rating calculation of a confirmed match', () => {
         async (s) => (await ratingOf(await athleteOf(m, s as 'RED' | 'BLUE')))?.rating ?? 200,
       ),
     );
-    const outcomes = await Promise.all([1, 2, 3, 4].map(() => calc.calculate(m.id, elo)));
+    const outcomes = await Promise.all([1, 2, 3, 4].map(() => calc.calculate(m.id)));
     expect(outcomes.filter((o) => !o.replayed)).toHaveLength(1);
     expect(new Set(outcomes.map((o) => o.calculationId)).size).toBe(1);
     expect(await t.admin.ratingHistory.count({ where: { matchId: m.id } })).toBe(2);
@@ -283,7 +283,7 @@ describe('rating calculation of a confirmed match', () => {
     }
     expect(next).toBeDefined();
     await setResult(next!, { winnerSide: 'RED', method: 'POINTS', methodDetail: 'LAST_TECHNICAL_ACTION' });
-    const r = await calc.calculate(next!.id, elo);
+    const r = await calc.calculate(next!.id);
     const rows = await t.admin.ratingHistory.findMany({ where: { calculationId: r.calculationId! } });
     for (const h of rows) expect(h.ratingBefore).toBe(latest.get(h.athleteId) ?? 200);
     const red = await athleteOf(next!, 'RED');
@@ -294,16 +294,16 @@ describe('rating calculation of a confirmed match', () => {
   it('skips matches that are not rated and fails on a result the rules do not know', async () => {
     const noWinner = await free();
     await setResult(noWinner, { winnerSide: null, method: 'NO_SHOW' });
-    expect(await calc.calculate(noWinner.id, elo)).toMatchObject({ status: 'SKIPPED', reason: 'NO_WINNER' });
+    expect(await calc.calculate(noWinner.id)).toMatchObject({ status: 'SKIPPED', reason: 'NO_WINNER' });
     const unknown = await free();
     await setResult(unknown, { winnerSide: 'RED', method: 'POINTS', methodDetail: 'SOMETHING_NEW' });
-    expect(await calc.calculate(unknown.id, elo)).toMatchObject({ status: 'FAILED', reason: 'UNCLASSIFIED' });
+    expect(await calc.calculate(unknown.id)).toMatchObject({ status: 'FAILED', reason: 'UNCLASSIFIED' });
     // Не начислено ничего.
     expect(await t.admin.ratingHistory.count({ where: { matchId: { in: [noWinner.id, unknown.id] } } })).toBe(
       0,
     );
     // Повторный вызов SKIPPED — без изменений.
-    expect(await calc.calculate(noWinner.id, elo)).toMatchObject({ status: 'SKIPPED', replayed: true });
+    expect(await calc.calculate(noWinner.id)).toMatchObject({ status: 'SKIPPED', replayed: true });
   });
 
   it('keeps a match of a frozen athlete pending and rates it once the athlete is active again', async () => {
@@ -315,13 +315,154 @@ describe('rating calculation of a confirmed match', () => {
       create: { athleteId: red, rating: 200, peakRating: 200, lowestRating: 200, status: 'FROZEN' },
       update: { status: 'FROZEN' },
     });
-    const pending = await calc.calculate(m.id, elo);
+    const pending = await calc.calculate(m.id);
     expect(pending).toMatchObject({ status: 'PENDING', reason: 'ATHLETE_NOT_ACTIVE', replayed: false });
     expect(await t.admin.ratingHistory.count({ where: { matchId: m.id } })).toBe(0);
     await t.admin.athleteRating.update({ where: { athleteId: red }, data: { status: 'ACTIVE' } });
-    const done = await calc.calculate(m.id, elo);
+    const done = await calc.calculate(m.id);
     expect(done).toMatchObject({ calculationId: pending.calculationId, status: 'COMPLETED', reason: null });
     expect(await t.admin.ratingHistory.count({ where: { matchId: m.id } })).toBe(2);
+  });
+
+  /** Две схватки без результата с общим спортсменом: [раньше, позже, общий спортсмен]. */
+  const freePair = async (): Promise<[ScheduledMatch, ScheduledMatch, string]> => {
+    const taken = new Set(
+      (await t.admin.matchResult.findMany({ select: { matchId: true } })).map((r) => r.matchId),
+    );
+    const open = matches.filter((x) => !taken.has(x.id));
+    for (const a of open)
+      for (const b of open) {
+        if (a === b) continue;
+        const ids = new Set([await athleteOf(a, 'RED'), await athleteOf(a, 'BLUE')]);
+        for (const side of ['RED', 'BLUE'] as const) {
+          const shared = await athleteOf(b, side);
+          if (ids.has(shared)) return [a, b, shared];
+        }
+      }
+    throw new Error('no pair of open matches with a shared athlete');
+  };
+  const historyOf = (calculationId: string) => t.admin.ratingHistory.findMany({ where: { calculationId } });
+
+  it("rates an athlete's matches in order: a later match waits for the earlier one", async () => {
+    const [early, late, shared] = await freePair();
+    await setResult(early, { winnerSide: 'RED', method: 'POINTS' });
+    await setResult(late, { winnerSide: 'BLUE', method: 'SUPERIORITY' });
+
+    // Подтверждение более поздней схватки обработано первым — расчёт ждёт.
+    const waiting = await calc.calculate(late.id);
+    expect(waiting).toMatchObject({ status: 'PENDING', reason: 'EARLIER_MATCH_PENDING' });
+    expect(await t.admin.ratingHistory.count({ where: { matchId: late.id } })).toBe(0);
+
+    const first = await calc.calculate(early.id);
+    expect(first.status).toBe('COMPLETED');
+    const released = await calc.releasePending(first.athleteIds);
+    expect(released).toEqual([
+      expect.objectContaining({ calculationId: waiting.calculationId, status: 'COMPLETED' }),
+    ]);
+    // Вторая схватка начата от рейтинга после первой.
+    const after = (await historyOf(first.calculationId!)).find((h) => h.athleteId === shared)!;
+    const next = (await historyOf(waiting.calculationId!)).find((h) => h.athleteId === shared)!;
+    expect(next.ratingBefore).toBe(after.ratingAfter);
+    expect((await ratingOf(shared))?.rating).toBe(next.ratingAfter);
+  });
+
+  it('turns an amended result into a correction without rewriting history', async () => {
+    const m = await free();
+    await setResult(m, { winnerSide: 'RED', method: 'TOTAL_VICTORY' });
+    const red = await athleteOf(m, 'RED');
+    const blue = await athleteOf(m, 'BLUE');
+    const first = await calc.calculate(m.id);
+    expect(first.status).toBe('COMPLETED');
+    const [redBefore, blueBefore] = [(await ratingOf(red))!, (await ratingOf(blue))!];
+    const oldRows = await historyOf(first.calculationId!);
+    const old = (id: string) => oldRows.find((h) => h.athleteId === id)!;
+
+    // Результат изменён: победил синий по баллам.
+    await t.admin.matchResult.update({
+      where: { matchId: m.id },
+      data: { status: 'AMENDED', winnerSide: 'BLUE', method: 'POINTS', methodDetail: null, revision: 2 },
+    });
+    const amended = await calc.calculate(m.id);
+    expect(amended).toMatchObject({ status: 'COMPLETED', replayed: false });
+    expect(amended.calculationId).not.toBe(first.calculationId);
+    expect(
+      (await t.admin.ratingCalculation.findUniqueOrThrow({ where: { id: first.calculationId! } })).status,
+    ).toBe('SUPERSEDED');
+    // Прежняя история на месте; новая — от тех же рейтингов до схватки.
+    expect(await historyOf(first.calculationId!)).toHaveLength(2);
+    const newRows = await historyOf(amended.calculationId!);
+    const now = (id: string) => newRows.find((h) => h.athleteId === id)!;
+    expect(now(red).ratingBefore).toBe(old(red).ratingBefore);
+    expect(now(blue).ratingBefore).toBe(old(blue).ratingBefore);
+    expect(now(blue).outcome).toBe('WIN_ON_POINTS');
+    expect(now(red).outcome).toBe('LOSS_ON_POINTS');
+    // Текущий рейтинг получил разницу к начисленному; победа и поражение поменялись местами.
+    for (const [id, was] of [
+      [red, redBefore],
+      [blue, blueBefore],
+    ] as const) {
+      const correction = now(id).ratingDelta - old(id).ratingDelta;
+      const r = (await ratingOf(id))!;
+      expect(r.rating).toBe(was.rating + correction);
+      expect(r.ratedMatches).toBe(was.ratedMatches);
+      const c = await t.admin.ratingCorrection.findFirstOrThrow({
+        where: { athleteId: id, calculationId: amended.calculationId! },
+      });
+      expect(c).toMatchObject({
+        kind: 'RESULT_AMENDED',
+        supersededCalculationId: first.calculationId,
+        ratingBefore: was.rating,
+        ratingAfter: was.rating + correction,
+        delta: correction,
+      });
+    }
+    expect((await ratingOf(red))!.wins).toBe(redBefore.wins - 1);
+    expect((await ratingOf(blue))!.wins).toBe(blueBefore.wins + 1);
+    expect(
+      await t.admin.auditLog.count({ where: { action: 'rating.amended', entityId: amended.calculationId! } }),
+    ).toBe(1);
+    // Повтор — без второй корректировки.
+    expect(await calc.calculate(m.id)).toMatchObject({
+      calculationId: amended.calculationId,
+      replayed: true,
+    });
+    expect(await t.admin.ratingCorrection.count({ where: { calculationId: amended.calculationId! } })).toBe(
+      2,
+    );
+
+    // Изменён ещё раз — неявка обоих, схватка не рейтинговая: начисленное снимается полностью.
+    await t.admin.matchResult.update({
+      where: { matchId: m.id },
+      data: { winnerSide: null, method: 'NO_SHOW', revision: 3 },
+    });
+    expect(await calc.calculate(m.id)).toMatchObject({ status: 'SKIPPED', reason: 'NO_WINNER' });
+    for (const [id, was] of [
+      [red, redBefore],
+      [blue, blueBefore],
+    ] as const) {
+      const r = (await ratingOf(id))!;
+      expect(r.rating).toBe(was.rating - old(id).ratingDelta);
+      expect(r.ratedMatches).toBe(was.ratedMatches - 1);
+    }
+  });
+
+  it('writes nothing for a match of a competition that is not rated', async () => {
+    const m = await free();
+    await setResult(m, { winnerSide: 'RED', method: 'POINTS' });
+    await t.admin.competition.update({
+      where: { id: w.competitionId },
+      data: { competitionType: 'NON_RATED' },
+    });
+    try {
+      expect(await calc.calculate(m.id)).toMatchObject({ calculationId: null, reason: 'NOT_RATED' });
+      expect(await t.admin.ratingCalculation.count({ where: { matchId: m.id } })).toBe(0);
+    } finally {
+      await t.admin.competition.update({
+        where: { id: w.competitionId },
+        data: { competitionType: 'RATED' },
+      });
+    }
+    expect((await calc.calculate(m.id)).status).toBe('COMPLETED');
   });
 
   it('gives the application no way to rewrite or delete history', async () => {
@@ -331,5 +472,6 @@ describe('rating calculation of a confirmed match', () => {
     );
     await expect(db.$executeRaw`DELETE FROM rating_history`).rejects.toThrow(/permission denied/);
     await expect(db.$executeRaw`DELETE FROM athlete_rating`).rejects.toThrow(/permission denied/);
+    await expect(db.$executeRaw`UPDATE rating_correction SET delta = 0`).rejects.toThrow(/permission denied/);
   });
 });

@@ -1,8 +1,17 @@
 import fc from 'fast-check';
 import { RatingRuleParametersV1 } from '@sde/contracts';
 import { describe, expect, it } from 'vitest';
-import { classifyResult, Dec, expectedScore, kFactor, rateMatch, ratingLevel, roundRating } from './elo';
-import { RATING_OUTCOMES, type RatingOutcome, SAMBO_ELO_V1 } from './rules';
+import {
+  classifyResult,
+  Dec,
+  expectedScore,
+  isWinOutcome,
+  kFactor,
+  rateMatch,
+  ratingLevel,
+  roundRating,
+} from './elo.js';
+import { RATING_OUTCOMES, type RatingOutcome, SAMBO_ELO_V1 } from './rules.js';
 
 const R = SAMBO_ELO_V1;
 
@@ -196,5 +205,17 @@ describe('rule set parameters schema', () => {
     const r = RatingRuleParametersV1.safeParse({ ...R, ...patch });
     expect(r.success).toBe(false);
     if (code) expect(r.error?.issues.map((i) => i.message)).toContain(code);
+  });
+});
+
+describe('isWinOutcome', () => {
+  it('splits the outcomes into the winner and the loser halves', () => {
+    expect(RATING_OUTCOMES.filter(isWinOutcome)).toEqual([
+      'CLEAN_WIN',
+      'WIN_ON_POINTS',
+      'WIN_SMALL_ADVANTAGE',
+      'WIN_MINIMAL_ADVANTAGE',
+    ]);
+    expect(() => isWinOutcome('DRAW')).toThrow(/unknown/);
   });
 });

@@ -25,7 +25,9 @@ export const CONSUMERS: Partial<Record<EventType, readonly string[]>> = {
   'category.results_published': ['notifications'],
   // Phase 8b: «началась схватка»; подтверждённый результат сдвигает очередь ковра — проверка «скоро выступает».
   'match.started': ['notifications'],
-  'match.result_confirmed': ['notifications'],
+  // Рейтинг (docs/RATING_ARCHITECTURE.md, 6.1): расчёт после подтверждения и после изменения результата.
+  'match.result_confirmed': ['notifications', 'rating'],
+  'match.result_amended': ['rating'],
   // Phase 9a: заявки на регистрацию в системе — заявителю, проверяющим, организации.
   'onboarding.submitted': ['notifications'],
   'onboarding.changes_requested': ['notifications'],

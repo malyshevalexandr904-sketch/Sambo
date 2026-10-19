@@ -1,4 +1,4 @@
-// Worker: диспетчер outbox, очереди писем, импорта и уведомлений, регламентные задачи (ARCHITECTURE.md, 3.1).
+// Worker: диспетчер outbox, очереди писем, импорта, уведомлений и рейтинга, регламентные задачи (ARCHITECTURE.md, 3.1).
 import { createServer } from 'node:http';
 import { S3Client } from '@aws-sdk/client-s3';
 import { createPrismaClient } from '@sde/db';
@@ -23,6 +23,7 @@ import {
   SOON_SCAN_EVERY_MS,
 } from './notifications/notification.consumer';
 import { type ConsumerQueue, OutboxDispatcher, type OutboxJob } from './outbox/dispatcher';
+import { RATING_SWEEP_EVERY_MS, RatingConsumer, type RatingJob } from './rating/rating.consumer';
 import { WebPushTransport } from './push/web-push';
 
 function logFailures(w: Worker, logger: Logger): void {
@@ -54,6 +55,7 @@ function createWebPush(env: Env, logger: Logger): WebPushTransport | null {
 async function scheduleRepeatables(
   maintenanceQueue: Queue<{ job: MaintenanceJob }>,
   notificationQueue: Queue<NotificationJob>,
+  ratingQueue: Queue<RatingJob>,
 ): Promise<void> {
   for (const [name, schedule] of Object.entries(MAINTENANCE_JOBS)) {
     await maintenanceQueue.upsertJobScheduler(
@@ -66,6 +68,11 @@ async function scheduleRepeatables(
     'match-soon-scan',
     { every: SOON_SCAN_EVERY_MS },
     { name: 'soon-scan', data: { kind: 'soon-scan' }, opts: { removeOnComplete: true, removeOnFail: 100 } },
+  );
+  await ratingQueue.upsertJobScheduler(
+    'rating-sweep',
+    { every: RATING_SWEEP_EVERY_MS },
+    { name: 'sweep', data: { kind: 'sweep' }, opts: { removeOnComplete: true, removeOnFail: 100 } },
   );
 }
 
@@ -109,6 +116,7 @@ interface Handlers {
   email: (job: Job<OutboxJob>) => Promise<void>;
   imports: (job: Job<OutboxJob>) => Promise<void>;
   notifications: (job: Job<NotificationJob>) => Promise<void>;
+  rating: (job: Job<RatingJob>) => Promise<void>;
   maintenance: (job: Job<{ job: MaintenanceJob }>) => Promise<void>;
 }
 
@@ -118,6 +126,8 @@ function startWorkers(connection: Redis, h: Handlers): Worker[] {
     new Worker<OutboxJob>('email', h.email, { connection, concurrency: 5 }),
     new Worker<OutboxJob>('imports', h.imports, { connection, concurrency: 2 }),
     new Worker<NotificationJob>('notifications', h.notifications, { connection, concurrency: 5 }),
+    // Схватки разных спортсменов считаются параллельно; общий спортсмен — блокировка строки рейтинга.
+    new Worker<RatingJob>('rating', h.rating, { connection, concurrency: 4 }),
     new Worker<{ job: MaintenanceJob }>('maintenance', h.maintenance, { connection, concurrency: 1 }),
   ];
 }
@@ -132,7 +142,9 @@ async function main(): Promise<void> {
   const emailQueue = retryingQueue<OutboxJob>('email', connection, 5, 10_000);
   const importQueue = retryingQueue<OutboxJob>('imports', connection, 3, 5_000);
   const notificationQueue = retryingQueue<NotificationJob>('notifications', connection, 5, 10_000);
+  const ratingQueue = retryingQueue<RatingJob>('rating', connection, 8, 5_000);
   const maintenanceQueue = new Queue<{ job: MaintenanceJob }>('maintenance', { connection });
+  const queues = [emailQueue, importQueue, notificationQueue, ratingQueue, maintenanceQueue];
 
   const mailer = createMailer(env, logger);
   const emailConsumer = new EmailConsumer(db, mailer, logger, env);
@@ -144,16 +156,18 @@ async function main(): Promise<void> {
   });
   const maintenance = new Maintenance(db, s3, env, logger);
   const importConsumer = new ImportConsumer(db, s3, env, logger);
+  const ratingConsumer = new RatingConsumer(db, logger);
 
   const workers = startWorkers(connection, {
     email: (job) => emailConsumer.handle(job),
     imports: (job) => importConsumer.handle(job),
     notifications: (job) => notificationConsumer.handle(job),
+    rating: (job) => ratingConsumer.handle(job),
     maintenance: (job) => maintenance.run(job.data.job),
   });
   for (const w of workers) logFailures(w, logger);
 
-  await scheduleRepeatables(maintenanceQueue, notificationQueue);
+  await scheduleRepeatables(maintenanceQueue, notificationQueue, ratingQueue);
 
   const dispatcher = new OutboxDispatcher(
     db,
@@ -161,6 +175,7 @@ async function main(): Promise<void> {
       ['email', emailQueue],
       ['imports', importQueue],
       ['notifications', notificationQueue],
+      ['rating', ratingQueue],
     ]),
     logger,
   );
@@ -176,12 +191,7 @@ async function main(): Promise<void> {
     health.close();
     await dispatcher.stop();
     await Promise.all(workers.map((w) => w.close()));
-    await Promise.all([
-      emailQueue.close(),
-      importQueue.close(),
-      notificationQueue.close(),
-      maintenanceQueue.close(),
-    ]);
+    await Promise.all(queues.map((q) => q.close()));
     push?.close();
     await db.$disconnect();
     connection.disconnect();
