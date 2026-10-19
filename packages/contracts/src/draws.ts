@@ -4,7 +4,7 @@ import { Reason, Uuid } from './common.js';
 import type { CategoryRef, CategoryWeight } from './competition-categories.js';
 import type { CategoryStatus } from './competitions.js';
 import { DRAW_FORMATS, type Pool, type RoundLabel } from './formats.js';
-import type { RatedFormatPlanResult, RatedGroupLetter } from './rated-format.js';
+import type { GroupStandingCriterion, RatedFormatPlanResult, RatedGroupLetter } from './rated-format.js';
 import type { Gender } from './people.js';
 import type { EntryStatus } from './registrations.js';
 import type { CompetitionFormatCode } from './rulesets.js';
@@ -212,11 +212,51 @@ export interface BracketNodeDto {
   match: BracketMatchDto | null;
 }
 
+/** Строка таблицы подгруппы (ТЗ 31): место, итоги, значения критериев, выход в финальную часть. */
+export interface GroupStandingRowDto {
+  /** Место в подгруппе; равные по всем критериям делят место. */
+  position: number;
+  entryId: string;
+  matches: number;
+  wins: number;
+  losses: number;
+  /** Баллы, набранные в схватках подгруппы (справочно, в местах не участвует). */
+  points: number;
+  tiebreakers: {
+    /** Победы над равными по числу побед. */
+    headToHeadWins: number;
+    cleanWins: number;
+    superiorityWins: number;
+  };
+  /**
+   * Выходит в финальную часть. null — ещё неизвестно (подгруппа не завершена) или общее место на границе выхода:
+   * нужно решение (decisionRequired).
+   */
+  qualified: boolean | null;
+}
+
+export interface GroupStandingsDto {
+  group: RatedGroupLetter;
+  /** Все схватки подгруппы решены. */
+  complete: boolean;
+  /** Подгруппа завершена, но общее место на границе выхода не разрешено критериями. */
+  decisionRequired: boolean;
+  rows: GroupStandingRowDto[];
+}
+
 export interface BracketViewDto {
   format: CompetitionFormatCode;
   size: number;
   nodes: BracketNodeDto[];
   participants: DrawParticipantDto[];
+  /** Таблицы подгрупп рейтингового формата; у остальных форматов — null. */
+  groups: {
+    criteria: GroupStandingCriterion[];
+    /** Критерии мест подтверждены заказчиком (Q-F4); false — предварительные. */
+    criteriaConfirmed: boolean;
+    qualifiersPerGroup: number;
+    standings: GroupStandingsDto[];
+  } | null;
 }
 
 export interface DrawDto extends DrawSummaryDto {

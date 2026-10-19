@@ -1866,7 +1866,31 @@
     "seed": "seed {seed}",
     "withdrawn": "withdrawn",
     "group": "Group {group}",
-    "rating": "rating {rating}"
+    "rating": "rating {rating}",
+    "standings": {
+      "caption": "Group table",
+      "position": "Place",
+      "participant": "Athlete",
+      "matches": "M",
+      "wins": "W",
+      "losses": "L",
+      "cleanWins": "Clean",
+      "superiorityWins": "Sup.",
+      "points": "Points",
+      "qualified": "Advances",
+      "yes": "Advances",
+      "no": "No",
+      "undecided": "Decision",
+      "decisionRequired": "A shared place sits on the line to the final part: the criteria did not separate the athletes, so who advances is undecided and needs a decision.",
+      "rules": "Group places: {criteria}; athletes equal on every criterion share the place.",
+      "provisional": "The criteria are provisional: the format documents give no rule for group places, so they need to be confirmed.",
+      "criteria": {
+        "WINS": "wins",
+        "HEAD_TO_HEAD": "head-to-head",
+        "CLEAN_WINS": "clean wins",
+        "SUPERIORITY_WINS": "wins by superiority"
+      }
+    }
   },
   "scheduling": {
     "published": "Published",
