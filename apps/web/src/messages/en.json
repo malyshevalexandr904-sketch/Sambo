@@ -479,7 +479,12 @@
     "EVENT_NOT_ALLOWED_BY_RULESET": "This action is not allowed by the competition rules in the current state of the match.",
     "MATCH_RESULT_INCOMPLETE": "Record the result of the match first: the winner and the method.",
     "RESULT_NOT_CONFIRMED": "Some matches in the category have no confirmed result — the results cannot be published.",
-    "ORGANIZATION_ALREADY_REGISTERED": "This organization is already registered or its registration is under review by the platform team. If you are its head, please contact support."
+    "ORGANIZATION_ALREADY_REGISTERED": "This organization is already registered or its registration is under review by the platform team. If you are its head, please contact support.",
+    "RATED_COMPETITION_FORBIDDEN": "Only a platform administrator can create a rated competition.",
+    "COMPETITION_TYPE_LOCKED": "The type of a published competition can only be changed by an administrative procedure.",
+    "COMPETITION_TYPE_UNCHANGED": "The competition already has this type.",
+    "RATING_CALCULATIONS_EXIST": "Ratings have already been calculated for this competition, so its type cannot change. Use rating corrections instead.",
+    "RATING_RULE_SET_UNAVAILABLE": "There is no active rating calculation rules version."
   },
   "people": {
     "lastName": "Last name",
@@ -1173,7 +1178,38 @@
     },
     "notifyMatchesAhead": "“Bout coming up” notification",
     "notifyMatchesAheadHint": "Sent to guardians, athletes and following coaches when this many bouts are left before the athlete's bout on their mat.",
-    "notifyMatchesAheadOption": "{n, plural, =0 {Do not notify} one {# bout ahead} other {# bouts ahead}}"
+    "notifyMatchesAheadOption": "{n, plural, =0 {Do not notify} one {# bout ahead} other {# bouts ahead}}",
+    "rating": {
+      "title": "Rating",
+      "type": "Competition type",
+      "typeHint": "A rated competition changes athletes' Elo after every confirmed match. Only a platform administrator can create one.",
+      "types": {
+        "NON_RATED": "Non-rated",
+        "RATED": "Rated"
+      },
+      "ruleSet": "Calculation rules",
+      "publicDeltas": "Rating changes are public",
+      "yes": "Yes",
+      "no": "No",
+      "ratedHint": "Athletes' ratings change after every confirmed match. The platform sets the calculation rules; the organizer cannot change them.",
+      "nonRatedHint": "Matches of this competition do not change athletes' ratings.",
+      "enable": "Make rated",
+      "enableTitle": "Enable rating for the competition",
+      "enableDescription": "The active calculation rules version will be pinned. After publication the type can only be changed by an administrative procedure.",
+      "makeRated": "Make rated",
+      "makeNonRated": "Make non-rated",
+      "changeTitle": "Change the competition type",
+      "changeDescription": "Administrative procedure: possible while the competition has no rating calculations. The reason goes to the audit log.",
+      "rulesUnavailable": "Could not load the active calculation rules.",
+      "initialRating": "Initial rating",
+      "kFactors": "K factor",
+      "kUpTo": "K = {k} up to {to} Elo",
+      "kAbove": "K = {k} above {from} Elo",
+      "levels": "Levels",
+      "levelsRange": "1 to {count}",
+      "format": "Format",
+      "formatHint": "The rated tournament group scheme will be added at the next stage."
+    }
   },
   "applications": {
     "cardTitle": "Competition application",
