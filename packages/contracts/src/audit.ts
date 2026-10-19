@@ -190,6 +190,11 @@ export const AUDIT_ACTIONS = [
   // Рейтинг спортсменов (docs/RATING_ARCHITECTURE.md): расчёт по схватке; перерасчёт изменённого результата.
   'rating.calculated',
   'rating.amended',
+  // Корректирующие операции платформы (фаза 14): ручная корректировка, статус, пересборка, перерасчёт турнира.
+  'rating.corrected',
+  'rating.status_changed',
+  'rating.rebuilt',
+  'rating.recalculated',
   // Тип турнира меняет только платформа (docs/RATING_ARCHITECTURE.md, 3.1).
   'competition.rating_enabled',
   'competition.type_changed',

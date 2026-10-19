@@ -2331,6 +2331,7 @@ model Match {
   revisions          MatchResultRevision[]
   incidents          MedicalIncident[]
   ratingCalculations RatingCalculation[]
+  ratingCorrections  RatingCorrection[]    @relation("RatingCorrectionMatch")
 
   @@unique([competitionId, matchNumber])
   @@index([competitionId, status])
@@ -3009,10 +3010,11 @@ model CompetitionRatingConfig {
 enum RatingCorrectionKind {
   RESULT_AMENDED
   MANUAL
+  REBUILD
 }
 
-/// Корректировка рейтинга без переписывания истории (docs/RATING_ARCHITECTURE.md, 6.4): изменённый результат схватки
-/// (фаза 6) или ручная корректировка (фаза 14). Только дополняется.
+/// Корректировка рейтинга без переписывания истории (docs/RATING_ARCHITECTURE.md, 6.4, 6.5): изменённый результат
+/// схватки, ручная корректировка или применённая пересборка (фаза 14). Только дополняется.
 model RatingCorrection {
   id                      String               @id @default(uuid(7)) @db.Uuid
   athleteId               String               @map("athlete_id") @db.Uuid
@@ -3025,13 +3027,16 @@ model RatingCorrection {
   ratingAfter             Int                  @map("rating_after")
   delta                   Int
   reason                  String?
+  /// Схватка, к которой относится ручная корректировка (если указана).
+  relatedMatchId          String?              @map("related_match_id") @db.Uuid
   createdById             String?              @map("created_by_id") @db.Uuid
   createdAt               DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  athlete     AthleteProfile     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
-  calculation RatingCalculation? @relation("RatingCorrectionCalculation", fields: [calculationId], references: [id], onDelete: Restrict)
-  superseded  RatingCalculation? @relation("RatingCorrectionSuperseded", fields: [supersededCalculationId], references: [id], onDelete: Restrict)
-  createdBy   User?              @relation("RatingCorrectionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  athlete      AthleteProfile     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  relatedMatch Match?             @relation("RatingCorrectionMatch", fields: [relatedMatchId], references: [id], onDelete: Restrict)
+  calculation  RatingCalculation? @relation("RatingCorrectionCalculation", fields: [calculationId], references: [id], onDelete: Restrict)
+  superseded   RatingCalculation? @relation("RatingCorrectionSuperseded", fields: [supersededCalculationId], references: [id], onDelete: Restrict)
+  createdBy    User?              @relation("RatingCorrectionCreator", fields: [createdById], references: [id], onDelete: Restrict)
 
   @@index([athleteId, createdAt])
   @@map("rating_correction")
