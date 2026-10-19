@@ -3,6 +3,7 @@ export { BracketsModule } from './brackets.module';
 export {
   BracketsService,
   type BracketSource,
+  type GroupDecisionRecord,
   type MatchDependency,
   type SlotRow,
 } from './application/brackets.service';

@@ -7,6 +7,7 @@ import {
   type BracketState,
   entry,
   type GraphNode,
+  type GroupDecisions,
   losersOf,
   type NodeState,
   type Outcome,
@@ -23,6 +24,26 @@ export type DynamicResolver = (
   state: BracketState,
 ) => SideState;
 
+/**
+ * Правило формата для источника POOL_RANK (участник финальной части по месту в подгруппе): место известно, когда
+ * подгруппа завершена и место занимает один участник; иначе сторона ждёт.
+ */
+export type PoolRankResolver = (
+  source: Extract<Source, { type: 'POOL_RANK' }>,
+  graph: BracketGraph,
+  state: BracketState,
+  outcomes: ReadonlyMap<string, Outcome>,
+  decisions: GroupDecisions,
+) => SideState;
+
+/** Правила формата для источников, которые не сводятся к позиции жеребьёвки или узлу. */
+export interface SourceRules {
+  dynamic?: DynamicResolver;
+  poolRank?: PoolRankResolver;
+  /** Решения людей об общих местах подгрупп (для POOL_RANK). */
+  groupDecisions?: GroupDecisions;
+}
+
 /** Нарушение инварианта сетки: ошибка данных или вызова, а не пользователя. */
 export class BracketInvariantError extends Error {
   constructor(
@@ -31,7 +52,8 @@ export class BracketInvariantError extends Error {
       | 'unknown_node'
       | 'same_entry_on_both_sides'
       | 'outcome_not_applicable'
-      | 'dynamic_without_rule',
+      | 'dynamic_without_rule'
+      | 'pool_rank_without_rule',
     readonly nodeKey: string,
   ) {
     super(`${code}: ${nodeKey}`);
@@ -45,7 +67,13 @@ export type SlotMap = ReadonlyMap<number, string | null>;
 function sideFrom(
   node: GraphNode,
   source: Source,
-  ctx: { graph: BracketGraph; slots: SlotMap; state: BracketState; dynamic?: DynamicResolver },
+  ctx: {
+    graph: BracketGraph;
+    slots: SlotMap;
+    state: BracketState;
+    outcomes: ReadonlyMap<string, Outcome>;
+    rules: SourceRules;
+  },
 ): SideState {
   switch (source.type) {
     case 'DRAW_SLOT': {
@@ -67,8 +95,17 @@ function sideFrom(
       return id ? entry(id) : BYE;
     }
     case 'DYNAMIC':
-      if (!ctx.dynamic) throw new BracketInvariantError('dynamic_without_rule', node.key);
-      return ctx.dynamic(source, ctx.graph, ctx.state);
+      if (!ctx.rules.dynamic) throw new BracketInvariantError('dynamic_without_rule', node.key);
+      return ctx.rules.dynamic(source, ctx.graph, ctx.state);
+    case 'POOL_RANK':
+      if (!ctx.rules.poolRank) throw new BracketInvariantError('pool_rank_without_rule', node.key);
+      return ctx.rules.poolRank(
+        source,
+        ctx.graph,
+        ctx.state,
+        ctx.outcomes,
+        ctx.rules.groupDecisions ?? new Map(),
+      );
   }
 }
 
@@ -91,10 +128,10 @@ export function resolveBracket(
   graph: BracketGraph,
   slots: SlotMap,
   outcomes: ReadonlyMap<string, Outcome>,
-  dynamic?: DynamicResolver,
+  rules: SourceRules = {},
 ): BracketState {
   const state: BracketState = new Map();
-  const ctx = { graph, slots, state, dynamic };
+  const ctx = { graph, slots, state, outcomes, rules };
   for (const node of graph.nodes) {
     const red = sideFrom(node, node.red, ctx);
     const blue = sideFrom(node, node.blue, ctx);

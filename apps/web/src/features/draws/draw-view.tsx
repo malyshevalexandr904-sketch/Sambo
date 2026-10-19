@@ -265,6 +265,7 @@ export function DrawView({
           matchHref={
             draw.status === 'PUBLISHED' ? (id) => `/referee/${competition.id}/matches/${id}` : undefined
           }
+          decide={draw.status === 'PUBLISHED' ? { drawId: draw.id, onDecided: onChanged } : undefined}
         />
       </Card>
       {draw.status === 'PUBLISHED' ? <CategoryPlacements categoryId={draw.categoryId} /> : null}

@@ -487,7 +487,8 @@
     "RATING_CALCULATIONS_EXIST": "Ratings have already been calculated for this competition, so its type cannot change. Use rating corrections instead.",
     "RATING_RULE_SET_UNAVAILABLE": "There is no active rating calculation rules version.",
     "INSUFFICIENT_PARTICIPANTS": "Too few participants for the category format.",
-    "TOO_MANY_PARTICIPANTS": "Too many participants for the category format."
+    "TOO_MANY_PARTICIPANTS": "Too many participants for the category format.",
+    "GROUP_DECISION_MISMATCH": "The decision does not match the shared places of the group that are waiting for a decision: reload the page."
   },
   "people": {
     "lastName": "Last name",
@@ -1881,7 +1882,7 @@
       "yes": "Advances",
       "no": "No",
       "undecided": "Decision",
-      "decisionRequired": "A shared place sits on the line to the final part: the criteria did not separate the athletes, so who advances is undecided and needs a decision.",
+      "decisionRequired": "The criteria did not separate athletes whose place decides qualification or a final-stage pairing: the place needs a decision, and the matching final-stage side stays empty until then.",
       "rules": "Group places: {criteria}; athletes equal on every criterion share the place.",
       "provisional": "The criteria are provisional: the format documents give no rule for group places, so they need to be confirmed.",
       "criteria": {
@@ -1889,8 +1890,21 @@
         "HEAD_TO_HEAD": "head-to-head",
         "CLEAN_WINS": "clean wins",
         "SUPERIORITY_WINS": "wins by superiority"
+      },
+      "decision": {
+        "hint": "The criteria did not separate these athletes. Put them in order (first is higher) and give a reason: the order decides qualification and final-stage pairs.",
+        "tier": "Shared place",
+        "up": "Move up: {name}",
+        "down": "Move down: {name}",
+        "action": "Confirm the order",
+        "title": "Shared place decision",
+        "description": "The decision is logged with its reason. A new decision can replace it until matches that depend on it have started.",
+        "applied": "Order of the shared place confirmed by {who}, {when}: {reason}"
       }
-    }
+    },
+    "waitingPoolRank": "place {place} of group {group}",
+    "finalPart": "Final stage",
+    "finalPartHint": "Participants are group places (\"A1\" is first place in group A); a side is filled once its group is complete. There is no bronze match: both semifinal losers take third place."
   },
   "scheduling": {
     "published": "Published",

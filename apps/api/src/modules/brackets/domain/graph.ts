@@ -1,16 +1,17 @@
 // Граф сетки (ARCHITECTURE.md, 14.4; DATABASE.md, 3.6): узлы со ссылками на источники сторон — позицию
 // жеребьёвки, победителя или проигравшего узла, правило формата (DYNAMIC: участники утешительных схваток).
 // Узел играется как одна схватка. Состояние сетки — чистая функция графа, жеребьёвки и подтверждённых исходов.
-import type {
-  BracketNodeStatus,
-  BracketStage,
-  CompetitionFormatCode,
-  Pool,
-  RatedGroupLetter,
-  RoundLabel,
-  Side,
-  SlotSourceType,
-  WinMethod,
+import {
+  type BracketNodeStatus,
+  type BracketStage,
+  type CompetitionFormatCode,
+  type Pool,
+  RATED_GROUP_LETTERS,
+  type RatedGroupLetter,
+  type RoundLabel,
+  type Side,
+  type SlotSourceType,
+  type WinMethod,
 } from '@sde/contracts';
 
 export type { Side };
@@ -22,7 +23,9 @@ export type Source =
   | { type: 'DRAW_SLOT'; position: number }
   | { type: 'WINNER_OF'; node: string }
   | { type: 'LOSER_OF'; node: string }
-  | { type: 'DYNAMIC'; rule: DynamicRule; pool: Pool; round: number };
+  | { type: 'DYNAMIC'; rule: DynamicRule; pool: Pool; round: number }
+  /** Место `place` подгруппы `group` рейтингового формата (участник финальной части, «A1»). */
+  | { type: 'POOL_RANK'; group: RatedGroupLetter; place: number };
 
 export interface NodeLink {
   node: string;
@@ -76,6 +79,12 @@ export interface Outcome {
   blueScore?: number;
 }
 
+/**
+ * Решения людей об общих местах подгрупп рейтингового формата: по подгруппе — ярусы общего места, каждый в
+ * утверждённом порядке. Ярус применяется, только если совпадает с общим местом таблицы по составу.
+ */
+export type GroupDecisions = ReadonlyMap<RatedGroupLetter, readonly (readonly string[])[]>;
+
 export interface Placement {
   entryId: string;
   /** Деление мест допускается: 3, 3, 5, 5. */
@@ -128,6 +137,8 @@ export function sourceToRecord(s: Source): { type: SlotSourceType; ref: string }
       return { type: s.type, ref: s.node };
     case 'DYNAMIC':
       return { type: s.type, ref: `${s.rule}:${s.pool}:${s.round}` };
+    case 'POOL_RANK':
+      return { type: s.type, ref: `${s.group}:${s.place}` };
   }
 }
 
@@ -138,6 +149,11 @@ export function sourceFromRecord(type: SlotSourceType, ref: string): Source {
     const [rule, pool, round] = ref.split(':');
     if (rule === 'LOST_TO_POOL_WINNER' && (pool === 'A' || pool === 'B'))
       return { type, rule, pool, round: Number(round) };
+  }
+  if (type === 'POOL_RANK') {
+    const [group, place] = ref.split(':');
+    if (RATED_GROUP_LETTERS.includes(group as RatedGroupLetter) && Number(place) >= 1)
+      return { type, group: group as RatedGroupLetter, place: Number(place) };
   }
   throw new Error(`Unsupported bracket source ${type}:${ref}`);
 }

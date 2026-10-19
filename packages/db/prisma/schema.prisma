@@ -148,6 +148,7 @@ model User {
   createdDraws              Draw[]                    @relation("DrawCreator")
   publishedDraws            Draw[]                    @relation("DrawPublisher")
   supersededDraws           Draw[]                    @relation("DrawSuperseder")
+  groupPlaceDecisions       GroupPlaceDecision[]      @relation("GroupPlaceDecider")
   publishedSchedules        Schedule[]                @relation("SchedulePublisher")
   matAssignments            MatAssignment[]
   recordedMatchEvents       MatchEvent[]              @relation("MatchEventRecorder")
@@ -1358,50 +1359,51 @@ model Competition {
   updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt               DateTime?             @map("deleted_at") @db.Timestamptz(3)
 
-  organizer          Organization             @relation("CompetitionOrganizer", fields: [organizerOrganizationId], references: [id], onDelete: Restrict)
-  venue              Venue?                   @relation(fields: [venueId], references: [id], onDelete: Restrict)
-  discipline         Discipline               @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
-  ruleSetVersion     RuleSetVersion?          @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
-  logo               StoredFile?              @relation("CompetitionLogo", fields: [logoFileId], references: [id], onDelete: Restrict)
-  regulation         StoredFile?              @relation("CompetitionRegulation", fields: [regulationFileId], references: [id], onDelete: Restrict)
-  createdBy          User?                    @relation("CompetitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy          User?                    @relation("CompetitionUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
-  staff              CompetitionMembership[]
-  categories         CompetitionCategory[]
-  categoryRules      CategoryRule[]
-  requirements       CompetitionRequirement[]
-  applications       Application[]
-  entries            Entry[]
-  writeLease         CompetitionWriteLease?
-  documents          Document[]
-  consents           Consent[]
-  admissions         Admission[]
-  checkIns           CheckIn[]
-  scales             Scale[]
-  weighInWindows     WeighInWindow[]
-  weighInRecords     WeighInRecord[]
-  clearances         MedicalClearance[]
-  draws              Draw[]
-  drawSlots          DrawSlot[]
-  brackets           Bracket[]
-  bracketNodes       BracketNode[]
-  matches            Match[]
-  matchParticipants  MatchParticipant[]
-  mats               Mat[]
-  sessions           Session[]
-  schedule           Schedule?
-  matchSchedules     MatchSchedule[]
-  matAssignments     MatAssignment[]
-  matchEvents        MatchEvent[]
-  matchResults       MatchResult[]
-  matchRevisions     MatchResultRevision[]
-  categoryResults    CategoryResult[]
-  placements         Placement[]
-  athleteResults     AthleteResult[]
-  medicalIncidents   MedicalIncident[]
-  ratingCalculations RatingCalculation[]
-  tournamentSeeds    TournamentSeed[]
-  ratingConfig       CompetitionRatingConfig?
+  organizer           Organization             @relation("CompetitionOrganizer", fields: [organizerOrganizationId], references: [id], onDelete: Restrict)
+  venue               Venue?                   @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  discipline          Discipline               @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
+  ruleSetVersion      RuleSetVersion?          @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
+  logo                StoredFile?              @relation("CompetitionLogo", fields: [logoFileId], references: [id], onDelete: Restrict)
+  regulation          StoredFile?              @relation("CompetitionRegulation", fields: [regulationFileId], references: [id], onDelete: Restrict)
+  createdBy           User?                    @relation("CompetitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy           User?                    @relation("CompetitionUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+  staff               CompetitionMembership[]
+  categories          CompetitionCategory[]
+  categoryRules       CategoryRule[]
+  requirements        CompetitionRequirement[]
+  applications        Application[]
+  entries             Entry[]
+  writeLease          CompetitionWriteLease?
+  documents           Document[]
+  consents            Consent[]
+  admissions          Admission[]
+  checkIns            CheckIn[]
+  scales              Scale[]
+  weighInWindows      WeighInWindow[]
+  weighInRecords      WeighInRecord[]
+  clearances          MedicalClearance[]
+  draws               Draw[]
+  drawSlots           DrawSlot[]
+  brackets            Bracket[]
+  bracketNodes        BracketNode[]
+  matches             Match[]
+  matchParticipants   MatchParticipant[]
+  mats                Mat[]
+  sessions            Session[]
+  schedule            Schedule?
+  matchSchedules      MatchSchedule[]
+  matAssignments      MatAssignment[]
+  matchEvents         MatchEvent[]
+  matchResults        MatchResult[]
+  matchRevisions      MatchResultRevision[]
+  categoryResults     CategoryResult[]
+  placements          Placement[]
+  athleteResults      AthleteResult[]
+  medicalIncidents    MedicalIncident[]
+  ratingCalculations  RatingCalculation[]
+  tournamentSeeds     TournamentSeed[]
+  groupPlaceDecisions GroupPlaceDecision[]
+  ratingConfig        CompetitionRatingConfig?
 
   @@index([status, startDate])
   @@index([organizerOrganizationId, startDate])
@@ -2155,14 +2157,15 @@ model Draw {
   supersedeReason  String?               @map("supersede_reason")
   updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  competition  Competition         @relation(fields: [competitionId], references: [id], onDelete: Restrict)
-  category     CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  createdBy    User?               @relation("DrawCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  publishedBy  User?               @relation("DrawPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
-  supersededBy User?               @relation("DrawSuperseder", fields: [supersededById], references: [id], onDelete: Restrict)
-  slots        DrawSlot[]
-  seeds        TournamentSeed[]
-  brackets     Bracket[]
+  competition    Competition          @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category       CompetitionCategory  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  createdBy      User?                @relation("DrawCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedBy    User?                @relation("DrawPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
+  supersededBy   User?                @relation("DrawSuperseder", fields: [supersededById], references: [id], onDelete: Restrict)
+  slots          DrawSlot[]
+  seeds          TournamentSeed[]
+  groupDecisions GroupPlaceDecision[]
+  brackets       Bracket[]
 
   @@unique([categoryId, number])
   @@index([competitionId, status])
@@ -2209,6 +2212,27 @@ model TournamentSeed {
   @@unique([drawId, seedNumber])
   @@index([athleteId])
   @@map("tournament_seed")
+}
+
+/// Решение главного судьи о порядке участников, которых критерии мест подгруппы рейтингового формата не разделили
+/// (ТЗ 31: общее место на границе выхода или среди вышедших). `tiers` — упорядоченные списки участий, каждый — ровно
+/// один ярус общего места. Действует последнее решение по подгруппе; строки только дополняются.
+model GroupPlaceDecision {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  competitionId String   @map("competition_id") @db.Uuid
+  drawId        String   @map("draw_id") @db.Uuid
+  groupLetter   String   @map("group_letter")
+  tiers         Json
+  reason        String
+  decidedById   String   @map("decided_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  draw        Draw        @relation(fields: [drawId], references: [id], onDelete: Restrict)
+  decidedBy   User        @relation("GroupPlaceDecider", fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([drawId, groupLetter, createdAt])
+  @@map("group_place_decision")
 }
 
 /// Этап сетки опубликованной жеребьёвки: основная сетка, утешительные схватки, круговая группа.

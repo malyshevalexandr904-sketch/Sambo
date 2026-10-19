@@ -91,11 +91,32 @@ export const GroupStandingRules = z.strictObject({
     .refine((c) => new Set(c).size === c.length, { error: 'duplicate_criterion' }),
   /**
    * Критерии подтверждены заказчиком. В источниках правила мест в подгруппе нет (docs/RATED_TOURNAMENT_FORMAT.md,
-   * 3; Q-F4): пока false — по умолчанию как места круговой системы, решение заказчика требуется.
+   * 3; Q-F4); false — версия ждёт решения заказчика, и экран называет критерии предварительными.
    */
   confirmed: z.boolean(),
 });
 export type GroupStandingRules = z.infer<typeof GroupStandingRules>;
+
+/**
+ * Места категории с финальной частью (ТЗ 33, PlacementRule). Победитель финала — 1. `losers` — место проигравших
+ * схватки круга финальной части: финал — 2, полуфинал — 3 (схватки за 3 место нет, оба проигравших — 3), четвертьфинал
+ * — по правилу. `nonQualifiers` — места не вышедших из подгрупп: NO_PLACE — без места, BY_GROUP_POSITION — после
+ * участников финальной части по месту в подгруппе (равное место — общее).
+ */
+export const PlacementRules = z.strictObject({
+  losers: z.strictObject({
+    FINAL: z.literal(2),
+    SEMIFINAL: z.literal(3),
+    QUARTERFINAL: z.number().int().min(4),
+  }),
+  nonQualifiers: z.enum(['NO_PLACE', 'BY_GROUP_POSITION']),
+  /**
+   * Места ниже третьего подтверждены заказчиком. 1, 2 и два третьих места — из схемы (G1); места проигравших
+   * четвертьфиналы и не вышедших из подгрупп в источниках не заданы (docs/RATED_TOURNAMENT_FORMAT.md, 3; Q-F5).
+   */
+  confirmed: z.boolean(),
+});
+export type PlacementRules = z.infer<typeof PlacementRules>;
 
 /** Версия формата: правила по числу участников подряд, схемы кругов для всех возможных размеров подгрупп. */
 export const RatedFormatConfig = z
@@ -109,6 +130,7 @@ export const RatedFormatConfig = z
     /** Схватки за 3 место нет: оба проигравших полуфиналиста — 3 место. */
     thirdPlace: z.literal('BOTH_SEMIFINAL_LOSERS'),
     groupStandingRules: GroupStandingRules,
+    placementRules: PlacementRules,
   })
   .superRefine((cfg, ctx) => {
     cfg.rules.forEach((r, i) => {
@@ -243,10 +265,17 @@ export const RATED_GROUPS_V1: RatedFormatConfig = RatedFormatConfig.parse({
   },
   distribution: 'SNAKE',
   thirdPlace: 'BOTH_SEMIFINAL_LOSERS',
-  // TODO(Q-F4): решение заказчика — пока как места круговой системы платформы.
+  // Q-F4: порядок как в круговой системе платформы утверждён заказчиком 2026-10-19.
   groupStandingRules: {
     criteria: ['WINS', 'HEAD_TO_HEAD', 'CLEAN_WINS', 'SUPERIORITY_WINS'],
-    confirmed: false,
+    confirmed: true,
+  },
+  // Q-F5: в источниках правила нет; утверждено заказчиком 2026-10-19 — проигравшие четвертьфиналы делят 5 место,
+  // не вышедшие из подгрупп идут после участников финальной части по месту в подгруппе.
+  placementRules: {
+    losers: { FINAL: 2, SEMIFINAL: 3, QUARTERFINAL: 5 },
+    nonQualifiers: 'BY_GROUP_POSITION',
+    confirmed: true,
   },
 });
 
@@ -291,6 +320,13 @@ export function ratedFormatRule(
   return (
     config.rules.find((r) => participants >= r.minParticipants && participants <= r.maxParticipants) ?? null
   );
+}
+
+/** Участник финальной части по ссылке «A1»: подгруппа и место в ней. */
+export function parseQualifierRef(ref: string): { group: RatedGroupLetter; place: number } {
+  const group = ref[0] as RatedGroupLetter;
+  if (!RATED_GROUP_LETTERS.includes(group)) throw new Error(`Invalid qualifier ${ref}`);
+  return { group, place: Number(ref.slice(1)) };
 }
 
 /** Схема кругов подгруппы размера `size`: пары позиций (1 — высший посев) по кругам. */

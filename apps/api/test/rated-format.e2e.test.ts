@@ -1,8 +1,8 @@
-// Формат рейтингового турнира (фазы 9–11, docs/RATED_TOURNAMENT_FORMAT.md): категория рейтингового турнира по
+// Формат рейтингового турнира (фазы 9–12, docs/RATED_TOURNAMENT_FORMAT.md): категория рейтингового турнира по
 // умолчанию получает формат SPECIAL_GROUP_RATED и план подгрупп по числу допущенных; меньше 3 и больше 39 участников —
 // ошибка формата. Жеребьёвка сеет по рейтингу на момент жеребьёвки, раскладывает подгруппы змейкой и сохраняет посев;
-// публикация строит по сетке на каждую подгруппу. Таблицы подгрупп — по критериям версии формата (пока не
-// подтверждены, Q-F4). Нерейтинговый турнир выбирает формат по правилам, как раньше.
+// публикация строит по сетке на каждую подгруппу. Таблицы подгрупп — по критериям версии формата (утверждены
+// заказчиком, Q-F4); затем финальная часть по местам подгрупп. Нерейтинговый турнир выбирает формат по правилам, как раньше.
 import type {
   BracketViewDto,
   CategoryBracketDto,
@@ -155,13 +155,13 @@ describe('rated group generation', () => {
     const groups: Record<string, number[]> = {};
     for (const s of draw.slots) (groups[s.pool!] ??= []).push(s.seedNumber!);
     expect(groups).toEqual({ A: [1, 8, 9], B: [2, 7, 10], C: [3, 6, 11], D: [4, 5, 12, 13] });
-    // Предпросмотр — круги каждой подгруппы по схеме формата.
-    expect(draw.bracket.nodes).toHaveLength(15);
-    expect(new Set(draw.bracket.nodes.map((n) => n.group))).toEqual(new Set(['A', 'B', 'C', 'D']));
-    // Таблицы подгрупп до схваток: критерии версии формата не подтверждены, выход ещё не решён.
+    // Предпросмотр — круги каждой подгруппы по схеме формата (15 схваток) и финальная часть (7).
+    expect(draw.bracket.nodes).toHaveLength(22);
+    expect(new Set(draw.bracket.nodes.map((n) => n.group))).toEqual(new Set(['A', 'B', 'C', 'D', null]));
+    // Таблицы подгрупп до схваток: критерии версии формата утверждены, выход ещё не решён.
     expect(draw.bracket.groups).toMatchObject({
       criteria: ['WINS', 'HEAD_TO_HEAD', 'CLEAN_WINS', 'SUPERIORITY_WINS'],
-      criteriaConfirmed: false,
+      criteriaConfirmed: true,
       qualifiersPerGroup: 2,
     });
     expect(draw.bracket.groups!.standings.map((g) => [g.group, g.complete, g.rows.length])).toEqual([
@@ -219,16 +219,18 @@ describe('rated group generation', () => {
       ['POOL', 2, 'B', 3],
       ['POOL', 3, 'C', 3],
       ['POOL', 4, 'D', 6],
+      ['FINAL', 5, null, 7],
     ]);
     expect(
       await t.admin.match.count({ where: { categoryId: cat.categoryId, matchNumber: { not: null } } }),
-    ).toBe(15);
+    ).toBe(22);
     const view = await rated.staff.manager.agent
       .get(`/api/v1/categories/${cat.categoryId}/brackets`)
       .expect(200);
     const bracket = (view.body.data as CategoryBracketDto).bracket!;
     expect(bracket.format).toBe('SPECIAL_GROUP_RATED');
-    expect(bracket.nodes.every((n) => n.group !== null && n.match !== null)).toBe(true);
+    expect(bracket.nodes.every((n) => n.match !== null)).toBe(true);
+    expect(bracket.nodes.filter((n) => n.group === null).map((n) => n.stage)).toEqual(Array(7).fill('FINAL'));
     expect(bracket.groups?.standings).toHaveLength(4);
     expect(bracket.participants.find((p) => p.seedNumber === 1)).toMatchObject({
       pool: 'A',
@@ -321,5 +323,193 @@ describe('rated group standings', () => {
       [3, 3, 1, 2],
       [4, 4, 0, 3],
     ]);
+  });
+
+  it('fills the final part from the group places and takes the places from it', async () => {
+    const w = await refereeWorld(t, [{ admitted: 6 }], async (world) => {
+      await t.admin.competition.update({
+        where: { id: world.competitionId },
+        data: { competitionType: 'RATED' },
+      });
+    });
+    const categoryId = w.categories[0]!.categoryId;
+    const chief = w.staff.chief;
+    const view = async (): Promise<BracketViewDto> => {
+      const r = await chief.agent.get(`/api/v1/categories/${categoryId}/brackets`);
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+      return (r.body.data as CategoryBracketDto).bracket!;
+    };
+    const before = await view();
+    const seed = new Map(before.participants.map((p) => [p.entryId, p.seedNumber!]));
+    const final = (b: BracketViewDto) => b.nodes.filter((n) => n.stage === 'FINAL');
+    expect(final(before).map((n) => [n.label, n.red.source, n.blue.source, n.red.entryId])).toEqual([
+      ['SEMIFINAL', { type: 'POOL_RANK', ref: 'A:1' }, { type: 'POOL_RANK', ref: 'B:2' }, null],
+      ['SEMIFINAL', { type: 'POOL_RANK', ref: 'B:1' }, { type: 'POOL_RANK', ref: 'A:2' }, null],
+      ['FINAL', { type: 'WINNER_OF', ref: 'FINAL:1:1' }, { type: 'WINNER_OF', ref: 'FINAL:1:2' }, null],
+    ]);
+    // Каждую готовую схватку выигрывает меньший номер посева, пока сетка не сыграна.
+    const playReady = async (): Promise<number> => {
+      const ready = (await scheduledMatches(t, categoryId)).filter(
+        (m) => !m.result && m.participants.length === 2 && m.participants.every((p) => p.entryId && !p.isBye),
+      );
+      for (const m of ready) {
+        const red = m.participants.find((p) => p.side === 'RED')!.entryId!;
+        const blue = m.participants.find((p) => p.side === 'BLUE')!.entryId!;
+        const played = await playToResult(chief, m.id, seed.get(red)! < seed.get(blue)! ? 'RED' : 'BLUE');
+        const c = await confirm(chief, played);
+        expect(c.status, JSON.stringify(c.body)).toBe(200);
+      }
+      return ready.length;
+    };
+    // Подгруппы (6 схваток) — затем полуфиналы получают участников по местам подгрупп.
+    expect(await playReady()).toBe(6);
+    const afterGroups = await view();
+    // Змейка: A — посевы 1, 4, 5; B — 2, 3, 6. A1 = 1, A2 = 4, B1 = 2, B2 = 3.
+    expect(
+      final(afterGroups).map((n) => [
+        n.red.entryId && seed.get(n.red.entryId),
+        n.blue.entryId && seed.get(n.blue.entryId),
+      ]),
+    ).toEqual([
+      [1, 3],
+      [2, 4],
+      [null, null],
+    ]);
+    expect(afterGroups.groups!.standings.every((g) => g.complete && !g.decisionRequired)).toBe(true);
+    expect(await playReady()).toBe(2);
+    expect(await playReady()).toBe(1);
+
+    const r = await chief.agent.get(`/api/v1/categories/${categoryId}/results`);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const results = r.body.data as CategoryResultsDto;
+    expect(results.status).toBe('PROVISIONAL');
+    // Схватки за 3 место нет: оба проигравших полуфиналы — 3; третьи места подгрупп (A — посев 5, B — 6) делят 5 место
+    // после четырёх участников финальной части (Q-F5).
+    expect(
+      results.placements
+        .map((p) => [seed.get(p.entryId)!, p.place, p.wins, p.losses])
+        .sort((a, b) => a[1]! - b[1]! || a[0]! - b[0]!),
+    ).toEqual([
+      [1, 1, 4, 0],
+      [2, 2, 3, 1],
+      [3, 3, 1, 2],
+      [4, 3, 1, 2],
+      [5, 5, 0, 2],
+      [6, 5, 0, 2],
+    ]);
+  });
+
+  it('waits for the chief judge to order a shared group place, then fills the final part', async () => {
+    const w = await refereeWorld(t, [{ admitted: 6 }], async (world) => {
+      await t.admin.competition.update({
+        where: { id: world.competitionId },
+        data: { competitionType: 'RATED' },
+      });
+    });
+    const categoryId = w.categories[0]!.categoryId;
+    const chief = w.staff.chief;
+    const draw = await t.admin.draw.findFirstOrThrow({ where: { categoryId, status: 'PUBLISHED' } });
+    const view = async (): Promise<BracketViewDto> => {
+      const r = await chief.agent.get(`/api/v1/categories/${categoryId}/brackets`);
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+      return (r.body.data as CategoryBracketDto).bracket!;
+    };
+    const before = await view();
+    const seed = new Map(before.participants.map((p) => [p.entryId, p.seedNumber!]));
+    const entryOfSeed = (n: number): string => [...seed.entries()].find(([, s]) => s === n)![0];
+    // Подгруппа A — посевы 1, 4, 5: 1 > 4, 4 > 5, 5 > 1 — все по одной победе по баллам, критерии не разделяют.
+    for (const m of await scheduledMatches(t, categoryId)) {
+      const red = m.participants.find((p) => p.side === 'RED')?.entryId;
+      const blue = m.participants.find((p) => p.side === 'BLUE')?.entryId;
+      if (!red || !blue) continue;
+      const [r, b] = [seed.get(red)!, seed.get(blue)!];
+      const cycle = new Set([r, b]).has(1) && new Set([r, b]).has(5);
+      const winner = cycle ? (r === 5 ? 'RED' : 'BLUE') : r < b ? 'RED' : 'BLUE';
+      const c = await confirm(chief, await playToResult(chief, m.id, winner));
+      expect(c.status, JSON.stringify(c.body)).toBe(200);
+    }
+    const tied = await view();
+    const a = tied.groups!.standings.find((g) => g.group === 'A')!;
+    expect(a).toMatchObject({ complete: true, decisionRequired: true, decision: null });
+    expect(a.rows.map((r) => r.position)).toEqual([1, 1, 1]);
+    expect(tied.groups!.canDecide).toBe(true);
+    const semis = tied.nodes.filter((n) => n.stage === 'FINAL' && n.label === 'SEMIFINAL');
+    expect(
+      semis.map((n) => [
+        n.red.entryId && seed.get(n.red.entryId),
+        n.blue.entryId && seed.get(n.blue.entryId),
+      ]),
+    ).toEqual([
+      [null, 3],
+      [2, null],
+    ]);
+
+    const url = `/api/v1/draws/${draw.id}/group-decisions`;
+    const order = [entryOfSeed(4), entryOfSeed(1), entryOfSeed(5)];
+    // Судья без права изменять результаты решить не может; решение должно покрывать ровно общее место.
+    expect(
+      (await send(w.refs.judge1.s, 'post', url, { group: 'A', tiers: [order], reason: 'Решение ГСК' }))
+        .status,
+    ).toBe(403);
+    const partial = await send(chief, 'post', url, {
+      group: 'A',
+      tiers: [order.slice(0, 2)],
+      reason: 'Решение ГСК',
+    });
+    expect(partial.status).toBe(422);
+    expect(partial.body.error).toMatchObject({ code: 'GROUP_DECISION_MISMATCH', details: { group: 'A' } });
+    expect(
+      (await send(chief, 'post', url, { group: 'B', tiers: [order], reason: 'Решение ГСК' })).body.error.code,
+    ).toBe('GROUP_DECISION_MISMATCH');
+    const ok = await send(chief, 'post', url, {
+      group: 'A',
+      tiers: [order],
+      reason: 'Решение ГСК по жребию',
+    });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+
+    const decided = await view();
+    const da = decided.groups!.standings.find((g) => g.group === 'A')!;
+    expect(da).toMatchObject({ decisionRequired: false, decision: { reason: 'Решение ГСК по жребию' } });
+    expect(da.rows.map((r) => [seed.get(r.entryId), r.position, r.qualified])).toEqual([
+      [4, 1, true],
+      [1, 2, true],
+      [5, 3, false],
+    ]);
+    // A1 = 4, A2 = 1; B1 = 2, B2 = 3.
+    expect(
+      decided.nodes
+        .filter((n) => n.stage === 'FINAL' && n.label === 'SEMIFINAL')
+        .map((n) => [seed.get(n.red.entryId!), seed.get(n.blue.entryId!)]),
+    ).toEqual([
+      [4, 3],
+      [2, 1],
+    ]);
+    expect(
+      await t.admin.auditLog.count({ where: { action: 'bracket.group_places_decided', entityId: draw.id } }),
+    ).toBe(1);
+    const row = await t.admin.groupPlaceDecision.findFirstOrThrow({ where: { drawId: draw.id } });
+    await expect(
+      t.admin.groupPlaceDecision.update({ where: { id: row.id }, data: { reason: 'x' } }),
+    ).rejects.toThrow(/immutable/);
+    // Новое решение заменяет прежнее, пока зависящие схватки не начаты: A1 = 1, A2 = 4.
+    const again = [entryOfSeed(1), entryOfSeed(4), entryOfSeed(5)];
+    const replaced = await send(chief, 'post', url, {
+      group: 'A',
+      tiers: [again],
+      reason: 'Исправление ГСК',
+    });
+    expect(replaced.status, JSON.stringify(replaced.body)).toBe(200);
+    const semis2 = (await view()).nodes.filter((n) => n.stage === 'FINAL' && n.label === 'SEMIFINAL');
+    expect(semis2.map((n) => [seed.get(n.red.entryId!), seed.get(n.blue.entryId!)])).toEqual([
+      [1, 3],
+      [2, 4],
+    ]);
+    // Полуфинал сыгран — решение, которое поменяло бы его участников, не принимается.
+    const semi = semis2[0]!.match!;
+    expect((await confirm(chief, await playToResult(chief, semi.id, 'RED'))).status).toBe(200);
+    const late = await send(chief, 'post', url, { group: 'A', tiers: [order], reason: 'Поздно' });
+    expect(late.body.error.code).toBe('DEPENDENT_MATCHES_STARTED');
+    expect((await view()).groups!.standings[0]!.decision).toMatchObject({ reason: 'Исправление ГСК' });
   });
 });

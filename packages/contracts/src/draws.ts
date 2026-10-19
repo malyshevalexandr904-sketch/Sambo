@@ -4,7 +4,12 @@ import { Reason, Uuid } from './common.js';
 import type { CategoryRef, CategoryWeight } from './competition-categories.js';
 import type { CategoryStatus } from './competitions.js';
 import { DRAW_FORMATS, type Pool, type RoundLabel } from './formats.js';
-import type { GroupStandingCriterion, RatedFormatPlanResult, RatedGroupLetter } from './rated-format.js';
+import {
+  type GroupStandingCriterion,
+  RATED_GROUP_LETTERS,
+  type RatedFormatPlanResult,
+  type RatedGroupLetter,
+} from './rated-format.js';
 import type { Gender } from './people.js';
 import type { EntryStatus } from './registrations.js';
 import type { CompetitionFormatCode } from './rulesets.js';
@@ -50,7 +55,7 @@ export type WinMethod = (typeof WIN_METHODS)[number];
 export const MATCH_RESULT_STATUSES = ['PROVISIONAL', 'CONFIRMED', 'PUBLISHED', 'AMENDED'] as const;
 export type MatchResultStatus = (typeof MATCH_RESULT_STATUSES)[number];
 
-export const BRACKET_STAGES = ['MAIN', 'REPECHAGE', 'POOL'] as const;
+export const BRACKET_STAGES = ['MAIN', 'REPECHAGE', 'POOL', 'FINAL'] as const;
 export type BracketStage = (typeof BRACKET_STAGES)[number];
 
 /** Источник стороны узла: позиция жеребьёвки, победитель или проигравший узла, правило формата. */
@@ -93,6 +98,27 @@ export type DrawCreate = z.infer<typeof DrawCreate>;
 
 export const DrawSupersede = z.object({ reason: Reason });
 export type DrawSupersede = z.infer<typeof DrawSupersede>;
+
+/**
+ * Решение главного судьи об общем месте подгруппы рейтингового формата (ТЗ 31): каждый ярус — участники одного
+ * общего места в утверждённом порядке (первый — выше). Ярусы — ровно те, что требуют решения (decisionRequired).
+ */
+export const GroupPlaceDecisionInput = z.object({
+  group: z.enum(RATED_GROUP_LETTERS),
+  tiers: z
+    .array(z.array(Uuid).min(2).max(9))
+    .min(1)
+    .max(4)
+    .refine((t) => new Set(t.flat()).size === t.flat().length, { error: 'duplicate_entry' }),
+  reason: Reason,
+});
+export type GroupPlaceDecisionInput = z.infer<typeof GroupPlaceDecisionInput>;
+
+export interface GroupPlaceDecisionDto {
+  drawId: string;
+  group: RatedGroupLetter;
+  decidedAt: string;
+}
 
 // ---------- Ответы ----------
 
@@ -230,7 +256,7 @@ export interface GroupStandingRowDto {
   };
   /**
    * Выходит в финальную часть. null — ещё неизвестно (подгруппа не завершена) или общее место на границе выхода:
-   * нужно решение (decisionRequired).
+   * нужно решение (decisionRequired). Одна подгруппа без финальной части — всегда null.
    */
   qualified: boolean | null;
 }
@@ -239,8 +265,13 @@ export interface GroupStandingsDto {
   group: RatedGroupLetter;
   /** Все схватки подгруппы решены. */
   complete: boolean;
-  /** Подгруппа завершена, но общее место на границе выхода не разрешено критериями. */
+  /**
+   * Подгруппа завершена, но критерии не разделили участников, от места которых зависит выход в финальную часть или
+   * пара в ней: порядок задаёт решение главного судьи.
+   */
   decisionRequired: boolean;
+  /** Действующее решение об общем месте этой подгруппы; нет — null. */
+  decision: { reason: string; decidedAt: string; decidedBy: UserRef | null } | null;
   rows: GroupStandingRowDto[];
 }
 
@@ -256,6 +287,8 @@ export interface BracketViewDto {
     criteriaConfirmed: boolean;
     qualifiersPerGroup: number;
     standings: GroupStandingsDto[];
+    /** Пользователь может решить общее место (`result.amend`, опубликованная сетка). */
+    canDecide: boolean;
   } | null;
 }
 
