@@ -169,6 +169,31 @@ export interface PublicRankingRow {
 export interface PublicAthleteRating extends PublicRankingRow {
   lowestRating: number;
   lastRatedMatchAt: string | null;
+  /** Доля побед среди рейтинговых схваток, % с одним знаком; без схваток — null. */
+  winRate: number | null;
+}
+
+/**
+ * График Elo (ТЗ 40): точки по времени — рейтинг после каждой посчитанной схватки и корректировки; первая точка —
+ * рейтинг до первого события. Старые точки отбрасываются сверх лимита.
+ */
+export interface PublicRatingChart {
+  points: { at: string; rating: number }[];
+  /** Точек было больше, показаны последние. */
+  truncated: boolean;
+}
+
+/** Рейтинговый турнир в истории спортсмена (ТЗ 39): рейтинг до и после турнира, схватки. */
+export interface PublicRatedCompetition {
+  slug: string;
+  name: string;
+  startDate: string;
+  ratingBefore: number;
+  ratingAfter: number;
+  delta: number;
+  matches: number;
+  wins: number;
+  losses: number;
 }
 
 export const RatingHistoryQuery = PageQuery;

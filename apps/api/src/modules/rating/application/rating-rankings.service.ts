@@ -104,6 +104,7 @@ export class RatingRankingsService {
       ...this.row(r, await this.rules(), new Set([r.person_id])),
       lowestRating: r.lowest_rating,
       lastRatedMatchAt: r.last_rated_match_at?.toISOString() ?? null,
+      winRate: r.rated_matches > 0 ? Math.round((r.wins * 1000) / r.rated_matches) / 10 : null,
     };
   }
 
@@ -153,7 +154,7 @@ export class RatingRankingsService {
   }
 
   /** Спортсмен с рейтингом и согласием на публикацию; иначе — «не найдено». */
-  private async publicAthlete(publicId: string): Promise<string> {
+  async publicAthlete(publicId: string): Promise<string> {
     const athlete = await this.db.athleteProfile.findUnique({
       where: { publicId },
       select: { id: true, personId: true, status: true, rating: { select: { status: true } } },

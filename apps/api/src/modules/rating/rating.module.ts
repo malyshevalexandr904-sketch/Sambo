@@ -9,6 +9,7 @@ import { CompetitionRatingService } from './application/competition-rating.servi
 import { RatingAdminService } from './application/rating-admin.service';
 import { RatingAuditService } from './application/rating-audit.service';
 import { RatingCalculationService } from './application/rating-calculation.service';
+import { RatingProfileService } from './application/rating-profile.service';
 import { RatingRankingsService } from './application/rating-rankings.service';
 import { RatingRulesService } from './application/rating-rules.service';
 
@@ -23,6 +24,7 @@ import { RatingRulesService } from './application/rating-rules.service';
     CompetitionRatingResultsService,
     RatingAdminService,
     RatingAuditService,
+    RatingProfileService,
   ],
   exports: [
     RatingRulesService,
@@ -30,6 +32,7 @@ import { RatingRulesService } from './application/rating-rules.service';
     RatingRankingsService,
     CompetitionRatingService,
     CompetitionRatingResultsService,
+    RatingProfileService,
   ],
 })
 export class RatingModule {}

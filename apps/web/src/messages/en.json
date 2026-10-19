@@ -2780,7 +2780,14 @@
       "LOSS_SMALL_ADVANTAGE": "Loss by a small advantage",
       "LOSS_ON_POINTS": "Loss on points",
       "CLEAN_LOSS": "Clean loss"
-    }
+    },
+    "winRate": "Win rate",
+    "chart": "Rating chart",
+    "chartLabel": "Rating chart: from {from} to {to}, peak {peak}",
+    "chartTruncated": "Showing the latest 1000 changes.",
+    "competitions": "Rated competitions",
+    "competition": "Competition",
+    "competitionRating": "Rating before → after"
   },
   "ratingAdmin": {
     "title": "Rating",

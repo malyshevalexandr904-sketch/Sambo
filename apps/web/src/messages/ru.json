@@ -2780,7 +2780,14 @@
       "LOSS_SMALL_ADVANTAGE": "Поражение с небольшим преимуществом",
       "LOSS_ON_POINTS": "Поражение по баллам",
       "CLEAN_LOSS": "Чистое поражение"
-    }
+    },
+    "winRate": "Доля побед",
+    "chart": "График рейтинга",
+    "chartLabel": "График рейтинга: от {from} до {to}, лучший {peak}",
+    "chartTruncated": "Показаны последние 1000 изменений.",
+    "competitions": "Рейтинговые турниры",
+    "competition": "Турнир",
+    "competitionRating": "Рейтинг до → после"
   },
   "ratingAdmin": {
     "title": "Рейтинг",
