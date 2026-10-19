@@ -22,6 +22,7 @@ import {
   type BracketState,
   entry,
   type GraphNode,
+  type GroupDecisions,
   losersOf,
   type Outcome,
   PENDING,
@@ -139,15 +140,23 @@ export function ratedGroupStandings(
   graph: BracketGraph,
   state: BracketState,
   outcomes: ReadonlyMap<string, Outcome>,
+  decisions: GroupDecisions = new Map(),
 ): GroupStanding[] {
-  return groupStandings(graph, state, outcomes, RATED_GROUPS_V1.groupStandingRules, ratedQualifiers(graph));
+  return groupStandings(
+    graph,
+    state,
+    outcomes,
+    RATED_GROUPS_V1.groupStandingRules,
+    ratedQualifiers(graph),
+    decisions,
+  );
 }
 
 /**
  * Участник финальной части «A1»: подгруппа завершена и место занимает один участник. Общее место (критерии не
- * разделили) — сторона ждёт решения людей (decisionRequired в таблице подгруппы).
+ * разделили) — сторона ждёт решения людей (decisionRequired в таблице подгруппы, решение — GroupDecisions).
  */
-export const ratedPoolRank: PoolRankResolver = (source, graph, state, outcomes) => {
+export const ratedPoolRank: PoolRankResolver = (source, graph, state, outcomes, decisions) => {
   const standing = standingOf(
     graph,
     source.group,
@@ -155,6 +164,7 @@ export const ratedPoolRank: PoolRankResolver = (source, graph, state, outcomes) 
     outcomes,
     RATED_GROUPS_V1.groupStandingRules,
     ratedQualifiers(graph),
+    decisions.get(source.group),
   );
   if (!standing.complete) return PENDING;
   const rows = standing.rows.filter((r) => r.position === source.place);
@@ -183,8 +193,9 @@ export function ratedPlacements(
   graph: BracketGraph,
   state: BracketState,
   outcomes: ReadonlyMap<string, Outcome>,
+  decisions: GroupDecisions = new Map(),
 ): Placement[] | null {
-  const standings = ratedGroupStandings(graph, state, outcomes);
+  const standings = ratedGroupStandings(graph, state, outcomes, decisions);
   const stats = winLoss(state);
   const placement = (entryId: string, place: number): Placement => ({
     entryId,

@@ -38,7 +38,12 @@ import {
 } from './draw-mapper';
 import { type CategoryContext, DrawParticipantsService, parseStoredInput } from './draw-participants';
 
-const CANDIDATES: readonly PermissionCode[] = ['draw.create', 'draw.publish', 'draw.republish'];
+const CANDIDATES: readonly PermissionCode[] = [
+  'draw.create',
+  'draw.publish',
+  'draw.republish',
+  'result.amend',
+];
 
 interface Viewer {
   perms: Set<PermissionCode>;
@@ -223,7 +228,12 @@ export class DrawQueriesService {
         size: slots.length,
         nodes,
         participants,
-        groups: toGroupsDto(groups, slots.length),
+        groups: toGroupsDto(
+          groups,
+          slots.length,
+          published ? await this.brackets.decisionRecords(null, row.id) : [],
+          published && v.perms.has('result.amend'),
+        ),
       },
     };
   }
@@ -249,7 +259,12 @@ export class DrawQueriesService {
           size: slots.length,
           nodes,
           participants: toParticipants(slots, infos, row.seeds),
-          groups: toGroupsDto(await this.brackets.groups(null, row.id), slots.length),
+          groups: toGroupsDto(
+            await this.brackets.groups(null, row.id),
+            slots.length,
+            await this.brackets.decisionRecords(null, row.id),
+            v.perms.has('result.amend'),
+          ),
         }
       : null;
     return {

@@ -3,7 +3,13 @@
 // Состояние сетки не хранится отдельно: оно пересчитывается из жеребьёвки и сыгранных схваток, а стороны схваток
 // приводятся к нему — так продвижение, BYE и утешительные схватки не расходятся с графом.
 import { Injectable } from '@nestjs/common';
-import type { BracketNodeDto, CompetitionFormatCode, DrawStatus } from '@sde/contracts';
+import {
+  type BracketNodeDto,
+  type CompetitionFormatCode,
+  type DrawStatus,
+  RATED_GROUP_LETTERS,
+  type RatedGroupLetter,
+} from '@sde/contracts';
 import { type Tx, uuidv7 } from '@sde/db';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
@@ -16,9 +22,9 @@ import {
   MatchesService,
 } from '../../matches';
 import { nodeDependencies, participantsKnownAtPublish } from '../domain/dependencies';
-import type { BracketGraph, BracketState, Outcome, Placement } from '../domain/graph';
-import type { GroupStanding } from '../domain/group-standings';
-import { ratedGroupStandings } from '../domain/rated-groups';
+import type { BracketGraph, BracketState, GroupDecisions, Outcome, Placement } from '../domain/graph';
+import { type GroupStanding, undecidedTiers } from '../domain/group-standings';
+import { ratedGroupStandings, ratedQualifiers } from '../domain/rated-groups';
 import { isComplete } from '../domain/resolve';
 import { type FormatStrategy, resolveFormat, strategyFor } from '../domain/strategies';
 import {
@@ -63,6 +69,7 @@ interface LiveBracket {
   graph: BracketGraph;
   state: BracketState;
   outcomes: Map<string, Outcome>;
+  decisions: GroupDecisions;
   nodeIds: Map<string, string>;
   matchByKey: Map<string, MatchRecord>;
   competitionId: string;
@@ -70,6 +77,19 @@ interface LiveBracket {
 }
 
 const slotMap = (slots: SlotRow[]) => new Map(slots.map((s) => [s.position, s.entryId]));
+
+/** Ярусы решения из JSON строки group_place_decision (записываются только этим модулем). */
+const tiersOf = (json: unknown): string[][] =>
+  Array.isArray(json) ? json.map((t) => (Array.isArray(t) ? t.map(String) : [])) : [];
+
+/** Действующее решение об общем месте каждой подгруппы: последнее по времени. */
+export interface GroupDecisionRecord {
+  group: RatedGroupLetter;
+  tiers: string[][];
+  reason: string;
+  decidedAt: Date;
+  decidedBy: { id: string; displayName: string } | null;
+}
 
 function requireStrategy(format: CompetitionFormatCode): FormatStrategy {
   const strategy = strategyFor(format);
@@ -163,12 +183,16 @@ export class BracketsService {
           blueScore: m.result.blueScore ?? undefined,
         });
     }
-    const state = resolveFormat(strategy, graph, slotMap(draw.slots), outcomes);
+    const decisions = new Map(
+      (await this.decisionRecords(tx, drawId)).map((d) => [d.group, d.tiers] as const),
+    );
+    const state = resolveFormat(strategy, graph, slotMap(draw.slots), outcomes, decisions);
     return {
       strategy,
       graph,
       state,
       outcomes,
+      decisions,
       nodeIds,
       matchByKey,
       competitionId: draw.competitionId,
@@ -188,7 +212,52 @@ export class BracketsService {
   async groups(tx: Tx | null, drawId: string): Promise<GroupStanding[] | null> {
     const live = await this.live(tx, drawId);
     if (!live || live.graph.format !== 'SPECIAL_GROUP_RATED') return null;
-    return ratedGroupStandings(live.graph, live.state, live.outcomes);
+    return ratedGroupStandings(live.graph, live.state, live.outcomes, live.decisions);
+  }
+
+  /** Действующие решения об общих местах подгрупп жеребьёвки (последнее по каждой подгруппе). */
+  async decisionRecords(tx: Tx | null, drawId: string): Promise<GroupDecisionRecord[]> {
+    const rows = await (tx ?? this.db).groupPlaceDecision.findMany({
+      where: { drawId },
+      orderBy: { id: 'asc' },
+      select: {
+        groupLetter: true,
+        tiers: true,
+        reason: true,
+        createdAt: true,
+        decidedBy: { select: { id: true, displayName: true } },
+      },
+    });
+    const latest = new Map<RatedGroupLetter, GroupDecisionRecord>();
+    for (const r of rows) {
+      const group = RATED_GROUP_LETTERS.find((g) => g === r.groupLetter);
+      if (!group) continue;
+      latest.set(group, {
+        group,
+        tiers: tiersOf(r.tiers),
+        reason: r.reason,
+        decidedAt: r.createdAt,
+        decidedBy: r.decidedBy,
+      });
+    }
+    return [...latest.values()];
+  }
+
+  /**
+   * Ярусы общего места подгруппы, которые ждут решения людей, — без прежнего решения по этой подгруппе (новое его
+   * заменяет). Подгруппы нет или формат не рейтинговый — null. Вызывается под блокировкой жеребьёвки.
+   */
+  async undecidedTiers(tx: Tx, drawId: string, group: RatedGroupLetter): Promise<string[][] | null> {
+    const live = await this.live(tx, drawId);
+    if (!live || live.graph.format !== 'SPECIAL_GROUP_RATED') return null;
+    if (!live.graph.nodes.some((n) => n.group === group)) return null;
+    const decisions = new Map(live.decisions);
+    decisions.delete(group);
+    // Схватки подгруппы от решений не зависят (их стороны — позиции жеребьёвки): хватит текущего состояния.
+    const standing = ratedGroupStandings(live.graph, live.state, live.outcomes, decisions).find(
+      (g) => g.group === group,
+    );
+    return standing ? undecidedTiers(standing, ratedQualifiers(live.graph)) : null;
   }
 
   /** Узлы опубликованной сетки со схватками; сетки нет — null. */
@@ -234,7 +303,7 @@ export class BracketsService {
   ): Promise<{ complete: boolean; placements: Placement[] | null; format: CompetitionFormatCode } | null> {
     const live = await this.live(tx, drawId);
     if (!live) return null;
-    const placements = live.strategy.placements(live.graph, live.state, live.outcomes);
+    const placements = live.strategy.placements(live.graph, live.state, live.outcomes, live.decisions);
     return { complete: isComplete(live.state), placements, format: live.graph.format };
   }
 

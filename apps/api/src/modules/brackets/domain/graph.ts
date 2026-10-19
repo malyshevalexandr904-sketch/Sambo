@@ -79,6 +79,12 @@ export interface Outcome {
   blueScore?: number;
 }
 
+/**
+ * Решения людей об общих местах подгрупп рейтингового формата: по подгруппе — ярусы общего места, каждый в
+ * утверждённом порядке. Ярус применяется, только если совпадает с общим местом таблицы по составу.
+ */
+export type GroupDecisions = ReadonlyMap<RatedGroupLetter, readonly (readonly string[])[]>;
+
 export interface Placement {
   entryId: string;
   /** Деление мест допускается: 3, 3, 5, 5. */

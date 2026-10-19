@@ -4,7 +4,7 @@
 // добавляются новыми стратегиями без изменения ядра (граф, разрешение состояния, хранение).
 import type { CompetitionFormatCode, DrawFormat } from '@sde/contracts';
 import { buildSingleElimination, singleEliminationPlacements } from './elimination';
-import type { BracketGraph, BracketState, Outcome, Placement } from './graph';
+import type { BracketGraph, BracketState, GroupDecisions, Outcome, Placement } from './graph';
 import { buildRatedGroups, ratedPlacements, ratedPoolRank, validateRated } from './rated-groups';
 import { buildRepechage, lostToPoolWinner, repechagePlacements } from './repechage';
 import { type DynamicResolver, type PoolRankResolver, resolveBracket, type SlotMap } from './resolve';
@@ -30,6 +30,7 @@ export interface FormatStrategy {
     graph: BracketGraph,
     state: BracketState,
     outcomes: ReadonlyMap<string, Outcome>,
+    decisions?: GroupDecisions,
   ): Placement[] | null;
 }
 
@@ -72,12 +73,17 @@ export function strategyFor(format: CompetitionFormatCode): FormatStrategy | nul
   return (STRATEGIES as Partial<Record<CompetitionFormatCode, FormatStrategy>>)[format] ?? null;
 }
 
-/** Состояние сетки формата: жеребьёвка + подтверждённые исходы. */
+/** Состояние сетки формата: жеребьёвка, подтверждённые исходы и решения людей об общих местах подгрупп. */
 export function resolveFormat(
   strategy: FormatStrategy,
   graph: BracketGraph,
   slots: SlotMap,
   outcomes: ReadonlyMap<string, Outcome> = new Map(),
+  groupDecisions: GroupDecisions = new Map(),
 ): BracketState {
-  return resolveBracket(graph, slots, outcomes, { dynamic: strategy.dynamic, poolRank: strategy.poolRank });
+  return resolveBracket(graph, slots, outcomes, {
+    dynamic: strategy.dynamic,
+    poolRank: strategy.poolRank,
+    groupDecisions,
+  });
 }

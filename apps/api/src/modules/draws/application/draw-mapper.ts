@@ -15,7 +15,7 @@ import {
   type UserRef,
 } from '@sde/contracts';
 import type { Prisma } from '@sde/db';
-import type { GroupStanding } from '../../brackets';
+import type { GroupDecisionRecord, GroupStanding } from '../../brackets';
 import type { CategoryRow } from '../../categories';
 import type { SeparationReport } from '../domain/separation';
 import type { ParticipantInfo } from './draw-participants';
@@ -153,17 +153,31 @@ export function toSeparationDto(
 }
 
 /** Таблицы подгрупп рейтингового формата с критериями мест версии формата; другие форматы — null. */
-export function toGroupsDto(standings: GroupStanding[] | null, size: number): BracketViewDto['groups'] {
+export function toGroupsDto(
+  standings: GroupStanding[] | null,
+  size: number,
+  decisions: GroupDecisionRecord[] = [],
+  canDecide = false,
+): BracketViewDto['groups'] {
   if (!standings) return null;
   const rules = RATED_GROUPS_V1.groupStandingRules;
+  const decisionOf = (g: GroupStanding) => {
+    // Решение показывается, пока действует: после изменения результата ярусы могли стать другими.
+    const d = g.decided ? decisions.find((x) => x.group === g.group) : undefined;
+    return d
+      ? { reason: d.reason, decidedAt: d.decidedAt.toISOString(), decidedBy: toUserRef(d.decidedBy) }
+      : null;
+  };
   return {
     criteria: [...rules.criteria],
     criteriaConfirmed: rules.confirmed,
     qualifiersPerGroup: ratedFormatRule(size)?.qualifiersPerGroup ?? 0,
+    canDecide,
     standings: standings.map((g) => ({
       group: g.group,
       complete: g.complete,
       decisionRequired: g.decisionRequired,
+      decision: decisionOf(g),
       rows: g.rows.map((r) => ({
         position: r.position,
         entryId: r.entryId,

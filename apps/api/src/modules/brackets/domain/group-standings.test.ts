@@ -1,7 +1,7 @@
 import { RATED_GROUPS_V1, type WinMethod } from '@sde/contracts';
 import { describe, expect, it } from 'vitest';
 import type { Outcome, Side } from './graph';
-import { groupStandings } from './group-standings';
+import { groupStandings, undecidedTiers } from './group-standings';
 import { ratedPlacements } from './rated-groups';
 import { resolveFormat, strategyFor } from './strategies';
 
@@ -137,5 +137,24 @@ describe('group standings (GroupStandingsService)', () => {
     expect(only!.rows.every((r) => r.qualified === null)).toBe(true);
     const unfinished = run(3, (x, y) => (x === 1 && y === 2 ? undefined : [x, 'POINTS']));
     expect(ratedPlacements(unfinished.graph, unfinished.state, unfinished.outcomes)).toBeNull();
+  });
+
+  it('orders a shared place by the decision of people when it matches the tie exactly', () => {
+    // Подгруппа A: 1 > 2, 2 > 3, 3 > 1 — общее 1 место на троих при выходе двух.
+    const cycle: Parameters<typeof run>[1] = (x, y) => (x === 1 && y === 3 ? [3, 'POINTS'] : [x, 'POINTS']);
+    const { graph, state, outcomes } = run(6, cycle);
+    const [tied] = groupStandings(graph, state, outcomes, RULES, 2);
+    expect(undecidedTiers(tied!, 2)).toEqual([[e(1), e(2), e(3)]]);
+    const decided = groupStandings(graph, state, outcomes, RULES, 2, new Map([['A', [[e(2), e(3), e(1)]]]]));
+    expect(decided[0]).toMatchObject({ decisionRequired: false, decided: true });
+    expect(decided[0]!.rows.map((r) => [r.entryId, r.position, r.qualified])).toEqual([
+      [e(2), 1, true],
+      [e(3), 2, true],
+      [e(1), 3, false],
+    ]);
+    expect(undecidedTiers(decided[0]!, 2)).toEqual([]);
+    // Решение о другом составе (например, после изменения результата) не применяется.
+    const stale = groupStandings(graph, state, outcomes, RULES, 2, new Map([['A', [[e(2), e(3)]]]]));
+    expect(stale[0]).toMatchObject({ decisionRequired: true, decided: false });
   });
 });

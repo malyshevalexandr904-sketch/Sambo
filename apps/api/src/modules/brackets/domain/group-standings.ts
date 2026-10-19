@@ -4,7 +4,7 @@
 // выхода в финальную часть или среди вышедших, выход и пары финала не решаются автоматически (decisionRequired).
 // Рейтинг в местах не участвует (ТЗ 22).
 import type { GroupStandingCriterion, GroupStandingRules, RatedGroupLetter, WinMethod } from '@sde/contracts';
-import type { BracketGraph, BracketState, Outcome } from './graph';
+import type { BracketGraph, BracketState, GroupDecisions, Outcome } from './graph';
 import { entryOf, losersOf, winnerOf } from './graph';
 
 /** Чистая победа для мест: чистая, а также неявка, снятие, травма, дисквалификация соперника (решение заказчика). */
@@ -39,7 +39,20 @@ export interface GroupStanding {
   group: RatedGroupLetter;
   complete: boolean;
   decisionRequired: boolean;
+  /** Порядок общего места задан решением людей. */
+  decided: boolean;
   rows: GroupStandingRow[];
+}
+
+const sameMembers = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((id) => b.includes(id));
+
+/** Ярусы общего места, разделённые решением людей: ярус, совпавший с решением по составу, — в его порядке. */
+function applyDecision(tiers: string[][], decision: readonly (readonly string[])[]): string[][] {
+  return tiers.flatMap((tier) => {
+    const order = tier.length > 1 ? decision.find((d) => sameMembers(d, tier)) : undefined;
+    return order ? order.map((id) => [id]) : [tier];
+  });
 }
 
 const winsAgainst = (id: string, members: ReadonlySet<string>, games: readonly Game[]): number =>
@@ -146,9 +159,12 @@ export function standingOf(
   outcomes: ReadonlyMap<string, Outcome>,
   rules: GroupStandingRules,
   qualifiers: number,
+  decision: readonly (readonly string[])[] = [],
 ): GroupStanding {
   const { participants, stat, games, complete } = collect(graph, group, state, outcomes);
-  const tiers = orderTiers([...participants].sort(), games, rules.criteria);
+  const byCriteria = orderTiers([...participants].sort(), games, rules.criteria);
+  // Решение людей действует только у завершённой подгруппы: до конца круга равенство ещё может разрешиться.
+  const tiers = complete ? applyDecision(byCriteria, decision) : byCriteria;
   const rows: GroupStandingRow[] = [];
   let decisionRequired = false;
   for (const tier of tiers) {
@@ -157,9 +173,9 @@ export function standingOf(
     // Выход решается только у завершённой подгруппы; общее место через границу — решение людей. Общее место среди
     // вышедших тоже требует решения: от него зависит пара финальной части (A1 — B2). Одна подгруппа
     // (qualifiers = 0) финальной части не имеет — выхода нет.
-    const decided = complete && qualifiers > 0;
-    const qualified = !decided ? null : last <= qualifiers ? true : position > qualifiers ? false : null;
-    if (decided && tier.length > 1 && position <= qualifiers) decisionRequired = true;
+    const settled = complete && qualifiers > 0;
+    const qualified = !settled ? null : last <= qualifiers ? true : position > qualifiers ? false : null;
+    if (settled && tier.length > 1 && position <= qualifiers) decisionRequired = true;
     const tied = new Set(tier);
     const byWins = new Set([...participants].filter((id) => stat(id).wins === stat(tier[0] as string).wins));
     for (const id of tier) {
@@ -178,7 +194,7 @@ export function standingOf(
       });
     }
   }
-  return { group, complete, decisionRequired, rows };
+  return { group, complete, decisionRequired, decided: tiers.length !== byCriteria.length, rows };
 }
 
 /** Таблицы всех подгрупп сетки рейтингового формата по порядку букв. */
@@ -188,7 +204,22 @@ export function groupStandings(
   outcomes: ReadonlyMap<string, Outcome>,
   rules: GroupStandingRules,
   qualifiers: number,
+  decisions: GroupDecisions = new Map(),
 ): GroupStanding[] {
   const groups = [...new Set(graph.nodes.flatMap((n) => (n.group ? [n.group] : [])))].sort();
-  return groups.map((g) => standingOf(graph, g, state, outcomes, rules, qualifiers));
+  return groups.map((g) => standingOf(graph, g, state, outcomes, rules, qualifiers, decisions.get(g)));
+}
+
+/**
+ * Ярусы общего места, которые требуют решения людей: завершённая подгруппа, место яруса — среди выходящих
+ * (на границе или внутри). Пусто — решать нечего.
+ */
+export function undecidedTiers(standing: GroupStanding, qualifiers: number): string[][] {
+  if (!standing.complete || qualifiers === 0) return [];
+  const byPosition = new Map<number, string[]>();
+  for (const r of standing.rows)
+    byPosition.set(r.position, [...(byPosition.get(r.position) ?? []), r.entryId]);
+  return [...byPosition.entries()]
+    .filter(([position, ids]) => ids.length > 1 && position <= qualifiers)
+    .map(([, ids]) => ids);
 }

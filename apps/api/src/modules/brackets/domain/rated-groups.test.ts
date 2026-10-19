@@ -169,6 +169,16 @@ describe('rated groups bracket', () => {
     expect(placements).toBeNull();
   });
 
+  it('fills the pending final sides once people order the shared place', () => {
+    const graph = strategy.build(6);
+    const { outcomes } = playAll(6, (key) =>
+      key === groupKey('A', 2, 1) ? { winner: 'BLUE', method: 'POINTS' } : undefined,
+    );
+    const state = resolveFormat(strategy, graph, slots(6), outcomes, new Map([['A', [[e(3), e(1), e(2)]]]]));
+    expect(state.get(finalKey(1, 1))?.red).toEqual({ kind: 'ENTRY', entryId: e(3) });
+    expect(state.get(finalKey(1, 2))?.blue).toEqual({ kind: 'ENTRY', entryId: e(1) });
+  });
+
   it('places a single group by its table', () => {
     expect(playAll(4).placements?.map((p) => [p.entryId, p.place])).toEqual([
       [e(1), 1],

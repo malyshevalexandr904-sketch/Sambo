@@ -7,6 +7,7 @@ import {
   type BracketState,
   entry,
   type GraphNode,
+  type GroupDecisions,
   losersOf,
   type NodeState,
   type Outcome,
@@ -32,12 +33,15 @@ export type PoolRankResolver = (
   graph: BracketGraph,
   state: BracketState,
   outcomes: ReadonlyMap<string, Outcome>,
+  decisions: GroupDecisions,
 ) => SideState;
 
 /** Правила формата для источников, которые не сводятся к позиции жеребьёвки или узлу. */
 export interface SourceRules {
   dynamic?: DynamicResolver;
   poolRank?: PoolRankResolver;
+  /** Решения людей об общих местах подгрупп (для POOL_RANK). */
+  groupDecisions?: GroupDecisions;
 }
 
 /** Нарушение инварианта сетки: ошибка данных или вызова, а не пользователя. */
@@ -95,7 +99,13 @@ function sideFrom(
       return ctx.rules.dynamic(source, ctx.graph, ctx.state);
     case 'POOL_RANK':
       if (!ctx.rules.poolRank) throw new BracketInvariantError('pool_rank_without_rule', node.key);
-      return ctx.rules.poolRank(source, ctx.graph, ctx.state, ctx.outcomes);
+      return ctx.rules.poolRank(
+        source,
+        ctx.graph,
+        ctx.state,
+        ctx.outcomes,
+        ctx.rules.groupDecisions ?? new Map(),
+      );
   }
 }
 
