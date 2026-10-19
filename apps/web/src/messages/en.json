@@ -1881,7 +1881,7 @@
       "yes": "Advances",
       "no": "No",
       "undecided": "Decision",
-      "decisionRequired": "A shared place sits on the line to the final part: the criteria did not separate the athletes, so who advances is undecided and needs a decision.",
+      "decisionRequired": "The criteria did not separate athletes whose place decides qualification or a final-stage pairing: the place needs a decision, and the matching final-stage side stays empty until then.",
       "rules": "Group places: {criteria}; athletes equal on every criterion share the place.",
       "provisional": "The criteria are provisional: the format documents give no rule for group places, so they need to be confirmed.",
       "criteria": {
@@ -1890,7 +1890,10 @@
         "CLEAN_WINS": "clean wins",
         "SUPERIORITY_WINS": "wins by superiority"
       }
-    }
+    },
+    "waitingPoolRank": "place {place} of group {group}",
+    "finalPart": "Final stage",
+    "finalPartHint": "Participants are group places (\"A1\" is first place in group A); a side is filled once its group is complete. There is no bronze match: both semifinal losers take third place."
   },
   "scheduling": {
     "published": "Published",

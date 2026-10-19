@@ -16,8 +16,11 @@ export interface MatchDurations {
   repechage: number | null;
 }
 
-/** Этап сетки для таблицы bracket: основная сетка (или круговая группа), затем утешительные схватки. */
-const STAGE_ORDER: Record<BracketStage, number> = { MAIN: 1, POOL: 1, REPECHAGE: 2 };
+/**
+ * Этап сетки для таблицы bracket: основная сетка (или круговая группа), затем утешительные схватки. Финальная часть
+ * рейтингового формата — после всех подгрупп.
+ */
+const STAGE_ORDER: Record<Exclude<BracketStage, 'FINAL'>, number> = { MAIN: 1, POOL: 1, REPECHAGE: 2 };
 
 /** Номер подгруппы рейтингового формата (A — 1); у остальных узлов — 0. */
 const groupIndex = (n: GraphNode): number => (n.group ? RATED_GROUP_LETTERS.indexOf(n.group) + 1 : 0);
@@ -41,7 +44,7 @@ export function bracketStages(graph: BracketGraph): BracketStageSpec[] {
       stages.set(key, {
         key,
         kind: n.stage,
-        stageOrder: n.group ? groupIndex(n) : STAGE_ORDER[n.stage],
+        stageOrder: n.group ? groupIndex(n) : n.stage === 'FINAL' ? stages.size + 1 : STAGE_ORDER[n.stage],
         label: n.group ?? null,
       });
   }
@@ -78,12 +81,15 @@ export function matchSpec(
 /**
  * Порядок номеров схваток категории: основная сетка по кругам, затем утешительные схватки по шагам, финал —
  * последним (его участники определяются раньше, но проводится он после утешительных схваток). Подгруппы
- * рейтингового формата — круг за кругом: в круге подгруппа A, затем B и так далее.
+ * рейтингового формата — круг за кругом: в круге подгруппа A, затем B и так далее; финальная часть — после подгрупп.
  */
 export function numberingOrder(graph: BracketGraph): GraphNode[] {
   const finalRound = Math.max(0, ...graph.nodes.filter((n) => n.stage === 'MAIN').map((n) => n.round));
-  const group = (n: GraphNode): number =>
-    n.stage === 'MAIN' && n.label === 'FINAL' && n.round === finalRound ? 2 : n.stage === 'REPECHAGE' ? 1 : 0;
+  const group = (n: GraphNode): number => {
+    if (n.stage === 'FINAL') return 3;
+    if (n.stage === 'MAIN' && n.label === 'FINAL' && n.round === finalRound) return 2;
+    return n.stage === 'REPECHAGE' ? 1 : 0;
+  };
   return [...graph.nodes].sort(
     (a, b) =>
       group(a) - group(b) || a.round - b.round || groupIndex(a) - groupIndex(b) || a.position - b.position,

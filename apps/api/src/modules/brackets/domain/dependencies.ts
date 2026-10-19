@@ -15,6 +15,9 @@ function keysOf(source: Source, graph: BracketGraph): string[] {
     case 'WINNER_OF':
     case 'LOSER_OF':
       return [source.node];
+    case 'POOL_RANK':
+      // Место в подгруппе известно только после всех её схваток.
+      return graph.nodes.filter((n) => n.group === source.group).map((n) => n.key);
     case 'DYNAMIC': {
       const rounds = eliminationRounds(graph.size);
       return [mainKey(rounds - 1, source.pool === 'A' ? 1 : 2)];

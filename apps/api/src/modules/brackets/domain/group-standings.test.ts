@@ -18,6 +18,7 @@ function run(n: number, result: (a: number, b: number) => [number, WinMethod, nu
   const slots = new Map(Array.from({ length: n }, (_, i) => [i + 1, e(i + 1)] as const));
   const outcomes = new Map<string, Outcome>();
   for (const node of graph.nodes) {
+    if (!node.group) continue;
     const [red, blue] = [node.red, node.blue].map((s) => (s.type === 'DRAW_SLOT' ? s.position : 0)) as [
       number,
       number,
@@ -98,10 +99,21 @@ describe('group standings (GroupStandingsService)', () => {
     const [a] = table(6, (x, y) => (x === 1 && y === 3 ? [3, 'POINTS'] : [x, 'POINTS']));
     expect(a!.rows.map((r) => r.position)).toEqual([1, 1, 1]);
     expect(a!.decisionRequired).toBe(true);
-    // Без общего места на границе решение не нужно: выходят все трое при выходе трёх.
+    // Выходят все трое при выходе трёх, но общее место среди вышедших решает пары финала — тоже решение людей.
     const [whole] = table(6, (x, y) => (x === 1 && y === 3 ? [3, 'POINTS'] : [x, 'POINTS']), 3);
-    expect(whole!.decisionRequired).toBe(false);
+    expect(whole!.decisionRequired).toBe(true);
     expect(whole!.rows.every((r) => r.qualified === true)).toBe(true);
+    // Общее место ниже выхода решения не требует.
+    // 10 участников — подгруппы по 5: 3 > 4 > 5 > 3 по кругу делят 3 место.
+    const [low] = table(10, (x, y) => (x === 3 && y === 5 ? [5, 'POINTS'] : [x, 'POINTS']));
+    expect(low!.rows.map((r) => [r.position, r.qualified])).toEqual([
+      [1, true],
+      [2, true],
+      [3, false],
+      [3, false],
+      [3, false],
+    ]);
+    expect(low!.decisionRequired).toBe(false);
   });
 
   it('applies only the configured criteria, in order', () => {

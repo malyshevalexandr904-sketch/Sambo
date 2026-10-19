@@ -1,7 +1,8 @@
 // Места в подгруппах рейтингового формата (ТЗ 31; docs/RATED_TOURNAMENT_FORMAT.md, 3): критерии — данные версии
 // формата (GroupStandingRules), применяются по порядку к равным; разделившиеся равные снова сравниваются с первого
 // критерия (личные встречи — внутри меньшей группы). Неразрешённое равенство — общее место; если оно на границе
-// выхода в финальную часть, выход не решается автоматически (decisionRequired). Рейтинг в местах не участвует (ТЗ 22).
+// выхода в финальную часть или среди вышедших, выход и пары финала не решаются автоматически (decisionRequired).
+// Рейтинг в местах не участвует (ТЗ 22).
 import type { GroupStandingCriterion, GroupStandingRules, RatedGroupLetter, WinMethod } from '@sde/contracts';
 import type { BracketGraph, BracketState, Outcome } from './graph';
 import { entryOf, losersOf, winnerOf } from './graph';
@@ -138,7 +139,7 @@ function collect(
 }
 
 /** Таблица одной подгруппы. */
-function standingOf(
+export function standingOf(
   graph: BracketGraph,
   group: RatedGroupLetter,
   state: BracketState,
@@ -153,11 +154,12 @@ function standingOf(
   for (const tier of tiers) {
     const position = rows.length + 1;
     const last = position + tier.length - 1;
-    // Выход решается только у завершённой подгруппы; общее место через границу — решение людей. Одна подгруппа
+    // Выход решается только у завершённой подгруппы; общее место через границу — решение людей. Общее место среди
+    // вышедших тоже требует решения: от него зависит пара финальной части (A1 — B2). Одна подгруппа
     // (qualifiers = 0) финальной части не имеет — выхода нет.
     const decided = complete && qualifiers > 0;
     const qualified = !decided ? null : last <= qualifiers ? true : position > qualifiers ? false : null;
-    if (decided && qualified === null) decisionRequired = true;
+    if (decided && tier.length > 1 && position <= qualifiers) decisionRequired = true;
     const tied = new Set(tier);
     const byWins = new Set([...participants].filter((id) => stat(id).wins === stat(tier[0] as string).wins));
     for (const id of tier) {

@@ -36,6 +36,7 @@ function useCtx(view: BracketViewDto, matchHref?: (matchId: string) => string): 
 /** Кто займёт сторону, пока участник не известен: «Победитель № 7», проигравший победителю подгруппы. */
 function useSourceText(ctx: Ctx): (s: BracketSideDto) => string {
   const t = useTranslations('bracket');
+  const letters = useTranslations('draws.ratedPlan.letters');
   return (s) => {
     if (s.bye) return t('bye');
     if (s.source.type === 'WINNER_OF') {
@@ -45,6 +46,10 @@ function useSourceText(ctx: Ctx): (s: BracketSideDto) => string {
     if (s.source.type === 'DYNAMIC') {
       const [, pool, round] = s.source.ref.split(':');
       return t('waitingDynamic', { pool: pool ?? '', round: round ?? '' });
+    }
+    if (s.source.type === 'POOL_RANK') {
+      const [group, place] = s.source.ref.split(':');
+      return t('waitingPoolRank', { group: letters(group ?? 'A'), place: place ?? '' });
     }
     return t('waiting');
   };
@@ -171,10 +176,19 @@ function RoundTabs({
   );
 }
 
-function EliminationView({ view, matchHref }: { view: BracketViewDto; matchHref?: (id: string) => string }) {
+function EliminationView({
+  view,
+  matchHref,
+  stage = 'MAIN',
+}: {
+  view: BracketViewDto;
+  matchHref?: (id: string) => string;
+  /** Этап на выбывание: основная сетка или финальная часть рейтингового формата. */
+  stage?: 'MAIN' | 'FINAL';
+}) {
   const t = useTranslations('bracket');
   const ctx = useCtx(view, matchHref);
-  const main = view.nodes.filter((n) => n.stage === 'MAIN');
+  const main = view.nodes.filter((n) => n.stage === stage);
   const rounds = [...new Set(main.map((n) => n.round))].sort((a, b) => a - b);
   const labels = new Map(
     rounds.map((r) => [r, t(`rounds.${main.find((n) => n.round === r)?.label ?? 'FINAL'}`)]),
@@ -334,7 +348,7 @@ function RoundRobinView({ view, matchHref }: { view: BracketViewDto; matchHref?:
   );
 }
 
-/** Рейтинговый формат: каждая подгруппа — своя круговая таблица и свои круги. */
+/** Рейтинговый формат: каждая подгруппа — своя круговая таблица и свои круги, затем финальная часть на выбывание. */
 function GroupsView({ view, matchHref }: { view: BracketViewDto; matchHref?: (id: string) => string }) {
   const t = useTranslations('bracket');
   const letters = useTranslations('draws.ratedPlan.letters');
@@ -371,6 +385,13 @@ function GroupsView({ view, matchHref }: { view: BracketViewDto; matchHref?: (id
           />
         </section>
       ))}
+      {view.nodes.some((n) => n.stage === 'FINAL') ? (
+        <section aria-label={t('finalPart')} className="break-inside-avoid">
+          <h3 className="mb-1 text-lg font-semibold">{t('finalPart')}</h3>
+          <p className="mb-3 text-sm text-slate-600">{t('finalPartHint')}</p>
+          <EliminationView view={view} matchHref={matchHref} stage="FINAL" />
+        </section>
+      ) : null}
     </div>
   );
 }

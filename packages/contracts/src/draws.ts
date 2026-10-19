@@ -50,7 +50,7 @@ export type WinMethod = (typeof WIN_METHODS)[number];
 export const MATCH_RESULT_STATUSES = ['PROVISIONAL', 'CONFIRMED', 'PUBLISHED', 'AMENDED'] as const;
 export type MatchResultStatus = (typeof MATCH_RESULT_STATUSES)[number];
 
-export const BRACKET_STAGES = ['MAIN', 'REPECHAGE', 'POOL'] as const;
+export const BRACKET_STAGES = ['MAIN', 'REPECHAGE', 'POOL', 'FINAL'] as const;
 export type BracketStage = (typeof BRACKET_STAGES)[number];
 
 /** Источник стороны узла: позиция жеребьёвки, победитель или проигравший узла, правило формата. */

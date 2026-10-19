@@ -155,9 +155,9 @@ describe('rated group generation', () => {
     const groups: Record<string, number[]> = {};
     for (const s of draw.slots) (groups[s.pool!] ??= []).push(s.seedNumber!);
     expect(groups).toEqual({ A: [1, 8, 9], B: [2, 7, 10], C: [3, 6, 11], D: [4, 5, 12, 13] });
-    // Предпросмотр — круги каждой подгруппы по схеме формата.
-    expect(draw.bracket.nodes).toHaveLength(15);
-    expect(new Set(draw.bracket.nodes.map((n) => n.group))).toEqual(new Set(['A', 'B', 'C', 'D']));
+    // Предпросмотр — круги каждой подгруппы по схеме формата (15 схваток) и финальная часть (7).
+    expect(draw.bracket.nodes).toHaveLength(22);
+    expect(new Set(draw.bracket.nodes.map((n) => n.group))).toEqual(new Set(['A', 'B', 'C', 'D', null]));
     // Таблицы подгрупп до схваток: критерии версии формата не подтверждены, выход ещё не решён.
     expect(draw.bracket.groups).toMatchObject({
       criteria: ['WINS', 'HEAD_TO_HEAD', 'CLEAN_WINS', 'SUPERIORITY_WINS'],
@@ -219,16 +219,18 @@ describe('rated group generation', () => {
       ['POOL', 2, 'B', 3],
       ['POOL', 3, 'C', 3],
       ['POOL', 4, 'D', 6],
+      ['FINAL', 5, null, 7],
     ]);
     expect(
       await t.admin.match.count({ where: { categoryId: cat.categoryId, matchNumber: { not: null } } }),
-    ).toBe(15);
+    ).toBe(22);
     const view = await rated.staff.manager.agent
       .get(`/api/v1/categories/${cat.categoryId}/brackets`)
       .expect(200);
     const bracket = (view.body.data as CategoryBracketDto).bracket!;
     expect(bracket.format).toBe('SPECIAL_GROUP_RATED');
-    expect(bracket.nodes.every((n) => n.group !== null && n.match !== null)).toBe(true);
+    expect(bracket.nodes.every((n) => n.match !== null)).toBe(true);
+    expect(bracket.nodes.filter((n) => n.group === null).map((n) => n.stage)).toEqual(Array(7).fill('FINAL'));
     expect(bracket.groups?.standings).toHaveLength(4);
     expect(bracket.participants.find((p) => p.seedNumber === 1)).toMatchObject({
       pool: 'A',
@@ -320,6 +322,73 @@ describe('rated group standings', () => {
       [2, 2, 2, 1],
       [3, 3, 1, 2],
       [4, 4, 0, 3],
+    ]);
+  });
+
+  it('fills the final part from the group places and takes the places from it', async () => {
+    const w = await refereeWorld(t, [{ admitted: 6 }], async (world) => {
+      await t.admin.competition.update({
+        where: { id: world.competitionId },
+        data: { competitionType: 'RATED' },
+      });
+    });
+    const categoryId = w.categories[0]!.categoryId;
+    const chief = w.staff.chief;
+    const view = async (): Promise<BracketViewDto> => {
+      const r = await chief.agent.get(`/api/v1/categories/${categoryId}/brackets`);
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+      return (r.body.data as CategoryBracketDto).bracket!;
+    };
+    const before = await view();
+    const seed = new Map(before.participants.map((p) => [p.entryId, p.seedNumber!]));
+    const final = (b: BracketViewDto) => b.nodes.filter((n) => n.stage === 'FINAL');
+    expect(final(before).map((n) => [n.label, n.red.source, n.blue.source, n.red.entryId])).toEqual([
+      ['SEMIFINAL', { type: 'POOL_RANK', ref: 'A:1' }, { type: 'POOL_RANK', ref: 'B:2' }, null],
+      ['SEMIFINAL', { type: 'POOL_RANK', ref: 'B:1' }, { type: 'POOL_RANK', ref: 'A:2' }, null],
+      ['FINAL', { type: 'WINNER_OF', ref: 'FINAL:1:1' }, { type: 'WINNER_OF', ref: 'FINAL:1:2' }, null],
+    ]);
+    // Каждую готовую схватку выигрывает меньший номер посева, пока сетка не сыграна.
+    const playReady = async (): Promise<number> => {
+      const ready = (await scheduledMatches(t, categoryId)).filter(
+        (m) => !m.result && m.participants.length === 2 && m.participants.every((p) => p.entryId && !p.isBye),
+      );
+      for (const m of ready) {
+        const red = m.participants.find((p) => p.side === 'RED')!.entryId!;
+        const blue = m.participants.find((p) => p.side === 'BLUE')!.entryId!;
+        const played = await playToResult(chief, m.id, seed.get(red)! < seed.get(blue)! ? 'RED' : 'BLUE');
+        const c = await confirm(chief, played);
+        expect(c.status, JSON.stringify(c.body)).toBe(200);
+      }
+      return ready.length;
+    };
+    // Подгруппы (6 схваток) — затем полуфиналы получают участников по местам подгрупп.
+    expect(await playReady()).toBe(6);
+    const afterGroups = await view();
+    // Змейка: A — посевы 1, 4, 5; B — 2, 3, 6. A1 = 1, A2 = 4, B1 = 2, B2 = 3.
+    expect(
+      final(afterGroups).map((n) => [
+        n.red.entryId && seed.get(n.red.entryId),
+        n.blue.entryId && seed.get(n.blue.entryId),
+      ]),
+    ).toEqual([
+      [1, 3],
+      [2, 4],
+      [null, null],
+    ]);
+    expect(afterGroups.groups!.standings.every((g) => g.complete && !g.decisionRequired)).toBe(true);
+    expect(await playReady()).toBe(2);
+    expect(await playReady()).toBe(1);
+
+    const r = await chief.agent.get(`/api/v1/categories/${categoryId}/results`);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    const results = r.body.data as CategoryResultsDto;
+    expect(results.status).toBe('PROVISIONAL');
+    // Схватки за 3 место нет: оба проигравших полуфиналы — 3; не вышедшие из подгрупп мест не получают (Q-F5).
+    expect(results.placements.map((p) => [seed.get(p.entryId), p.place, p.wins, p.losses])).toEqual([
+      [1, 1, 4, 0],
+      [2, 2, 3, 1],
+      [3, 3, 1, 2],
+      [4, 3, 1, 2],
     ]);
   });
 });
