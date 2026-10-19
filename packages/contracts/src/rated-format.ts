@@ -91,7 +91,7 @@ export const GroupStandingRules = z.strictObject({
     .refine((c) => new Set(c).size === c.length, { error: 'duplicate_criterion' }),
   /**
    * Критерии подтверждены заказчиком. В источниках правила мест в подгруппе нет (docs/RATED_TOURNAMENT_FORMAT.md,
-   * 3; Q-F4): пока false — по умолчанию как места круговой системы, решение заказчика требуется.
+   * 3; Q-F4); false — версия ждёт решения заказчика, и экран называет критерии предварительными.
    */
   confirmed: z.boolean(),
 });
@@ -265,10 +265,10 @@ export const RATED_GROUPS_V1: RatedFormatConfig = RatedFormatConfig.parse({
   },
   distribution: 'SNAKE',
   thirdPlace: 'BOTH_SEMIFINAL_LOSERS',
-  // TODO(Q-F4): решение заказчика — пока как места круговой системы платформы.
+  // Q-F4: порядок как в круговой системе платформы утверждён заказчиком 2026-10-19.
   groupStandingRules: {
     criteria: ['WINS', 'HEAD_TO_HEAD', 'CLEAN_WINS', 'SUPERIORITY_WINS'],
-    confirmed: false,
+    confirmed: true,
   },
   // TODO(Q-F5): решение заказчика — проигравшие четвертьфиналы делят 5 место, не вышедшие из подгрупп мест не
   // получают (в источниках правила нет).
