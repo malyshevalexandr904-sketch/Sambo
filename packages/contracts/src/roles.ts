@@ -208,6 +208,14 @@ const MATRIX: Record<PermissionCode, string> = {
   'notification.announce':        'x..ix......',
   'venue_node.manage':            'x..ix......',
   'write_lease.recover':          'x..ix......',
+  'competition.create_rated':     'xx.........',
+  'competition.convert_to_rated': 'xx.........',
+  'competition.manage_rating_rules': 'x..........',
+  'competition.recalculate_rating': 'xx.........',
+  'competition.view_rating_audit': 'xx.........',
+  'competition.publish_rating_results': 'xx.........',
+  'rating.correct':               'xx.........',
+  'rating.rebuild_apply':         'x..........',
 };
 
 export type RolePermissionMap = Record<RoleCode, Partial<Record<PermissionCode, GrantMode>>>;

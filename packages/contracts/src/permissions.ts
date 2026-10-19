@@ -94,6 +94,18 @@ export const PERMISSIONS = {
   'notification.announce': { scopes: [C], description: 'Объявления участникам' },
   'venue_node.manage': { scopes: [C], description: 'Площадочный узел' },
   'write_lease.recover': { scopes: [C], description: 'Аварийный возврат права записи' },
+  // Рейтинг спортсменов (docs/RATING_ARCHITECTURE.md, 3.2): только платформа — у ролей турнира и организации их нет.
+  'competition.create_rated': { scopes: [P], description: 'Создание рейтингового турнира' },
+  'competition.convert_to_rated': {
+    scopes: [P],
+    description: 'Включение рейтинга у турнира и административная смена типа турнира',
+  },
+  'competition.manage_rating_rules': { scopes: [P], description: 'Версии правил расчёта рейтинга' },
+  'competition.recalculate_rating': { scopes: [P], description: 'Досчёт и проверка рейтинга' },
+  'competition.view_rating_audit': { scopes: [P], description: 'Журнал расчётов рейтинга' },
+  'competition.publish_rating_results': { scopes: [P], description: 'Публикация изменений рейтинга турнира' },
+  'rating.correct': { scopes: [P], description: 'Корректировка и заморозка рейтинга спортсмена' },
+  'rating.rebuild_apply': { scopes: [P], description: 'Применение пересборки рейтинга' },
 } as const satisfies Record<string, PermissionDef>;
 
 export type PermissionCode = keyof typeof PERMISSIONS;

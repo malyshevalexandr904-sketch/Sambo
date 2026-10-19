@@ -449,6 +449,8 @@ describe('rating calculation of a confirmed match', () => {
   it('writes nothing for a match of a competition that is not rated', async () => {
     const m = await free();
     await setResult(m, { winnerSide: 'RED', method: 'POINTS' });
+    // После расчётов тип турнира не меняется (триггер, фаза 8); здесь проверяется собственная проверка расчёта.
+    await t.admin.$executeRaw`ALTER TABLE competition DISABLE TRIGGER competition_type_guard`;
     await t.admin.competition.update({
       where: { id: w.competitionId },
       data: { competitionType: 'NON_RATED' },
@@ -461,6 +463,7 @@ describe('rating calculation of a confirmed match', () => {
         where: { id: w.competitionId },
         data: { competitionType: 'RATED' },
       });
+      await t.admin.$executeRaw`ALTER TABLE competition ENABLE TRIGGER competition_type_guard`;
     }
     expect((await calc.calculate(m.id)).status).toBe('COMPLETED');
   });

@@ -43,6 +43,7 @@ export function createData(
     registrationStartsAt: new Date(input.registrationStartsAt),
     registrationEndsAt: new Date(input.registrationEndsAt),
     level: input.level,
+    competitionType: input.competitionType,
     disciplineCode: input.disciplineCode,
     ruleSetVersionId: input.ruleSetVersionId ?? null,
     logoFileId: input.logoFileId ?? null,

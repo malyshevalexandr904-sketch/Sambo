@@ -1,7 +1,8 @@
 // Рейтинг спортсменов (docs/RATING_RULES.md, docs/RATING_ARCHITECTURE.md): исходы схватки и параметры версии
 // правил расчёта (RatingRuleSet.parameters). Расчёт — apps/api/src/modules/rating/domain.
 import { z } from 'zod';
-import { type LocalizedText, PageQuery, Uuid } from './common.js';
+import { type LocalizedText, PageQuery, Reason, Uuid } from './common.js';
+import { COMPETITION_TYPES } from './competitions.js';
 import { WIN_METHODS } from './draws.js';
 import { GENDERS } from './people.js';
 
@@ -40,10 +41,6 @@ export const RATING_CALCULATION_STATUSES = [
   'SUPERSEDED',
 ] as const;
 export type RatingCalculationStatus = (typeof RATING_CALCULATION_STATUSES)[number];
-
-/** Тип турнира (RATING_ARCHITECTURE.md, 3.1): RATED — подтверждённые схватки меняют рейтинг. */
-export const COMPETITION_TYPES = ['NON_RATED', 'RATED'] as const;
-export type CompetitionType = (typeof COMPETITION_TYPES)[number];
 
 /** Корректировка рейтинга: изменённый результат схватки (6.4) или ручная (фаза 14). */
 export const RATING_CORRECTION_KINDS = ['RESULT_AMENDED', 'MANUAL'] as const;
@@ -186,4 +183,43 @@ export interface PublicRatingHistoryItem {
   outcome: RatingOutcome | null;
   competition: { slug: string; name: string } | null;
   opponent: (PublicRatedAthlete & { ratingBefore: number }) | null;
+}
+
+// ---- Рейтинговый турнир: включение и смена типа платформой (docs/RATING_ARCHITECTURE.md, 3.1) ----
+
+/**
+ * Включение рейтинга у турнира до публикации (`competition.convert_to_rated`): закрепляется версия правил расчёта —
+ * указанная или действующая.
+ */
+export const CompetitionRatingEnable = z.object({
+  ruleSetId: Uuid.optional(),
+  publicDeltas: z.boolean().default(true),
+  reason: Reason,
+});
+export type CompetitionRatingEnable = z.infer<typeof CompetitionRatingEnable>;
+
+/**
+ * Административная смена типа турнира (в том числе опубликованного), пока по турниру нет ни одного расчёта
+ * рейтинга. Причина обязательна, действие записывается в аудит.
+ */
+export const CompetitionTypeChange = z.object({
+  competitionType: z.enum(COMPETITION_TYPES),
+  ruleSetId: Uuid.optional(),
+  publicDeltas: z.boolean().default(true),
+  reason: Reason,
+});
+export type CompetitionTypeChange = z.infer<typeof CompetitionTypeChange>;
+
+/** Версия правил расчёта для экрана создания рейтингового турнира (только чтение). */
+export interface RatingRuleSetSummary {
+  id: string;
+  code: string;
+  version: number;
+  name: string;
+  calculationVersion: string;
+  activeFrom: string | null;
+  rules: Pick<
+    RatingRuleParametersV1,
+    'initialRating' | 'kFactorRules' | 'scoreRules' | 'levelRules' | 'roundingRule'
+  >;
 }

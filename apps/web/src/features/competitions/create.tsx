@@ -16,11 +16,13 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { OrganizationPicker } from '@/components/organization-picker';
 import { afterServerRoleChange, roleBefore } from '@/features/cabinet-role';
+import { platformHas } from '@/lib/access';
 import { useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useFieldMessage } from '@/lib/errors';
-import { pickName, qk, useDisciplines } from '@/lib/queries';
+import { pickName, qk, useDisciplines, useMe } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
+import { ActiveRatingRules } from './rating-card';
 import { VenueSelect } from './venue-select';
 
 /** Часовые пояса России (и UTC); турнир может быть и в другом — поле принимает любой пояс IANA. */
@@ -53,6 +55,7 @@ interface FormValues {
   registrationEndsLocal: string;
   venueId: string;
   ruleSetVersionId: string;
+  competitionType: 'NON_RATED' | 'RATED';
 }
 
 const today = (): string => new Date().toISOString().slice(0, 10);
@@ -78,7 +81,10 @@ export function CompetitionCreateForm() {
     registrationEndsLocal: '',
     venueId: '',
     ruleSetVersionId: '',
+    competitionType: 'NON_RATED',
   });
+  // Рейтинговый турнир создаёт только платформа; сервер проверяет право сам (docs/RATING_ARCHITECTURE.md, 3.1).
+  const canRated = platformHas(useMe().data, 'competition.create_rated');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const organizer = v.organizerOrganizationId;
   const rulesets = useQuery({
@@ -113,6 +119,7 @@ export function CompetitionCreateForm() {
       registrationEndsAt: toInstant(v.registrationEndsLocal),
       venueId: v.venueId || undefined,
       ruleSetVersionId: v.ruleSetVersionId || undefined,
+      competitionType: canRated ? v.competitionType : 'NON_RATED',
     };
     const local: Record<string, string> = {};
     if (!body.name || body.name.length < 3) local.name = 'too_short';
@@ -214,6 +221,20 @@ export function CompetitionCreateForm() {
             </Field>
           </div>
         </Card>
+        {canRated ? (
+          <Card>
+            <CardTitle>{t('competitions.rating.title')}</CardTitle>
+            <Field id="c-type" label={t('competitions.rating.type')} hint={t('competitions.rating.typeHint')}>
+              <Select id="c-type" value={v.competitionType} onChange={set('competitionType')}>
+                <option value="NON_RATED">{t('competitions.rating.types.NON_RATED')}</option>
+                <option value="RATED">{t('competitions.rating.types.RATED')}</option>
+              </Select>
+            </Field>
+            <div className="mt-4">
+              <ActiveRatingRules enabled={v.competitionType === 'RATED'} />
+            </div>
+          </Card>
+        ) : null}
         <ScheduleCard values={v} errors={errors} set={set} />
         <Card>
           <CardTitle>{t('competitions.venue')}</CardTitle>

@@ -21,6 +21,7 @@ import { AuditService } from '../../audit';
 import { FilesService } from '../../files';
 import { OrganizationScopeService } from '../../organizations';
 import { OutboxService } from '../../outbox';
+import { CompetitionRatingService } from '../../rating';
 import { RuleSetsService } from '../../rulesets';
 import { WriteLeaseService } from '../../venue-sync';
 import {
@@ -70,6 +71,7 @@ export class CompetitionsService {
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
     private readonly cabinetRoles: CabinetRolesService,
+    private readonly rating: CompetitionRatingService,
   ) {}
 
   // ---------- Чтение ----------
@@ -115,6 +117,9 @@ export class CompetitionsService {
     for (const t of transitionsFrom(row.status)) {
       if (await this.policy.can(user, t.permission, scope)) actions.push(`transition:${t.to}`);
     }
+    // Тип турнира меняет только платформа (docs/RATING_ARCHITECTURE.md, 3.1).
+    if (await this.policy.can(user, 'competition.convert_to_rated', { kind: 'PLATFORM' }))
+      actions.push('competition.convert_to_rated');
     const roles = grants.competitions.find((g) => g.competitionId === row.id)?.roles ?? [];
     const version = row.ruleSetVersionId ? await this.rulesets.versionInfo(row.ruleSetVersionId) : null;
     return {
@@ -129,6 +134,7 @@ export class CompetitionsService {
       cancelledAt: row.cancelledAt?.toISOString() ?? null,
       cancelReason: row.cancelReason,
       counters: await this.extensions.countersFor(row.id),
+      rating: row.competitionType === 'RATED' ? await this.rating.forCompetition(row.id) : null,
       weighInFailureOutcome: row.weighInFailureOutcome,
       notifyMatchesAhead: row.notifyMatchesAhead,
       writeAuthority: await this.leases.authority(row.id),
@@ -149,6 +155,12 @@ export class CompetitionsService {
   async create(user: AuthUser, input: CompetitionCreate): Promise<Competition> {
     const orgScope = await this.orgScopes.scopeOf(input.organizerOrganizationId);
     const access = await this.policy.assert(user, 'competition.create', orgScope);
+    // Рейтинговый турнир — только платформа; явный отказ, а не тихая замена типа (docs/RATING_ARCHITECTURE.md, 3.1).
+    if (
+      input.competitionType === 'RATED' &&
+      !(await this.policy.can(user, 'competition.create_rated', { kind: 'PLATFORM' }))
+    )
+      throw new DomainError('RATED_COMPETITION_FORBIDDEN');
     if (!orgScope.visibleToAll)
       throw new DomainError('ORGANIZATION_NOT_ACTIVE', { organizationId: input.organizerOrganizationId });
     const id = await this.db.tx(async (tx) => {
@@ -165,6 +177,10 @@ export class CompetitionsService {
       const competitionId = uuidv7();
       const slug = await this.refs.uniqueSlug(tx, input.name, input.startDate, input.slug);
       await tx.competition.create({ data: createData(input, competitionId, slug, user.id) });
+      const ruleSet =
+        input.competitionType === 'RATED'
+          ? await this.rating.pin(tx, competitionId, { publicDeltas: true, reason: null }, user.id)
+          : null;
       await this.leases.createCloudLease(tx, competitionId, user.id);
       if (!access.viaPlatform) await this.grantManager(tx, competitionId, user.id);
       await this.audit.record(tx, {
@@ -179,7 +195,10 @@ export class CompetitionsService {
           status: 'DRAFT',
           startDate: input.startDate,
           endDate: input.endDate,
+          competitionType: input.competitionType,
+          ...(ruleSet ? { ratingCalculationVersion: ruleSet.calculationVersion } : {}),
         },
+        platformIntervention: input.competitionType === 'RATED',
       });
       return competitionId;
     });
