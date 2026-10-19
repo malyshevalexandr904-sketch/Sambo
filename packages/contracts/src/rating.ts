@@ -321,6 +321,8 @@ export type RatingRecalculateInput = z.infer<typeof RatingRecalculateInput>;
 
 export interface AdminAthleteRating {
   athleteId: string;
+  publicId: string;
+  name: string;
   rating: number;
   level: number;
   status: RatingStatus;
@@ -399,4 +401,62 @@ export interface RatingRecalculationReport {
   skipped: number;
   pending: number;
   failed: number;
+}
+
+// ---- Раздел «Рейтинг» кабинета администратора (docs/RATING_ARCHITECTURE.md, 8; фаза 14) ----
+
+/** Сводка: сколько рейтингов, кто не в ACTIVE, что ждёт или упало, последние корректировки. */
+export interface RatingDashboard {
+  calculationVersion: string | null;
+  athletes: { total: number; frozen: number; suspended: number };
+  calculations: { completed: number; pending: number; failed: number; skipped: number };
+  ratedCompetitions: number;
+  lastCalculatedAt: string | null;
+  recentCorrections: (RatingCorrectionDto & { athleteName: string })[];
+}
+
+export const RatingCalculationsQuery = PageQuery.extend({
+  status: z.enum(RATING_CALCULATION_STATUSES).optional(),
+  competitionId: Uuid.optional(),
+  athleteId: Uuid.optional(),
+});
+export type RatingCalculationsQuery = z.infer<typeof RatingCalculationsQuery>;
+
+export interface RatingCalculationSide {
+  athleteId: string;
+  name: string;
+  side: 'RED' | 'BLUE';
+  /** Изменение — только у посчитанной схватки. */
+  ratingBefore: number | null;
+  ratingAfter: number | null;
+  delta: number | null;
+}
+
+/** Строка журнала расчётов. */
+export interface RatingCalculationEntry {
+  id: string;
+  status: RatingCalculationStatus;
+  statusReason: string | null;
+  calculationVersion: string;
+  matchResultRevision: number;
+  match: { id: string; number: number | null; category: LocalizedText };
+  competition: { id: string; name: string };
+  athletes: RatingCalculationSide[];
+  createdAt: string;
+  processedAt: string | null;
+}
+
+export const RatingAthletesQuery = z.object({
+  q: z.string().trim().min(2).max(100),
+});
+export type RatingAthletesQuery = z.infer<typeof RatingAthletesQuery>;
+
+/** Найденный спортсмен для перехода к его рейтингу. */
+export interface RatingAthleteHit {
+  athleteId: string;
+  publicId: string;
+  name: string;
+  birthYear: number;
+  rating: number | null;
+  status: RatingStatus | null;
 }

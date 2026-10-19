@@ -67,7 +67,11 @@ export class RatingAdminService {
   ) {}
 
   async athlete(athleteId: string): Promise<AdminAthleteRating> {
-    await this.ensureAthlete(this.db, athleteId);
+    const profile = await this.db.athleteProfile.findUnique({
+      where: { id: athleteId },
+      select: { publicId: true, person: { select: { lastName: true, firstName: true } } },
+    });
+    if (!profile) throw new DomainError('NOT_FOUND', { resource: 'athlete' });
     const [row, pending] = await Promise.all([
       this.db.athleteRating.findUnique({ where: { athleteId } }),
       this.pendingCount(athleteId),
@@ -76,6 +80,8 @@ export class RatingAdminService {
     const rating = row?.rating ?? rules.initialRating;
     return {
       athleteId,
+      publicId: profile.publicId,
+      name: `${profile.person.lastName} ${profile.person.firstName}`,
       rating,
       level: ratingLevel(rules, rating),
       status: row?.status ?? 'ACTIVE',
@@ -455,7 +461,7 @@ function rebuildEvents(
   ];
 }
 
-function correctionDto(c: RatingCorrection): RatingCorrectionDto {
+export function correctionDto(c: RatingCorrection): RatingCorrectionDto {
   return {
     id: c.id,
     athleteId: c.athleteId,

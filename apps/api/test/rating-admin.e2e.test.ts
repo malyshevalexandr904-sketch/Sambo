@@ -3,6 +3,9 @@
 // платформы; организатор и судьи турнира получают 403 от сервера. История не переписывается.
 import type {
   AdminAthleteRating,
+  RatingAthleteHit,
+  RatingCalculationEntry,
+  RatingDashboard,
   RatingCorrectionDto,
   RatingRebuildReport,
   RatingRecalculationReport,
@@ -393,5 +396,74 @@ describe('rating corrections by the platform', () => {
     );
     expect(notRated.status).toBe(422);
     expect(notRated.body.error.code).toBe('COMPETITION_NOT_RATED');
+  });
+});
+
+describe('rating section of the admin cabinet', () => {
+  it('summarises ratings, lists calculations by status and athlete, and finds athletes by name', async () => {
+    for (const s of [organizer, w.staff.manager])
+      for (const path of ['dashboard', 'calculations', 'athletes?q=ив'])
+        expect((await s.agent.get(`${api}/rating/${path}`)).status, path).toBe(403);
+
+    const dash = await platformAdmin.agent.get(`${api}/rating/dashboard`).expect(200);
+    const completed = await t.admin.ratingCalculation.count({ where: { status: 'COMPLETED' } });
+    expect(dash.body.data as RatingDashboard).toMatchObject({
+      calculationVersion: 'sambo-elo@1/elo-1',
+      athletes: { total: await t.admin.athleteRating.count(), frozen: 0, suspended: 0 },
+      calculations: { completed, pending: 0, failed: 0 },
+      ratedCompetitions: 1,
+    });
+    const recent = (dash.body.data as RatingDashboard).recentCorrections;
+    expect(recent.length).toBeGreaterThan(0);
+    expect(recent[0]!.athleteName).toMatch(/\S+ \S+/);
+
+    const all = await platformAdmin.agent.get(`${api}/rating/calculations?limit=100`).expect(200);
+    const list = all.body.data as RatingCalculationEntry[];
+    expect(list).toHaveLength(await t.admin.ratingCalculation.count());
+    const done = list.find((c) => c.status === 'COMPLETED')!;
+    expect(done.athletes).toHaveLength(2);
+    expect(done.athletes.every((a) => a.delta !== null && a.name.length > 1)).toBe(true);
+    expect(done.competition.id).toBe(w.competitionId);
+    const superseded = await platformAdmin.agent
+      .get(`${api}/rating/calculations`)
+      .query({ status: 'SUPERSEDED' })
+      .expect(200);
+    expect((superseded.body.data as RatingCalculationEntry[]).every((c) => c.status === 'SUPERSEDED')).toBe(
+      true,
+    );
+    expect(superseded.body.data).toHaveLength(1);
+
+    const athleteId = done.athletes[0]!.athleteId;
+    const mine = await platformAdmin.agent.get(`${api}/rating/calculations`).query({ athleteId }).expect(200);
+    const rows = mine.body.data as RatingCalculationEntry[];
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((c) => c.athletes.some((a) => a.athleteId === athleteId))).toBe(true);
+
+    const person = await t.admin.athleteProfile.findUniqueOrThrow({
+      where: { id: athleteId },
+      include: { person: true },
+    });
+    const found = await platformAdmin.agent
+      .get(`${api}/rating/athletes`)
+      .query({ q: person.person.lastName.slice(0, 4) })
+      .expect(200);
+    expect(found.body.data as RatingAthleteHit[]).toContainEqual(
+      expect.objectContaining({
+        athleteId,
+        publicId: person.publicId,
+        name: `${person.person.lastName} ${person.person.firstName}`,
+        rating: await ratingOf(athleteId),
+        status: 'ACTIVE',
+      }),
+    );
+    // Символы LIKE ищутся как есть.
+    expect(
+      (await platformAdmin.agent.get(`${api}/rating/athletes`).query({ q: '%%' }).expect(200)).body.data,
+    ).toEqual([]);
+    const card = await platformAdmin.agent.get(`${api}/athletes/${athleteId}/rating`).expect(200);
+    expect(card.body.data).toMatchObject({
+      publicId: person.publicId,
+      name: `${person.person.lastName} ${person.person.firstName}`,
+    });
   });
 });
