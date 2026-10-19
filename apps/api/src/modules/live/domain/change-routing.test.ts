@@ -6,6 +6,7 @@ import {
   type ChangeRow,
   changedPayload,
   groupChanges,
+  PUBLIC_TOPICS,
   TABLE_TOPICS,
 } from './change-routing';
 
@@ -102,6 +103,19 @@ describe('groupChanges', () => {
   });
 });
 
+describe('rating calculations', () => {
+  it('change only the rating topic, public too: no match, mat or status of a match is touched', () => {
+    const [g] = groupChanges(
+      [row({ t: 'rating_calculation', id: 'rc1', m: M1, v: null, s: 'COMPLETED' })],
+      new BoundedVersionMemory(),
+    );
+    expect([...(g?.topics ?? [])]).toEqual(['rating']);
+    expect([...(g?.matchIds ?? [])]).toEqual([]);
+    expect(g?.allMats).toBe(false);
+    expect(PUBLIC_TOPICS).toContain('rating');
+  });
+});
+
 describe('BoundedVersionMemory', () => {
   it('forgets the oldest matches beyond the limit', () => {
     const memory = new BoundedVersionMemory(2);
@@ -127,6 +141,11 @@ describe('TABLE_TOPICS', () => {
       }
       for (const [, table] of sql.matchAll(/CREATE TRIGGER "\w+_sync_log"\s+AFTER [A-Z ]+ ON "(\w+)"/g))
         triggers.add(table as string);
+      // Таблицы вне журнала синхронизации, уведомляющие канал `sde_live` своим триггером (расчёт рейтинга).
+      for (const [, table] of sql.matchAll(
+        /CREATE TRIGGER "\w+_notify"\s+AFTER [A-Z ]+(?:OF "\w+" )?ON "(\w+)"/g,
+      ))
+        if (table !== 'sync_log') triggers.add(table as string);
     }
     expect(triggers.size).toBeGreaterThan(20);
     expect(Object.keys(TABLE_TOPICS).sort()).toEqual([...triggers].sort());

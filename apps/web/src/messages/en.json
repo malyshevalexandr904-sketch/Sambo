@@ -1377,7 +1377,22 @@
     "participantsTotal": "Approved entries: {count}",
     "category": "Category",
     "participants": "Entries",
-    "ratingLink": "Rating"
+    "ratingLink": "Rating",
+    "rating": {
+      "badge": "Rated tournament",
+      "title": "Rating changes",
+      "lead": "Elo rating changes after every confirmed match. Matches rated: {matches}.",
+      "empty": "No matches have been rated yet.",
+      "athlete": "Athlete",
+      "before": "Before",
+      "after": "Now",
+      "change": "Change",
+      "winsLosses": "Wins / losses",
+      "level": "Level {level}",
+      "recentMatches": "Latest matches",
+      "match": "Match #{number}",
+      "beforeAfter": "{before} → {after}"
+    }
   },
   "admission": {
     "statuses": {

@@ -1377,7 +1377,22 @@
     "participantsTotal": "Одобрено участий: {count}",
     "category": "Категория",
     "participants": "Участников",
-    "ratingLink": "Рейтинг"
+    "ratingLink": "Рейтинг",
+    "rating": {
+      "badge": "Рейтинговый турнир",
+      "title": "Изменения рейтинга",
+      "lead": "Рейтинг Elo меняется после каждой подтверждённой схватки. Посчитано схваток: {matches}.",
+      "empty": "Посчитанных схваток пока нет.",
+      "athlete": "Спортсмен",
+      "before": "До турнира",
+      "after": "Сейчас",
+      "change": "Изменение",
+      "winsLosses": "Побед / поражений",
+      "level": "Уровень {level}",
+      "recentMatches": "Последние схватки",
+      "match": "Схватка №{number}",
+      "beforeAfter": "{before} → {after}"
+    }
   },
   "admission": {
     "statuses": {

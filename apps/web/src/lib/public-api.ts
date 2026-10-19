@@ -27,10 +27,12 @@ const cache = (g.__sdePublicApiCache ??= new Map<string, Entry>());
 
 /** Темы, после которых меняется и список турниров (название, даты, статус, приём заявок). */
 const LIST_TOPICS = new Set(['competition']);
+/** Расчёт рейтинга турнира меняет и общую таблицу рейтинга, и карточки и историю спортсменов. */
+const RATING_PATHS = ['/rankings', '/athletes/'];
 
 /**
  * Сбросить кэш: `slug` — ответы этого турнира (`/competitions/{slug}` и вложенные), при изменении самого турнира —
- * и список; `null` — всё.
+ * и список, после расчёта рейтинга — и таблица рейтинга с карточками спортсменов; `null` — всё.
  */
 export function invalidatePublic(slug: string | null, topics: readonly string[]): void {
   if (slug === null) {
@@ -39,11 +41,13 @@ export function invalidatePublic(slug: string | null, topics: readonly string[])
   }
   const own = `/competitions/${encodeURIComponent(slug)}`;
   const list = topics.some((t) => LIST_TOPICS.has(t));
+  const rating = topics.includes('rating');
   for (const url of [...cache.keys()]) {
     const path = url.slice(PREFIX.length);
     const rest = path.startsWith(own) ? path.slice(own.length) : null;
     if (rest !== null && (rest === '' || rest.startsWith('/') || rest.startsWith('?'))) cache.delete(url);
     else if (list && (path === '/competitions' || path.startsWith('/competitions?'))) cache.delete(url);
+    else if (rating && RATING_PATHS.some((p) => path.startsWith(p))) cache.delete(url);
   }
 }
 

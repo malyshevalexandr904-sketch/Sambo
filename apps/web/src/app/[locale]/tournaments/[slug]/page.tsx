@@ -7,6 +7,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { cache } from 'react';
 import { MarkdownLite } from '@/components/markdown-lite';
 import { PublicShell, publicDates, publicInstant, RegistrationBadge } from '@/components/public-shell';
+import { TournamentRating } from '@/features/rating/tournament-rating';
 import { Link } from '@/i18n/navigation';
 import { PublicApiError, publicApi } from '@/lib/public-api';
 
@@ -63,8 +64,13 @@ export default async function TournamentPage({
           <p className="mt-1 text-slate-700">
             {publicDates(c.startDate, c.endDate, locale)} · {name(c.discipline)} · {c.organizerName}
           </p>
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             <RegistrationBadge competition={c} />
+            {c.competitionType === 'RATED' ? (
+              <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-sm font-medium text-amber-900">
+                {t('rating.badge')}
+              </span>
+            ) : null}
           </div>
         </div>
       </div>
@@ -197,6 +203,8 @@ export default async function TournamentPage({
           </>
         )}
       </section>
+
+      {c.ratingPublic ? <TournamentRating slug={c.slug} locale={locale} timeZone={c.timezone} /> : null}
     </PublicShell>
   );
 }
