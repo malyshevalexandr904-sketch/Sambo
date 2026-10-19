@@ -1336,7 +1336,8 @@
     "categoriesTbd": "Categories are not set yet.",
     "participantsTotal": "Approved entries: {count}",
     "category": "Category",
-    "participants": "Entries"
+    "participants": "Entries",
+    "ratingLink": "Rating"
   },
   "admission": {
     "statuses": {
@@ -2608,6 +2609,55 @@
       "COACH": "Coach",
       "ATHLETE": "Athlete",
       "GUARDIAN": "Athlete’s representative"
+    }
+  },
+  "rating": {
+    "title": "Sambo rating",
+    "lead": "Rating based on rated tournaments: the stronger the opponent and the more convincing the win, the bigger the gain.",
+    "filters": "Table filters",
+    "gender": "Gender",
+    "any": "Any",
+    "ageFrom": "Age from",
+    "ageTo": "Age to",
+    "apply": "Show",
+    "reset": "Reset filters",
+    "filtersHint": "The place is in the overall table; filters only narrow the list. Age is by year of birth.",
+    "unavailable": "The rating is temporarily unavailable. Please try again later.",
+    "invalidFilters": "Check the filters: the minimum age cannot exceed the maximum age.",
+    "empty": "The table is empty for now: a rating appears after the first match at a rated tournament.",
+    "emptyFiltered": "Nobody matches these filters.",
+    "rank": "Place",
+    "athlete": "Athlete",
+    "rating": "Rating",
+    "level": "Level",
+    "matches": "Matches",
+    "winsLosses": "Wins / losses",
+    "peakRating": "Best rating",
+    "lowestRating": "Lowest rating",
+    "next": "Next",
+    "older": "Earlier",
+    "hiddenAthlete": "Athlete hidden",
+    "rankUp": "up {n} since yesterday",
+    "rankDown": "down {n} since yesterday",
+    "backToList": "Full table",
+    "lastMatch": "Last rated match: {date}",
+    "history": "Rating history",
+    "historyEmpty": "No rating changes yet.",
+    "date": "Date",
+    "event": "Event",
+    "opponent": "Opponent",
+    "change": "Change",
+    "correction": "Correction",
+    "opponentRating": "rating before the match: {rating}",
+    "outcomes": {
+      "CLEAN_WIN": "Clean win",
+      "WIN_ON_POINTS": "Win on points",
+      "WIN_SMALL_ADVANTAGE": "Win by a small advantage",
+      "WIN_MINIMAL_ADVANTAGE": "Win by a minimal advantage",
+      "LOSS_MINIMAL_ADVANTAGE": "Loss by a minimal advantage",
+      "LOSS_SMALL_ADVANTAGE": "Loss by a small advantage",
+      "LOSS_ON_POINTS": "Loss on points",
+      "CLEAN_LOSS": "Clean loss"
     }
   }
 }

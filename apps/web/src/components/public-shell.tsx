@@ -16,6 +16,9 @@ export async function PublicShell({ children }: { children: ReactNode }) {
             {tc('appName')} · {t('title')}
           </Link>
           <div className="flex items-center gap-3">
+            <Link href="/rating" className="inline-flex min-h-11 items-center text-blue-700 underline">
+              {t('ratingLink')}
+            </Link>
             <Link href="/login" className="inline-flex min-h-11 items-center text-blue-700 underline">
               {t('login')}
             </Link>

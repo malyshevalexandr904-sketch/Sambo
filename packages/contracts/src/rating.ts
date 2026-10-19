@@ -1,7 +1,9 @@
 // Рейтинг спортсменов (docs/RATING_RULES.md, docs/RATING_ARCHITECTURE.md): исходы схватки и параметры версии
 // правил расчёта (RatingRuleSet.parameters). Расчёт — apps/api/src/modules/rating/domain.
 import { z } from 'zod';
+import { type LocalizedText, PageQuery, Uuid } from './common.js';
 import { WIN_METHODS } from './draws.js';
+import { GENDERS } from './people.js';
 
 /** Вид победы для рейтинга (RATING_RULES.md, 3.1). */
 export const RATING_WIN_KINDS = ['CLEAN', 'POINTS', 'SMALL_ADVANTAGE', 'MINIMAL_ADVANTAGE'] as const;
@@ -116,3 +118,72 @@ export const RatingRuleParametersV1 = z.strictObject({
 });
 export type RatingRuleParametersV1 = z.infer<typeof RatingRuleParametersV1>;
 export const RATING_RULES_SCHEMA_VERSION = 1;
+
+// ---- Публичная таблица рейтинга (docs/RATING_ARCHITECTURE.md, 8; фаза 7) ----
+
+/** Публичный идентификатор спортсмена (AthleteProfile.publicId). */
+export const AthletePublicId = z.string().regex(/^[A-Za-z0-9_-]{6,32}$/, { error: 'invalid_public_id' });
+
+/**
+ * Фильтры таблицы: пол, возраст — полных лет в текущем году (как возрастные группы самбо, по году рождения),
+ * регион, клуб. Место в таблице — общее, фильтр только сужает список.
+ */
+export const RankingsQuery = PageQuery.extend({
+  gender: z.enum(GENDERS).optional(),
+  ageFrom: z.coerce.number().int().min(0).max(120).optional(),
+  ageTo: z.coerce.number().int().min(0).max(120).optional(),
+  regionId: Uuid.optional(),
+  clubId: Uuid.optional(),
+}).refine((q) => q.ageFrom === undefined || q.ageTo === undefined || q.ageFrom <= q.ageTo, {
+  error: 'age_range_invalid',
+  path: ['ageTo'],
+});
+export type RankingsQuery = z.infer<typeof RankingsQuery>;
+
+/**
+ * Спортсмен на публичных страницах (ADR-15, как табло): «Фамилия И.» и ссылка на карточку — только при действующем
+ * общем согласии на распространение ПДн; иначе `name` и `publicId` пусты, `hidden: true`. Клуб и регион — всегда.
+ */
+export interface PublicRatedAthlete {
+  publicId: string | null;
+  name: string | null;
+  hidden: boolean;
+  club: string | null;
+  region: LocalizedText | null;
+}
+
+export interface PublicRankingRow {
+  /** Место в общей таблице; равный рейтинг — одно место. */
+  rank: number;
+  /** На сколько мест поднялся (+) или опустился (−) с последнего ежедневного снимка; null — снимка ещё нет. */
+  rankChange: number | null;
+  athlete: PublicRatedAthlete;
+  rating: number;
+  level: number;
+  peakRating: number;
+  ratedMatches: number;
+  wins: number;
+  losses: number;
+}
+
+export interface PublicAthleteRating extends PublicRankingRow {
+  lowestRating: number;
+  lastRatedMatchAt: string | null;
+}
+
+export const RatingHistoryQuery = PageQuery;
+export type RatingHistoryQuery = z.infer<typeof RatingHistoryQuery>;
+
+/** Точка истории рейтинга (для графика: X — `at`, Y — `ratingAfter`): схватка или корректировка. */
+export interface PublicRatingHistoryItem {
+  kind: 'MATCH' | 'CORRECTION';
+  at: string;
+  ratingBefore: number;
+  ratingAfter: number;
+  delta: number;
+  levelAfter: number;
+  /** Схватка: исход для спортсмена (RatingOutcome); корректировка — null. */
+  outcome: RatingOutcome | null;
+  competition: { slug: string; name: string } | null;
+  opponent: (PublicRatedAthlete & { ratingBefore: number }) | null;
+}
