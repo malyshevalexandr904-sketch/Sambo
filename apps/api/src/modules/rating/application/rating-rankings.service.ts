@@ -20,6 +20,7 @@ import { RANKED_ATHLETES, type RatingRules, ratingLevel, SAMBO_ELO_CODE, toRuleS
 import { decodeCursor, toPage } from '../../../common/http/http';
 import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
+import { RatingSeasonService, seasonRanked } from './rating-season.service';
 
 interface RankedRow {
   athlete_id: string;
@@ -39,6 +40,8 @@ interface RankedRow {
   region_ru: string | null;
   region_en: string | null;
   previous_rank: number | null;
+  /** Сезонная таблица: рейтинг на начало сезона. */
+  rating_start?: number | null;
 }
 
 /** Человек на публичной странице: имя, клуб, регион. */
@@ -63,9 +66,14 @@ const CLUB_LATERAL = Prisma.sql`
 
 @Injectable()
 export class RatingRankingsService {
-  constructor(private readonly db: PrismaService) {}
+  constructor(
+    private readonly db: PrismaService,
+    private readonly seasons: RatingSeasonService,
+  ) {}
 
+  /** Общая таблица или сезонная (`season`): фильтры и постраничность одинаковые, место — по своей таблице. */
   async list(q: RankingsQuery): Promise<Page<PublicRankingRow>> {
+    const source = q.season ? seasonRanked((await this.seasons.find(q.season)).bounds) : RANKED_ATHLETES;
     const where: Prisma.Sql[] = [];
     if (q.gender) where.push(Prisma.sql`p.gender = ${q.gender}::"Gender"`);
     const year = new Date().getUTCFullYear();
@@ -82,7 +90,7 @@ export class RatingRankingsService {
         Prisma.sql`(r.rating < ${rating} OR (r.rating = ${rating} AND r.athlete_id > ${cursor.id}::uuid))`,
       );
     }
-    const rows = await this.ranked(where, q.limit + 1);
+    const rows = await this.ranked(where, q.limit + 1, source);
     const [rules, visible] = await Promise.all([
       this.rules(),
       this.distribution(rows.map((r) => r.person_id)),
@@ -193,20 +201,29 @@ export class RatingRankingsService {
       LIMIT ${q.limit + 1}`;
   }
 
-  private ranked(where: Prisma.Sql[], limit: number): Promise<RankedRow[]> {
+  /** Строки таблицы; изменение места за сутки — только у общей таблицы (снимки мест — по ней). */
+  private ranked(
+    where: Prisma.Sql[],
+    limit: number,
+    source: Prisma.Sql = RANKED_ATHLETES,
+  ): Promise<RankedRow[]> {
     const filter = where.length ? Prisma.sql`WHERE ${Prisma.join(where, ' AND ')}` : Prisma.empty;
+    const overall = source === RANKED_ATHLETES;
+    const previous = overall
+      ? Prisma.sql`LEFT JOIN LATERAL (
+          SELECT s.rank FROM rating_rank_snapshot s
+          WHERE s.athlete_id = r.athlete_id AND s.snapshot_date < current_date
+          ORDER BY s.snapshot_date DESC LIMIT 1
+        ) prev ON true`
+      : Prisma.sql`LEFT JOIN (SELECT NULL::int AS rank) prev ON true`;
     return this.db.$queryRaw<RankedRow[]>`
       SELECT r.*, p.last_name, p.first_name, club.short_name AS club,
              reg.name_ru AS region_ru, reg.name_en AS region_en, prev.rank AS previous_rank
-      FROM (${RANKED_ATHLETES}) r
+      FROM (${source}) r
       JOIN person p ON p.id = r.person_id
       ${CLUB_LATERAL}
       LEFT JOIN region reg ON reg.id = COALESCE(p.region_id, club.region_id)
-      LEFT JOIN LATERAL (
-        SELECT s.rank FROM rating_rank_snapshot s
-        WHERE s.athlete_id = r.athlete_id AND s.snapshot_date < current_date
-        ORDER BY s.snapshot_date DESC LIMIT 1
-      ) prev ON true
+      ${previous}
       ${filter}
       ORDER BY r.rating DESC, r.athlete_id
       LIMIT ${limit}`;
@@ -233,6 +250,10 @@ export class RatingRankingsService {
       ratedMatches: r.rated_matches,
       wins: r.wins,
       losses: r.losses,
+      season:
+        r.rating_start === undefined || r.rating_start === null
+          ? null
+          : { ratingStart: r.rating_start, delta: r.rating - r.rating_start },
     };
   }
 

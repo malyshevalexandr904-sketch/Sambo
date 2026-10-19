@@ -1,6 +1,8 @@
 // Публичная таблица рейтинга (docs/RATING_ARCHITECTURE.md, 8): место, изменение места за сутки, уровень, рейтинг,
 // схватки. Имя и ссылка на карточку — только при согласии спортсмена на распространение ПДн (ADR-15). Без входа.
-import type { Page, PublicRankingRow } from '@sde/contracts';
+// Сезон (ТЗ 68) — отдельная таблица по тому же рейтингу: спортсмены со схватками сезона, место — по рейтингу на конец
+// сезона, рядом изменение за сезон.
+import type { DataEnvelope, Page, PublicRankingRow, PublicRatingSeason } from '@sde/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { PublicShell } from '@/components/public-shell';
@@ -8,8 +10,10 @@ import { RatedAthleteLabel, RankChange } from '@/components/rating-labels';
 import { Link } from '@/i18n/navigation';
 import { PublicApiError, publicApi } from '@/lib/public-api';
 
-const FILTERS = ['gender', 'ageFrom', 'ageTo', 'regionId', 'clubId'] as const;
+const FILTERS = ['season', 'gender', 'ageFrom', 'ageTo', 'regionId', 'clubId'] as const;
 type Filters = Partial<Record<(typeof FILTERS)[number] | 'cursor', string>>;
+
+const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
 
 export async function generateMetadata({
   params,
@@ -38,13 +42,19 @@ export default async function RatingPage({
     const v = sp[k];
     if (typeof v === 'string' && v.trim() !== '') q[k] = v.trim();
   }
-  let page: Page<PublicRankingRow> | null = null;
-  let invalid = false;
-  try {
-    page = await publicApi<Page<PublicRankingRow>>('/rankings', { ...q, limit: '50' });
-  } catch (e) {
-    invalid = e instanceof PublicApiError && e.status === 400;
-  }
+  const [seasons, result] = await Promise.all([
+    publicApi<DataEnvelope<PublicRatingSeason[]>>('/rating-seasons')
+      .then((r) => r.data)
+      .catch(() => [] as PublicRatingSeason[]),
+    publicApi<Page<PublicRankingRow>>('/rankings', { ...q, limit: '50' }).catch((e: unknown) =>
+      e instanceof PublicApiError && (e.status === 400 || e.status === 404) ? ('invalid' as const) : null,
+    ),
+  ]);
+  const page = result === 'invalid' ? null : result;
+  const invalid = result === 'invalid';
+  const season = q.season ? seasons.find((s) => s.code === q.season) : undefined;
+  const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+  const day = (d: string) => date.format(new Date(`${d}T12:00:00Z`));
   const nextQuery = page?.page.nextCursor ? { ...q, cursor: page.page.nextCursor } : null;
   const filtered = FILTERS.some((k) => q[k]);
   return (
@@ -53,6 +63,19 @@ export default async function RatingPage({
       <p className="mt-2 text-slate-700">{t('lead')}</p>
 
       <form method="get" className="mt-6 flex flex-wrap items-end gap-3" aria-label={t('filters')}>
+        {seasons.length > 0 ? (
+          <label className="flex flex-col text-sm text-slate-700">
+            {t('season')}
+            <select name="season" defaultValue={q.season ?? ''} className="mt-1 min-h-11 rounded border px-2">
+              <option value="">{t('allTime')}</option>
+              {seasons.map((s) => (
+                <option key={s.code} value={s.code}>
+                  {s.current ? t('currentSeason', { name: s.name }) : s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <label className="flex flex-col text-sm text-slate-700">
           {t('gender')}
           <select name="gender" defaultValue={q.gender ?? ''} className="mt-1 min-h-11 rounded border px-2">
@@ -96,7 +119,9 @@ export default async function RatingPage({
           </Link>
         ) : null}
       </form>
-      <p className="mt-2 text-sm text-slate-600">{t('filtersHint')}</p>
+      <p className="mt-2 text-sm text-slate-600">
+        {season ? t('seasonHint', { from: day(season.startsOn), to: day(season.endsOn) }) : t('filtersHint')}
+      </p>
 
       {page === null ? (
         <p role="alert" className="mt-6 rounded-md border border-red-200 bg-red-50 p-4 text-red-900">
@@ -117,8 +142,13 @@ export default async function RatingPage({
                   {t('athlete')}
                 </th>
                 <th scope="col" className="px-3 py-2 text-right">
-                  {t('rating')}
+                  {season ? (season.current ? t('ratingNow') : t('ratingSeasonEnd')) : t('rating')}
                 </th>
+                {season ? (
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('seasonChange')}
+                  </th>
+                ) : null}
                 <th scope="col" className="px-3 py-2 text-right">
                   {t('level')}
                 </th>
@@ -140,6 +170,13 @@ export default async function RatingPage({
                     <RatedAthleteLabel athlete={r.athlete} locale={locale} />
                   </td>
                   <td className="px-3 py-2 text-right font-semibold tabular-nums">{r.rating}</td>
+                  {season ? (
+                    <td
+                      className={`px-3 py-2 text-right tabular-nums ${(r.season?.delta ?? 0) > 0 ? 'text-green-800' : (r.season?.delta ?? 0) < 0 ? 'text-red-800' : ''}`}
+                    >
+                      {r.season ? signed(r.season.delta) : '—'}
+                    </td>
+                  ) : null}
                   <td className="px-3 py-2 text-right tabular-nums">{r.level}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{r.ratedMatches}</td>
                   <td className="px-3 py-2 text-right tabular-nums">

@@ -111,6 +111,7 @@ export const ERROR_CODES = {
     'GROUP_DECISION_MISMATCH',
     'RATING_UNCHANGED',
     'COMPETITION_NOT_RATED',
+    'RATING_SEASON_OVERLAP',
   ] as const),
   ...codes('RATE_LIMIT_ERROR', ['RATE_LIMITED'] as const),
   ...codes('INTERNAL_ERROR', ['INTERNAL_ERROR', 'DEPENDENCY_UNAVAILABLE'] as const),

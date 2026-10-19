@@ -12,6 +12,7 @@ import { RatingCalculationService } from './application/rating-calculation.servi
 import { RatingProfileService } from './application/rating-profile.service';
 import { RatingRankingsService } from './application/rating-rankings.service';
 import { RatingRulesService } from './application/rating-rules.service';
+import { RatingSeasonService } from './application/rating-season.service';
 
 /** Рейтинг спортсменов (docs/RATING_ARCHITECTURE.md). */
 @Module({
@@ -25,6 +26,7 @@ import { RatingRulesService } from './application/rating-rules.service';
     RatingAdminService,
     RatingAuditService,
     RatingProfileService,
+    RatingSeasonService,
   ],
   exports: [
     RatingRulesService,
@@ -33,6 +35,7 @@ import { RatingRulesService } from './application/rating-rules.service';
     CompetitionRatingService,
     CompetitionRatingResultsService,
     RatingProfileService,
+    RatingSeasonService,
   ],
 })
 export class RatingModule {}

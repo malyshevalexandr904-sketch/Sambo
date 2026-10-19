@@ -24,6 +24,7 @@ export const qk = {
   ratingDashboard: ['admin', 'rating', 'dashboard'] as const,
   ratingAthletes: (q: string) => ['admin', 'rating', 'athletes', q] as const,
   ratingCalculations: (params: object) => ['admin', 'rating', 'calculations', params] as const,
+  ratingSeasons: ['admin', 'rating', 'seasons'] as const,
   ratingAthlete: (id: string) => ['admin', 'rating', 'athlete', id] as const,
   ratingCorrections: (id: string) => ['admin', 'rating', 'athlete', id, 'corrections'] as const,
   settings: ['settings'] as const,

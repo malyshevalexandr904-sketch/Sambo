@@ -2,9 +2,10 @@
 // доступ, что у карточки рейтинга: спортсмен с рейтингом и общим согласием на распространение ПДн, иначе — 404.
 // Учитываются действующие расчёты (COMPLETED) и корректировки; турниры — только опубликованные.
 import { Injectable } from '@nestjs/common';
-import type { PublicRatedCompetition, PublicRatingChart } from '@sde/contracts';
+import type { PublicAthleteSeason, PublicRatedCompetition, PublicRatingChart } from '@sde/contracts';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { RatingRankingsService } from './rating-rankings.service';
+import { RatingSeasonService, seasonBounds, seasonRanked } from './rating-season.service';
 
 /** Точек на графике — последние; для многолетней истории этого достаточно. */
 const CHART_POINTS = 1000;
@@ -14,6 +15,7 @@ export class RatingProfileService {
   constructor(
     private readonly db: PrismaService,
     private readonly rankings: RatingRankingsService,
+    private readonly seasonList: RatingSeasonService,
   ) {}
 
   async chart(publicId: string): Promise<PublicRatingChart> {
@@ -86,5 +88,43 @@ export class RatingProfileService {
       wins: r.wins,
       losses: r.losses,
     }));
+  }
+
+  /**
+   * Сезоны спортсмена, новые сверху (ТЗ 68): место в сезонной таблице, рейтинг на начало и конец сезона, схватки.
+   * Сезон без рейтинговых схваток спортсмена не показывается.
+   */
+  async seasons(publicId: string): Promise<PublicAthleteSeason[]> {
+    const athleteId = await this.rankings.publicAthlete(publicId);
+    const seasons = await this.seasonList.publicList();
+    const rows = await Promise.all(
+      seasons.map(async (season) => {
+        const bounds = seasonBounds({ startsOn: new Date(season.startsOn), endsOn: new Date(season.endsOn) });
+        const [r] = await this.db.$queryRaw<
+          {
+            rank: number;
+            rating: number;
+            rating_start: number;
+            rated_matches: number;
+            wins: number;
+            losses: number;
+          }[]
+        >`SELECT r.rank, r.rating, r.rating_start, r.rated_matches, r.wins, r.losses
+          FROM (${seasonRanked(bounds)}) r WHERE r.athlete_id = ${athleteId}::uuid`;
+        return r
+          ? {
+              season,
+              rank: r.rank,
+              ratingStart: r.rating_start,
+              ratingEnd: r.rating,
+              delta: r.rating - r.rating_start,
+              matches: r.rated_matches,
+              wins: r.wins,
+              losses: r.losses,
+            }
+          : null;
+      }),
+    );
+    return rows.filter((r): r is PublicAthleteSeason => r !== null);
   }
 }

@@ -5,6 +5,7 @@ import {
   type DataEnvelope,
   type Page,
   type PublicAthleteRating,
+  type PublicAthleteSeason,
   type PublicRatedCompetition,
   type PublicRatingChart,
   type PublicRatingHistoryItem,
@@ -56,7 +57,7 @@ export default async function AthleteRatingPage({
   if (!a) notFound();
   const t = await getTranslations('rating');
   const cursor = (await searchParams).cursor;
-  const [history, chart, competitions] = await Promise.all([
+  const [history, chart, competitions, seasons] = await Promise.all([
     publicApi<Page<PublicRatingHistoryItem>>(`/athletes/${publicId}/rating-history`, {
       limit: '50',
       cursor: typeof cursor === 'string' ? cursor : undefined,
@@ -72,7 +73,14 @@ export default async function AthleteRatingPage({
       : publicApi<DataEnvelope<PublicRatedCompetition[]>>(`/athletes/${publicId}/rated-competitions`)
           .then((r) => r.data)
           .catch(() => null),
+    typeof cursor === 'string'
+      ? null
+      : publicApi<DataEnvelope<PublicAthleteSeason[]>>(`/athletes/${publicId}/rating-seasons`)
+          .then((r) => r.data)
+          .catch(() => null),
   ]);
+  const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
+  const tone = (n: number) => (n > 0 ? 'text-green-800' : n < 0 ? 'text-red-800' : '');
   const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' });
   const facts: [string, string | number][] = [
     [t('rating'), a.rating],
@@ -137,6 +145,65 @@ export default async function AthleteRatingPage({
             })}
           />
           {chart.truncated ? <p className="mt-1 text-xs text-slate-600">{t('chartTruncated')}</p> : null}
+        </section>
+      ) : null}
+
+      {seasons && seasons.length > 0 ? (
+        <section className="mt-8" aria-labelledby="rating-seasons">
+          <h2 id="rating-seasons" className="text-xl font-semibold text-slate-900">
+            {t('seasons')}
+          </h2>
+          <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">{t('seasons')}</caption>
+              <thead className="bg-slate-100 text-slate-700">
+                <tr>
+                  <th scope="col" className="px-3 py-2">
+                    {t('season')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('seasonRank')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('seasonRating')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('change')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('winsLosses')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {seasons.map((s) => (
+                  <tr key={s.season.code} className="border-t border-slate-200 align-top">
+                    <td className="px-3 py-2">
+                      <Link
+                        href={{ pathname: '/rating', query: { season: s.season.code } }}
+                        className="text-blue-700 underline"
+                      >
+                        {s.season.name}
+                      </Link>
+                      {s.season.current ? (
+                        <span className="block text-xs text-slate-600">{t('seasonOngoing')}</span>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{s.rank}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {s.ratingStart} → {s.ratingEnd}
+                    </td>
+                    <td className={`px-3 py-2 text-right font-semibold tabular-nums ${tone(s.delta)}`}>
+                      {signed(s.delta)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {s.wins} / {s.losses}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       ) : null}
 

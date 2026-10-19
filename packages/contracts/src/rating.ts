@@ -1,7 +1,7 @@
 // Рейтинг спортсменов (docs/RATING_RULES.md, docs/RATING_ARCHITECTURE.md): исходы схватки и параметры версии
 // правил расчёта (RatingRuleSet.parameters). Расчёт — apps/api/src/modules/rating/domain.
 import { z } from 'zod';
-import { type LocalizedText, PageQuery, Reason, Uuid } from './common.js';
+import { LocalDate, type LocalizedText, PageQuery, Reason, Uuid } from './common.js';
 import { COMPETITION_TYPES } from './competitions.js';
 import { WIN_METHODS } from './draws.js';
 import { GENDERS } from './people.js';
@@ -128,7 +128,15 @@ export const AthletePublicId = z.string().regex(/^[A-Za-z0-9_-]{6,32}$/, { error
  * Фильтры таблицы: пол, возраст — полных лет в текущем году (как возрастные группы самбо, по году рождения),
  * регион, клуб. Место в таблице — общее, фильтр только сужает список.
  */
+/** Код сезона рейтинга, например «2026». */
+export const RatingSeasonCode = z
+  .string()
+  .trim()
+  .regex(/^[0-9A-Za-z][0-9A-Za-z._-]{0,19}$/, { error: 'invalid_season_code' });
+
 export const RankingsQuery = PageQuery.extend({
+  /** Сезонная таблица (ТЗ 68): спортсмены со схватками в сезоне, порядок — по рейтингу на конец сезона. */
+  season: RatingSeasonCode.optional(),
   gender: z.enum(GENDERS).optional(),
   ageFrom: z.coerce.number().int().min(0).max(120).optional(),
   ageTo: z.coerce.number().int().min(0).max(120).optional(),
@@ -164,6 +172,11 @@ export interface PublicRankingRow {
   ratedMatches: number;
   wins: number;
   losses: number;
+  /**
+   * Сезонная таблица: рейтинг на начало сезона и изменение за сезон; `rating` — на конец сезона (для идущего — текущий),
+   * `peakRating` — наибольший в сезоне, схватки — сезонные. В общей таблице — null.
+   */
+  season: { ratingStart: number; delta: number } | null;
 }
 
 export interface PublicAthleteRating extends PublicRankingRow {
@@ -195,6 +208,49 @@ export interface PublicRatedCompetition {
   wins: number;
   losses: number;
 }
+
+// ---- Сезоны рейтинга (ТЗ 68; фаза 15): отдельное представление единого рейтинга, Elo не сбрасывается ----
+
+/** Сезон на публичных страницах; даты — календарные, по Москве, включительно. */
+export interface PublicRatingSeason {
+  code: string;
+  name: string;
+  startsOn: string;
+  endsOn: string;
+  /** Сегодня внутри сезона. */
+  current: boolean;
+}
+
+/** Сезон в карточке спортсмена: место в сезонной таблице, рейтинг на начало и конец сезона, схватки сезона. */
+export interface PublicAthleteSeason {
+  season: PublicRatingSeason;
+  /** Место в сезонной таблице. */
+  rank: number;
+  ratingStart: number;
+  ratingEnd: number;
+  delta: number;
+  matches: number;
+  wins: number;
+  losses: number;
+}
+
+/** Сезон в кабинете администратора платформы. */
+export interface RatingSeason extends PublicRatingSeason {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Создание и изменение сезона (`competition.manage_rating_rules`): сезоны не пересекаются. */
+export const RatingSeasonInput = z
+  .object({
+    code: RatingSeasonCode,
+    name: z.string().trim().min(1).max(100),
+    startsOn: LocalDate,
+    endsOn: LocalDate,
+  })
+  .refine((s) => s.startsOn <= s.endsOn, { error: 'season_dates_invalid', path: ['endsOn'] });
+export type RatingSeasonInput = z.infer<typeof RatingSeasonInput>;
 
 export const RatingHistoryQuery = PageQuery;
 export type RatingHistoryQuery = z.infer<typeof RatingHistoryQuery>;

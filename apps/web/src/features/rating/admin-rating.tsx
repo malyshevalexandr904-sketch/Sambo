@@ -1,6 +1,7 @@
 'use client';
 // Раздел «Рейтинг» кабинета администратора платформы (docs/RATING_ARCHITECTURE.md, 8; ТЗ 46, 65; фаза 14): сводка,
-// поиск спортсмена, журнал расчётов и досчёт турнира. Права проверяет сервер; здесь — только видимость действий.
+// поиск спортсмена, журнал расчётов и досчёт турнира; сезоны рейтинга (ТЗ 68; фаза 15). Права проверяет сервер;
+// здесь — только видимость действий.
 import type {
   DataEnvelope,
   Page,
@@ -9,6 +10,8 @@ import type {
   RatingCalculationStatus,
   RatingDashboard,
   RatingRecalculationReport,
+  RatingSeason,
+  RatingSeasonInput,
 } from '@sde/contracts';
 import { RATING_CALCULATION_STATUSES } from '@sde/contracts';
 import {
@@ -18,6 +21,7 @@ import {
   Card,
   CardTitle,
   EmptyState,
+  Field,
   Input,
   PageHeader,
   Select,
@@ -31,8 +35,9 @@ import { useState } from 'react';
 import { hasPlatformPermission } from '@/components/app-shell';
 import { QueryState, ReasonAction } from '@/components/common';
 import { Link } from '@/i18n/navigation';
-import { api } from '@/lib/api';
-import { formatDateTime } from '@/lib/format';
+import { api, ApiError } from '@/lib/api';
+import { useErrorMessage, useFieldMessage } from '@/lib/errors';
+import { formatDate, formatDateTime } from '@/lib/format';
 import { qk, useMe } from '@/lib/queries';
 
 const STATUS_TONE: Record<RatingCalculationStatus, 'success' | 'warning' | 'danger' | 'neutral' | 'info'> = {
@@ -353,6 +358,179 @@ export function CalculationJournal({ athleteId }: { athleteId?: string }) {
   );
 }
 
+const EMPTY_SEASON: RatingSeasonInput = { code: '', name: '', startsOn: '', endsOn: '' };
+
+/** Создание и изменение сезона; сервер проверяет код, даты и пересечение с другими сезонами. */
+function SeasonForm({
+  season,
+  onDone,
+  onCancel,
+}: {
+  season: RatingSeason | null;
+  onDone: () => Promise<void>;
+  onCancel: () => void;
+}) {
+  const t = useTranslations('ratingAdmin');
+  const tc = useTranslations('common');
+  const errorMessage = useErrorMessage();
+  const fieldMessage = useFieldMessage();
+  const [value, setValue] = useState<RatingSeasonInput>(
+    season
+      ? { code: season.code, name: season.name, startsOn: season.startsOn, endsOn: season.endsOn }
+      : EMPTY_SEASON,
+  );
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const id = season?.id ?? 'new';
+  const field = (key: keyof RatingSeasonInput, type = 'text') => (
+    <Input
+      id={`season-${id}-${key}`}
+      type={type}
+      value={value[key]}
+      aria-invalid={fields[key] ? true : undefined}
+      onChange={(e) => setValue({ ...value, [key]: e.target.value })}
+    />
+  );
+  const filled = Object.values(value).every((v) => v.trim() !== '');
+  return (
+    <form
+      className="grid gap-3 rounded-md border border-slate-200 p-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError(null);
+        setFields({});
+        try {
+          await api(season ? `/admin/rating/seasons/${season.id}` : '/admin/rating/seasons', {
+            method: season ? 'PUT' : 'POST',
+            body: value,
+          });
+          await onDone();
+        } catch (err) {
+          if (err instanceof ApiError && err.fields.length > 0)
+            setFields(Object.fromEntries(err.fields.map((f) => [f.path, fieldMessage(f.code) ?? ''])));
+          else setError(errorMessage(err));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {error ? <Alert tone="danger">{error}</Alert> : null}
+      <div className="grid gap-3 sm:grid-cols-2 [&>*]:min-w-0">
+        <Field
+          id={`season-${id}-code`}
+          label={t('seasonCode')}
+          hint={t('seasonCodeHint')}
+          error={fields.code}
+        >
+          {field('code')}
+        </Field>
+        <Field id={`season-${id}-name`} label={t('seasonName')} error={fields.name}>
+          {field('name')}
+        </Field>
+        <Field id={`season-${id}-startsOn`} label={t('seasonStarts')} error={fields.startsOn}>
+          {field('startsOn', 'date')}
+        </Field>
+        <Field id={`season-${id}-endsOn`} label={t('seasonEnds')} error={fields.endsOn}>
+          {field('endsOn', 'date')}
+        </Field>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" disabled={!filled} loading={busy}>
+          {t('saveSeason')}
+        </Button>
+        <Button type="button" variant="secondary" onClick={onCancel}>
+          {tc('cancel')}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+function Seasons() {
+  const t = useTranslations('ratingAdmin');
+  const locale = useLocale();
+  const { data: me } = useMe();
+  const queryClient = useQueryClient();
+  const canManage = hasPlatformPermission(me, 'competition.manage_rating_rules');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const seasons = useQuery({
+    queryKey: qk.ratingSeasons,
+    queryFn: async () => (await api<DataEnvelope<RatingSeason[]>>('/admin/rating/seasons')).data,
+  });
+  const done = async () => {
+    setEditing(null);
+    setSaved(true);
+    await queryClient.invalidateQueries({ queryKey: qk.ratingSeasons });
+  };
+  const open = (key: string) => {
+    setSaved(false);
+    setEditing(key);
+  };
+  return (
+    <Card>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <CardTitle className="mb-0">{t('seasons')}</CardTitle>
+        {canManage && editing !== 'new' ? (
+          <Button size="sm" variant="secondary" onClick={() => open('new')}>
+            {t('addSeason')}
+          </Button>
+        ) : null}
+      </div>
+      <p className="mb-3 text-sm text-slate-600">{t('seasonsLead')}</p>
+      {saved ? (
+        <Alert tone="success" className="mb-3">
+          {t('seasonSaved')}
+        </Alert>
+      ) : null}
+      {editing === 'new' ? (
+        <div className="mb-3">
+          <SeasonForm season={null} onDone={done} onCancel={() => setEditing(null)} />
+        </div>
+      ) : null}
+      <QueryState isPending={seasons.isPending} error={seasons.error}>
+        {() =>
+          (seasons.data ?? []).length === 0 ? (
+            <p className="text-sm text-slate-600">{t('seasonsEmpty')}</p>
+          ) : (
+            <ul className="divide-y divide-slate-100 text-sm">
+              {(seasons.data ?? []).map((s) => (
+                <li key={s.id} className="py-2">
+                  {editing === s.id ? (
+                    <SeasonForm season={s} onDone={done} onCancel={() => setEditing(null)} />
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span>
+                        <span className="font-medium">{s.name}</span>{' '}
+                        <span className="text-slate-500">({s.code})</span>
+                        {s.current ? (
+                          <Badge tone="success" className="ml-2">
+                            {t('seasonCurrent')}
+                          </Badge>
+                        ) : null}
+                        <span className="block text-slate-600">
+                          {formatDate(s.startsOn, locale)} — {formatDate(s.endsOn, locale)}
+                        </span>
+                      </span>
+                      {canManage ? (
+                        <Button size="sm" variant="secondary" onClick={() => open(s.id)}>
+                          {t('editSeason')}
+                        </Button>
+                      ) : null}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )
+        }
+      </QueryState>
+    </Card>
+  );
+}
+
 export function AdminRating() {
   const t = useTranslations('ratingAdmin');
   return (
@@ -361,6 +539,7 @@ export function AdminRating() {
       <div className="grid gap-6 [&>*]:min-w-0">
         <Summary />
         <AthleteSearch />
+        <Seasons />
         <CalculationJournal />
       </div>
     </>
