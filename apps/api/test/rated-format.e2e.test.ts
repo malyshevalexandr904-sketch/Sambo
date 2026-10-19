@@ -383,12 +383,19 @@ describe('rated group standings', () => {
     expect(r.status, JSON.stringify(r.body)).toBe(200);
     const results = r.body.data as CategoryResultsDto;
     expect(results.status).toBe('PROVISIONAL');
-    // Схватки за 3 место нет: оба проигравших полуфиналы — 3; не вышедшие из подгрупп мест не получают (Q-F5).
-    expect(results.placements.map((p) => [seed.get(p.entryId), p.place, p.wins, p.losses])).toEqual([
+    // Схватки за 3 место нет: оба проигравших полуфиналы — 3; третьи места подгрупп (A — посев 5, B — 6) делят 5 место
+    // после четырёх участников финальной части (Q-F5).
+    expect(
+      results.placements
+        .map((p) => [seed.get(p.entryId)!, p.place, p.wins, p.losses])
+        .sort((a, b) => a[1]! - b[1]! || a[0]! - b[0]!),
+    ).toEqual([
       [1, 1, 4, 0],
       [2, 2, 3, 1],
       [3, 3, 1, 2],
       [4, 3, 1, 2],
+      [5, 5, 0, 2],
+      [6, 5, 0, 2],
     ]);
   });
 

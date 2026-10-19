@@ -188,7 +188,7 @@ describe('rated groups bracket', () => {
     ]);
   });
 
-  it('places the final part: 1, 2, two thirds, quarterfinal losers fifth; others without a place', () => {
+  it('places the final part: 1, 2, two thirds, quarterfinal losers fifth, then the others by group position', () => {
     // 13: подгруппы A 1–3, B 4–6, C 7–9, D 10–13; побеждает меньшая позиция. Четвертьфиналы A1–B2 (1–5), C1–D2
     // (7–11), B1–A2 (4–2), D1–C2 (10–8); полуфиналы 1–7, 2–8; финал 1–2.
     const { state, placements } = playAll(13);
@@ -202,6 +202,12 @@ describe('rated groups bracket', () => {
       [e(5), 5, 1, 2],
       [e(10), 5, 3, 1],
       [e(11), 5, 2, 2],
+      // Не вышедшие: третьи места подгрупп делят 9 место (после восьми участников финальной части), четвёртое — 13.
+      [e(3), 9, 0, 2],
+      [e(6), 9, 0, 2],
+      [e(9), 9, 0, 2],
+      [e(12), 9, 1, 2],
+      [e(13), 13, 0, 3],
     ]);
   });
 

@@ -270,12 +270,12 @@ export const RATED_GROUPS_V1: RatedFormatConfig = RatedFormatConfig.parse({
     criteria: ['WINS', 'HEAD_TO_HEAD', 'CLEAN_WINS', 'SUPERIORITY_WINS'],
     confirmed: true,
   },
-  // TODO(Q-F5): решение заказчика — проигравшие четвертьфиналы делят 5 место, не вышедшие из подгрупп мест не
-  // получают (в источниках правила нет).
+  // Q-F5: в источниках правила нет; утверждено заказчиком 2026-10-19 — проигравшие четвертьфиналы делят 5 место,
+  // не вышедшие из подгрупп идут после участников финальной части по месту в подгруппе.
   placementRules: {
     losers: { FINAL: 2, SEMIFINAL: 3, QUARTERFINAL: 5 },
-    nonQualifiers: 'NO_PLACE',
-    confirmed: false,
+    nonQualifiers: 'BY_GROUP_POSITION',
+    confirmed: true,
   },
 });
 
