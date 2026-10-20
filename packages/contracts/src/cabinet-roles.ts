@@ -9,7 +9,6 @@ import { ROLE_CODES, type RoleCode } from './roles.js';
 export const CABINET_ROLES = [
   'ADMIN',
   'ORGANIZATION_HEAD',
-  'TOURNAMENT_STAFF',
   'REFEREE',
   'MEDICAL',
   'COACH',
@@ -28,8 +27,8 @@ export const isCabinetRole = (v: unknown): v is CabinetRole =>
 export const CABINET_ROLE_GRANTS: Record<CabinetRole, readonly RoleCode[]> = {
   ADMIN: ['SUPER_ADMIN', 'PLATFORM_ADMIN'],
   ORGANIZATION_HEAD: ['FEDERATION_ADMIN', 'ORGANIZER', 'CLUB_MANAGER'],
-  TOURNAMENT_STAFF: ['TOURNAMENT_MANAGER', 'SECRETARY'],
-  REFEREE: ['CHIEF_REFEREE', 'REFEREE'],
+  // Руководитель турнира и секретарь — в роли «Судья»: отдельной роли «Персонал турнира» нет (0.15.x).
+  REFEREE: ['TOURNAMENT_MANAGER', 'SECRETARY', 'CHIEF_REFEREE', 'REFEREE'],
   MEDICAL: ['MEDICAL_STAFF'],
   COACH: ['COACH'],
   ATHLETE: [],

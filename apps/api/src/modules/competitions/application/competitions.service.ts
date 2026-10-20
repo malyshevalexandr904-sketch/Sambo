@@ -204,12 +204,12 @@ export class CompetitionsService {
     });
     if (access.viaPlatform) return this.toDto(user, await this.loadRow(id));
     // Роль руководителя турнира уже выдана: права пересчитываются по новой версии (новый объект пользователя).
-    // Она действует в роли кабинета «Персонал турнира» (0.13.0): организатор управляет турниром и так (наследование
-    // на турниры своей организации), а федерация — нет; тогда сессия переходит в «Персонал турнира».
+    // Она действует в роли кабинета «Судья»: организатор управляет турниром и так (наследование на турниры своей
+    // организации), а федерация — нет; тогда сессия переходит в роль «Судья».
     let viewer: AuthUser = { ...user, permissionsVersion: user.permissionsVersion + 1 };
     if (!(await this.policy.can(viewer, 'competition.update', await this.scopes.scopeOf(id)))) {
-      const switched = await this.cabinetRoles.selectIfHeld(user.id, user.sessionId, 'TOURNAMENT_STAFF');
-      if (switched) viewer = { ...viewer, activeRole: 'TOURNAMENT_STAFF' };
+      const switched = await this.cabinetRoles.selectIfHeld(user.id, user.sessionId, 'REFEREE');
+      if (switched) viewer = { ...viewer, activeRole: 'REFEREE' };
     }
     return this.toDto(viewer, await this.loadRow(id));
   }

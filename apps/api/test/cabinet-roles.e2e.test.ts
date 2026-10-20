@@ -212,7 +212,7 @@ describe('роль в кабинете', () => {
     });
   });
 
-  it('федерация создала турнир — сессия в роли «Персонал турнира», им можно управлять сразу; организатор остаётся', async () => {
+  it('федерация создала турнир — сессия в роли «Судья», им можно управлять сразу; организатор остаётся', async () => {
     const start = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
     const body = (organizerOrganizationId: string) => ({
       name: 'Первенство федерации',
@@ -235,8 +235,8 @@ describe('роль в кабинете', () => {
     expect(created.status, JSON.stringify(created.body)).toBe(201);
     expect(created.body.data.allowedActions).toContain('competition.update');
     expect(await me(fa)).toMatchObject({
-      activeRole: 'TOURNAMENT_STAFF',
-      availableRoles: ['ORGANIZATION_HEAD', 'TOURNAMENT_STAFF'],
+      activeRole: 'REFEREE',
+      availableRoles: ['ORGANIZATION_HEAD', 'REFEREE'],
     });
     const c = created.body.data as { id: string; version: number };
     expect(

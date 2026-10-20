@@ -2728,7 +2728,6 @@
     "roles": {
       "ADMIN": "Platform administrator",
       "ORGANIZATION_HEAD": "Head of organization",
-      "TOURNAMENT_STAFF": "Tournament staff",
       "REFEREE": "Referee",
       "MEDICAL": "Tournament doctor",
       "COACH": "Coach",

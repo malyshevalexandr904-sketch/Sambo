@@ -133,7 +133,7 @@ export function CompetitionCreateForm() {
       try {
         const before = await roleBefore(queryClient);
         const res = await api<DataEnvelope<Competition>>('/competitions', { method: 'POST', body });
-        // Федерация, создавшая турнир, переходит в роль «Персонал турнира» (0.13.1).
+        // Федерация, создавшая турнир, переходит в роль «Судья», где действует роль руководителя турнира.
         await afterServerRoleChange(queryClient, before);
         router.push(`/competitions/${res.data.id}`);
       } catch (e) {

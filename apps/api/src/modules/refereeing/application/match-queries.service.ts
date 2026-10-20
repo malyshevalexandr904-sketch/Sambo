@@ -349,9 +349,8 @@ export class MatchQueriesService {
     const scope = await this.competitions.scopeFor(competition);
     await this.policy.assert(user, 'competition.view', scope);
     const session = await this.crews.currentSession(competition.id);
-    // Должности в бригаде — только в роли кабинета, где у пользователя есть роль бригады в этом турнире (судья,
-    // главный судья — «Судья»; секретарь — «Персонал турнира»; 0.13.1): иначе экран не обещает того, чего сервер не
-    // разрешит.
+    // Должности в бригаде — только в роли кабинета «Судья», где действуют роли бригады этого турнира (судья,
+    // главный судья, секретарь): иначе экран не обещает того, чего сервер не разрешит.
     const myRoles: MatCrewRole[] =
       session && (await this.crewRoleActive(user, competition.id))
         ? ((await this.crews.rolesInSession(user.id, session.id)).get(matId) ?? [])
