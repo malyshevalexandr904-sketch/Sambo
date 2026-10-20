@@ -8,7 +8,7 @@
 
 - [DEPLOYMENT.md](DEPLOYMENT.md) — окружения, переменные, роли БД, миграции, хранилище.
 - [LOAD_TEST.md](LOAD_TEST.md) — нагрузочный тест живых данных (10 000 зрителей, 12 ковров), запас сервера.
-- Рейтинговая система Elo и рейтинговые турниры: [RATING_RULES.md](RATING_RULES.md) — формула, K, исходы, округление, контрольные примеры; [RATED_TOURNAMENT_FORMAT.md](RATED_TOURNAMENT_FORMAT.md) — подгруппы, места и финальная часть по числу участников; [RATING_ARCHITECTURE.md](RATING_ARCHITECTURE.md) — модель, расчёт, права, API, фронтенд; [RATING_ACCEPTANCE.md](RATING_ACCEPTANCE.md) — критерии приёмки (ТЗ 76) и тесты, которые их проверяют. Изменения DATABASE.md — раздел 3.10.
+- Рейтинговая система Elo и рейтинговые турниры: [RATING_RULES.md](RATING_RULES.md) — формула, K, исходы, округление, контрольные примеры; [RATED_TOURNAMENT_FORMAT.md](RATED_TOURNAMENT_FORMAT.md) — подгруппы, места и финальная часть по числу участников; [RATING_ARCHITECTURE.md](RATING_ARCHITECTURE.md) — модель, расчёт, права, API, фронтенд; [RATING_ACCEPTANCE.md](RATING_ACCEPTANCE.md) — критерии приёмки (ТЗ 76) и тесты, которые их проверяют.
 - [../CONTRIBUTING.md](../CONTRIBUTING.md) — правила работы с кодом.
 - [../CHANGELOG.md](../CHANGELOG.md) — изменения по версиям.
 
