@@ -8,6 +8,7 @@
 
 - [DEPLOYMENT.md](DEPLOYMENT.md) — окружения, переменные, роли БД, миграции, хранилище.
 - [LOAD_TEST.md](LOAD_TEST.md) — нагрузочный тест живых данных (10 000 зрителей, 12 ковров), запас сервера.
+- [RATING_ACCEPTANCE.md](RATING_ACCEPTANCE.md) — критерии приёмки рейтинга (ТЗ 76) и тесты, которые их проверяют.
 - [../CONTRIBUTING.md](../CONTRIBUTING.md) — правила работы с кодом.
 - [../CHANGELOG.md](../CHANGELOG.md) — изменения по версиям.
 
