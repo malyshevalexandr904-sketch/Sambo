@@ -19,8 +19,9 @@ describe('роли кабинета', () => {
     }
     expect(cabinetRoleOf('CLUB_MANAGER')).toBe('ORGANIZATION_HEAD');
     expect(cabinetRoleOf('ORGANIZER')).toBe('ORGANIZATION_HEAD');
-    expect(cabinetRoleOf('SECRETARY')).toBe('TOURNAMENT_STAFF');
+    expect(cabinetRoleOf('SECRETARY')).toBe('REFEREE');
     expect(cabinetRoleOf('CHIEF_REFEREE')).toBe('REFEREE');
+    expect(cabinetRoleOf('TOURNAMENT_MANAGER')).toBe('REFEREE');
     expect(cabinetRoleOf('MEDICAL_STAFF')).toBe('MEDICAL');
     expect(cabinetRoleOf('SUPER_ADMIN')).toBe('ADMIN');
   });

@@ -257,8 +257,9 @@ describe('права в выбранной роли кабинета (0.13.0)', 
       OTHER_CLUB,
     ]);
     expect(grantsForRole(many, 'REFEREE').competitions).toEqual([
-      { competitionId: 'comp', roles: ['CHIEF_REFEREE'] },
+      { competitionId: 'comp', roles: ['CHIEF_REFEREE', 'SECRETARY'] },
     ]);
+    expect(grantsForRole(many, 'COACH').competitions).toEqual([]);
     expect(grantsForRole(many, 'ADMIN').platform).toEqual(['PLATFORM_ADMIN']);
     expect(grantsForRole(many, null)).toEqual(base);
   });
