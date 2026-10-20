@@ -195,6 +195,9 @@ export const AUDIT_ACTIONS = [
   'rating.status_changed',
   'rating.rebuilt',
   'rating.recalculated',
+  // Сезоны рейтинга (фаза 15).
+  'rating.season_created',
+  'rating.season_updated',
   // Тип турнира меняет только платформа (docs/RATING_ARCHITECTURE.md, 3.1).
   'competition.rating_enabled',
   'competition.type_changed',

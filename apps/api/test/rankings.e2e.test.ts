@@ -1,7 +1,14 @@
 // Публичная таблица рейтинга (фаза 7, docs/RATING_ARCHITECTURE.md, 8): место (равный рейтинг — одно место), фильтры
 // только сужают список, курсор, изменение места по ежедневному снимку, имя — только при согласии на распространение
 // ПДн (ADR-15); карточка и история спортсмена.
-import type { Page, PublicAthleteRating, PublicRankingRow, PublicRatingHistoryItem } from '@sde/contracts';
+import type {
+  Page,
+  PublicAthleteRating,
+  PublicRankingRow,
+  PublicRatedCompetition,
+  PublicRatingChart,
+  PublicRatingHistoryItem,
+} from '@sde/contracts';
 import { uuidv7 } from '@sde/db';
 import { snapshotRanks } from '@sde/rating';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -236,7 +243,41 @@ describe('public rating history', () => {
       opponent: { publicId: null, name: null, hidden: true, ratingBefore: 200 },
     });
     const card = await get<{ data: PublicAthleteRating }>(`/rankings/${red.athlete.publicId}`);
-    expect(card.body.data).toMatchObject({ rank: 1, rating: 212, ratedMatches: 1, wins: 1, losses: 0 });
+    expect(card.body.data).toMatchObject({
+      rank: 1,
+      rating: 212,
+      ratedMatches: 1,
+      wins: 1,
+      losses: 0,
+      winRate: 100,
+    });
+
+    // График (ТЗ 40): рейтинг до первого события и после каждого.
+    const chart = await get<{ data: PublicRatingChart }>(`/athletes/${red.athlete.publicId}/rating-chart`);
+    expect(chart.status).toBe(200);
+    expect(chart.body.data.truncated).toBe(false);
+    expect(chart.body.data.points.map((p) => p.rating)).toEqual([200, 212]);
+    // Рейтинговые турниры (ТЗ 39).
+    const rated = await get<{ data: PublicRatedCompetition[] }>(
+      `/athletes/${red.athlete.publicId}/rated-competitions`,
+    );
+    expect(rated.body.data).toEqual([
+      {
+        slug: competition.slug,
+        name: competition.name,
+        startDate: competition.startDate.toISOString().slice(0, 10),
+        ratingBefore: 200,
+        ratingAfter: 212,
+        delta: 12,
+        matches: 1,
+        wins: 1,
+        losses: 0,
+      },
+    ]);
+    // Без согласия — как несуществующий.
+    const blue = await entryOf('BLUE');
+    for (const path of ['rating-chart', 'rated-competitions'])
+      expect((await get(`/athletes/${blue.athlete.publicId}/${path}`)).status).toBe(404);
 
     // Черновик турнира не раскрывается в истории.
     await t.admin.competition.update({ where: { id: w.competitionId }, data: { status: 'DRAFT' } });
@@ -244,5 +285,9 @@ describe('public rating history', () => {
       `/athletes/${red.athlete.publicId}/rating-history`,
     );
     expect(hidden.body.data[0]!.competition).toBeNull();
+    expect(
+      (await get<{ data: PublicRatedCompetition[] }>(`/athletes/${red.athlete.publicId}/rated-competitions`))
+        .body.data,
+    ).toEqual([]);
   });
 });

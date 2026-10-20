@@ -5,6 +5,9 @@ import {
   type DataEnvelope,
   type Page,
   type PublicAthleteRating,
+  type PublicAthleteSeason,
+  type PublicRatedCompetition,
+  type PublicRatingChart,
   type PublicRatingHistoryItem,
 } from '@sde/contracts';
 import type { Metadata } from 'next';
@@ -13,6 +16,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { cache } from 'react';
 import { PublicShell } from '@/components/public-shell';
 import { RatedAthleteLabel, RankChange } from '@/components/rating-labels';
+import { RatingChart } from '@/features/rating/rating-chart';
 import { Link } from '@/i18n/navigation';
 import { PublicApiError, publicApi } from '@/lib/public-api';
 
@@ -53,15 +57,30 @@ export default async function AthleteRatingPage({
   if (!a) notFound();
   const t = await getTranslations('rating');
   const cursor = (await searchParams).cursor;
-  let history: Page<PublicRatingHistoryItem> | null = null;
-  try {
-    history = await publicApi<Page<PublicRatingHistoryItem>>(`/athletes/${publicId}/rating-history`, {
+  const [history, chart, competitions, seasons] = await Promise.all([
+    publicApi<Page<PublicRatingHistoryItem>>(`/athletes/${publicId}/rating-history`, {
       limit: '50',
       cursor: typeof cursor === 'string' ? cursor : undefined,
-    });
-  } catch {
-    history = null;
-  }
+    }).catch(() => null),
+    // На следующих страницах истории график и турниры не нужны.
+    typeof cursor === 'string'
+      ? null
+      : publicApi<DataEnvelope<PublicRatingChart>>(`/athletes/${publicId}/rating-chart`)
+          .then((r) => r.data)
+          .catch(() => null),
+    typeof cursor === 'string'
+      ? null
+      : publicApi<DataEnvelope<PublicRatedCompetition[]>>(`/athletes/${publicId}/rated-competitions`)
+          .then((r) => r.data)
+          .catch(() => null),
+    typeof cursor === 'string'
+      ? null
+      : publicApi<DataEnvelope<PublicAthleteSeason[]>>(`/athletes/${publicId}/rating-seasons`)
+          .then((r) => r.data)
+          .catch(() => null),
+  ]);
+  const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
+  const tone = (n: number) => (n > 0 ? 'text-green-800' : n < 0 ? 'text-red-800' : '');
   const date = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric' });
   const facts: [string, string | number][] = [
     [t('rating'), a.rating],
@@ -71,6 +90,7 @@ export default async function AthleteRatingPage({
     [t('lowestRating'), a.lowestRating],
     [t('matches'), a.ratedMatches],
     [t('winsLosses'), `${a.wins} / ${a.losses}`],
+    [t('winRate'), a.winRate === null ? '—' : `${new Intl.NumberFormat(locale).format(a.winRate)} %`],
   ];
   return (
     <PublicShell>
@@ -108,6 +128,137 @@ export default async function AthleteRatingPage({
         <p className="mt-3 text-sm text-slate-600">
           {t('lastMatch', { date: date.format(new Date(a.lastRatedMatchAt)) })}
         </p>
+      ) : null}
+
+      {chart && chart.points.length > 1 ? (
+        <section className="mt-8" aria-labelledby="rating-chart">
+          <h2 id="rating-chart" className="text-xl font-semibold text-slate-900">
+            {t('chart')}
+          </h2>
+          <RatingChart
+            points={chart.points}
+            locale={locale}
+            label={t('chartLabel', {
+              from: chart.points[0]!.rating,
+              to: chart.points[chart.points.length - 1]!.rating,
+              peak: Math.max(...chart.points.map((p) => p.rating)),
+            })}
+          />
+          {chart.truncated ? <p className="mt-1 text-xs text-slate-600">{t('chartTruncated')}</p> : null}
+        </section>
+      ) : null}
+
+      {seasons && seasons.length > 0 ? (
+        <section className="mt-8" aria-labelledby="rating-seasons">
+          <h2 id="rating-seasons" className="text-xl font-semibold text-slate-900">
+            {t('seasons')}
+          </h2>
+          <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">{t('seasons')}</caption>
+              <thead className="bg-slate-100 text-slate-700">
+                <tr>
+                  <th scope="col" className="px-3 py-2">
+                    {t('season')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('seasonRank')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('seasonRating')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('change')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('winsLosses')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {seasons.map((s) => (
+                  <tr key={s.season.code} className="border-t border-slate-200 align-top">
+                    <td className="px-3 py-2">
+                      <Link
+                        href={{ pathname: '/rating', query: { season: s.season.code } }}
+                        className="text-blue-700 underline"
+                      >
+                        {s.season.name}
+                      </Link>
+                      {s.season.current ? (
+                        <span className="block text-xs text-slate-600">{t('seasonOngoing')}</span>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">{s.rank}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {s.ratingStart} → {s.ratingEnd}
+                    </td>
+                    <td className={`px-3 py-2 text-right font-semibold tabular-nums ${tone(s.delta)}`}>
+                      {signed(s.delta)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {s.wins} / {s.losses}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {competitions && competitions.length > 0 ? (
+        <section className="mt-8" aria-labelledby="rated-competitions">
+          <h2 id="rated-competitions" className="text-xl font-semibold text-slate-900">
+            {t('competitions')}
+          </h2>
+          <div className="mt-3 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <table className="w-full text-left text-sm">
+              <caption className="sr-only">{t('competitions')}</caption>
+              <thead className="bg-slate-100 text-slate-700">
+                <tr>
+                  <th scope="col" className="px-3 py-2">
+                    {t('competition')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('competitionRating')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('change')}
+                  </th>
+                  <th scope="col" className="px-3 py-2 text-right">
+                    {t('winsLosses')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {competitions.map((c) => (
+                  <tr key={c.slug} className="border-t border-slate-200 align-top">
+                    <td className="px-3 py-2">
+                      <Link href={`/tournaments/${c.slug}`} className="text-blue-700 underline">
+                        {c.name}
+                      </Link>
+                      <span className="block text-xs text-slate-600">
+                        {date.format(new Date(`${c.startDate}T12:00:00Z`))}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {c.ratingBefore} → {c.ratingAfter}
+                    </td>
+                    <td
+                      className={`px-3 py-2 text-right font-semibold tabular-nums ${c.delta > 0 ? 'text-green-800' : c.delta < 0 ? 'text-red-800' : ''}`}
+                    >
+                      {c.delta > 0 ? `+${c.delta}` : c.delta < 0 ? `−${-c.delta}` : '0'}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {c.wins} / {c.losses}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
       ) : null}
 
       <h2 className="mt-8 text-xl font-semibold text-slate-900">{t('history')}</h2>

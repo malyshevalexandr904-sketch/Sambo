@@ -163,6 +163,7 @@ model User {
   onboardingDocuments       OnboardingDocument[]      @relation("OnboardingDocumentUploader")
   ratingConfigsEnabled      CompetitionRatingConfig[] @relation("CompetitionRatingEnabler")
   ratingCorrections         RatingCorrection[]        @relation("RatingCorrectionCreator")
+  ratingSeasons             RatingSeason[]            @relation("RatingSeasonCreator")
 
   @@index([status, createdAt])
   @@map("user")
@@ -2978,6 +2979,7 @@ model RatingHistory {
 
   @@unique([calculationId, athleteId])
   @@index([athleteId, matchFinishedAt, id])
+  @@index([matchFinishedAt])
   @@map("rating_history")
 }
 
@@ -3056,4 +3058,21 @@ model RatingRankSnapshot {
   @@id([snapshotDate, athleteId])
   @@index([athleteId, snapshotDate])
   @@map("rating_rank_snapshot")
+}
+
+/// Сезон рейтинга (docs/RATING_ARCHITECTURE.md, 5, 10; ТЗ 68): отдельное представление единого рейтинга за период —
+/// Elo при смене сезона не сбрасывается. Даты по Москве, включительно; сезоны не пересекаются (exclusion constraint).
+model RatingSeason {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  code        String   @unique
+  name        String
+  startsOn    DateTime @map("starts_on") @db.Date
+  endsOn      DateTime @map("ends_on") @db.Date
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  createdBy User @relation("RatingSeasonCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@map("rating_season")
 }

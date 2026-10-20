@@ -401,7 +401,9 @@
     "duplicate_key": "The separation key is given twice",
     "too_many_participants": "Too many participants for one bracket",
     "not_enough_participants": "At least two participants are needed",
-    "rated_seeding_by_rating": "In the rated format seeding comes from ratings and cannot be set manually"
+    "rated_seeding_by_rating": "In the rated format seeding comes from ratings and cannot be set manually",
+    "invalid_season_code": "The season code takes Latin letters, digits, dots, hyphens or underscores, up to 20 characters",
+    "season_dates_invalid": "The season ends before it starts"
   },
   "errors": {
     "VALIDATION_FAILED": "Please check the form fields.",
@@ -492,7 +494,8 @@
     "GROUP_DECISION_MISMATCH": "The decision does not match the shared places of the group that are waiting for a decision: reload the page.",
     "RATING_CHANGED": "The athlete's rating changed while you were looking: reload the page and check the value.",
     "RATING_UNCHANGED": "The rating already has this value: nothing to correct.",
-    "COMPETITION_NOT_RATED": "The competition is not rated, so no rating is calculated for it."
+    "COMPETITION_NOT_RATED": "The competition is not rated, so no rating is calculated for it.",
+    "RATING_SEASON_OVERLAP": "Rating seasons cannot overlap: change the dates."
   },
   "people": {
     "lastName": "Last name",
@@ -2745,7 +2748,7 @@
     "reset": "Reset filters",
     "filtersHint": "The place is in the overall table; filters only narrow the list. Age is by year of birth.",
     "unavailable": "The rating is temporarily unavailable. Please try again later.",
-    "invalidFilters": "Check the filters: the minimum age cannot exceed the maximum age.",
+    "invalidFilters": "Check the filters: the minimum age cannot exceed the maximum age, and the season must be one from the list.",
     "empty": "The table is empty for now: a rating appears after the first match at a rated tournament.",
     "emptyFiltered": "Nobody matches these filters.",
     "rank": "Place",
@@ -2780,7 +2783,25 @@
       "LOSS_SMALL_ADVANTAGE": "Loss by a small advantage",
       "LOSS_ON_POINTS": "Loss on points",
       "CLEAN_LOSS": "Clean loss"
-    }
+    },
+    "winRate": "Win rate",
+    "chart": "Rating chart",
+    "chartLabel": "Rating chart: from {from} to {to}, peak {peak}",
+    "chartTruncated": "Showing the latest 1000 changes.",
+    "competitions": "Rated competitions",
+    "competition": "Competition",
+    "competitionRating": "Rating before → after",
+    "season": "Season",
+    "allTime": "All time",
+    "currentSeason": "{name} (ongoing)",
+    "seasonHint": "Season {from} to {to}: athletes with matches in the season, ranked by their rating at the end of the season. The rating is not reset when a season changes. Filters only narrow the list.",
+    "ratingNow": "Rating now",
+    "ratingSeasonEnd": "Rating at season end",
+    "seasonChange": "Season change",
+    "seasons": "Seasons",
+    "seasonRank": "Season place",
+    "seasonRating": "Rating: start → end",
+    "seasonOngoing": "ongoing"
   },
   "ratingAdmin": {
     "title": "Rating",
@@ -2892,6 +2913,19 @@
       "LOSS_SMALL_ADVANTAGE": "Loss by a small advantage",
       "LOSS_ON_POINTS": "Loss on points",
       "CLEAN_LOSS": "Clean loss"
-    }
+    },
+    "seasons": "Rating seasons",
+    "seasonsLead": "A season is a separate table over the shared rating for a period; the rating is not reset when a season changes. Dates are Moscow time, inclusive; seasons cannot overlap.",
+    "seasonsEmpty": "No seasons yet.",
+    "seasonCode": "Code",
+    "seasonName": "Name",
+    "seasonStarts": "Start",
+    "seasonEnds": "End",
+    "seasonCurrent": "Ongoing",
+    "addSeason": "Add season",
+    "editSeason": "Edit",
+    "saveSeason": "Save",
+    "seasonSaved": "Season saved.",
+    "seasonCodeHint": "Latin letters and digits, for example 2026."
   }
 }
