@@ -26,6 +26,7 @@
     "@nestjs/platform-express": "11.2.6",
     "@sde/contracts": "workspace:*",
     "@sde/db": "workspace:*",
+    "@sde/rating": "workspace:*",
     "@sde/server-kit": "workspace:*",
     "cookie-parser": "1.4.7",
     "express": "5.2.1",

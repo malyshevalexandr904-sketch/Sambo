@@ -1,6 +1,7 @@
 // Обслуживание БД и хранилища (DATABASE.md, 5, 8, 9): партиции журналов, сроки хранения служебных данных.
 import { DeleteObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { type PrismaClient, uuidv7 } from '@sde/db';
+import { snapshotRanks } from '@sde/rating';
 import type { Env, Logger } from '@sde/server-kit';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -13,6 +14,9 @@ export const MAINTENANCE_JOBS = {
   expireDocuments: { every: 60 * 60 * 1000 },
   closeRegistrations: { every: 5 * 60 * 1000 },
   cleanupSyncLog: { every: DAY },
+  // Места таблицы рейтинга — для «изменения позиции» (docs/RATING_ARCHITECTURE.md, 10). Каждый час: снимок дня
+  // пишется первым запуском после полуночи UTC, повтор в тот же день ничего не меняет.
+  snapshotRatingRanks: { every: 60 * 60 * 1000 },
 } as const;
 
 export type MaintenanceJob = keyof typeof MAINTENANCE_JOBS;
@@ -43,6 +47,9 @@ export class Maintenance {
         return;
       case 'cleanupSyncLog':
         await this.cleanupSyncLog();
+        return;
+      case 'snapshotRatingRanks':
+        await this.snapshotRatingRanks();
         return;
     }
   }
@@ -234,5 +241,12 @@ export class Maintenance {
     });
     if (count > 0) this.logger.info({ count }, 'Old sync log records removed');
     return count;
+  }
+
+  /** Снимок мест таблицы рейтинга на сегодня (UTC). */
+  async snapshotRatingRanks(now: Date = new Date()): Promise<number> {
+    const written = await this.db.$transaction((tx) => snapshotRanks(tx, now));
+    if (written > 0) this.logger.info({ count: written }, 'Rating ranks snapshot');
+    return written;
   }
 }

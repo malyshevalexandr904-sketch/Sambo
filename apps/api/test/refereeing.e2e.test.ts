@@ -169,7 +169,7 @@ describe('a match on the mat: call, start, score, result, confirmation, bracket'
       expect(p.status, JSON.stringify(p.body)).toBe(201);
     }
     let m = await getMatch(s, matchId);
-    expect(m.state?.blue.penalties).toEqual(['REMARK', 'WARNING_1']);
+    expect(m.state?.blue.penalties).toEqual(['WARNING_1', 'WARNING_2']);
     expect(m.state?.red.points).toBe(5);
     // Удержание 10 с — 2 балла; отмена последнего события отменяет удержание целиком.
     await event(s, matchId, { type: 'HOLD_STARTED', side: 'RED', expectedSeq: 4, matchClockMs: 60_000 });

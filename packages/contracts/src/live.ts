@@ -131,6 +131,8 @@ export const LIVE_TOPICS = [
   'crews',
   'matches',
   'results',
+  /** Расчёт рейтинга по схватке рейтингового турнира (фаза 13). */
+  'rating',
 ] as const;
 export type LiveTopic = (typeof LIVE_TOPICS)[number];
 

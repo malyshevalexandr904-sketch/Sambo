@@ -1,9 +1,16 @@
 // Расстановка жеребьёвки (ARCHITECTURE.md, 14.5, шаги 3–4): размер сетки и BYE, посеянные — на места посева,
 // остальные перемешиваются генератором и расставляются жадно с разведением (сначала самые большие команды),
 // затем попарные обмены, пока они уменьшают штраф. Результат зависит только от входа и seed.
-import { drawSize, eliminationRounds, isEliminationFormat, type Pool, poolOfPosition } from '@sde/contracts';
+import {
+  type DrawPool,
+  drawSize,
+  eliminationRounds,
+  isEliminationFormat,
+  poolOfPosition,
+} from '@sde/contracts';
 import type { DrawInput, DrawParticipant } from './draw-input';
 import { createPrng, type Prng, shuffle } from './prng';
+import { ratedGroupSlots } from './rated-groups';
 import { byePositions, seedPositions } from './seeding';
 import { compareVectors, keyValue, Placement, type SeparationReport, separationReport } from './separation';
 
@@ -12,7 +19,7 @@ export interface DrawSlotSpec {
   /** null — BYE. */
   entryId: string | null;
   seedNumber: number | null;
-  pool: Pool | null;
+  pool: DrawPool | null;
 }
 
 export interface DrawLayout {
@@ -30,6 +37,12 @@ const MAX_IMPROVEMENT_PASSES = 64;
 export function computeDrawLayout(input: DrawInput, seed: string): DrawLayout {
   const prng = createPrng(seed);
   const size = drawSize(input.format, input.participants.length);
+  if (input.format === 'SPECIAL_GROUP_RATED')
+    return {
+      size,
+      slots: ratedGroupSlots(input, prng),
+      separation: { applicable: false, keys: [...input.separation], groups: [], unmet: 0 },
+    };
   return isEliminationFormat(input.format)
     ? eliminationLayout(input, size, prng)
     : roundRobinLayout(input, size, prng);

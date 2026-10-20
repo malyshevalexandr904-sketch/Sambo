@@ -6,6 +6,9 @@ import { computeDrawLayout } from './layout';
 import { byePositions, seedOrder, seedPositions } from './seeding';
 import { idealMeetingRound } from './separation';
 
+/** Форматы без своих правил числа участников; рейтинговый проверяется отдельно (rated-groups.test). */
+const FORMATS = DRAW_FORMATS.filter((f) => f !== 'SPECIAL_GROUP_RATED');
+
 const SEED = '9f86d081884c7d659a2feaa0c55ad015';
 const id = (i: number): string => `00000000-0000-7000-8000-${String(i).padStart(12, '0')}`;
 
@@ -104,7 +107,7 @@ describe('draw input', () => {
 });
 
 describe('draw layout for N = 1…64 in every format', () => {
-  for (const format of DRAW_FORMATS)
+  for (const format of FORMATS)
     it(`${format}: every participant once, BYEs only against athletes, reproducible`, () => {
       for (let n = 1; n <= 64; n++) {
         const list = participants(

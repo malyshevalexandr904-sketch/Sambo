@@ -13,14 +13,23 @@ export const COMPETITION_FORMAT_CODES = [
   'PENALTY_POINTS_ELIMINATION',
   'GROUP_STAGE',
   'GROUP_PLUS_PLAYOFF',
+  // Рейтинговый турнир: подгруппы по кругу и финальная часть (docs/RATED_TOURNAMENT_FORMAT.md).
+  'SPECIAL_GROUP_RATED',
 ] as const;
 export type CompetitionFormatCode = (typeof COMPETITION_FORMAT_CODES)[number];
 
+/**
+ * Тай-брейки при равенстве баллов. Порядок по правилам вида спорта «самбо» (приказ Минспорта России от 04.12.2020
+ * № 892, ред. от 07.03.2024), ст. 34: TECHNICAL_POINTS (п. 2) → MORE_HIGH_SCORES (п. 3) → LAST_TECHNICAL_ACTION
+ * (п. 4) → FEWER_PENALTIES (п. 8) → LAST_PENALTY (пп. 7, 9); REFEREE_DECISION — если ничего не решило.
+ */
 export const TIE_BREAKERS = [
   'LAST_TECHNICAL_ACTION',
   'FEWER_PENALTIES',
   'MORE_HIGH_SCORES',
   'REFEREE_DECISION',
+  'TECHNICAL_POINTS',
+  'LAST_PENALTY',
 ] as const;
 export type TieBreaker = (typeof TIE_BREAKERS)[number];
 
@@ -216,14 +225,25 @@ export const SAMPLE_RULESET_PARAMETERS: RuleSetParametersV1 = {
     ],
     maxPerMatch: 1,
   },
+  // Ст. 35 п. 4 «в», ст. 37 пп. 4–5: первое предупреждение без оценки, второе и третье — 1 балл сопернику,
+  // четвёртое — снятие со схватки (досрочная победа соперника).
   penalties: [
-    { code: 'REMARK', opponentPoints: 0 },
-    { code: 'WARNING_1', opponentPoints: 1 },
-    { code: 'WARNING_2', opponentPoints: 2 },
-    { code: 'DISQUALIFICATION', kind: 'DISQUALIFICATION' },
+    { code: 'WARNING_1', opponentPoints: 0 },
+    { code: 'WARNING_2', opponentPoints: 1 },
+    { code: 'WARNING_3', opponentPoints: 1 },
+    { code: 'WARNING_4_REMOVAL', kind: 'DISQUALIFICATION' },
   ],
+  // Ст. 19 п. 2 «г», ст. 33 п. 1 «в»: явное преимущество — разница 8 баллов.
   superiorityPoints: 8,
-  tieBreakers: ['LAST_TECHNICAL_ACTION', 'FEWER_PENALTIES', 'REFEREE_DECISION'],
+  // Ст. 34.
+  tieBreakers: [
+    'TECHNICAL_POINTS',
+    'MORE_HIGH_SCORES',
+    'LAST_TECHNICAL_ACTION',
+    'FEWER_PENALTIES',
+    'LAST_PENALTY',
+    'REFEREE_DECISION',
+  ],
   formatSelection: [
     { minParticipants: 2, maxParticipants: 5, format: 'ROUND_ROBIN' },
     { minParticipants: 6, maxParticipants: null, format: 'ELIMINATION_WITH_REPECHAGE' },

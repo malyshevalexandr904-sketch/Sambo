@@ -1,140 +1,13 @@
 'use client';
 // Визуализация сетки (IMPLEMENTATION_PLAN, Phase 5): участники, номера схваток, победители, переходы, BYE,
-// утешительные схватки, круговая таблица. На телефоне — вертикальный список кругов с переключателем
+// утешительные схватки, круговая таблица, подгруппы рейтингового формата. На телефоне — вертикальный список кругов с переключателем
 // (ARCHITECTURE.md, 23.3), на экране и в печати — дерево по кругам.
-import type {
-  BracketNodeDto,
-  BracketSideDto,
-  BracketViewDto,
-  DrawParticipantDto,
-  Side,
-} from '@sde/contracts';
-import { Badge, cn } from '@sde/ui';
+import type { BracketNodeDto, BracketViewDto } from '@sde/contracts';
+import { cn } from '@sde/ui';
 import { useTranslations } from 'next-intl';
-import { useMemo, useState } from 'react';
-import { Link } from '@/i18n/navigation';
-
-interface Ctx {
-  participants: Map<string, DrawParticipantDto>;
-  nodes: Map<string, BracketNodeDto>;
-  /** Ссылка на страницу схватки (опубликованная сетка, Phase 7b). */
-  matchHref?: (matchId: string) => string;
-}
-
-function useCtx(view: BracketViewDto, matchHref?: (matchId: string) => string): Ctx {
-  return useMemo(
-    () => ({
-      participants: new Map(view.participants.map((p) => [p.entryId, p])),
-      nodes: new Map(view.nodes.map((n) => [n.key, n])),
-      matchHref,
-    }),
-    [view, matchHref],
-  );
-}
-
-/** Кто займёт сторону, пока участник не известен: «Победитель № 7», проигравший победителю подгруппы. */
-function useSourceText(ctx: Ctx): (s: BracketSideDto) => string {
-  const t = useTranslations('bracket');
-  return (s) => {
-    if (s.bye) return t('bye');
-    if (s.source.type === 'WINNER_OF') {
-      const number = ctx.nodes.get(s.source.ref)?.match?.number;
-      return number ? t('waitingWinner', { number }) : t('waiting');
-    }
-    if (s.source.type === 'DYNAMIC') {
-      const [, pool, round] = s.source.ref.split(':');
-      return t('waitingDynamic', { pool: pool ?? '', round: round ?? '' });
-    }
-    return t('waiting');
-  };
-}
-
-function SideRow({ node, side, ctx }: { node: BracketNodeDto; side: Side; ctx: Ctx }) {
-  const t = useTranslations('bracket');
-  const describe = useSourceText(ctx);
-  const s = side === 'RED' ? node.red : node.blue;
-  const p = s.entryId ? ctx.participants.get(s.entryId) : undefined;
-  const won = node.winnerSide === side && node.status === 'DECIDED';
-  const r = node.match?.result;
-  const score =
-    r && r.method !== 'BYE' && r.method !== 'NO_SHOW' ? (side === 'RED' ? r.redScore : r.blueScore) : null;
-  const lost = node.status === 'DECIDED' && node.winnerSide !== null && node.winnerSide !== side;
-  return (
-    <div
-      className={cn(
-        'flex min-h-10 items-center gap-2 border-l-4 px-2 py-1 print:min-h-0 print:py-0',
-        side === 'RED' ? 'border-red-600' : 'border-blue-600',
-        lost && 'text-slate-400',
-      )}
-    >
-      <span className="sr-only">{t(side === 'RED' ? 'red' : 'blue')}: </span>
-      {p ? (
-        <span className={cn('min-w-0 flex-1 print:truncate', won && 'font-semibold')}>
-          <span className="block truncate print:inline">
-            {p.publicName}
-            {won ? <span aria-label={t('winner')}> ✓</span> : null}
-          </span>
-          <span className="block truncate text-xs text-slate-500 print:ml-1 print:inline print:text-[9px]">
-            {p.organization?.name ?? ''}
-            {p.seedNumber ? ` · ${t('seed', { seed: p.seedNumber })}` : ''}
-          </span>
-        </span>
-      ) : (
-        <span className="flex-1 text-xs italic text-slate-500 print:text-[9px]">{describe(s)}</span>
-      )}
-      {p?.entryStatus === 'WITHDRAWN' ? <Badge tone="warning">{t('withdrawn')}</Badge> : null}
-      {score !== null ? (
-        <span className={cn('font-mono tabular-nums', won && 'font-bold')}>{score}</span>
-      ) : null}
-    </div>
-  );
-}
-
-/** Ход схватки в сетке (Phase 7a): идёт, пауза, вызвана, ждёт подтверждения; после подтверждения — способ победы. */
-function MatchProgress({ node }: { node: BracketNodeDto }) {
-  const t = useTranslations('referee');
-  const m = node.match;
-  if (!m) return null;
-  if (m.result?.status === 'PROVISIONAL') return <Badge tone="warning">{t('awaitingConfirmation')}</Badge>;
-  if (m.status === 'IN_PROGRESS') return <Badge tone="success">{t('matchStatuses.IN_PROGRESS')}</Badge>;
-  if (m.status === 'PAUSED') return <Badge tone="warning">{t('matchStatuses.PAUSED')}</Badge>;
-  if (m.status === 'READY') return <Badge tone="info">{t('matchStatuses.READY')}</Badge>;
-  if (m.result && m.result.method !== 'BYE') return <span>{t(`methods.${m.result.method}`)}</span>;
-  return null;
-}
-
-function MatchCard({ node, ctx }: { node: BracketNodeDto; ctx: Ctx }) {
-  const t = useTranslations('bracket');
-  const number = node.match?.number ?? null;
-  const title = number !== null ? t('match', { number }) : node.status === 'WALKOVER' ? t('walkover') : ' ';
-  return (
-    <article
-      className="break-inside-avoid rounded-md border border-slate-200 bg-white text-sm shadow-sm print:rounded-sm print:text-[10px] print:shadow-none"
-      aria-label={`${t(`rounds.${node.label}`)} ${number !== null ? t('match', { number }) : ''}`.trim()}
-    >
-      <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-2 py-0.5 text-xs text-slate-600 print:py-0 print:text-[9px]">
-        {node.match && number !== null && ctx.matchHref ? (
-          <Link
-            href={ctx.matchHref(node.match.id)}
-            className="font-medium text-blue-800 hover:underline print:text-inherit"
-          >
-            {title}
-          </Link>
-        ) : (
-          <span className="font-medium">{title}</span>
-        )}
-        <span className="flex items-center gap-1">
-          {node.placeForWinner === 3 ? <span>{t('forThird')}</span> : null}
-          <MatchProgress node={node} />
-        </span>
-      </header>
-      <SideRow node={node} side="RED" ctx={ctx} />
-      <SideRow node={node} side="BLUE" ctx={ctx} />
-    </article>
-  );
-}
-
-const byPosition = (a: BracketNodeDto, b: BracketNodeDto): number => a.position - b.position;
+import { useState } from 'react';
+import { type GroupDecide, GroupStandingTable, StandingRules } from './group-standings';
+import { byPosition, MatchCard, useCtx } from './match-card';
 
 function RoundTabs({
   rounds,
@@ -169,10 +42,19 @@ function RoundTabs({
   );
 }
 
-function EliminationView({ view, matchHref }: { view: BracketViewDto; matchHref?: (id: string) => string }) {
+function EliminationView({
+  view,
+  matchHref,
+  stage = 'MAIN',
+}: {
+  view: BracketViewDto;
+  matchHref?: (id: string) => string;
+  /** Этап на выбывание: основная сетка или финальная часть рейтингового формата. */
+  stage?: 'MAIN' | 'FINAL';
+}) {
   const t = useTranslations('bracket');
   const ctx = useCtx(view, matchHref);
-  const main = view.nodes.filter((n) => n.stage === 'MAIN');
+  const main = view.nodes.filter((n) => n.stage === stage);
   const rounds = [...new Set(main.map((n) => n.round))].sort((a, b) => a - b);
   const labels = new Map(
     rounds.map((r) => [r, t(`rounds.${main.find((n) => n.round === r)?.label ?? 'FINAL'}`)]),
@@ -332,14 +214,76 @@ function RoundRobinView({ view, matchHref }: { view: BracketViewDto; matchHref?:
   );
 }
 
+/** Рейтинговый формат: каждая подгруппа — своя круговая таблица и свои круги, затем финальная часть на выбывание. */
+function GroupsView({
+  view,
+  matchHref,
+  decide,
+}: {
+  view: BracketViewDto;
+  matchHref?: (id: string) => string;
+  decide?: GroupDecide;
+}) {
+  const t = useTranslations('bracket');
+  const letters = useTranslations('draws.ratedPlan.letters');
+  const groups = [...new Set(view.nodes.map((n) => n.group).filter((g) => g !== null))].sort();
+  const participants = new Map(view.participants.map((p) => [p.entryId, p]));
+  return (
+    <div className="space-y-8">
+      {view.groups ? <StandingRules groups={view.groups} /> : null}
+      {groups.map((group) => (
+        <section
+          key={group}
+          aria-label={t('group', { group: letters(group) })}
+          className="break-inside-avoid"
+        >
+          <h3 className="mb-3 text-lg font-semibold">{t('group', { group: letters(group) })}</h3>
+          {view.groups?.standings
+            .filter((s) => s.group === group)
+            .map((s) => (
+              <div key={s.group} className="mb-4">
+                <GroupStandingTable
+                  standing={s}
+                  participants={participants}
+                  qualifiers={view.groups?.qualifiersPerGroup ?? 0}
+                  decide={view.groups?.canDecide ? decide : undefined}
+                />
+              </div>
+            ))}
+          <RoundRobinView
+            view={{
+              ...view,
+              nodes: view.nodes.filter((n) => n.group === group),
+              participants: view.participants.filter((p) => p.pool === group),
+            }}
+            matchHref={matchHref}
+          />
+        </section>
+      ))}
+      {view.nodes.some((n) => n.stage === 'FINAL') ? (
+        <section aria-label={t('finalPart')} className="break-inside-avoid">
+          <h3 className="mb-1 text-lg font-semibold">{t('finalPart')}</h3>
+          <p className="mb-3 text-sm text-slate-600">{t('finalPartHint')}</p>
+          <EliminationView view={view} matchHref={matchHref} stage="FINAL" />
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 export function BracketView({
   view,
   matchHref,
+  decide,
 }: {
   view: BracketViewDto;
   /** Ссылка на страницу схватки: номер схватки в карточке становится ссылкой. */
   matchHref?: (matchId: string) => string;
+  /** Опубликованная сетка рейтингового формата: решение общего места подгруппы (если есть право). */
+  decide?: GroupDecide;
 }) {
+  if (view.format === 'SPECIAL_GROUP_RATED')
+    return <GroupsView view={view} matchHref={matchHref} decide={decide} />;
   return view.format === 'ROUND_ROBIN' ? (
     <RoundRobinView view={view} matchHref={matchHref} />
   ) : (

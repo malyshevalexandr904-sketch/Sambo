@@ -7,9 +7,11 @@ import { MatchesModule } from '../matches';
 import { RegistrationsModule } from '../registrations';
 import { ResultsModule } from '../results';
 import { SchedulingModule } from '../scheduling';
+import { GroupDecisionsController } from './api/group-decisions.controller';
 import { MatchesController } from './api/matches.controller';
 import { OfficiatingController } from './api/officiating.controller';
 import { AmendService } from './application/amend.service';
+import { GroupDecisionService } from './application/group-decision.service';
 import { ManualMatchesService } from './application/manual-matches.service';
 import { MatchCommandsService } from './application/match-commands.service';
 import { MedicalIncidentsService } from './application/medical-incidents.service';
@@ -27,6 +29,7 @@ import { WithdrawalsService } from './application/withdrawals.service';
  * расписания (бригады, места схваток), заявок (участник «на ковре»), турниров и категорий (статусы первой схватки).
  * Phase 7b: изменение подтверждённого результата, врач на ковре, ручная схватка, перенос и отмена, протоколы;
  * итоги категории пересчитывает модуль results по вызову отсюда. Хранение схватки — модуль matches.
+ * Рейтинг, фаза 12: решение общего места подгруппы рейтингового формата (как изменение результата).
  * Phase 8a: табло ковра — публичная проекция ковра и схватки (ScoreboardService) для живых каналов и публичного API.
  */
 @Module({
@@ -40,7 +43,7 @@ import { WithdrawalsService } from './application/withdrawals.service';
     ResultsModule,
     SchedulingModule,
   ],
-  controllers: [MatchesController, OfficiatingController],
+  controllers: [MatchesController, OfficiatingController, GroupDecisionsController],
   providers: [
     MatchContextService,
     MatchQueriesService,
@@ -48,6 +51,7 @@ import { WithdrawalsService } from './application/withdrawals.service';
     ScoringService,
     ResultsService,
     WithdrawalsService,
+    GroupDecisionService,
     AmendService,
     MedicalIncidentsService,
     ManualMatchesService,

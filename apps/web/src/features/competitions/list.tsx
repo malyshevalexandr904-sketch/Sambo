@@ -11,6 +11,7 @@ import { Link } from '@/i18n/navigation';
 import { hasAnywhere } from '@/lib/access';
 import { api } from '@/lib/api';
 import { qk, useMe } from '@/lib/queries';
+import { CompetitionTypeBadge } from './rating-card';
 import { CompetitionStatusBadge, formatDates, formatInZone } from './shared';
 
 type Scope = 'mine' | 'open' | 'all';
@@ -101,7 +102,10 @@ function CompetitionCard({ competition: c }: { competition: CompetitionSummary }
         <Link href={`/competitions/${c.id}`} className="text-lg font-semibold text-blue-800 hover:underline">
           {c.name}
         </Link>
-        <CompetitionStatusBadge status={c.status} />
+        <span className="flex flex-wrap justify-end gap-1">
+          <CompetitionTypeBadge competition={c} />
+          <CompetitionStatusBadge status={c.status} />
+        </span>
       </div>
       <p className="mt-1 text-sm text-slate-600">
         {formatDates(c.startDate, c.endDate, locale)} · {c.organizer.shortName}

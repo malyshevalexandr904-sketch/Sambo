@@ -21,6 +21,7 @@ import { useErrorMessage } from '@/lib/errors';
 import { qk, useMe } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 import { EditCard } from './edit-card';
+import { RatingCard } from './rating-card';
 import { formatDates, formatInZone, useFailedText } from './shared';
 
 /** Мандатная комиссия и соревнования: на дашборде — прибытие и допуск (раздел 34 ТЗ). */
@@ -31,6 +32,7 @@ export function OverviewTab({ competition: c }: { competition: Competition }) {
   return (
     <div className="grid gap-6 xl:grid-cols-2">
       <InfoCard competition={c} />
+      <RatingCard competition={c} />
       {c.status === 'DRAFT' && can('competition.update') ? <ReadinessCard competition={c} /> : null}
       {c.allowedActions.some((a) => a.startsWith('transition:')) ? <TransitionsCard competition={c} /> : null}
       {c.registrationOpenNow ? <ApplyCard competition={c} /> : null}

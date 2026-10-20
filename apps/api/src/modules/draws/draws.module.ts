@@ -3,6 +3,7 @@ import { AuditModule } from '../audit';
 import { BracketsModule } from '../brackets';
 import { CategoriesModule } from '../categories';
 import { CompetitionsModule } from '../competitions';
+import { RatingModule } from '../rating';
 import { DrawsController } from './api/draws.controller';
 import { DrawLifecycle } from './application/draw-lifecycle';
 import { DrawParticipantsService } from './application/draw-participants';
@@ -11,10 +12,10 @@ import { DrawsService } from './application/draws.service';
 
 /**
  * Жеребьёвка (Phase 5a; ADR-11): детерминированный генератор, посев, BYE, разведение по клубам и регионам,
- * черновик → публикация → новая версия с причиной, проверка повтора по seed.
+ * черновик → публикация → новая версия с причиной, проверка повтора по seed. Рейтинговый формат — посев по рейтингу.
  */
 @Module({
-  imports: [AuditModule, BracketsModule, CategoriesModule, CompetitionsModule],
+  imports: [AuditModule, BracketsModule, CategoriesModule, CompetitionsModule, RatingModule],
   controllers: [DrawsController],
   providers: [DrawParticipantsService, DrawQueriesService, DrawsService, DrawLifecycle],
 })

@@ -20,6 +20,7 @@ import { api, ApiError } from '@/lib/api';
 import { useFieldMessage } from '@/lib/errors';
 import { pickName } from '@/lib/queries';
 import { DrawView } from './draw-view';
+import { RatedPlanCard } from './rated-plan';
 import { DrawStatusBadge, useCommandError, useDraw, useFormatLabel, useInvalidateDraws } from './shared';
 
 const SEED_RE = /^[0-9a-f]{32}$/;
@@ -43,22 +44,26 @@ function CreateDraft({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const seedInvalid = randomSeed !== '' && (!SEED_RE.test(randomSeed) || /^0+$/.test(randomSeed));
+  // Рейтинговый формат: посев — по рейтингу, разведения нет (сервер так и строит).
+  const rated = format === 'SPECIAL_GROUP_RATED';
   const toggle = (key: SeparationKey): void =>
     setKeys((k) => (k.includes(key) ? k.filter((x) => x !== key) : [...k, key]));
   const submit = async (): Promise<void> => {
     setBusy(true);
     setError(null);
     try {
-      const seeding = Object.entries(seeds)
-        .filter(([, v]) => v.trim() !== '')
-        .map(([entryId, v]) => ({ entryId, seedNumber: Number(v) }));
+      const seeding = rated
+        ? []
+        : Object.entries(seeds)
+            .filter(([, v]) => v.trim() !== '')
+            .map(([entryId, v]) => ({ entryId, seedNumber: Number(v) }));
       const r = await api<DataEnvelope<DrawDto>>(`/categories/${data.category.id}/draws`, {
         method: 'POST',
         body: {
           format: format || undefined,
           seeding,
           // Приоритет разведения фиксированный: команда важнее региона.
-          separation: { by: SEPARATION_KEYS.filter((k) => keys.includes(k)) },
+          separation: { by: rated ? [] : SEPARATION_KEYS.filter((k) => keys.includes(k)) },
           randomSeed: randomSeed || undefined,
         },
       });
@@ -93,47 +98,72 @@ function CreateDraft({
             ))}
           </Select>
         </Field>
-        <fieldset>
-          <legend className="mb-1 text-sm font-medium">{t('separation')}</legend>
-          <p className="mb-2 text-xs text-slate-600">{t('separationHint')}</p>
-          {(['ORGANIZATION', 'REGION'] as const).map((key) => (
-            <label key={key} className="flex min-h-11 items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="size-5"
-                checked={keys.includes(key)}
-                onChange={() => toggle(key)}
-              />
-              {t(`keys.${key}`)}
-            </label>
-          ))}
-        </fieldset>
-      </div>
-      <details className="mt-4">
-        <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium">{t('seeding')}</summary>
-        <p className="mb-2 text-xs text-slate-600">{t('seedingHint')}</p>
-        <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
-          {data.participants.map((p) => (
-            <li key={p.entryId} className="flex items-center gap-3 px-3 py-1">
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm">{p.publicName}</span>
-                <span className="block truncate text-xs text-slate-500">{p.organization?.name ?? ''}</span>
-              </span>
-              <label className="sr-only" htmlFor={`seed-${p.entryId}`}>
-                {t('seedNumber')}
+        {rated ? (
+          <p className="text-sm text-slate-600">{t('ratedSeeding')}</p>
+        ) : (
+          <fieldset>
+            <legend className="mb-1 text-sm font-medium">{t('separation')}</legend>
+            <p className="mb-2 text-xs text-slate-600">{t('separationHint')}</p>
+            {(['ORGANIZATION', 'REGION'] as const).map((key) => (
+              <label key={key} className="flex min-h-11 items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-5"
+                  checked={keys.includes(key)}
+                  onChange={() => toggle(key)}
+                />
+                {t(`keys.${key}`)}
               </label>
-              <Input
-                id={`seed-${p.entryId}`}
-                inputMode="numeric"
-                className="w-20"
-                placeholder="—"
-                value={seeds[p.entryId] ?? ''}
-                onChange={(e) => setSeeds((s) => ({ ...s, [p.entryId]: e.target.value.replace(/\D/g, '') }))}
-              />
-            </li>
-          ))}
+            ))}
+          </fieldset>
+        )}
+      </div>
+      {rated ? (
+        <ul
+          className="mt-4 divide-y divide-slate-100 rounded-md border border-slate-200"
+          aria-label={t('ratingColumn')}
+        >
+          {[...data.participants]
+            .sort((a, b) => (b.ratingAtDraw ?? 0) - (a.ratingAtDraw ?? 0))
+            .map((p) => (
+              <li key={p.entryId} className="flex items-center gap-3 px-3 py-1">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm">{p.publicName}</span>
+                  <span className="block truncate text-xs text-slate-500">{p.organization?.name ?? ''}</span>
+                </span>
+                <span className="font-mono tabular-nums">{p.ratingAtDraw ?? '—'}</span>
+              </li>
+            ))}
         </ul>
-      </details>
+      ) : (
+        <details className="mt-4">
+          <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium">{t('seeding')}</summary>
+          <p className="mb-2 text-xs text-slate-600">{t('seedingHint')}</p>
+          <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
+            {data.participants.map((p) => (
+              <li key={p.entryId} className="flex items-center gap-3 px-3 py-1">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm">{p.publicName}</span>
+                  <span className="block truncate text-xs text-slate-500">{p.organization?.name ?? ''}</span>
+                </span>
+                <label className="sr-only" htmlFor={`seed-${p.entryId}`}>
+                  {t('seedNumber')}
+                </label>
+                <Input
+                  id={`seed-${p.entryId}`}
+                  inputMode="numeric"
+                  className="w-20"
+                  placeholder="—"
+                  value={seeds[p.entryId] ?? ''}
+                  onChange={(e) =>
+                    setSeeds((s) => ({ ...s, [p.entryId]: e.target.value.replace(/\D/g, '') }))
+                  }
+                />
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
       <details className="mt-2">
         <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium">{t('advanced')}</summary>
         <Field
@@ -214,6 +244,7 @@ export function CategoryDraws({
           </Alert>
         ) : null}
       </Card>
+      {data.ratedPlan ? <RatedPlanCard result={data.ratedPlan} /> : null}
       {data.allowedActions.includes('draw.create') ? (
         <CreateDraft
           data={data}

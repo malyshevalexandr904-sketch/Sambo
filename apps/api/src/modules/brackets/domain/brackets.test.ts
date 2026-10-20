@@ -8,6 +8,9 @@ import { resolveBracket, type SlotMap } from './resolve';
 import { roundRobinPairs } from './round-robin';
 import { resolveFormat, strategyFor } from './strategies';
 
+/** Форматы без своих правил числа участников; рейтинговый проверяется отдельно (rated-groups.test). */
+const FORMATS = DRAW_FORMATS.filter((f) => f !== 'SPECIAL_GROUP_RATED');
+
 const e = (i: number): string => `e${String(i).padStart(3, '0')}`;
 
 /** Стандартные места BYE (как в жеребьёвке): места посевов n + 1 … size. */
@@ -60,7 +63,10 @@ function play(
 
 const statuses = (state: BracketState) => [...state.values()].map((s) => s.status);
 
-describe('bracket structure for N = 1…64', () => {
+/** Переборы всех размеров сетки: секунда локально, но на загруженном CI-раннере — дольше 5 с по умолчанию. */
+const HEAVY = 30_000;
+
+describe('bracket structure for N = 1…64', { timeout: HEAVY }, () => {
   it('single elimination: N − 1 matches, BYEs only in round 1, a final always', () => {
     for (let n = 2; n <= 64; n++) {
       const run = play('SINGLE_ELIMINATION', n, () => 'RED');
@@ -107,7 +113,7 @@ describe('bracket structure for N = 1…64', () => {
   });
 
   it('refuses fewer than two participants', () => {
-    for (const format of DRAW_FORMATS) {
+    for (const format of FORMATS) {
       expect(strategyFor(format)!.validate(1)).toBe('not_enough_participants');
       expect(strategyFor(format)!.validate(0)).toBe('not_enough_participants');
       expect(strategyFor(format)!.validate(2)).toBeNull();
@@ -116,8 +122,8 @@ describe('bracket structure for N = 1…64', () => {
   });
 });
 
-describe('bracket invariants under random results (property)', () => {
-  for (const format of DRAW_FORMATS)
+describe('bracket invariants under random results (property)', { timeout: HEAVY }, () => {
+  for (const format of FORMATS)
     it(`${format}: no self-matches, a single champion, everybody placed`, () => {
       fc.assert(
         fc.property(fc.integer({ min: 2, max: 64 }), fc.infiniteStream(fc.boolean()), (n, coins) => {
@@ -401,7 +407,7 @@ describe('both participants lost (Phase 7a: both withdrawn after the draw)', () 
   });
 });
 
-describe('place floors keep normal brackets unchanged (property)', () => {
+describe('place floors keep normal brackets unchanged (property)', { timeout: HEAVY }, () => {
   it('places in a fully played bracket follow 1, 2, 3, 3, 5… for every size', () => {
     fc.assert(
       fc.property(

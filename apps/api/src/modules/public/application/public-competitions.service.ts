@@ -45,6 +45,8 @@ const DETAIL_SELECT = {
   requirementsMd: true,
   contactInfo: true,
   cancelReason: true,
+  competitionType: true,
+  ratingConfig: { select: { publicDeltas: true } },
   discipline: { select: { nameRu: true, nameEn: true } },
   regulation: { select: { storageKey: true, status: true } },
   requirements: {
@@ -196,6 +198,8 @@ export class PublicCompetitionsService {
       categories: row.categories.map((c) => toPublicCategory(c, participants.get(c.id) ?? 0)),
       contacts: contact,
       cancelReason: row.status === 'CANCELLED' ? row.cancelReason : null,
+      competitionType: row.competitionType,
+      ratingPublic: row.competitionType === 'RATED' && row.ratingConfig?.publicDeltas === true,
     };
   }
 }

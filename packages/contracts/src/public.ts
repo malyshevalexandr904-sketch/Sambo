@@ -7,6 +7,7 @@ import {
   type CompetitionContactInfo,
   type CompetitionLevel,
   type CompetitionStatus,
+  type CompetitionType,
   PUBLIC_COMPETITION_STATUSES,
   type RequirementKind,
 } from './competitions.js';
@@ -66,4 +67,7 @@ export interface PublicCompetition extends PublicCompetitionSummary {
   categories: PublicCompetitionCategory[];
   contacts: CompetitionContactInfo | null;
   cancelReason: string | null;
+  competitionType: CompetitionType;
+  /** Рейтинговый турнир показывает изменения рейтинга публично (`rating-summary`, `rated-matches`). */
+  ratingPublic: boolean;
 }

@@ -13,20 +13,24 @@ import { CompetitionReferences } from './application/competition-references';
 import { CompetitionsService } from './application/competitions.service';
 import { RegulationService } from './application/regulation.service';
 import { StaffService } from './application/staff.service';
+import { RatingModule } from '../rating';
+import { CompetitionRatingController } from './api/competition-rating.controller';
+import { CompetitionTypeService } from './application/competition-type.service';
 
 /**
  * Турниры (Phase 4a): турнир, машина состояний, положение, персонал. Категории, требования и заявки подключаются
  * к жизненному циклу турнира через CompetitionExtensions.
  */
 @Module({
-  imports: [OrganizationsModule, FilesModule, AuthModule, RuleSetsModule, AuditModule],
-  controllers: [CompetitionsController, CompetitionInvitesController],
+  imports: [OrganizationsModule, FilesModule, AuthModule, RuleSetsModule, AuditModule, RatingModule],
+  controllers: [CompetitionsController, CompetitionInvitesController, CompetitionRatingController],
   providers: [
     CompetitionScopeService,
     CompetitionExtensions,
     CompetitionReferences,
     CompetitionStatusWriter,
     CompetitionsService,
+    CompetitionTypeService,
     RegulationService,
     StaffService,
   ],

@@ -87,79 +87,83 @@ model User {
   updatedAt              DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt              DateTime?  @map("deleted_at") @db.Timestamptz(3)
 
-  person                    Person?                  @relation("UserPerson", fields: [personId], references: [id], onDelete: Restrict)
+  person                    Person?                   @relation("UserPerson", fields: [personId], references: [id], onDelete: Restrict)
   identities                AuthIdentity[]
   refreshTokens             RefreshToken[]
   sessionRoles              SessionRole[]
   verificationTokens        VerificationToken[]
-  platformRoles             PlatformRoleAssignment[] @relation("PlatformRoleUser")
-  grantedPlatformRoles      PlatformRoleAssignment[] @relation("PlatformRoleGrantor")
-  organizationMemberships   OrganizationMembership[] @relation("MembershipUser")
-  invitedMemberships        OrganizationMembership[] @relation("MembershipInviter")
-  competitionMemberships    CompetitionMembership[]  @relation("CompetitionMembershipUser")
-  invitedCompetitionStaff   CompetitionMembership[]  @relation("CompetitionMembershipInviter")
-  createdOrganizations      Organization[]           @relation("OrganizationCreator")
-  createdPersons            Person[]                 @relation("PersonCreator")
+  platformRoles             PlatformRoleAssignment[]  @relation("PlatformRoleUser")
+  grantedPlatformRoles      PlatformRoleAssignment[]  @relation("PlatformRoleGrantor")
+  organizationMemberships   OrganizationMembership[]  @relation("MembershipUser")
+  invitedMemberships        OrganizationMembership[]  @relation("MembershipInviter")
+  competitionMemberships    CompetitionMembership[]   @relation("CompetitionMembershipUser")
+  invitedCompetitionStaff   CompetitionMembership[]   @relation("CompetitionMembershipInviter")
+  createdOrganizations      Organization[]            @relation("OrganizationCreator")
+  createdPersons            Person[]                  @relation("PersonCreator")
   uploadedFiles             StoredFile[]
   auditEntries              AuditLog[]
   dataAccessEntries         DataAccessLog[]
   updatedSettings           SystemSetting[]
-  createdAthletes           AthleteProfile[]         @relation("AthleteCreator")
-  createdCoaches            CoachProfile[]           @relation("CoachCreator")
-  createdCoachMemberships   CoachMembership[]        @relation("CoachMembershipCreator")
-  createdReferees           RefereeProfile[]         @relation("RefereeCreator")
-  createdAthleteMemberships AthleteMembership[]      @relation("AthleteMembershipCreator")
-  createdAthleteCoaches     AthleteCoach[]           @relation("AthleteCoachCreator")
-  createdRanks              AthleteRankRecord[]      @relation("RankCreator")
-  revokedRanks              AthleteRankRecord[]      @relation("RankRevoker")
-  createdGuardians          Guardian[]               @relation("GuardianCreator")
-  verifiedGuardians         Guardian[]               @relation("GuardianVerifier")
-  endedGuardians            Guardian[]               @relation("GuardianEnder")
-  createdConsentTemplates   ConsentTemplate[]        @relation("ConsentTemplateCreator")
-  recordedConsents          Consent[]                @relation("ConsentRecorder")
-  revokedConsents           Consent[]                @relation("ConsentRevoker")
-  createdRuleSets           RuleSet[]                @relation("RuleSetCreator")
-  createdRuleSetVersions    RuleSetVersion[]         @relation("RuleSetVersionCreator")
-  publishedRuleSetVersions  RuleSetVersion[]         @relation("RuleSetPublisher")
-  createdAgeGroups          AgeGroup[]               @relation("AgeGroupCreator")
-  createdCategoryTemplates  CategoryTemplate[]       @relation("CategoryTemplateCreator")
-  uploadedDocuments         Document[]               @relation("DocumentUploader")
-  reviewedDocuments         Document[]               @relation("DocumentReviewer")
-  importJobs                ImportJob[]              @relation("ImportCreator")
-  createdVenues             Venue[]                  @relation("VenueCreator")
-  createdCompetitions       Competition[]            @relation("CompetitionCreator")
-  updatedCompetitions       Competition[]            @relation("CompetitionUpdater")
-  createdApplications       Application[]            @relation("ApplicationCreator")
-  submittedApplications     Application[]            @relation("ApplicationSubmitter")
-  reviewedApplications      Application[]            @relation("ApplicationReviewer")
-  createdEntries            Entry[]                  @relation("EntryCreator")
-  decidedEntries            Entry[]                  @relation("EntryDecider")
-  withdrawnEntries          Entry[]                  @relation("EntryWithdrawer")
-  acquiredLeases            CompetitionWriteLease[]  @relation("LeaseAcquirer")
-  waivedAdmissionChecks     AdmissionCheck[]         @relation("AdmissionCheckUpdater")
-  checkInOperations         CheckIn[]                @relation("CheckInOperator")
-  weighInAttempts           WeighInAttempt[]         @relation("WeighInOperator")
-  recordedClearances        MedicalClearance[]       @relation("ClearanceRecorder")
-  revokedClearances         MedicalClearance[]       @relation("ClearanceRevoker")
+  createdAthletes           AthleteProfile[]          @relation("AthleteCreator")
+  createdCoaches            CoachProfile[]            @relation("CoachCreator")
+  createdCoachMemberships   CoachMembership[]         @relation("CoachMembershipCreator")
+  createdReferees           RefereeProfile[]          @relation("RefereeCreator")
+  createdAthleteMemberships AthleteMembership[]       @relation("AthleteMembershipCreator")
+  createdAthleteCoaches     AthleteCoach[]            @relation("AthleteCoachCreator")
+  createdRanks              AthleteRankRecord[]       @relation("RankCreator")
+  revokedRanks              AthleteRankRecord[]       @relation("RankRevoker")
+  createdGuardians          Guardian[]                @relation("GuardianCreator")
+  verifiedGuardians         Guardian[]                @relation("GuardianVerifier")
+  endedGuardians            Guardian[]                @relation("GuardianEnder")
+  createdConsentTemplates   ConsentTemplate[]         @relation("ConsentTemplateCreator")
+  recordedConsents          Consent[]                 @relation("ConsentRecorder")
+  revokedConsents           Consent[]                 @relation("ConsentRevoker")
+  createdRuleSets           RuleSet[]                 @relation("RuleSetCreator")
+  createdRuleSetVersions    RuleSetVersion[]          @relation("RuleSetVersionCreator")
+  publishedRuleSetVersions  RuleSetVersion[]          @relation("RuleSetPublisher")
+  createdAgeGroups          AgeGroup[]                @relation("AgeGroupCreator")
+  createdCategoryTemplates  CategoryTemplate[]        @relation("CategoryTemplateCreator")
+  uploadedDocuments         Document[]                @relation("DocumentUploader")
+  reviewedDocuments         Document[]                @relation("DocumentReviewer")
+  importJobs                ImportJob[]               @relation("ImportCreator")
+  createdVenues             Venue[]                   @relation("VenueCreator")
+  createdCompetitions       Competition[]             @relation("CompetitionCreator")
+  updatedCompetitions       Competition[]             @relation("CompetitionUpdater")
+  createdApplications       Application[]             @relation("ApplicationCreator")
+  submittedApplications     Application[]             @relation("ApplicationSubmitter")
+  reviewedApplications      Application[]             @relation("ApplicationReviewer")
+  createdEntries            Entry[]                   @relation("EntryCreator")
+  decidedEntries            Entry[]                   @relation("EntryDecider")
+  withdrawnEntries          Entry[]                   @relation("EntryWithdrawer")
+  acquiredLeases            CompetitionWriteLease[]   @relation("LeaseAcquirer")
+  waivedAdmissionChecks     AdmissionCheck[]          @relation("AdmissionCheckUpdater")
+  checkInOperations         CheckIn[]                 @relation("CheckInOperator")
+  weighInAttempts           WeighInAttempt[]          @relation("WeighInOperator")
+  recordedClearances        MedicalClearance[]        @relation("ClearanceRecorder")
+  revokedClearances         MedicalClearance[]        @relation("ClearanceRevoker")
   notifications             Notification[]
   notificationPreferences   NotificationPreference[]
   pushSubscriptions         PushSubscription[]
   follows                   Follow[]
-  createdDraws              Draw[]                   @relation("DrawCreator")
-  publishedDraws            Draw[]                   @relation("DrawPublisher")
-  supersededDraws           Draw[]                   @relation("DrawSuperseder")
-  publishedSchedules        Schedule[]               @relation("SchedulePublisher")
+  createdDraws              Draw[]                    @relation("DrawCreator")
+  publishedDraws            Draw[]                    @relation("DrawPublisher")
+  supersededDraws           Draw[]                    @relation("DrawSuperseder")
+  groupPlaceDecisions       GroupPlaceDecision[]      @relation("GroupPlaceDecider")
+  publishedSchedules        Schedule[]                @relation("SchedulePublisher")
   matAssignments            MatAssignment[]
-  recordedMatchEvents       MatchEvent[]             @relation("MatchEventRecorder")
-  publishedCategoryResults  CategoryResult[]         @relation("CategoryResultPublisher")
-  matchResultRevisions      MatchResultRevision[]    @relation("MatchResultReviser")
-  medicalIncidents          MedicalIncident[]        @relation("MedicalIncidentRecorder")
-  proposedMatchResults      MatchResult[]            @relation("MatchResultProposer")
-  confirmedMatchResults     MatchResult[]            @relation("MatchResultConfirmer")
-  onboardingRequests        OnboardingRequest[]      @relation("OnboardingApplicant")
-  decidedOnboardingRequests OnboardingRequest[]      @relation("OnboardingDecider")
-  onboardingStatusChanges   OnboardingStatusChange[] @relation("OnboardingStatusActor")
-  onboardingDocuments       OnboardingDocument[]     @relation("OnboardingDocumentUploader")
+  recordedMatchEvents       MatchEvent[]              @relation("MatchEventRecorder")
+  publishedCategoryResults  CategoryResult[]          @relation("CategoryResultPublisher")
+  matchResultRevisions      MatchResultRevision[]     @relation("MatchResultReviser")
+  medicalIncidents          MedicalIncident[]         @relation("MedicalIncidentRecorder")
+  proposedMatchResults      MatchResult[]             @relation("MatchResultProposer")
+  confirmedMatchResults     MatchResult[]             @relation("MatchResultConfirmer")
+  onboardingRequests        OnboardingRequest[]       @relation("OnboardingApplicant")
+  decidedOnboardingRequests OnboardingRequest[]       @relation("OnboardingDecider")
+  onboardingStatusChanges   OnboardingStatusChange[]  @relation("OnboardingStatusActor")
+  onboardingDocuments       OnboardingDocument[]      @relation("OnboardingDocumentUploader")
+  ratingConfigsEnabled      CompetitionRatingConfig[] @relation("CompetitionRatingEnabler")
+  ratingCorrections         RatingCorrection[]        @relation("RatingCorrectionCreator")
+  ratingSeasons             RatingSeason[]            @relation("RatingSeasonCreator")
 
   @@index([status, createdAt])
   @@map("user")
@@ -426,13 +430,13 @@ model Region {
   nameRu      String @map("name_ru")
   nameEn      String @map("name_en")
 
-  country            Country        @relation(fields: [countryCode], references: [code], onDelete: Restrict)
+  country            Country             @relation(fields: [countryCode], references: [code], onDelete: Restrict)
   organizations      Organization[]
   persons            Person[]
   venues             Venue[]
-  representedApps    Application[]  @relation("ApplicationRegion")
-  entrySnapRegions   Entry[]        @relation("EntrySnapRegion")
-  representedEntries Entry[]        @relation("EntryRepresentationRegion")
+  representedApps    Application[]       @relation("ApplicationRegion")
+  entrySnapRegions   Entry[]             @relation("EntrySnapRegion")
+  representedEntries Entry[]             @relation("EntryRepresentationRegion")
   onboardingRequests OnboardingRequest[] @relation("OnboardingOrgRegion")
 
   @@unique([countryCode, code])
@@ -634,13 +638,13 @@ model StoredFile {
   verifiedAt   DateTime?  @map("verified_at") @db.Timestamptz(3)
   deletedAt    DateTime?  @map("deleted_at") @db.Timestamptz(3)
 
-  uploadedBy        User?          @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
-  organizationLogos Organization[] @relation("OrganizationLogo")
-  personPhotos      Person[]       @relation("PersonPhoto")
-  document          Document?      @relation("DocumentFile")
-  importJobs        ImportJob[]    @relation("ImportFile")
-  competitionLogos  Competition[]  @relation("CompetitionLogo")
-  regulations       Competition[]  @relation("CompetitionRegulation")
+  uploadedBy         User?               @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  organizationLogos  Organization[]      @relation("OrganizationLogo")
+  personPhotos       Person[]            @relation("PersonPhoto")
+  document           Document?           @relation("DocumentFile")
+  importJobs         ImportJob[]         @relation("ImportFile")
+  competitionLogos   Competition[]       @relation("CompetitionLogo")
+  regulations        Competition[]       @relation("CompetitionRegulation")
   onboardingDocument OnboardingDocument? @relation("OnboardingDocumentFile")
 
   @@index([status, createdAt])
@@ -781,17 +785,23 @@ model AthleteProfile {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  person      Person              @relation(fields: [personId], references: [id], onDelete: Restrict)
-  createdBy   User?               @relation("AthleteCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  memberships AthleteMembership[]
-  coaches     AthleteCoach[]
-  ranks       AthleteRankRecord[]
-  guardians   Guardian[]
-  documents   Document[]
-  entries     Entry[]
-  results     AthleteResult[]
-  checkIns    CheckIn[]
-  clearances  MedicalClearance[]
+  person                Person               @relation(fields: [personId], references: [id], onDelete: Restrict)
+  createdBy             User?                @relation("AthleteCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  memberships           AthleteMembership[]
+  coaches               AthleteCoach[]
+  ranks                 AthleteRankRecord[]
+  guardians             Guardian[]
+  documents             Document[]
+  entries               Entry[]
+  results               AthleteResult[]
+  checkIns              CheckIn[]
+  clearances            MedicalClearance[]
+  rating                AthleteRating?
+  ratingHistory         RatingHistory[]      @relation("RatingHistoryAthlete")
+  ratingCorrections     RatingCorrection[]
+  ratingRankSnapshots   RatingRankSnapshot[]
+  ratingOpponentHistory RatingHistory[]      @relation("RatingHistoryOpponent")
+  tournamentSeeds       TournamentSeed[]
 
   @@map("athlete_profile")
 }
@@ -805,9 +815,9 @@ model CoachProfile {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  person       Person            @relation(fields: [personId], references: [id], onDelete: Restrict)
-  createdBy    User?             @relation("CoachCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  memberships  CoachMembership[]
+  person             Person              @relation(fields: [personId], references: [id], onDelete: Restrict)
+  createdBy          User?               @relation("CoachCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  memberships        CoachMembership[]
   athletes           AthleteCoach[]
   applications       Application[]
   onboardingRequests OnboardingRequest[]
@@ -818,15 +828,15 @@ model CoachProfile {
 /// Тренер в организации (клубе, спортшколе) с периодом. Не зависит от аккаунта: тренер без входа в систему
 /// тоже бывает. Права тренера-пользователя даёт OrganizationMembership с ролью COACH.
 model CoachMembership {
-  id             String    @id @default(uuid(7)) @db.Uuid
-  coachId        String    @map("coach_id") @db.Uuid
-  organizationId String    @map("organization_id") @db.Uuid
-  validFrom      DateTime  @map("valid_from") @db.Date
-  validTo        DateTime? @map("valid_to") @db.Date
+  id                String    @id @default(uuid(7)) @db.Uuid
+  coachId           String    @map("coach_id") @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  validFrom         DateTime  @map("valid_from") @db.Date
+  validTo           DateTime? @map("valid_to") @db.Date
   /// Тренер рассматривает заявки спортсменов, выбравших его (Phase 9a). Назначает руководитель организации.
-  canReviewAthletes Boolean @default(false) @map("can_review_athletes")
-  createdById    String?   @map("created_by_id") @db.Uuid
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  canReviewAthletes Boolean   @default(false) @map("can_review_athletes")
+  createdById       String?   @map("created_by_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
   coach        CoachProfile @relation(fields: [coachId], references: [id], onDelete: Restrict)
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
@@ -1267,6 +1277,7 @@ enum CompetitionFormatCode {
   PENALTY_POINTS_ELIMINATION
   GROUP_STAGE
   GROUP_PLUS_PLAYOFF
+  SPECIAL_GROUP_RATED
 }
 
 enum CategoryRuleKind {
@@ -1343,51 +1354,57 @@ model Competition {
   /// «Скоро выступает» (Phase 8b): уведомлять, когда перед схваткой спортсмена на ковре осталось не больше N
   /// схваток; 0 — не уведомлять. CHECK 0–10.
   notifyMatchesAhead      Int                   @default(3) @map("notify_matches_ahead")
+  /// Рейтинговый турнир (docs/RATING_ARCHITECTURE.md, 3.1): RATED — подтверждённые схватки меняют Elo.
+  competitionType         CompetitionType       @default(NON_RATED) @map("competition_type")
   createdAt               DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt               DateTime?             @map("deleted_at") @db.Timestamptz(3)
 
-  organizer         Organization             @relation("CompetitionOrganizer", fields: [organizerOrganizationId], references: [id], onDelete: Restrict)
-  venue             Venue?                   @relation(fields: [venueId], references: [id], onDelete: Restrict)
-  discipline        Discipline               @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
-  ruleSetVersion    RuleSetVersion?          @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
-  logo              StoredFile?              @relation("CompetitionLogo", fields: [logoFileId], references: [id], onDelete: Restrict)
-  regulation        StoredFile?              @relation("CompetitionRegulation", fields: [regulationFileId], references: [id], onDelete: Restrict)
-  createdBy         User?                    @relation("CompetitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  updatedBy         User?                    @relation("CompetitionUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
-  staff             CompetitionMembership[]
-  categories        CompetitionCategory[]
-  categoryRules     CategoryRule[]
-  requirements      CompetitionRequirement[]
-  applications      Application[]
-  entries           Entry[]
-  writeLease        CompetitionWriteLease?
-  documents         Document[]
-  consents          Consent[]
-  admissions        Admission[]
-  checkIns          CheckIn[]
-  scales            Scale[]
-  weighInWindows    WeighInWindow[]
-  weighInRecords    WeighInRecord[]
-  clearances        MedicalClearance[]
-  draws             Draw[]
-  drawSlots         DrawSlot[]
-  brackets          Bracket[]
-  bracketNodes      BracketNode[]
-  matches           Match[]
-  matchParticipants MatchParticipant[]
-  mats              Mat[]
-  sessions          Session[]
-  schedule          Schedule?
-  matchSchedules    MatchSchedule[]
-  matAssignments    MatAssignment[]
-  matchEvents       MatchEvent[]
-  matchResults      MatchResult[]
-  matchRevisions    MatchResultRevision[]
-  categoryResults   CategoryResult[]
-  placements        Placement[]
-  athleteResults    AthleteResult[]
-  medicalIncidents  MedicalIncident[]
+  organizer           Organization             @relation("CompetitionOrganizer", fields: [organizerOrganizationId], references: [id], onDelete: Restrict)
+  venue               Venue?                   @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  discipline          Discipline               @relation(fields: [disciplineCode], references: [code], onDelete: Restrict)
+  ruleSetVersion      RuleSetVersion?          @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
+  logo                StoredFile?              @relation("CompetitionLogo", fields: [logoFileId], references: [id], onDelete: Restrict)
+  regulation          StoredFile?              @relation("CompetitionRegulation", fields: [regulationFileId], references: [id], onDelete: Restrict)
+  createdBy           User?                    @relation("CompetitionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy           User?                    @relation("CompetitionUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+  staff               CompetitionMembership[]
+  categories          CompetitionCategory[]
+  categoryRules       CategoryRule[]
+  requirements        CompetitionRequirement[]
+  applications        Application[]
+  entries             Entry[]
+  writeLease          CompetitionWriteLease?
+  documents           Document[]
+  consents            Consent[]
+  admissions          Admission[]
+  checkIns            CheckIn[]
+  scales              Scale[]
+  weighInWindows      WeighInWindow[]
+  weighInRecords      WeighInRecord[]
+  clearances          MedicalClearance[]
+  draws               Draw[]
+  drawSlots           DrawSlot[]
+  brackets            Bracket[]
+  bracketNodes        BracketNode[]
+  matches             Match[]
+  matchParticipants   MatchParticipant[]
+  mats                Mat[]
+  sessions            Session[]
+  schedule            Schedule?
+  matchSchedules      MatchSchedule[]
+  matAssignments      MatAssignment[]
+  matchEvents         MatchEvent[]
+  matchResults        MatchResult[]
+  matchRevisions      MatchResultRevision[]
+  categoryResults     CategoryResult[]
+  placements          Placement[]
+  athleteResults      AthleteResult[]
+  medicalIncidents    MedicalIncident[]
+  ratingCalculations  RatingCalculation[]
+  tournamentSeeds     TournamentSeed[]
+  groupPlaceDecisions GroupPlaceDecision[]
+  ratingConfig        CompetitionRatingConfig?
 
   @@index([status, startDate])
   @@index([organizerOrganizationId, startDate])
@@ -1588,6 +1605,7 @@ model Entry {
   weighInAttempts      WeighInAttempt[]
   weighInRecord        WeighInRecord?
   drawSlots            DrawSlot[]
+  tournamentSeeds      TournamentSeed[]
   matchParticipations  MatchParticipant[]
   activeMatch          Match?              @relation("EntryActiveMatch", fields: [activeMatchId], references: [id], onDelete: Restrict)
   placements           Placement[]
@@ -1998,17 +2016,17 @@ model NotificationPreference {
 /// (`sessionId` — семейство refresh token): после выхода или окончания сессии на устройство ничего не уходит, а
 /// при следующем входе браузер подписывает себя заново. Один `endpoint` — одно устройство одного пользователя.
 model PushSubscription {
-  id          String    @id @default(uuid(7)) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  sessionId   String    @map("session_id") @db.Uuid
-  endpoint    String    @unique
-  p256dh      String
-  auth        String
+  id         String    @id @default(uuid(7)) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  sessionId  String    @map("session_id") @db.Uuid
+  endpoint   String    @unique
+  p256dh     String
+  auth       String
   /// Браузер и система кратко (для списка устройств в настройках).
-  userAgent   String?   @map("user_agent")
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
-  lastUsedAt  DateTime? @map("last_used_at") @db.Timestamptz(3)
+  userAgent  String?   @map("user_agent")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -2140,13 +2158,15 @@ model Draw {
   supersedeReason  String?               @map("supersede_reason")
   updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  competition  Competition         @relation(fields: [competitionId], references: [id], onDelete: Restrict)
-  category     CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  createdBy    User?               @relation("DrawCreator", fields: [createdById], references: [id], onDelete: Restrict)
-  publishedBy  User?               @relation("DrawPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
-  supersededBy User?               @relation("DrawSuperseder", fields: [supersededById], references: [id], onDelete: Restrict)
-  slots        DrawSlot[]
-  brackets     Bracket[]
+  competition    Competition          @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category       CompetitionCategory  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  createdBy      User?                @relation("DrawCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  publishedBy    User?                @relation("DrawPublisher", fields: [publishedById], references: [id], onDelete: Restrict)
+  supersededBy   User?                @relation("DrawSuperseder", fields: [supersededById], references: [id], onDelete: Restrict)
+  slots          DrawSlot[]
+  seeds          TournamentSeed[]
+  groupDecisions GroupPlaceDecision[]
+  brackets       Bracket[]
 
   @@unique([categoryId, number])
   @@index([competitionId, status])
@@ -2161,7 +2181,7 @@ model DrawSlot {
   position      Int
   entryId       String? @map("entry_id") @db.Uuid
   seedNumber    Int?    @map("seed_number")
-  /// Подгруппа A или B (выбывание с утешительными), иначе пусто.
+  /// Подгруппа: A или B (выбывание с утешительными), A–H (рейтинговый формат), иначе пусто.
   pool          String?
 
   competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
@@ -2170,6 +2190,50 @@ model DrawSlot {
 
   @@unique([drawId, position])
   @@map("draw_slot")
+}
+
+/// Посев рейтингового формата (ТЗ 27, 28): номер посева и рейтинг спортсмена на момент жеребьёвки — отдельно от
+/// текущего рейтинга. Пишется вместе со слотами черновика и больше не меняется: другой посев — новая версия жеребьёвки.
+model TournamentSeed {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  competitionId String   @map("competition_id") @db.Uuid
+  drawId        String   @map("draw_id") @db.Uuid
+  entryId       String   @map("entry_id") @db.Uuid
+  athleteId     String   @map("athlete_id") @db.Uuid
+  seedNumber    Int      @map("seed_number")
+  ratingAtDraw  Int      @map("rating_at_draw")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  competition Competition    @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  draw        Draw           @relation(fields: [drawId], references: [id], onDelete: Restrict)
+  entry       Entry          @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  athlete     AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@unique([drawId, entryId])
+  @@unique([drawId, seedNumber])
+  @@index([athleteId])
+  @@map("tournament_seed")
+}
+
+/// Решение главного судьи о порядке участников, которых критерии мест подгруппы рейтингового формата не разделили
+/// (ТЗ 31: общее место на границе выхода или среди вышедших). `tiers` — упорядоченные списки участий, каждый — ровно
+/// один ярус общего места. Действует последнее решение по подгруппе; строки только дополняются.
+model GroupPlaceDecision {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  competitionId String   @map("competition_id") @db.Uuid
+  drawId        String   @map("draw_id") @db.Uuid
+  groupLetter   String   @map("group_letter")
+  tiers         Json
+  reason        String
+  decidedById   String   @map("decided_by_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  draw        Draw        @relation(fields: [drawId], references: [id], onDelete: Restrict)
+  decidedBy   User        @relation("GroupPlaceDecider", fields: [decidedById], references: [id], onDelete: Restrict)
+
+  @@index([drawId, groupLetter, createdAt])
+  @@map("group_place_decision")
 }
 
 /// Этап сетки опубликованной жеребьёвки: основная сетка, утешительные схватки, круговая группа.
@@ -2256,17 +2320,19 @@ model Match {
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  competition   Competition           @relation(fields: [competitionId], references: [id], onDelete: Restrict)
-  category      CompetitionCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  bracketNode   BracketNode?          @relation(fields: [bracketNodeId], references: [id], onDelete: Restrict)
-  mat           Mat?                  @relation(fields: [matId], references: [id], onDelete: Restrict)
-  participants  MatchParticipant[]
-  schedule      MatchSchedule?
-  events        MatchEvent[]
-  result        MatchResult?
-  activeEntries Entry[]               @relation("EntryActiveMatch")
-  revisions     MatchResultRevision[]
-  incidents     MedicalIncident[]
+  competition        Competition           @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  category           CompetitionCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  bracketNode        BracketNode?          @relation(fields: [bracketNodeId], references: [id], onDelete: Restrict)
+  mat                Mat?                  @relation(fields: [matId], references: [id], onDelete: Restrict)
+  participants       MatchParticipant[]
+  schedule           MatchSchedule?
+  events             MatchEvent[]
+  result             MatchResult?
+  activeEntries      Entry[]               @relation("EntryActiveMatch")
+  revisions          MatchResultRevision[]
+  incidents          MedicalIncident[]
+  ratingCalculations RatingCalculation[]
+  ratingCorrections  RatingCorrection[]    @relation("RatingCorrectionMatch")
 
   @@unique([competitionId, matchNumber])
   @@index([competitionId, status])
@@ -2693,46 +2759,46 @@ enum OrganizationLegalForm {
 /// Не больше одной незавершённой заявки пользователя на роль (partial unique, миграция). Переходы статуса — только
 /// сервером (OnboardingService), каждый переход — строка истории.
 model OnboardingRequest {
-  id                  String           @id @default(uuid(7)) @db.Uuid
-  userId              String           @map("user_id") @db.Uuid
-  role                OnboardingRole
-  kind                OnboardingKind   @default(REGISTRATION)
-  status              OnboardingStatus @default(DRAFT)
-  inOrganization      Boolean?         @map("in_organization")
-  organizationId      String?          @map("organization_id") @db.Uuid
-  coachId             String?          @map("coach_id") @db.Uuid
-  lastName            String?          @map("last_name")
-  firstName           String?          @map("first_name")
-  middleName          String?          @map("middle_name")
-  birthDate           DateTime?        @map("birth_date") @db.Date
-  gender              Gender?
-  phone               String?
-  contactEmail        String?          @map("contact_email") @db.Citext
-  telegram            String?
-  contactChannels     String[]         @default([]) @map("contact_channels")
-  coachQualification  String?          @map("coach_qualification")
-  refereeCategoryCode String?          @map("referee_category_code")
-  orgName             String?          @map("org_name")
-  orgShortName        String?          @map("org_short_name")
-  orgType             OrganizationType? @map("org_type")
-  orgLegalForm        OrganizationLegalForm? @map("org_legal_form")
-  orgCountryCode      String?          @map("org_country_code") @db.Char(2)
-  orgRegionId         String?          @map("org_region_id") @db.Uuid
-  orgCity             String?          @map("org_city")
-  orgInn              String?          @map("org_inn")
-  orgOgrn             String?          @map("org_ogrn")
-  orgLegalName        String?          @map("org_legal_name")
-  orgLegalAddress     String?          @map("org_legal_address")
-  consentTemplateId   String?          @map("consent_template_id") @db.Uuid
-  consentGivenAt      DateTime?        @map("consent_given_at") @db.Timestamptz(3)
-  decisionReason      String?          @map("decision_reason")
-  decidedById         String?          @map("decided_by_id") @db.Uuid
-  decidedAt           DateTime?        @map("decided_at") @db.Timestamptz(3)
-  submittedAt         DateTime?        @map("submitted_at") @db.Timestamptz(3)
-  resultOrganizationId String?         @map("result_organization_id") @db.Uuid
-  version             Int              @default(1)
-  createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt           DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                   String                 @id @default(uuid(7)) @db.Uuid
+  userId               String                 @map("user_id") @db.Uuid
+  role                 OnboardingRole
+  kind                 OnboardingKind         @default(REGISTRATION)
+  status               OnboardingStatus       @default(DRAFT)
+  inOrganization       Boolean?               @map("in_organization")
+  organizationId       String?                @map("organization_id") @db.Uuid
+  coachId              String?                @map("coach_id") @db.Uuid
+  lastName             String?                @map("last_name")
+  firstName            String?                @map("first_name")
+  middleName           String?                @map("middle_name")
+  birthDate            DateTime?              @map("birth_date") @db.Date
+  gender               Gender?
+  phone                String?
+  contactEmail         String?                @map("contact_email") @db.Citext
+  telegram             String?
+  contactChannels      String[]               @default([]) @map("contact_channels")
+  coachQualification   String?                @map("coach_qualification")
+  refereeCategoryCode  String?                @map("referee_category_code")
+  orgName              String?                @map("org_name")
+  orgShortName         String?                @map("org_short_name")
+  orgType              OrganizationType?      @map("org_type")
+  orgLegalForm         OrganizationLegalForm? @map("org_legal_form")
+  orgCountryCode       String?                @map("org_country_code") @db.Char(2)
+  orgRegionId          String?                @map("org_region_id") @db.Uuid
+  orgCity              String?                @map("org_city")
+  orgInn               String?                @map("org_inn")
+  orgOgrn              String?                @map("org_ogrn")
+  orgLegalName         String?                @map("org_legal_name")
+  orgLegalAddress      String?                @map("org_legal_address")
+  consentTemplateId    String?                @map("consent_template_id") @db.Uuid
+  consentGivenAt       DateTime?              @map("consent_given_at") @db.Timestamptz(3)
+  decisionReason       String?                @map("decision_reason")
+  decidedById          String?                @map("decided_by_id") @db.Uuid
+  decidedAt            DateTime?              @map("decided_at") @db.Timestamptz(3)
+  submittedAt          DateTime?              @map("submitted_at") @db.Timestamptz(3)
+  resultOrganizationId String?                @map("result_organization_id") @db.Uuid
+  version              Int                    @default(1)
+  createdAt            DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime               @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user               User                     @relation("OnboardingApplicant", fields: [userId], references: [id], onDelete: Restrict)
   organization       Organization?            @relation("OnboardingOrganization", fields: [organizationId], references: [id], onDelete: Restrict)
@@ -2787,4 +2853,226 @@ model OnboardingStatusChange {
 
   @@index([requestId, createdAt])
   @@map("onboarding_status_change")
+}
+
+enum RatingRuleSetStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+/// Версия правил расчёта рейтинга спортсменов (docs/RATING_ARCHITECTURE.md, 4): K, S, уровни, классификатор
+/// исходов, округление — в `parameters` (RatingRuleParametersV1). После ACTIVE не меняется (триггер); турнир
+/// закрепляет версию, расчёт схватки ссылается на неё навсегда.
+model RatingRuleSet {
+  id            String              @id @default(uuid(7)) @db.Uuid
+  code          String
+  version       Int
+  name          String
+  schemaVersion Int                 @map("schema_version")
+  parameters    Json
+  checksum      String
+  engineVersion String              @map("engine_version")
+  status        RatingRuleSetStatus @default(DRAFT)
+  activeFrom    DateTime?           @map("active_from") @db.Timestamptz(3)
+  activeTo      DateTime?           @map("active_to") @db.Timestamptz(3)
+  createdAt     DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  calculations RatingCalculation[]
+  competitions CompetitionRatingConfig[]
+
+  @@unique([code, version])
+  @@map("rating_rule_set")
+}
+
+enum RatingStatus {
+  ACTIVE
+  FROZEN
+  SUSPENDED
+}
+
+enum RatingCalculationStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+  FAILED
+  SUPERSEDED
+}
+
+/// Текущий рейтинг спортсмена (docs/RATING_ARCHITECTURE.md, 5): read model и строка блокировки расчёта
+/// (FOR UPDATE в порядке athlete_id). Меняется только расчётом схватки и корректировками.
+model AthleteRating {
+  athleteId        String       @id @map("athlete_id") @db.Uuid
+  rating           Int
+  peakRating       Int          @map("peak_rating")
+  lowestRating     Int          @map("lowest_rating")
+  ratedMatches     Int          @default(0) @map("rated_matches")
+  wins             Int          @default(0)
+  losses           Int          @default(0)
+  status           RatingStatus @default(ACTIVE)
+  lastRatedMatchAt DateTime?    @map("last_rated_match_at") @db.Timestamptz(3)
+  version          Int          @default(1)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  athlete AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@map("athlete_rating")
+}
+
+/// Расчёт рейтинга по схватке (docs/RATING_ARCHITECTURE.md, 6.2): один на вариант результата и версию расчёта.
+/// `input` — снимок результата и участников, по которому считали.
+model RatingCalculation {
+  id                  String                  @id @default(uuid(7)) @db.Uuid
+  matchId             String                  @map("match_id") @db.Uuid
+  competitionId       String                  @map("competition_id") @db.Uuid
+  ruleSetId           String                  @map("rule_set_id") @db.Uuid
+  calculationVersion  String                  @map("calculation_version")
+  matchResultRevision Int                     @map("match_result_revision")
+  status              RatingCalculationStatus
+  statusReason        String?                 @map("status_reason")
+  input               Json
+  processedAt         DateTime?               @map("processed_at") @db.Timestamptz(3)
+  createdAt           DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime                @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  match       Match              @relation(fields: [matchId], references: [id], onDelete: Restrict)
+  competition Competition        @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  ruleSet     RatingRuleSet      @relation(fields: [ruleSetId], references: [id], onDelete: Restrict)
+  history     RatingHistory[]
+  corrections RatingCorrection[] @relation("RatingCorrectionCalculation")
+  replacedBy  RatingCorrection[] @relation("RatingCorrectionSuperseded")
+
+  @@unique([matchId, calculationVersion, matchResultRevision])
+  @@index([competitionId, status])
+  @@map("rating_calculation")
+}
+
+/// История рейтинга (docs/RATING_ARCHITECTURE.md, 5): строка на спортсмена на расчёт. Только дополняется — у роли
+/// приложения нет UPDATE и DELETE; ошибки исправляются корректировками.
+model RatingHistory {
+  id                   String   @id @default(uuid(7)) @db.Uuid
+  calculationId        String   @map("calculation_id") @db.Uuid
+  athleteId            String   @map("athlete_id") @db.Uuid
+  competitionId        String   @map("competition_id") @db.Uuid
+  matchId              String   @map("match_id") @db.Uuid
+  ratingBefore         Int      @map("rating_before")
+  ratingAfter          Int      @map("rating_after")
+  ratingDelta          Int      @map("rating_delta")
+  ratingAfterExact     Decimal  @map("rating_after_exact") @db.Decimal(14, 6)
+  levelBefore          Int      @map("level_before")
+  levelAfter           Int      @map("level_after")
+  opponentAthleteId    String   @map("opponent_athlete_id") @db.Uuid
+  opponentRatingBefore Int      @map("opponent_rating_before")
+  outcome              String
+  actualScore          Decimal  @map("actual_score") @db.Decimal(5, 4)
+  expectedScore        Decimal  @map("expected_score") @db.Decimal(12, 10)
+  coefficientK         Int      @map("coefficient_k")
+  calculationVersion   String   @map("calculation_version")
+  matchFinishedAt      DateTime @map("match_finished_at") @db.Timestamptz(3)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  calculation RatingCalculation @relation(fields: [calculationId], references: [id], onDelete: Restrict)
+  athlete     AthleteProfile    @relation("RatingHistoryAthlete", fields: [athleteId], references: [id], onDelete: Restrict)
+  opponent    AthleteProfile    @relation("RatingHistoryOpponent", fields: [opponentAthleteId], references: [id], onDelete: Restrict)
+
+  @@unique([calculationId, athleteId])
+  @@index([athleteId, matchFinishedAt, id])
+  @@index([matchFinishedAt])
+  @@map("rating_history")
+}
+
+enum CompetitionType {
+  NON_RATED
+  RATED
+}
+
+/// Рейтинговые настройки турнира (docs/RATING_ARCHITECTURE.md, 3.1, 4): закреплённая версия правил расчёта.
+/// Включение рейтинга администратором платформы — фаза 8.
+model CompetitionRatingConfig {
+  competitionId String   @id @map("competition_id") @db.Uuid
+  ruleSetId     String   @map("rule_set_id") @db.Uuid
+  /// Дельты рейтинга видны публично на странице турнира.
+  publicDeltas  Boolean  @default(true) @map("public_deltas")
+  enabledById   String?  @map("enabled_by_id") @db.Uuid
+  enabledAt     DateTime @default(now()) @map("enabled_at") @db.Timestamptz(3)
+  reason        String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition   @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  ruleSet     RatingRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Restrict)
+  enabledBy   User?         @relation("CompetitionRatingEnabler", fields: [enabledById], references: [id], onDelete: Restrict)
+
+  @@index([ruleSetId])
+  @@map("competition_rating_config")
+}
+
+enum RatingCorrectionKind {
+  RESULT_AMENDED
+  MANUAL
+  REBUILD
+}
+
+/// Корректировка рейтинга без переписывания истории (docs/RATING_ARCHITECTURE.md, 6.4, 6.5): изменённый результат
+/// схватки, ручная корректировка или применённая пересборка (фаза 14). Только дополняется.
+model RatingCorrection {
+  id                      String               @id @default(uuid(7)) @db.Uuid
+  athleteId               String               @map("athlete_id") @db.Uuid
+  kind                    RatingCorrectionKind
+  /// Расчёт, который ввёл корректировку (новый вариант результата схватки).
+  calculationId           String?              @map("calculation_id") @db.Uuid
+  /// Заменённый расчёт (прежний вариант результата).
+  supersededCalculationId String?              @map("superseded_calculation_id") @db.Uuid
+  ratingBefore            Int                  @map("rating_before")
+  ratingAfter             Int                  @map("rating_after")
+  delta                   Int
+  reason                  String?
+  /// Схватка, к которой относится ручная корректировка (если указана).
+  relatedMatchId          String?              @map("related_match_id") @db.Uuid
+  createdById             String?              @map("created_by_id") @db.Uuid
+  createdAt               DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  athlete      AthleteProfile     @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+  relatedMatch Match?             @relation("RatingCorrectionMatch", fields: [relatedMatchId], references: [id], onDelete: Restrict)
+  calculation  RatingCalculation? @relation("RatingCorrectionCalculation", fields: [calculationId], references: [id], onDelete: Restrict)
+  superseded   RatingCalculation? @relation("RatingCorrectionSuperseded", fields: [supersededCalculationId], references: [id], onDelete: Restrict)
+  createdBy    User?              @relation("RatingCorrectionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([athleteId, createdAt])
+  @@map("rating_correction")
+}
+
+/// Ежедневный снимок мест таблицы рейтинга (docs/RATING_ARCHITECTURE.md, 10): «изменение позиции» — сравнение с
+/// последним снимком, а не пересчёт истории на запрос. Пишет worker; хранится год.
+model RatingRankSnapshot {
+  snapshotDate DateTime @map("snapshot_date") @db.Date
+  athleteId    String   @map("athlete_id") @db.Uuid
+  rank         Int
+  rating       Int
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  athlete AthleteProfile @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@id([snapshotDate, athleteId])
+  @@index([athleteId, snapshotDate])
+  @@map("rating_rank_snapshot")
+}
+
+/// Сезон рейтинга (docs/RATING_ARCHITECTURE.md, 5, 10; ТЗ 68): отдельное представление единого рейтинга за период —
+/// Elo при смене сезона не сбрасывается. Даты по Москве, включительно; сезоны не пересекаются (exclusion constraint).
+model RatingSeason {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  code        String   @unique
+  name        String
+  startsOn    DateTime @map("starts_on") @db.Date
+  endsOn      DateTime @map("ends_on") @db.Date
+  createdById String   @map("created_by_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  createdBy User @relation("RatingSeasonCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@map("rating_season")
 }

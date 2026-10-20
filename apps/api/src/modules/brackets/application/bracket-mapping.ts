@@ -1,5 +1,5 @@
 // Преобразования графа сетки: строки узлов для БД, спецификации схваток по состоянию, порядок нумерации, DTO.
-import type { BracketNodeDto, BracketStage } from '@sde/contracts';
+import { type BracketNodeDto, type BracketStage, RATED_GROUP_LETTERS } from '@sde/contracts';
 import type { Prisma } from '@sde/db';
 import type { MatchRecord, MatchSpec, SideInit } from '../../matches';
 import {
@@ -16,8 +16,40 @@ export interface MatchDurations {
   repechage: number | null;
 }
 
-/** Этап сетки для таблицы bracket: основная сетка (или круговая группа), затем утешительные схватки. */
-export const STAGE_ORDER: Record<BracketStage, number> = { MAIN: 1, POOL: 1, REPECHAGE: 2 };
+/**
+ * Этап сетки для таблицы bracket: основная сетка (или круговая группа), затем утешительные схватки. Финальная часть
+ * рейтингового формата — после всех подгрупп.
+ */
+const STAGE_ORDER: Record<Exclude<BracketStage, 'FINAL'>, number> = { MAIN: 1, POOL: 1, REPECHAGE: 2 };
+
+/** Номер подгруппы рейтингового формата (A — 1); у остальных узлов — 0. */
+const groupIndex = (n: GraphNode): number => (n.group ? RATED_GROUP_LETTERS.indexOf(n.group) + 1 : 0);
+
+/** Этап сетки узла: у каждой подгруппы рейтингового формата — свой, у остальных — по стадии. */
+export const bracketKeyOf = (n: GraphNode): string => (n.group ? `POOL:${n.group}` : n.stage);
+
+export interface BracketStageSpec {
+  key: string;
+  kind: BracketStage;
+  stageOrder: number;
+  label: string | null;
+}
+
+/** Этапы сетки (строки bracket) в порядке первого появления узлов. */
+export function bracketStages(graph: BracketGraph): BracketStageSpec[] {
+  const stages = new Map<string, BracketStageSpec>();
+  for (const n of graph.nodes) {
+    const key = bracketKeyOf(n);
+    if (!stages.has(key))
+      stages.set(key, {
+        key,
+        kind: n.stage,
+        stageOrder: n.group ? groupIndex(n) : n.stage === 'FINAL' ? stages.size + 1 : STAGE_ORDER[n.stage],
+        label: n.group ?? null,
+      });
+  }
+  return [...stages.values()];
+}
 
 const sideInit = (s: SideState): SideInit =>
   s.kind === 'ENTRY' ? { entryId: s.entryId, bye: false } : { entryId: null, bye: s.kind === 'BYE' };
@@ -48,19 +80,26 @@ export function matchSpec(
 
 /**
  * Порядок номеров схваток категории: основная сетка по кругам, затем утешительные схватки по шагам, финал —
- * последним (его участники определяются раньше, но проводится он после утешительных схваток).
+ * последним (его участники определяются раньше, но проводится он после утешительных схваток). Подгруппы
+ * рейтингового формата — круг за кругом: в круге подгруппа A, затем B и так далее; финальная часть — после подгрупп.
  */
 export function numberingOrder(graph: BracketGraph): GraphNode[] {
   const finalRound = Math.max(0, ...graph.nodes.filter((n) => n.stage === 'MAIN').map((n) => n.round));
-  const group = (n: GraphNode): number =>
-    n.stage === 'MAIN' && n.label === 'FINAL' && n.round === finalRound ? 2 : n.stage === 'REPECHAGE' ? 1 : 0;
-  return [...graph.nodes].sort((a, b) => group(a) - group(b) || a.round - b.round || a.position - b.position);
+  const group = (n: GraphNode): number => {
+    if (n.stage === 'FINAL') return 3;
+    if (n.stage === 'MAIN' && n.label === 'FINAL' && n.round === finalRound) return 2;
+    return n.stage === 'REPECHAGE' ? 1 : 0;
+  };
+  return [...graph.nodes].sort(
+    (a, b) =>
+      group(a) - group(b) || a.round - b.round || groupIndex(a) - groupIndex(b) || a.position - b.position,
+  );
 }
 
 export function nodeRows(
   graph: BracketGraph,
   ids: ReadonlyMap<string, string>,
-  bracketIds: ReadonlyMap<BracketStage, string>,
+  bracketIds: ReadonlyMap<string, string>,
   competitionId: string,
 ): Prisma.BracketNodeCreateManyInput[] {
   const idOf = (key: string): string => {
@@ -74,7 +113,7 @@ export function nodeRows(
     return {
       id: idOf(n.key),
       competitionId,
-      bracketId: bracketIds.get(n.stage) as string,
+      bracketId: bracketIds.get(bracketKeyOf(n)) as string,
       key: n.key,
       round: n.round,
       position: n.position,
@@ -111,6 +150,7 @@ export function nodeDtos(
     return {
       key: n.key,
       stage: n.stage,
+      group: n.group ?? null,
       round: n.round,
       position: n.position,
       label: n.label,

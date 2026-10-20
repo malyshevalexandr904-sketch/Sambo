@@ -118,6 +118,11 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
       visible: hasPlatformPermission(user, 'consent_template.manage'),
     },
     { href: '/admin/users', label: t('nav.users'), visible: hasPlatformPermission(user, 'user.view') },
+    {
+      href: '/admin/rating',
+      label: t('nav.rating'),
+      visible: hasPlatformPermission(user, 'competition.view_rating_audit'),
+    },
     { href: '/admin/audit', label: t('nav.audit'), visible: hasPlatformPermission(user, 'audit.view') },
     {
       href: '/admin/settings',

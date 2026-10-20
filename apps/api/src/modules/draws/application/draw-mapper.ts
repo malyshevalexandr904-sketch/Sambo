@@ -1,15 +1,21 @@
 // Представления жеребьёвки: версия (кратко и полностью), категория, участники и отчёт о разведении с названиями.
 import {
+  type BracketViewDto,
   type CategoryWeight,
+  type DrawPool,
   type DrawCategoryDto,
   type DrawParticipantDto,
   type DrawSlotDto,
   type DrawSummaryDto,
   type NamedRef,
+  RATED_GROUP_LETTERS,
+  RATED_GROUPS_V1,
+  ratedFormatRule,
   type SeparationReportDto,
   type UserRef,
 } from '@sde/contracts';
 import type { Prisma } from '@sde/db';
+import type { GroupDecisionRecord, GroupStanding } from '../../brackets';
 import type { CategoryRow } from '../../categories';
 import type { SeparationReport } from '../domain/separation';
 import type { ParticipantInfo } from './draw-participants';
@@ -38,6 +44,7 @@ export const DRAW_FULL_INCLUDE = {
   createdBy: USER_REF,
   publishedBy: USER_REF,
   supersededBy: USER_REF,
+  seeds: { select: { entryId: true, ratingAtDraw: true } },
   _count: { select: { slots: { where: { entryId: { not: null } } } } },
 } satisfies Prisma.DrawInclude;
 
@@ -91,14 +98,19 @@ export const toSlotDto = (s: {
   position: s.position,
   entryId: s.entryId,
   seedNumber: s.seedNumber,
-  pool: s.pool === 'A' || s.pool === 'B' ? s.pool : null,
+  pool: (RATED_GROUP_LETTERS as readonly string[]).includes(s.pool ?? '') ? (s.pool as DrawPool) : null,
 });
 
-/** Участники версии жеребьёвки в порядке позиций; данные — из снимка участия (ADR-10). */
+/**
+ * Участники версии жеребьёвки в порядке позиций; данные — из снимка участия (ADR-10), рейтинг — из посева
+ * рейтингового формата.
+ */
 export function toParticipants(
   slots: DrawSlotDto[],
   infos: ReadonlyMap<string, ParticipantInfo>,
+  seeds: readonly { entryId: string; ratingAtDraw: number }[] = [],
 ): DrawParticipantDto[] {
+  const ratings = new Map(seeds.map((x) => [x.entryId, x.ratingAtDraw]));
   return slots
     .filter((s): s is DrawSlotDto & { entryId: string } => s.entryId !== null)
     .map((s) => {
@@ -110,6 +122,7 @@ export function toParticipants(
         organization: info?.organization ?? null,
         region: info?.region ?? null,
         seedNumber: s.seedNumber,
+        ratingAtDraw: ratings.get(s.entryId) ?? null,
         position: s.position,
         pool: s.pool,
         entryStatus: info?.entryStatus ?? 'APPROVED',
@@ -136,5 +149,49 @@ export function toSeparationDto(
     keys: r.keys,
     unmet: r.unmet,
     groups: r.groups.map((g) => ({ ...g, name: names.get(g.value) ?? null })),
+  };
+}
+
+/** Таблицы подгрупп рейтингового формата с критериями мест версии формата; другие форматы — null. */
+export function toGroupsDto(
+  standings: GroupStanding[] | null,
+  size: number,
+  decisions: GroupDecisionRecord[] = [],
+  canDecide = false,
+): BracketViewDto['groups'] {
+  if (!standings) return null;
+  const rules = RATED_GROUPS_V1.groupStandingRules;
+  const decisionOf = (g: GroupStanding) => {
+    // Решение показывается, пока действует: после изменения результата ярусы могли стать другими.
+    const d = g.decided ? decisions.find((x) => x.group === g.group) : undefined;
+    return d
+      ? { reason: d.reason, decidedAt: d.decidedAt.toISOString(), decidedBy: toUserRef(d.decidedBy) }
+      : null;
+  };
+  return {
+    criteria: [...rules.criteria],
+    criteriaConfirmed: rules.confirmed,
+    qualifiersPerGroup: ratedFormatRule(size)?.qualifiersPerGroup ?? 0,
+    canDecide,
+    standings: standings.map((g) => ({
+      group: g.group,
+      complete: g.complete,
+      decisionRequired: g.decisionRequired,
+      decision: decisionOf(g),
+      rows: g.rows.map((r) => ({
+        position: r.position,
+        entryId: r.entryId,
+        matches: r.matches,
+        wins: r.wins,
+        losses: r.losses,
+        points: r.points,
+        tiebreakers: {
+          headToHeadWins: r.headToHeadWins,
+          cleanWins: r.cleanWins,
+          superiorityWins: r.superiorityWins,
+        },
+        qualified: r.qualified,
+      })),
+    })),
   };
 }

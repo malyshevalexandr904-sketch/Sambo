@@ -4,6 +4,12 @@ import { Reason, Uuid } from './common.js';
 import type { CategoryRef, CategoryWeight } from './competition-categories.js';
 import type { CategoryStatus } from './competitions.js';
 import { DRAW_FORMATS, type Pool, type RoundLabel } from './formats.js';
+import {
+  type GroupStandingCriterion,
+  RATED_GROUP_LETTERS,
+  type RatedFormatPlanResult,
+  type RatedGroupLetter,
+} from './rated-format.js';
 import type { Gender } from './people.js';
 import type { EntryStatus } from './registrations.js';
 import type { CompetitionFormatCode } from './rulesets.js';
@@ -49,7 +55,7 @@ export type WinMethod = (typeof WIN_METHODS)[number];
 export const MATCH_RESULT_STATUSES = ['PROVISIONAL', 'CONFIRMED', 'PUBLISHED', 'AMENDED'] as const;
 export type MatchResultStatus = (typeof MATCH_RESULT_STATUSES)[number];
 
-export const BRACKET_STAGES = ['MAIN', 'REPECHAGE', 'POOL'] as const;
+export const BRACKET_STAGES = ['MAIN', 'REPECHAGE', 'POOL', 'FINAL'] as const;
 export type BracketStage = (typeof BRACKET_STAGES)[number];
 
 /** Источник стороны узла: позиция жеребьёвки, победитель или проигравший узла, правило формата. */
@@ -93,7 +99,31 @@ export type DrawCreate = z.infer<typeof DrawCreate>;
 export const DrawSupersede = z.object({ reason: Reason });
 export type DrawSupersede = z.infer<typeof DrawSupersede>;
 
+/**
+ * Решение главного судьи об общем месте подгруппы рейтингового формата (ТЗ 31): каждый ярус — участники одного
+ * общего места в утверждённом порядке (первый — выше). Ярусы — ровно те, что требуют решения (decisionRequired).
+ */
+export const GroupPlaceDecisionInput = z.object({
+  group: z.enum(RATED_GROUP_LETTERS),
+  tiers: z
+    .array(z.array(Uuid).min(2).max(9))
+    .min(1)
+    .max(4)
+    .refine((t) => new Set(t.flat()).size === t.flat().length, { error: 'duplicate_entry' }),
+  reason: Reason,
+});
+export type GroupPlaceDecisionInput = z.infer<typeof GroupPlaceDecisionInput>;
+
+export interface GroupPlaceDecisionDto {
+  drawId: string;
+  group: RatedGroupLetter;
+  decidedAt: string;
+}
+
 // ---------- Ответы ----------
+
+/** Подгруппа позиции жеребьёвки: половина сетки с утешительными (A, B) или подгруппа рейтингового формата (A–H). */
+export type DrawPool = Pool | RatedGroupLetter;
 
 export interface NamedRef {
   id: string;
@@ -108,9 +138,11 @@ export interface DrawParticipantDto {
   organization: NamedRef | null;
   region: NamedRef | null;
   seedNumber: number | null;
-  /** Позиция в жеребьёвке и подгруппа. */
+  /** Рейтинг на момент жеребьёвки — по нему посев рейтингового формата; в других форматах — null. */
+  ratingAtDraw: number | null;
+  /** Позиция в жеребьёвке и подгруппа (A, B — выбывание с утешительными; A–H — рейтинговый формат). */
   position: number | null;
-  pool: Pool | null;
+  pool: DrawPool | null;
   /** Участие снято после жеребьёвки — отмечается в сетке (неявка — Phase 7). */
   entryStatus: EntryStatus;
 }
@@ -120,7 +152,7 @@ export interface DrawSlotDto {
   /** null — BYE. */
   entryId: string | null;
   seedNumber: number | null;
-  pool: Pool | null;
+  pool: DrawPool | null;
 }
 
 export interface SeparationGroupDto {
@@ -190,6 +222,8 @@ export interface BracketMatchDto {
 export interface BracketNodeDto {
   key: string;
   stage: BracketStage;
+  /** Подгруппа рейтингового формата; у остальных узлов — null. */
+  group: RatedGroupLetter | null;
   round: number;
   position: number;
   label: RoundLabel;
@@ -204,11 +238,58 @@ export interface BracketNodeDto {
   match: BracketMatchDto | null;
 }
 
+/** Строка таблицы подгруппы (ТЗ 31): место, итоги, значения критериев, выход в финальную часть. */
+export interface GroupStandingRowDto {
+  /** Место в подгруппе; равные по всем критериям делят место. */
+  position: number;
+  entryId: string;
+  matches: number;
+  wins: number;
+  losses: number;
+  /** Баллы, набранные в схватках подгруппы (справочно, в местах не участвует). */
+  points: number;
+  tiebreakers: {
+    /** Победы над равными по числу побед. */
+    headToHeadWins: number;
+    cleanWins: number;
+    superiorityWins: number;
+  };
+  /**
+   * Выходит в финальную часть. null — ещё неизвестно (подгруппа не завершена) или общее место на границе выхода:
+   * нужно решение (decisionRequired). Одна подгруппа без финальной части — всегда null.
+   */
+  qualified: boolean | null;
+}
+
+export interface GroupStandingsDto {
+  group: RatedGroupLetter;
+  /** Все схватки подгруппы решены. */
+  complete: boolean;
+  /**
+   * Подгруппа завершена, но критерии не разделили участников, от места которых зависит выход в финальную часть или
+   * пара в ней: порядок задаёт решение главного судьи.
+   */
+  decisionRequired: boolean;
+  /** Действующее решение об общем месте этой подгруппы; нет — null. */
+  decision: { reason: string; decidedAt: string; decidedBy: UserRef | null } | null;
+  rows: GroupStandingRowDto[];
+}
+
 export interface BracketViewDto {
   format: CompetitionFormatCode;
   size: number;
   nodes: BracketNodeDto[];
   participants: DrawParticipantDto[];
+  /** Таблицы подгрупп рейтингового формата; у остальных форматов — null. */
+  groups: {
+    criteria: GroupStandingCriterion[];
+    /** Критерии мест подтверждены заказчиком (Q-F4); false — предварительные. */
+    criteriaConfirmed: boolean;
+    qualifiersPerGroup: number;
+    standings: GroupStandingsDto[];
+    /** Пользователь может решить общее место (`result.amend`, опубликованная сетка). */
+    canDecide: boolean;
+  } | null;
 }
 
 export interface DrawDto extends DrawSummaryDto {
@@ -252,6 +333,8 @@ export interface CategoryDrawsDto {
   /** Одобренные участия, допуск которых ещё не решён. */
   admissionPending: number;
   suggestedFormat: CompetitionFormatCode | null;
+  /** План рейтингового формата по числу допущенных (если предлагается SPECIAL_GROUP_RATED). */
+  ratedPlan: RatedFormatPlanResult | null;
   /** Допущенные участники (для посева в черновике): без позиции. */
   participants: DrawParticipantDto[];
   draws: DrawSummaryDto[];

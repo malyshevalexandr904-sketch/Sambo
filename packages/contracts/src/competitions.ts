@@ -130,8 +130,20 @@ export function scheduleIssues(v: Schedule): { path: string; code: string }[] {
   return issues;
 }
 
+/** Тип турнира (RATING_ARCHITECTURE.md, 3.1): RATED — подтверждённые схватки меняют рейтинг. */
+export const COMPETITION_TYPES = ['NON_RATED', 'RATED'] as const;
+export type CompetitionType = (typeof COMPETITION_TYPES)[number];
+
+/**
+ * Создание турнира. Рейтинговый (`RATED`) — только с правом платформы `competition.create_rated`, иначе 403
+ * `RATED_COMPETITION_FORBIDDEN` (docs/RATING_ARCHITECTURE.md, 3.1). Изменением турнира тип не меняется.
+ */
 export const CompetitionCreate = z
-  .object({ ...CompetitionFields, organizerOrganizationId: Uuid })
+  .object({
+    ...CompetitionFields,
+    organizerOrganizationId: Uuid,
+    competitionType: z.enum(COMPETITION_TYPES).default('NON_RATED'),
+  })
   .superRefine((v, ctx) => {
     for (const i of scheduleIssues(v)) ctx.addIssue({ code: 'custom', path: [i.path], message: i.code });
   });
@@ -206,6 +218,8 @@ export interface CompetitionSummary {
   registrationEndsAt: string;
   status: CompetitionStatus;
   level: CompetitionLevel;
+  /** Рейтинговый или безрейтинговый (меняет только платформа). */
+  competitionType: CompetitionType;
   disciplineCode: string;
   /** Регистрация открыта сейчас: статус и окно регистрации. */
   registrationOpenNow: boolean;
@@ -233,6 +247,12 @@ export interface CompetitionCountersDto {
   notAdmitted: number;
 }
 
+export interface CompetitionRatingDto {
+  ruleSet: { id: string; code: string; version: number; name: string; calculationVersion: string };
+  publicDeltas: boolean;
+  enabledAt: string;
+}
+
 export interface Competition extends CompetitionSummary {
   descriptionMd: string | null;
   ruleSetVersion: RuleSetVersionRef | null;
@@ -244,6 +264,8 @@ export interface Competition extends CompetitionSummary {
   cancelledAt: string | null;
   cancelReason: string | null;
   counters: CompetitionCountersDto;
+  /** Рейтинг турнира: закреплённая версия правил расчёта (у рейтингового турнира). */
+  rating: CompetitionRatingDto | null;
   /** Исход неудачного официального взвешивания по положению (D-06). */
   weighInFailureOutcome: WeighInFailureOutcome;
   /** «Скоро выступает»: за сколько схваток уведомлять (0 — не уведомлять). */

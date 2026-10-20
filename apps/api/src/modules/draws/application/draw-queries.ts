@@ -1,15 +1,16 @@
 // Чтение жеребьёвки (API.md, 6.1): обзор турнира, версии категории, версия со слотами и предпросмотром сетки,
 // опубликованная сетка категории, проверка повтора по seed.
 import { Injectable } from '@nestjs/common';
-import type {
-  BracketViewDto,
-  CategoryBracketDto,
-  CategoryDrawsDto,
-  CompetitionStatus,
-  DrawDto,
-  DrawOverviewRow,
-  DrawVerifyDto,
-  PermissionCode,
+import {
+  type BracketViewDto,
+  type CategoryBracketDto,
+  type CategoryDrawsDto,
+  type CompetitionStatus,
+  type DrawDto,
+  type DrawOverviewRow,
+  type DrawVerifyDto,
+  type PermissionCode,
+  ratedFormatPlan,
 } from '@sde/contracts';
 import type { Tx } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
@@ -29,6 +30,7 @@ import {
   type DrawSummaryRow,
   toDrawCategory,
   toDrawSummary,
+  toGroupsDto,
   toParticipants,
   toSeparationDto,
   toSlotDto,
@@ -36,7 +38,12 @@ import {
 } from './draw-mapper';
 import { type CategoryContext, DrawParticipantsService, parseStoredInput } from './draw-participants';
 
-const CANDIDATES: readonly PermissionCode[] = ['draw.create', 'draw.publish', 'draw.republish'];
+const CANDIDATES: readonly PermissionCode[] = [
+  'draw.create',
+  'draw.publish',
+  'draw.republish',
+  'result.amend',
+];
 
 interface Viewer {
   perms: Set<PermissionCode>;
@@ -137,6 +144,7 @@ export class DrawQueriesService {
       admitted: ctx.admitted.length,
       admissionPending: ctx.admissionPending,
       suggestedFormat: ctx.suggestedFormat,
+      ratedPlan: ctx.suggestedFormat === 'SPECIAL_GROUP_RATED' ? ratedFormatPlan(ctx.admitted.length) : null,
       participants: ctx.admitted.map((p) => ({
         entryId: p.entryId,
         publicName: p.publicName,
@@ -144,6 +152,8 @@ export class DrawQueriesService {
         organization: p.organization,
         region: p.region,
         seedNumber: null,
+        // Рейтинг, по которому пройдёт посев рейтингового формата.
+        ratingAtDraw: ctx.suggestedFormat === 'SPECIAL_GROUP_RATED' ? p.rating : null,
         position: null,
         pool: null,
         entryStatus: p.entryStatus,
@@ -194,10 +204,13 @@ export class DrawQueriesService {
       null,
       slots.flatMap((s) => (s.entryId ? [s.entryId] : [])),
     );
-    const participants = toParticipants(slots, infos);
+    const participants = toParticipants(slots, infos, row.seeds);
+    const published = row.status === 'PUBLISHED';
     const nodes =
-      (row.status === 'PUBLISHED' ? await this.brackets.view(row.id) : null) ??
-      this.brackets.preview(row.format, row.slots);
+      (published ? await this.brackets.view(row.id) : null) ?? this.brackets.preview(row.format, row.slots);
+    const groups =
+      (published ? await this.brackets.groups(null, row.id) : null) ??
+      this.brackets.previewGroups(row.format, row.slots);
     return {
       ...toDrawSummary(row, stale, this.summaryActions(v, category, row, state)),
       competitionId: row.competitionId,
@@ -210,7 +223,18 @@ export class DrawQueriesService {
       publishedBy: toUserRef(row.publishedBy),
       supersededBy: toUserRef(row.supersededBy),
       supersedeReason: row.supersedeReason,
-      bracket: { format: row.format, size: slots.length, nodes, participants },
+      bracket: {
+        format: row.format,
+        size: slots.length,
+        nodes,
+        participants,
+        groups: toGroupsDto(
+          groups,
+          slots.length,
+          published ? await this.brackets.decisionRecords(null, row.id) : [],
+          published && v.perms.has('result.amend'),
+        ),
+      },
     };
   }
 
@@ -230,7 +254,18 @@ export class DrawQueriesService {
     );
     const nodes = await this.brackets.view(row.id);
     const bracket: BracketViewDto | null = nodes
-      ? { format: row.format, size: slots.length, nodes, participants: toParticipants(slots, infos) }
+      ? {
+          format: row.format,
+          size: slots.length,
+          nodes,
+          participants: toParticipants(slots, infos, row.seeds),
+          groups: toGroupsDto(
+            await this.brackets.groups(null, row.id),
+            slots.length,
+            await this.brackets.decisionRecords(null, row.id),
+            v.perms.has('result.amend'),
+          ),
+        }
       : null;
     return {
       category: toDrawCategory(category),

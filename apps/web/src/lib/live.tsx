@@ -139,6 +139,7 @@ const TOPIC_SECTIONS: Record<Exclude<LiveTopic, 'competition' | 'registrations'>
   crews: ['mat-assignments', 'crew-candidates', 'officiating'],
   matches: ['officiating', 'pending-confirmations', 'results', 'draws', 'schedule'],
   results: ['results', 'draws', 'categories'],
+  rating: ['rating'],
 };
 
 /**

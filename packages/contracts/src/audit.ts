@@ -145,6 +145,7 @@ export const AUDIT_ACTIONS = [
   'draw.published',
   'draw.superseded',
   'bracket.advanced',
+  'bracket.group_places_decided',
   'mat.created',
   'mat.updated',
   'session.created',
@@ -186,5 +187,19 @@ export const AUDIT_ACTIONS = [
   'onboarding.approved',
   'onboarding.rejected',
   'coach.review_rights_changed',
+  // Рейтинг спортсменов (docs/RATING_ARCHITECTURE.md): расчёт по схватке; перерасчёт изменённого результата.
+  'rating.calculated',
+  'rating.amended',
+  // Корректирующие операции платформы (фаза 14): ручная корректировка, статус, пересборка, перерасчёт турнира.
+  'rating.corrected',
+  'rating.status_changed',
+  'rating.rebuilt',
+  'rating.recalculated',
+  // Сезоны рейтинга (фаза 15).
+  'rating.season_created',
+  'rating.season_updated',
+  // Тип турнира меняет только платформа (docs/RATING_ARCHITECTURE.md, 3.1).
+  'competition.rating_enabled',
+  'competition.type_changed',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

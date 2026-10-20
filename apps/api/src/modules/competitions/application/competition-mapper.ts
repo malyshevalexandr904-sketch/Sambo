@@ -52,6 +52,7 @@ export function toSummary(
     registrationEndsAt: row.registrationEndsAt.toISOString(),
     status: row.status,
     level: row.level,
+    competitionType: row.competitionType,
     disciplineCode: row.disciplineCode,
     registrationOpenNow: registrationWindow(row, now) === 'OPEN',
     logoUrl: row.logo?.status === 'AVAILABLE' ? publicUrl(row.logo.storageKey) : null,

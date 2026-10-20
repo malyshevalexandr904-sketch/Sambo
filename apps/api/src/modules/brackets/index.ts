@@ -3,6 +3,7 @@ export { BracketsModule } from './brackets.module';
 export {
   BracketsService,
   type BracketSource,
+  type GroupDecisionRecord,
   type MatchDependency,
   type SlotRow,
 } from './application/brackets.service';
@@ -15,5 +16,6 @@ export {
   strategyFor,
 } from './domain/strategies';
 export type { BracketGraph, GraphNode, Placement } from './domain/graph';
+export type { GroupStanding, GroupStandingRow } from './domain/group-standings';
 export { nodeDependencies, participantsKnownAtPublish } from './domain/dependencies';
 export { numberingOrder } from './application/bracket-mapping';
