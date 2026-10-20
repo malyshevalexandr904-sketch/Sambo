@@ -91,6 +91,26 @@ describe('policies', () => {
     }
   });
 
+  it('every result coefficient S of Appendix 5 reaches the formula (200 vs 200, K 30, E 0.5)', () => {
+    const expected: [RatingOutcome, string, number][] = [
+      ['CLEAN_WIN', '1', 15],
+      ['WIN_ON_POINTS', '0.9', 12],
+      ['WIN_SMALL_ADVANTAGE', '0.7', 6],
+      ['WIN_MINIMAL_ADVANTAGE', '0.6', 3],
+      ['LOSS_MINIMAL_ADVANTAGE', '0.4', -3],
+      ['LOSS_SMALL_ADVANTAGE', '0.3', -6],
+      ['LOSS_ON_POINTS', '0.1', -12],
+      ['CLEAN_LOSS', '0', -15],
+    ];
+    expect(expected.map(([o]) => o)).toEqual([...RATING_OUTCOMES]);
+    for (const [outcome, s] of expected) expect(R.scoreRules[outcome]).toBe(s);
+    for (const [winner, , delta] of expected.slice(0, 4)) {
+      const loser = RATING_OUTCOMES[RATING_OUTCOMES.length - 1 - RATING_OUTCOMES.indexOf(winner)]!;
+      const r = rateMatch(R, { winnerRating: 200, loserRating: 200, winner, loser });
+      expect([r.winner.delta, r.loser.delta]).toEqual([delta, -delta]);
+    }
+  });
+
   it('levels: 1 below 400, then every 200, 10 from 2000', () => {
     expect([-10, 200, 399, 400, 599, 600, 1999, 2000, 9000].map((r) => ratingLevel(R, r))).toEqual([
       1, 1, 1, 2, 2, 3, 9, 10, 10,

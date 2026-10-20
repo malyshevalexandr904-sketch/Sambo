@@ -33,6 +33,28 @@ describe('role matrix (PERMISSIONS.md, 4)', () => {
     expect(ROLE_PERMISSIONS.SECRETARY['medical.view']).toBeUndefined();
   });
 
+  it('rating permissions are platform-only: no organization or tournament role holds them (TZ 76, 1–2)', () => {
+    const rating = [
+      'competition.create_rated',
+      'competition.convert_to_rated',
+      'competition.manage_rating_rules',
+      'competition.recalculate_rating',
+      'competition.view_rating_audit',
+      'competition.publish_rating_results',
+      'rating.correct',
+      'rating.rebuild_apply',
+    ] as const;
+    for (const [role, perms] of Object.entries(ROLE_PERMISSIONS)) {
+      const held = rating.filter((p) => perms[p]);
+      if (role === 'SUPER_ADMIN') expect(held).toEqual(rating);
+      else if (role === 'PLATFORM_ADMIN')
+        expect(held).toEqual(
+          rating.filter((p) => p !== 'competition.manage_rating_rules' && p !== 'rating.rebuild_apply'),
+        );
+      else expect(held, role).toEqual([]);
+    }
+  });
+
   it('platform roles are SUPER_ADMIN and PLATFORM_ADMIN', () => {
     expect(PLATFORM_ROLE_CODES).toEqual(['SUPER_ADMIN', 'PLATFORM_ADMIN']);
   });
