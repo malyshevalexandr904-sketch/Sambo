@@ -1,47 +1,163 @@
 'use client';
-// Информационное окно «О платформе и рейтинге»: что такое платформа, порядок доступа и как считается
-// рейтинг (docs/RATING_RULES.md, RATED_TOURNAMENT_FORMAT.md). Числа совпадают с версией правил sambo-elo@1
-// (packages/rating/src/rules.ts): старт 200, коэффициент 60 / 30 / 10, уровни через 200. Нативный <dialog>:
-// фокус внутри окна, закрытие по Esc, кнопке и щелчку по фону. Текст окна набран шрифтом Times New Roman.
+// Информационное окно «О платформе и рейтинге»: две вкладки («О платформе», «Система рейтинга»), в каждой краткая
+// сводка и раскрывающиеся разделы. Сведения о рейтинге совпадают с версией правил sambo-elo@1
+// (packages/rating/src/rules.ts; docs/RATING_RULES.md, RATED_TOURNAMENT_FORMAT.md): старт 200, коэффициент 60 / 30 / 10,
+// уровни через 200. Нативный <dialog>: фокус внутри окна, закрытие по Esc, кнопке и щелчку по фону. Вкладки по
+// шаблону WAI-ARIA (стрелки влево и вправо). Текст окна набран шрифтом Times New Roman.
 import { useTranslations } from 'next-intl';
-import { useRef } from 'react';
+import { type KeyboardEvent, useRef, useState } from 'react';
 import { Link } from '@/i18n/navigation';
 
-const FEATURES = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6'] as const;
-const FACTORS = ['factor1', 'factor2', 'factor3'] as const;
-const WINS = ['winClean', 'winPoints', 'winSmall', 'winMinimal'] as const;
-const K_ROWS = [
-  ['kRow1', 60],
-  ['kRow2', 30],
-  ['kRow3', 10],
-] as const;
+type Tab = 'platform' | 'rating';
+
+/** Содержимое раздела: абзацы, списки и таблицы по ключам словаря `about.<tab>.<section>.<key>`. */
+type Block =
+  | { p: string }
+  | { ul: readonly string[] }
+  | { ol: readonly string[] }
+  | { table: readonly (readonly [string, string])[]; head: readonly [string, string] };
+
+const TABS: readonly Tab[] = ['platform', 'rating'];
+
+const SECTIONS: Record<Tab, readonly { key: string; blocks: readonly Block[] }[]> = {
+  platform: [
+    { key: 'what', blocks: [{ p: 'p1' }, { p: 'p2' }] },
+    { key: 'roles', blocks: [{ p: 'intro' }, { ul: ['head', 'coach', 'athlete', 'referee', 'guest'] }] },
+    { key: 'register', blocks: [{ ol: ['s1', 's2', 's3', 's4', 's5'] }, { p: 'note' }] },
+    { key: 'tournaments', blocks: [{ ol: ['s1', 's2', 's3', 's4', 's5'] }, { p: 'note' }] },
+    { key: 'notifications', blocks: [{ p: 'p1' }, { p: 'p2' }] },
+    { key: 'data', blocks: [{ p: 'p1' }, { p: 'p2' }] },
+  ],
+  rating: [
+    { key: 'how', blocks: [{ p: 'p1' }, { p: 'p2' }, { p: 'p3' }] },
+    { key: 'opponent', blocks: [{ p: 'p1' }, { p: 'p2' }] },
+    { key: 'wins', blocks: [{ ul: ['clean', 'points', 'small', 'minimal'] }, { p: 'loss' }, { p: 'note' }] },
+    {
+      key: 'factor',
+      blocks: [
+        { p: 'p1' },
+        {
+          head: ['colRating', 'colValue'],
+          table: [
+            ['row1', 'v1'],
+            ['row2', 'v2'],
+            ['row3', 'v3'],
+          ],
+        },
+        { p: 'p2' },
+      ],
+    },
+    { key: 'counted', blocks: [{ ul: ['l1', 'l2', 'l3', 'l4'] }] },
+    { key: 'tournaments', blocks: [{ p: 'p1' }, { ul: ['l1', 'l2', 'l3', 'l4'] }] },
+    {
+      key: 'levels',
+      blocks: [
+        { p: 'p1' },
+        {
+          head: ['colLevel', 'colRating'],
+          table: [
+            ['l1', 'r1'],
+            ['l2', 'r2'],
+            ['l3', 'r3'],
+            ['l4', 'r4'],
+            ['l5', 'r5'],
+            ['l6', 'r6'],
+            ['l7', 'r7'],
+            ['l8', 'r8'],
+            ['l9', 'r9'],
+            ['l10', 'r10'],
+          ],
+        },
+      ],
+    },
+    { key: 'seasons', blocks: [{ p: 'p1' }, { p: 'p2' }] },
+    { key: 'corrections', blocks: [{ p: 'p1' }, { p: 'p2' }] },
+    { key: 'where', blocks: [{ ul: ['l1', 'l2', 'l3'] }, { p: 'privacy' }] },
+  ],
+};
 
 const SERIF = { fontFamily: '"Times New Roman", Times, serif' };
+const TEXT = 'text-base leading-relaxed text-slate-800';
 
 export function AboutPlatform({
   section = 'platform',
   variant = 'button',
 }: {
-  /** С какого раздела открыть окно. */
-  section?: 'platform' | 'rating';
+  /** Какая вкладка открыта при открытии окна. */
+  section?: Tab;
   /** Кнопка с рамкой (первый экран) или ссылка (страница рейтинга). */
   variant?: 'button' | 'link';
 }) {
   const t = useTranslations('about');
   const ref = useRef<HTMLDialogElement>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState<Tab>(section);
 
+  const select = (next: Tab, focus = false) => {
+    setTab(next);
+    body.current?.scrollTo({ top: 0 });
+    if (focus) ref.current?.querySelector<HTMLElement>(`#about-tab-${next}`)?.focus();
+  };
   const open = () => {
-    const dialog = ref.current;
-    if (!dialog) return;
-    dialog.showModal();
-    const target = dialog.querySelector<HTMLElement>(`#about-${section}`);
-    if (target && section !== 'platform') target.scrollIntoView({ block: 'start' });
-    else dialog.querySelector<HTMLElement>('[data-about-body]')?.scrollTo({ top: 0 });
+    setTab(section);
+    ref.current?.showModal();
+    body.current?.scrollTo({ top: 0 });
   };
   const close = () => ref.current?.close();
+  const onTabKey = (e: KeyboardEvent) => {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+    e.preventDefault();
+    const i = TABS.indexOf(tab);
+    const next = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length];
+    if (next) select(next, true);
+  };
 
-  const h3 = 'mt-5 text-lg font-bold text-slate-900';
-  const p = 'mt-2 text-base leading-relaxed text-slate-800';
+  const block = (b: Block, base: string, i: number) => {
+    if ('p' in b)
+      return (
+        <p key={i} className={`mt-2 ${TEXT}`}>
+          {t(`${base}.${b.p}`)}
+        </p>
+      );
+    if ('ul' in b || 'ol' in b) {
+      const items = 'ul' in b ? b.ul : b.ol;
+      const List = 'ul' in b ? 'ul' : 'ol';
+      return (
+        <List key={i} className={`mt-2 space-y-1 pl-6 ${TEXT} ${'ul' in b ? 'list-disc' : 'list-decimal'}`}>
+          {items.map((k) => (
+            <li key={k}>{t(`${base}.${k}`)}</li>
+          ))}
+        </List>
+      );
+    }
+    return (
+      <table key={i} className={`mt-3 w-full max-w-md border-collapse ${TEXT}`}>
+        <thead>
+          <tr>
+            {b.head.map((h, j) => (
+              <th
+                key={h}
+                scope="col"
+                className={`border border-slate-300 bg-slate-50 px-3 py-2 ${j === 1 ? 'text-right' : 'text-left'}`}
+              >
+                {t(`${base}.${h}`)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {b.table.map(([a, v]) => (
+            <tr key={a}>
+              <td className="border border-slate-300 px-3 py-2">{t(`${base}.${a}`)}</td>
+              <td className="border border-slate-300 px-3 py-2 text-right tabular-nums">
+                {t(`${base}.${v}`)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
 
   return (
     <>
@@ -63,116 +179,91 @@ export function AboutPlatform({
         onClick={(e) => {
           if (e.target === e.currentTarget) close();
         }}
-        className="m-auto w-[min(48rem,calc(100vw-2rem))] max-h-[calc(100dvh-2rem)] rounded-lg border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/50"
+        className="m-auto max-h-[calc(100dvh-2rem)] w-[min(48rem,calc(100vw-2rem))] rounded-lg border border-slate-200 bg-white p-0 shadow-xl backdrop:bg-slate-900/50"
         style={SERIF}
       >
         <div className="flex max-h-[calc(100dvh-2rem)] flex-col">
-          <header className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
-            <h2 id="about-title" className="text-2xl font-bold text-slate-900">
-              {t('title')}
-            </h2>
-            <button
-              type="button"
-              onClick={close}
-              className="min-h-11 min-w-11 rounded-md border border-slate-300 px-3 text-slate-900 hover:bg-slate-50"
-            >
-              {t('close')}
-            </button>
+          <header className="border-b border-slate-200 px-5 pt-4">
+            <div className="flex items-start justify-between gap-4">
+              <h2 id="about-title" className="text-2xl font-bold text-slate-900">
+                {t('title')}
+              </h2>
+              <button
+                type="button"
+                onClick={close}
+                className="min-h-11 min-w-11 rounded-md border border-slate-300 px-3 text-slate-900 hover:bg-slate-50"
+              >
+                {t('close')}
+              </button>
+            </div>
+            <div role="tablist" aria-label={t('tabsLabel')} className="mt-3 flex gap-1" onKeyDown={onTabKey}>
+              {TABS.map((k) => (
+                <button
+                  key={k}
+                  id={`about-tab-${k}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={tab === k}
+                  aria-controls={`about-panel-${k}`}
+                  tabIndex={tab === k ? 0 : -1}
+                  onClick={() => select(k)}
+                  className={`-mb-px min-h-11 rounded-t-md border px-4 text-base font-bold ${
+                    tab === k
+                      ? 'border-slate-200 border-b-white bg-white text-slate-900'
+                      : 'border-transparent text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  {t(`tabs.${k}`)}
+                </button>
+              ))}
+            </div>
           </header>
 
-          <div data-about-body className="overflow-y-auto px-5 pb-6">
-            <section id="about-platform" aria-labelledby="about-platform-title">
-              <h3 id="about-platform-title" className="mt-4 text-xl font-bold text-slate-900">
-                {t('platform.title')}
-              </h3>
-              <p className={p}>{t('platform.p1')}</p>
-              <h4 className={h3}>{t('platform.featuresTitle')}</h4>
-              <ul className="mt-2 list-disc space-y-1 pl-6 text-base leading-relaxed text-slate-800">
-                {FEATURES.map((k) => (
-                  <li key={k}>{t(`platform.${k}`)}</li>
-                ))}
-              </ul>
-              <h4 className={h3}>{t('platform.accessTitle')}</h4>
-              <p className={p}>{t('platform.a1')}</p>
-              <p className={p}>{t('platform.a2')}</p>
-            </section>
-
-            <section
-              id="about-rating"
-              aria-labelledby="about-rating-title"
-              className="mt-6 scroll-mt-2 border-t border-slate-200 pt-2"
-            >
-              <h3 id="about-rating-title" className="mt-4 text-xl font-bold text-slate-900">
-                {t('rating.title')}
-              </h3>
-              <p className={p}>{t('rating.p1')}</p>
-
-              <h4 className={h3}>{t('rating.startTitle')}</h4>
-              <p className={p}>{t('rating.start')}</p>
-
-              <h4 className={h3}>{t('rating.factorsTitle')}</h4>
-              <ol className="mt-2 list-decimal space-y-1 pl-6 text-base leading-relaxed text-slate-800">
-                {FACTORS.map((k) => (
-                  <li key={k}>{t(`rating.${k}`)}</li>
-                ))}
-              </ol>
-
-              <h4 className={h3}>{t('rating.winsTitle')}</h4>
-              <ul className="mt-2 space-y-2 text-base leading-relaxed text-slate-800">
-                {WINS.map((k) => (
-                  <li key={k}>
-                    <span className="font-bold">{t(`rating.${k}.name`)}.</span> {t(`rating.${k}.text`)}
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-sm text-slate-600">{t('rating.winsNote')}</p>
-
-              <h4 className={h3}>{t('rating.kTitle')}</h4>
-              <p className={p}>{t('rating.kText')}</p>
-              <table className="mt-2 w-full max-w-md border-collapse text-base text-slate-800">
-                <thead>
-                  <tr>
-                    <th scope="col" className="border border-slate-300 px-3 py-2 text-left">
-                      {t('rating.kColRating')}
-                    </th>
-                    <th scope="col" className="border border-slate-300 px-3 py-2 text-right">
-                      {t('rating.kColValue')}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {K_ROWS.map(([k, v]) => (
-                    <tr key={k}>
-                      <td className="border border-slate-300 px-3 py-2">{t(`rating.${k}`)}</td>
-                      <td className="border border-slate-300 px-3 py-2 text-right tabular-nums">{v}</td>
-                    </tr>
+          <div ref={body} className="overflow-y-auto px-5 pt-4 pb-6">
+            {TABS.map((k) => (
+              <div
+                key={k}
+                id={`about-panel-${k}`}
+                role="tabpanel"
+                aria-labelledby={`about-tab-${k}`}
+                hidden={tab !== k}
+              >
+                <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3">
+                  <p className="text-base font-bold text-slate-900">{t('summaryTitle')}</p>
+                  <ul className={`mt-1 list-disc space-y-1 pl-6 ${TEXT}`}>
+                    {['s1', 's2', 's3'].map((s) => (
+                      <li key={s}>{t(`${k}.summary.${s}`)}</li>
+                    ))}
+                  </ul>
+                </div>
+                <p className="mt-3 text-sm text-slate-600">{t('hint')}</p>
+                <div className="mt-2 divide-y divide-slate-200 border-y border-slate-200">
+                  {SECTIONS[k].map((s, i) => (
+                    <details key={s.key} open={i === 0} className="group">
+                      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 py-2 text-lg font-bold text-slate-900">
+                        {t(`${k}.${s.key}.title`)}
+                        <span
+                          aria-hidden="true"
+                          className="text-slate-500 transition-transform group-open:rotate-90"
+                        >
+                          ›
+                        </span>
+                      </summary>
+                      <div className="pb-4">{s.blocks.map((b, j) => block(b, `${k}.${s.key}`, j))}</div>
+                    </details>
                   ))}
-                </tbody>
-              </table>
-
-              <h4 className={h3}>{t('rating.tournamentsTitle')}</h4>
-              <p className={p}>{t('rating.tournaments')}</p>
-              <p className={p}>{t('rating.draw')}</p>
-
-              <h4 className={h3}>{t('rating.levelsTitle')}</h4>
-              <p className={p}>{t('rating.levels')}</p>
-
-              <h4 className={h3}>{t('rating.seasonsTitle')}</h4>
-              <p className={p}>{t('rating.seasons')}</p>
-
-              <h4 className={h3}>{t('rating.privacyTitle')}</h4>
-              <p className={p}>{t('rating.privacy')}</p>
-
-              {variant === 'button' ? (
-                <Link
-                  href="/rating"
-                  onClick={close}
-                  className="mt-5 inline-flex min-h-11 items-center text-blue-700 underline"
-                >
-                  {t('linkRating')}
-                </Link>
-              ) : null}
-            </section>
+                </div>
+                {k === 'rating' && variant === 'button' ? (
+                  <Link
+                    href="/rating"
+                    onClick={close}
+                    className="mt-4 inline-flex min-h-11 items-center text-blue-700 underline"
+                  >
+                    {t('linkRating')}
+                  </Link>
+                ) : null}
+              </div>
+            ))}
           </div>
         </div>
       </dialog>

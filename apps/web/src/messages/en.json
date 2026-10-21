@@ -51,64 +51,160 @@
     "openRating": "How the rating is calculated",
     "close": "Close",
     "title": "About Digital Sambo",
+    "tabsLabel": "Window sections",
+    "tabs": {
+      "platform": "About the platform",
+      "rating": "Rating system"
+    },
+    "summaryTitle": "In brief",
+    "hint": "Click a section title to open or hide it.",
     "linkRating": "Open the rating table",
     "platform": {
-      "title": "What Digital Sambo is",
-      "p1": "Digital Sambo is a digital platform for running sambo competitions and keeping sports results. It brings sports organizations, coaches, athletes and referees together in one system.",
-      "featuresTitle": "What the platform does",
-      "f1": "Registration of sports organizations, coaches, athletes and referees with data verification.",
-      "f2": "Entries for tournaments.",
-      "f3": "Admission, weigh-in and draw.",
-      "f4": "Electronic refereeing, bout protocols and scoreboard.",
-      "f5": "Public schedule, brackets and results.",
-      "f6": "Athlete rating based on rated tournaments.",
-      "accessTitle": "Access",
-      "a1": "Tournaments, schedule, brackets, results and the rating are open to all visitors without registration.",
-      "a2": "To work in the personal account, register and choose a role: organization head, coach, athlete or referee. Access opens after the application is reviewed."
+      "summary": {
+        "s1": "Digital Sambo is a single digital platform for running sambo competitions.",
+        "s2": "Tournaments, schedule, brackets, results and the rating are open to everyone without registration.",
+        "s3": "The personal account is available to organization heads, coaches, athletes and referees after their application is reviewed."
+      },
+      "what": {
+        "title": "What Digital Sambo is",
+        "p1": "Digital Sambo is a digital platform for organizing and running sambo competitions and keeping sports results. Sports organizations, coaches, athletes and referees work on it.",
+        "p2": "Every stage of a tournament runs in one system, from the entry to the final protocols. Data is entered once and used at every later stage, which reduces paperwork and errors."
+      },
+      "roles": {
+        "title": "Who uses the platform",
+        "intro": "What a user can do depends on their role. One person can have several roles, for example coach and referee.",
+        "head": "An organization head registers a federation, club or sports school, accepts coaches and athletes into it and enters tournaments.",
+        "coach": "A coach keeps a list of their athletes, enters them for competitions and follows their results. If the head allows it, a coach can review their athletes' applications to join the organization.",
+        "athlete": "An athlete keeps their profile, chooses an organization and a coach, and sees their entries, results and rating. A legal representative acts for a minor athlete.",
+        "referee": "A referee gets tournament assignments, runs bouts electronically and produces protocols.",
+        "guest": "A visitor without registration views tournaments, schedule, brackets, results and the rating."
+      },
+      "register": {
+        "title": "How to register",
+        "s1": "Create an account and confirm your email address.",
+        "s2": "Choose a role and fill in the application. You can save it as a draft and come back later.",
+        "s3": "If needed, attach documents confirming the application: a coach qualification document, a referee book, an extract from the state register or a document on the head's authority.",
+        "s4": "Submit the application for review. An application from a coach or athlete to join an organization is reviewed by its head; other applications are reviewed by the platform administration.",
+        "s5": "Wait for the decision. The application can be approved, rejected or returned for changes. After changes it is submitted again.",
+        "note": "The review progress is shown in the personal account. You get a notification on every status change."
+      },
+      "tournaments": {
+        "title": "How tournaments run",
+        "s1": "The organizer publishes the tournament: dates, venue, weight and age categories, requirements for participants.",
+        "s2": "Organizations and coaches enter their athletes.",
+        "s3": "Admission takes place: documents and medical clearance are checked, athletes arrive and weigh in.",
+        "s4": "After the weigh-in the draw is made and brackets and schedule are built.",
+        "s5": "Referees run bouts electronically; results appear on the scoreboard and the website as soon as they are confirmed.",
+        "note": "After the tournament the final protocols and places are published."
+      },
+      "notifications": {
+        "title": "Notifications",
+        "p1": "The platform reports important events: changes in the status of a registration application and a tournament entry, rejected documents, schedule changes, bouts starting soon and starting, and published results.",
+        "p2": "Notifications arrive in the personal account, and also by email and as browser notifications if the user turned them on. Notification channels are set in the personal account."
+      },
+      "data": {
+        "title": "Personal data protection",
+        "p1": "Personal data is processed under the Russian Federal Law on Personal Data. Each user sees only the information their role needs.",
+        "p2": "An athlete's name is published only with their consent to the distribution of personal data, and for a minor with the consent of the legal representative."
+      }
     },
     "rating": {
-      "title": "Rating system",
-      "p1": "The rating reflects a sambo athlete's level based on bouts at rated tournaments. It is calculated with the Elo system used in chess and other sports.",
-      "startTitle": "Starting rating",
-      "start": "Every athlete starts with 200 points. After each rated bout the winner's rating goes up and the loser's goes down.",
-      "factorsTitle": "What the change depends on",
-      "factor1": "Opponent strength. Beating a higher-rated opponent gives more points than beating a weaker one. Losing to a strong opponent costs fewer points.",
-      "factor2": "Kind of win. The more convincing the win, the bigger the gain.",
-      "factor3": "The athlete's current rating. The higher the rating, the less it changes in one bout. New athletes find their place in the table faster, while experienced athletes' ratings stay stable.",
-      "winsTitle": "Kinds of win",
-      "winClean": {
-        "name": "Clean win",
-        "text": "Early win: clean throw, opponent's submission, lead of 8 points or more. Opponent's withdrawal, disqualification, injury or no-show also count as a clean win."
+      "summary": {
+        "s1": "The rating shows a sambo athlete's level and is calculated with the Elo system.",
+        "s2": "Every athlete starts with 200 points; the rating changes only after bouts at rated tournaments.",
+        "s3": "The stronger the opponent and the more convincing the win, the bigger the gain."
       },
-      "winPoints": {
-        "name": "Win on points",
-        "text": "The athlete has more points when time runs out."
+      "how": {
+        "title": "How the rating is calculated",
+        "p1": "The rating uses the Elo system. It is used in chess and many other sports and makes it possible to compare athletes who have never met.",
+        "p2": "At their first rated tournament an athlete gets 200 points. After each rated bout the rating is recalculated automatically: the winner's goes up and the loser's goes down.",
+        "p3": "The size of the change depends on three things: the ratio of the opponents' ratings, the kind of win and each athlete's current rating. Each participant's rating is calculated separately."
       },
-      "winSmall": {
-        "name": "Win with a small advantage",
-        "text": "Points are equal; the win is given for higher-scored technical actions."
+      "opponent": {
+        "title": "Opponent strength",
+        "p1": "Before a bout the system estimates each athlete's chances from the difference in ratings. A win by the higher-rated athlete is expected and gives few points. A win over a stronger opponent is unexpected and gives many more points.",
+        "p2": "Losses work the same way: losing to a stronger opponent lowers the rating a little, losing to a weaker one lowers it more."
       },
-      "winMinimal": {
-        "name": "Win with a minimal advantage",
-        "text": "Points are equal; the win is given for the last scored technique, for penalties or by the referees' decision."
+      "wins": {
+        "title": "Kind of win",
+        "clean": "Clean win: an early win under the rules of the sport, that is a clean throw, the opponent's submission or a lead of 8 points or more. Opponent's withdrawal, disqualification, injury or no-show also count as a clean win. Gives the largest gain.",
+        "points": "Win on points: the athlete has more points when time runs out.",
+        "small": "Win with a small advantage: points are equal; the win is given for higher-scored technical actions.",
+        "minimal": "Win with a minimal advantage: points are equal; the win is given for the last scored technique, for penalties or by the referees' decision. Gives the smallest gain.",
+        "loss": "For the loser the rule is reversed: the smaller the opponent's advantage, the less the rating drops. A clean loss lowers it the most.",
+        "note": "The kind of win follows the Rules of the sport \"sambo\" approved by order No. 892 of the Russian Ministry of Sport of 04.12.2020."
       },
-      "winsNote": "Kinds of win follow the Rules of the sport \"sambo\" approved by order No. 892 of the Russian Ministry of Sport of 04.12.2020.",
-      "kTitle": "Change factor",
-      "kText": "The factor sets the largest rating change in one bout and depends on the athlete's rating before the bout.",
-      "kColRating": "Rating before the bout",
-      "kColValue": "Factor",
-      "kRow1": "up to 100 inclusive",
-      "kRow2": "101 to 300",
-      "kRow3": "above 300",
-      "tournamentsTitle": "Rated tournaments",
-      "tournaments": "The rating changes only after bouts at rated tournaments. The platform administration gives a tournament rated status, and it is shown on the tournament card. At other tournaments the rating does not change.",
-      "draw": "At a rated tournament athletes are split into pools by rating, and each has at least two bouts. Places are decided by sports results, not by rating.",
-      "levelsTitle": "Levels",
-      "levels": "Depending on the rating, an athlete gets a level from 1 to 10. Each next level starts 200 points higher: level 1 up to 399, level 2 from 400, level 3 from 600 and so on up to level 10 from 2000.",
-      "seasonsTitle": "Seasons",
-      "seasons": "The rating is not reset when a season changes. The season table lists athletes who competed in the season, ranked by their rating at the end of the season.",
-      "privacyTitle": "Publication of data",
-      "privacy": "An athlete's name is shown in the rating table only with their consent to the distribution of personal data. Without consent only the club and region are shown."
+      "factor": {
+        "title": "The athlete's current rating",
+        "p1": "The higher the rating, the less it changes in one bout. The largest possible change per bout is set by a factor that depends on the athlete's rating before the bout.",
+        "colRating": "Rating before the bout",
+        "colValue": "Largest change per bout",
+        "row1": "up to 100 points inclusive",
+        "v1": "60",
+        "row2": "101 to 300 points",
+        "v2": "30",
+        "row3": "above 300 points",
+        "v3": "10",
+        "p2": "This way new athletes find their place in the table faster, while experienced athletes' ratings stay stable and do not depend on a single chance result."
+      },
+      "counted": {
+        "title": "Which bouts count",
+        "l1": "Only bouts at rated tournaments with a confirmed result count.",
+        "l2": "No-show, withdrawal, injury and disqualification count as a clean win for the opponent.",
+        "l3": "A bye and a bout where neither athlete showed up do not count.",
+        "l4": "Bouts are calculated in the order they finished, so each next bout starts from the updated rating."
+      },
+      "tournaments": {
+        "title": "Rated tournaments",
+        "p1": "The platform administration gives a tournament rated status, and it is shown on the tournament card. At other tournaments the rating does not change.",
+        "l1": "Athletes in each category are split into pools by rating so that the strongest end up in different pools.",
+        "l2": "In a pool everyone meets everyone, so each athlete has at least two bouts.",
+        "l3": "The best athletes of the pools go to the knockout final part. There is no bout for third place: both semi-final losers take third place.",
+        "l4": "Places are decided only by sports results. The rating is used to split athletes into pools and does not affect places."
+      },
+      "levels": {
+        "title": "Levels",
+        "p1": "Based on the rating an athlete gets a level from 1 to 10. The level is recalculated automatically with the rating.",
+        "colLevel": "Level",
+        "colRating": "Rating, points",
+        "l1": "1",
+        "r1": "up to 399",
+        "l2": "2",
+        "r2": "400 to 599",
+        "l3": "3",
+        "r3": "600 to 799",
+        "l4": "4",
+        "r4": "800 to 999",
+        "l5": "5",
+        "r5": "1000 to 1199",
+        "l6": "6",
+        "r6": "1200 to 1399",
+        "l7": "7",
+        "r7": "1400 to 1599",
+        "l8": "8",
+        "r8": "1600 to 1799",
+        "l9": "9",
+        "r9": "1800 to 1999",
+        "l10": "10",
+        "r10": "2000 and above"
+      },
+      "seasons": {
+        "title": "Seasons",
+        "p1": "The rating is not reset when a season changes and keeps changing with new bouts.",
+        "p2": "Each season has its own table. It includes athletes who had rated bouts in the season, ranked by their rating at the end of the season, with the rating change over the season shown next to it."
+      },
+      "corrections": {
+        "title": "Corrected results",
+        "p1": "If referees correct a bout result after it ended, the participants' ratings are recalculated with the new result.",
+        "p2": "Rating history is never rewritten: every change is kept as a separate record with a date and a reason. Manual rating changes are made only by the platform administration, with a reason."
+      },
+      "where": {
+        "title": "Where to see the rating",
+        "l1": "The rating table is open to everyone and can be filtered by gender, age, region, club and season.",
+        "l2": "The athlete card shows rating, level, place, best rating, win rate, a rating chart and bout history.",
+        "l3": "The page of a rated tournament shows participants' rating changes during the tournament if this information is public.",
+        "privacy": "An athlete's name is shown only with their consent to the distribution of personal data. Without consent the table shows the club and region."
+      }
     }
   },
   "nav": {
