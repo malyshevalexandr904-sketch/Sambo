@@ -47,17 +47,10 @@
     "openCabinet": "Open my account"
   },
   "about": {
-    "open": "About the platform and rating",
-    "openRating": "How the rating is calculated",
+    "open": "About the platform",
     "close": "Close",
     "title": "About Digital Sambo",
-    "tabsLabel": "Window sections",
-    "tabs": {
-      "platform": "About the platform",
-      "rating": "Rating system"
-    },
     "hint": "Click a section title to open or hide it.",
-    "linkRating": "Open the rating table",
     "platform": {
       "what": {
         "title": "What Digital Sambo is",
@@ -69,9 +62,9 @@
         "intro": "What a user can do depends on their role. One person can have several roles, for example coach and referee.",
         "head": "An organization head registers a federation, club or sports school, accepts coaches and athletes into it and enters tournaments.",
         "coach": "A coach keeps a list of their athletes, enters them for competitions and follows their results. If the head allows it, a coach can review their athletes' applications to join the organization.",
-        "athlete": "An athlete keeps their profile, chooses an organization and a coach, and sees their entries, results and rating. A legal representative acts for a minor athlete.",
+        "athlete": "An athlete keeps their profile, chooses an organization and a coach, and sees their entries and results. A legal representative acts for a minor athlete.",
         "referee": "A referee gets tournament assignments, runs bouts electronically and produces protocols.",
-        "guest": "A visitor without registration views tournaments, schedule, brackets, results and the rating."
+        "guest": "A visitor without registration views tournaments, schedule, brackets and results."
       },
       "register": {
         "title": "How to register",
@@ -117,99 +110,6 @@
         "title": "Personal data protection",
         "p1": "Personal data is processed under the Russian Federal Law on Personal Data. Each user sees only the information their role needs.",
         "p2": "An athlete's name is published only with their consent to the distribution of personal data, and for a minor with the consent of the legal representative."
-      }
-    },
-    "rating": {
-      "how": {
-        "title": "How the rating is calculated",
-        "p1": "The rating uses the Elo system. It is used in chess and many other sports and makes it possible to compare athletes who have never met.",
-        "p2": "At their first rated tournament an athlete gets 200 points. After each rated bout the rating is recalculated automatically: the winner's goes up and the loser's goes down.",
-        "p3": "The size of the change depends on three things: the ratio of the opponents' ratings, the kind of win and each athlete's current rating. Each participant's rating is calculated separately."
-      },
-      "opponent": {
-        "title": "Opponent strength",
-        "p1": "Before a bout the system estimates each athlete's chances from the difference in ratings. A win by the higher-rated athlete is expected and gives few points. A win over a stronger opponent is unexpected and gives many more points.",
-        "p2": "Losses work the same way: losing to a stronger opponent lowers the rating a little, losing to a weaker one lowers it more."
-      },
-      "wins": {
-        "title": "Kind of win",
-        "clean": "Clean win: an early win under the rules of the sport, that is a clean throw, the opponent's submission or a lead of 8 points or more. Opponent's withdrawal, disqualification, injury or no-show also count as a clean win. Gives the largest gain.",
-        "points": "Win on points: the athlete has more points when time runs out.",
-        "small": "Win with a small advantage: points are equal; the win is given for higher-scored technical actions.",
-        "minimal": "Win with a minimal advantage: points are equal; the win is given for the last scored technique, for penalties or by the referees' decision. Gives the smallest gain.",
-        "loss": "For the loser the rule is reversed: the smaller the opponent's advantage, the less the rating drops. A clean loss lowers it the most.",
-        "note": "The kind of win follows the Rules of the sport \"sambo\" approved by order No. 892 of the Russian Ministry of Sport of 04.12.2020."
-      },
-      "factor": {
-        "title": "The athlete's current rating",
-        "p1": "The higher the rating, the less it changes in one bout. The largest possible change per bout is set by a factor that depends on the athlete's rating before the bout.",
-        "colRating": "Rating before the bout",
-        "colValue": "Largest change per bout",
-        "row1": "up to 100 points inclusive",
-        "v1": "60",
-        "row2": "101 to 300 points",
-        "v2": "30",
-        "row3": "above 300 points",
-        "v3": "10",
-        "p2": "This way new athletes find their place in the table faster, while experienced athletes' ratings stay stable and do not depend on a single chance result."
-      },
-      "counted": {
-        "title": "Which bouts count",
-        "l1": "Only bouts at rated tournaments with a confirmed result count.",
-        "l2": "No-show, withdrawal, injury and disqualification count as a clean win for the opponent.",
-        "l3": "A bye and a bout where neither athlete showed up do not count.",
-        "l4": "Bouts are calculated in the order they finished, so each next bout starts from the updated rating."
-      },
-      "tournaments": {
-        "title": "Rated tournaments",
-        "p1": "The platform administration gives a tournament rated status, and it is shown on the tournament card. At other tournaments the rating does not change.",
-        "l1": "Athletes in each category are split into pools by rating so that the strongest end up in different pools.",
-        "l2": "In a pool everyone meets everyone, so each athlete has at least two bouts.",
-        "l3": "The best athletes of the pools go to the knockout final part. There is no bout for third place: both semi-final losers take third place.",
-        "l4": "Places are decided only by sports results. The rating is used to split athletes into pools and does not affect places."
-      },
-      "levels": {
-        "title": "Levels",
-        "p1": "Based on the rating an athlete gets a level from 1 to 10. The level is recalculated automatically with the rating.",
-        "colLevel": "Level",
-        "colRating": "Rating, points",
-        "l1": "1",
-        "r1": "up to 399",
-        "l2": "2",
-        "r2": "400 to 599",
-        "l3": "3",
-        "r3": "600 to 799",
-        "l4": "4",
-        "r4": "800 to 999",
-        "l5": "5",
-        "r5": "1000 to 1199",
-        "l6": "6",
-        "r6": "1200 to 1399",
-        "l7": "7",
-        "r7": "1400 to 1599",
-        "l8": "8",
-        "r8": "1600 to 1799",
-        "l9": "9",
-        "r9": "1800 to 1999",
-        "l10": "10",
-        "r10": "2000 and above"
-      },
-      "seasons": {
-        "title": "Seasons",
-        "p1": "The rating is not reset when a season changes and keeps changing with new bouts.",
-        "p2": "Each season has its own table. It includes athletes who had rated bouts in the season, ranked by their rating at the end of the season, with the rating change over the season shown next to it."
-      },
-      "corrections": {
-        "title": "Corrected results",
-        "p1": "If referees correct a bout result after it ended, the participants' ratings are recalculated with the new result.",
-        "p2": "Rating history is never rewritten: every change is kept as a separate record with a date and a reason. Manual rating changes are made only by the platform administration, with a reason."
-      },
-      "where": {
-        "title": "Where to see the rating",
-        "l1": "The rating table is open to everyone and can be filtered by gender, age, region, club and season.",
-        "l2": "The athlete card shows rating, level, place, best rating, win rate, a rating chart and bout history.",
-        "l3": "The page of a rated tournament shows participants' rating changes during the tournament if this information is public.",
-        "privacy": "An athlete's name is shown only with their consent to the distribution of personal data. Without consent the table shows the club and region."
       }
     }
   },
