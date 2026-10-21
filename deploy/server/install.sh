@@ -233,7 +233,7 @@ note "Если соединение прервётся, зайдите снов�
 step "Запуск: база данных, миграции, приложение"
 "${COMPOSE[@]}" up -d --remove-orphans
 
-if [ -z "$(env_get DEMO_DATA_LOADED)" ]; then
+if [ -z "$(env_get DEMO_DATA_LOADED)" ] && [ -z "$(env_get DEMO_DATA_REMOVED)" ]; then
   step "Учебные данные (турниры и учётные записи из README, пароль — свой для этого сервера)"
   # seed-schedule.ts проводит жеребьёвки через код API внутри своего процесса (supertest, без HTTPS): Secure-cookie
   # там не вернулись бы, поэтому этому разовому процессу — режим разработки. Работающий api это не затрагивает.
