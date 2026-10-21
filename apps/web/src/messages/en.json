@@ -100,8 +100,6 @@
       "kRow1": "up to 100 inclusive",
       "kRow2": "101 to 300",
       "kRow3": "above 300",
-      "exampleTitle": "Example",
-      "example": "Two athletes rated 200 meet. With a clean win the winner gains 15 points and the loser loses 15. A win on points changes the rating by 12, a small advantage by 6 and a minimal advantage by 3.",
       "tournamentsTitle": "Rated tournaments",
       "tournaments": "The rating changes only after bouts at rated tournaments. The platform administration gives a tournament rated status, and it is shown on the tournament card. At other tournaments the rating does not change.",
       "draw": "At a rated tournament athletes are split into pools by rating, and each has at least two bouts. Places are decided by sports results, not by rating.",

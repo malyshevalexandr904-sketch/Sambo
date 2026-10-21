@@ -150,9 +150,6 @@ export function AboutPlatform({
                 </tbody>
               </table>
 
-              <h4 className={h3}>{t('rating.exampleTitle')}</h4>
-              <p className={p}>{t('rating.example')}</p>
-
               <h4 className={h3}>{t('rating.tournamentsTitle')}</h4>
               <p className={p}>{t('rating.tournaments')}</p>
               <p className={p}>{t('rating.draw')}</p>
