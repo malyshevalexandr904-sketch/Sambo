@@ -1,12 +1,13 @@
 import Image from 'next/image';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import logo from '@/assets/logo.png';
+import { AboutPlatform } from '@/components/about-platform';
 import { HomeLoginAction } from '@/components/home-login-action';
 import { Link } from '@/i18n/navigation';
 
 /**
  * Первый экран (Phase 9a, 0.13.0): логотип и название, вход (для уже вошедшего — сразу кабинет), регистрация с
- * выбором роли и просмотр общедоступной части без входа.
+ * выбором роли и просмотр общедоступной части без входа. Под подзаголовком кнопка окна «О платформе и рейтинге».
  */
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -25,6 +26,9 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       />
       <h1 className="mt-4 text-4xl font-bold text-slate-900 sm:text-5xl">{t('title')}</h1>
       <p className="mt-3 text-lg text-slate-700">{t('lead')}</p>
+      <div className="mt-4">
+        <AboutPlatform />
+      </div>
       <div className="mt-8 grid gap-4 md:grid-cols-3">
         <section className={card} aria-labelledby="home-login">
           <h2 id="home-login" className="text-lg font-semibold text-slate-900">

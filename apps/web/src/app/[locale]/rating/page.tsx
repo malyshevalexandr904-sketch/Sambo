@@ -5,6 +5,7 @@
 import type { DataEnvelope, Page, PublicRankingRow, PublicRatingSeason } from '@sde/contracts';
 import type { Metadata } from 'next';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { AboutPlatform } from '@/components/about-platform';
 import { PublicShell } from '@/components/public-shell';
 import { RatedAthleteLabel, RankChange } from '@/components/rating-labels';
 import { Link } from '@/i18n/navigation';
@@ -61,6 +62,7 @@ export default async function RatingPage({
     <PublicShell>
       <h1 className="text-3xl font-bold text-slate-900">{t('title')}</h1>
       <p className="mt-2 text-slate-700">{t('lead')}</p>
+      <AboutPlatform section="rating" variant="link" />
 
       <form method="get" className="mt-6 flex flex-wrap items-end gap-3" aria-label={t('filters')}>
         {seasons.length > 0 ? (

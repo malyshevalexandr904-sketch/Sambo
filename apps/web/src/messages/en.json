@@ -46,6 +46,73 @@
     "continue": "Continue",
     "openCabinet": "Open my account"
   },
+  "about": {
+    "open": "About the platform and rating",
+    "openRating": "How the rating is calculated",
+    "close": "Close",
+    "title": "About Digital Sambo",
+    "linkRating": "Open the rating table",
+    "platform": {
+      "title": "What Digital Sambo is",
+      "p1": "Digital Sambo is a digital platform for running sambo competitions and keeping sports results. It brings sports organizations, coaches, athletes and referees together in one system.",
+      "featuresTitle": "What the platform does",
+      "f1": "Registration of sports organizations, coaches, athletes and referees with data verification.",
+      "f2": "Entries for tournaments.",
+      "f3": "Admission, weigh-in and draw.",
+      "f4": "Electronic refereeing, bout protocols and scoreboard.",
+      "f5": "Public schedule, brackets and results.",
+      "f6": "Athlete rating based on rated tournaments.",
+      "accessTitle": "Access",
+      "a1": "Tournaments, schedule, brackets, results and the rating are open to all visitors without registration.",
+      "a2": "To work in the personal account, register and choose a role: organization head, coach, athlete or referee. Access opens after the application is reviewed."
+    },
+    "rating": {
+      "title": "Rating system",
+      "p1": "The rating reflects a sambo athlete's level based on bouts at rated tournaments. It is calculated with the Elo system used in chess and other sports.",
+      "startTitle": "Starting rating",
+      "start": "Every athlete starts with 200 points. After each rated bout the winner's rating goes up and the loser's goes down.",
+      "factorsTitle": "What the change depends on",
+      "factor1": "Opponent strength. Beating a higher-rated opponent gives more points than beating a weaker one. Losing to a strong opponent costs fewer points.",
+      "factor2": "Kind of win. The more convincing the win, the bigger the gain.",
+      "factor3": "The athlete's current rating. The higher the rating, the less it changes in one bout. New athletes find their place in the table faster, while experienced athletes' ratings stay stable.",
+      "winsTitle": "Kinds of win",
+      "winClean": {
+        "name": "Clean win",
+        "text": "Early win: clean throw, opponent's submission, lead of 8 points or more. Opponent's withdrawal, disqualification, injury or no-show also count as a clean win."
+      },
+      "winPoints": {
+        "name": "Win on points",
+        "text": "The athlete has more points when time runs out."
+      },
+      "winSmall": {
+        "name": "Win with a small advantage",
+        "text": "Points are equal; the win is given for higher-scored technical actions."
+      },
+      "winMinimal": {
+        "name": "Win with a minimal advantage",
+        "text": "Points are equal; the win is given for the last scored technique, for penalties or by the referees' decision."
+      },
+      "winsNote": "Kinds of win follow the Rules of the sport \"sambo\" approved by order No. 892 of the Russian Ministry of Sport of 04.12.2020.",
+      "kTitle": "Change factor",
+      "kText": "The factor sets the largest rating change in one bout and depends on the athlete's rating before the bout.",
+      "kColRating": "Rating before the bout",
+      "kColValue": "Factor",
+      "kRow1": "up to 100 inclusive",
+      "kRow2": "101 to 300",
+      "kRow3": "above 300",
+      "exampleTitle": "Example",
+      "example": "Two athletes rated 200 meet. With a clean win the winner gains 15 points and the loser loses 15. A win on points changes the rating by 12, a small advantage by 6 and a minimal advantage by 3.",
+      "tournamentsTitle": "Rated tournaments",
+      "tournaments": "The rating changes only after bouts at rated tournaments. The platform administration gives a tournament rated status, and it is shown on the tournament card. At other tournaments the rating does not change.",
+      "draw": "At a rated tournament athletes are split into pools by rating, and each has at least two bouts. Places are decided by sports results, not by rating.",
+      "levelsTitle": "Levels",
+      "levels": "Depending on the rating, an athlete gets a level from 1 to 10. Each next level starts 200 points higher: level 1 up to 399, level 2 from 400, level 3 from 600 and so on up to level 10 from 2000.",
+      "seasonsTitle": "Seasons",
+      "seasons": "The rating is not reset when a season changes. The season table lists athletes who competed in the season, ranked by their rating at the end of the season.",
+      "privacyTitle": "Publication of data",
+      "privacy": "An athlete's name is shown in the rating table only with their consent to the distribution of personal data. Without consent only the club and region are shown."
+    }
+  },
   "nav": {
     "dashboard": "Overview",
     "users": "Users",
