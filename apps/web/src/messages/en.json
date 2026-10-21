@@ -46,6 +46,73 @@
     "continue": "Continue",
     "openCabinet": "Open my account"
   },
+  "about": {
+    "open": "About the platform",
+    "close": "Close",
+    "title": "About Digital Sambo",
+    "hint": "Click a section title to open or hide it.",
+    "platform": {
+      "what": {
+        "title": "What Digital Sambo is",
+        "p1": "Digital Sambo is a digital platform for organizing and running sambo competitions and keeping sports results. Sports organizations, coaches, athletes and referees work on it.",
+        "p2": "Every stage of a tournament runs in one system, from the entry to the final protocols. Data is entered once and used at every later stage, which reduces paperwork and errors."
+      },
+      "roles": {
+        "title": "Who uses the platform",
+        "intro": "What a user can do depends on their role. One person can have several roles, for example coach and referee.",
+        "head": "An organization head registers a federation, club or sports school, accepts coaches and athletes into it and enters tournaments.",
+        "coach": "A coach keeps a list of their athletes, enters them for competitions and follows their results. If the head allows it, a coach can review their athletes' applications to join the organization.",
+        "athlete": "An athlete keeps their profile, chooses an organization and a coach, and sees their entries and results. A legal representative acts for a minor athlete.",
+        "referee": "A referee gets tournament assignments, runs bouts electronically and produces protocols.",
+        "guest": "A visitor without registration views tournaments, schedule, brackets and results."
+      },
+      "register": {
+        "title": "How to register",
+        "s1": "Create an account and confirm your email address.",
+        "s2": "Choose a role: organization head, coach, referee or athlete.",
+        "s3": "Fill in the application and attach the documents the role requires. You can save it as a draft and come back later.",
+        "s4": "Submit the application for review.",
+        "s5": "Wait for the decision. The application can be approved, rejected or returned for changes. After changes it is submitted again.",
+        "common": "For any role you give your full name, date of birth, gender, phone, email address and preferred contact channel: email, phone or Telegram. Below is what each role needs in addition.",
+        "head": {
+          "name": "Organization head",
+          "text": "A passport and organization details are needed: name, type (sports club, sports school, regional federation, competition organizer or other), legal status, country and city. A Russian legal entity also gives its INN, full name and legal address and attaches an extract from the state register (EGRUL). An organization is registered on the platform only once. The application is reviewed by the platform administration. Age 18 or over."
+        },
+        "coach": {
+          "name": "Coach",
+          "text": "A passport is needed. A coach with a qualification category attaches a document confirming it. The coach states whether they work in a sports organization and, if so, chooses it from the list. An application to work in an organization is reviewed by its head; other applications are reviewed by the platform administration. Age 18 or over."
+        },
+        "referee": {
+          "name": "Referee",
+          "text": "A passport, a referee book and the referee category are needed. The application is reviewed by the platform administration. Age 14 or over."
+        },
+        "athlete": {
+          "name": "Athlete",
+          "text": "The athlete states whether they train in a sports organization. If so, they choose the organization and their coach from the list, and the application is reviewed by the organization head or by a coach the head has allowed to do so. If the athlete is not in an organization, the platform administration reviews it. A passport or birth certificate can be attached if desired. Age 5 to 25. For a minor athlete the consent of a legal representative to personal data processing is required."
+        },
+        "note": "Review progress is shown in the personal account, and you get a notification on every status change. A registered coach or athlete can submit a separate application to join another organization."
+      },
+      "tournaments": {
+        "title": "How tournaments run",
+        "s1": "The organizer publishes the tournament: dates, venue, weight and age categories, requirements for participants.",
+        "s2": "Organizations and coaches enter their athletes.",
+        "s3": "Admission takes place: documents and medical clearance are checked, athletes arrive and weigh in.",
+        "s4": "After the weigh-in the draw is made and brackets and schedule are built.",
+        "s5": "Referees run bouts electronically; results appear on the scoreboard and the website as soon as they are confirmed.",
+        "note": "After the tournament the final protocols and places are published."
+      },
+      "notifications": {
+        "title": "Notifications",
+        "p1": "The platform reports important events: changes in the status of a registration application and a tournament entry, rejected documents, schedule changes, bouts starting soon and starting, and published results.",
+        "p2": "Notifications arrive in the personal account, and also by email and as browser notifications if the user turned them on. Notification channels are set in the personal account."
+      },
+      "data": {
+        "title": "Personal data protection",
+        "p1": "Personal data is processed under the Russian Federal Law on Personal Data. Each user sees only the information their role needs.",
+        "p2": "An athlete's name is published only with their consent to the distribution of personal data, and for a minor with the consent of the legal representative."
+      }
+    }
+  },
   "nav": {
     "dashboard": "Overview",
     "users": "Users",
