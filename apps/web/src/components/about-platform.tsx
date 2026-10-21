@@ -5,12 +5,13 @@
 import { useTranslations } from 'next-intl';
 import { useRef } from 'react';
 
-/** Содержимое раздела: абзацы и списки по ключам словаря `about.platform.<section>.<key>`. */
-type Block =
-  | { p: string }
-  | { ul: readonly string[] }
-  | { ol: readonly string[] }
-  | { named: readonly string[] };
+/** Содержимое раздела: абзац (`p`) или список (`ul`, `ol`, `named` с жирным названием) по ключам словаря. */
+interface Block {
+  p?: string;
+  ul?: readonly string[];
+  ol?: readonly string[];
+  named?: readonly string[];
+}
 
 const SECTIONS: readonly { key: string; blocks: readonly Block[] }[] = [
   { key: 'what', blocks: [{ p: 'p1' }, { p: 'p2' }] },
@@ -44,13 +45,13 @@ export function AboutPlatform() {
   const close = () => ref.current?.close();
 
   const block = (b: Block, base: string, i: number) => {
-    if ('p' in b)
+    if (b.p)
       return (
         <p key={i} className={`mt-2 ${TEXT}`}>
           {t(`${base}.${b.p}`)}
         </p>
       );
-    if ('named' in b)
+    if (b.named)
       return (
         <ul key={i} className={`mt-2 space-y-2 ${TEXT}`}>
           {b.named.map((k) => (
@@ -61,10 +62,10 @@ export function AboutPlatform() {
           ))}
         </ul>
       );
-    const items = 'ul' in b ? b.ul : b.ol;
-    const List = 'ul' in b ? 'ul' : 'ol';
+    const items = b.ul ?? b.ol ?? [];
+    const List = b.ul ? 'ul' : 'ol';
     return (
-      <List key={i} className={`mt-2 space-y-1 pl-6 ${TEXT} ${'ul' in b ? 'list-disc' : 'list-decimal'}`}>
+      <List key={i} className={`mt-2 space-y-1 pl-6 ${TEXT} ${b.ul ? 'list-disc' : 'list-decimal'}`}>
         {items.map((k) => (
           <li key={k}>{t(`${base}.${k}`)}</li>
         ))}
