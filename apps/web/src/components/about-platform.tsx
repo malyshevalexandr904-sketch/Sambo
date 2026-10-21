@@ -1,6 +1,6 @@
 'use client';
-// Информационное окно «О платформе и рейтинге»: две вкладки («О платформе», «Система рейтинга»), в каждой краткая
-// сводка и раскрывающиеся разделы. Сведения о рейтинге совпадают с версией правил sambo-elo@1
+// Информационное окно «О платформе и рейтинге»: две вкладки («О платформе», «Система рейтинга»), в каждой
+// раскрывающиеся разделы. Сведения о рейтинге совпадают с версией правил sambo-elo@1
 // (packages/rating/src/rules.ts; docs/RATING_RULES.md, RATED_TOURNAMENT_FORMAT.md): старт 200, коэффициент 60 / 30 / 10,
 // уровни через 200. Нативный <dialog>: фокус внутри окна, закрытие по Esc, кнопке и щелчку по фону. Вкладки по
 // шаблону WAI-ARIA (стрелки влево и вправо). Текст окна набран шрифтом Times New Roman.
@@ -15,6 +15,7 @@ type Block =
   | { p: string }
   | { ul: readonly string[] }
   | { ol: readonly string[] }
+  | { named: readonly string[] }
   | { table: readonly (readonly [string, string])[]; head: readonly [string, string] };
 
 const TABS: readonly Tab[] = ['platform', 'rating'];
@@ -23,7 +24,15 @@ const SECTIONS: Record<Tab, readonly { key: string; blocks: readonly Block[] }[]
   platform: [
     { key: 'what', blocks: [{ p: 'p1' }, { p: 'p2' }] },
     { key: 'roles', blocks: [{ p: 'intro' }, { ul: ['head', 'coach', 'athlete', 'referee', 'guest'] }] },
-    { key: 'register', blocks: [{ ol: ['s1', 's2', 's3', 's4', 's5'] }, { p: 'note' }] },
+    {
+      key: 'register',
+      blocks: [
+        { ol: ['s1', 's2', 's3', 's4', 's5'] },
+        { p: 'common' },
+        { named: ['head', 'coach', 'referee', 'athlete'] },
+        { p: 'note' },
+      ],
+    },
     { key: 'tournaments', blocks: [{ ol: ['s1', 's2', 's3', 's4', 's5'] }, { p: 'note' }] },
     { key: 'notifications', blocks: [{ p: 'p1' }, { p: 'p2' }] },
     { key: 'data', blocks: [{ p: 'p1' }, { p: 'p2' }] },
@@ -118,6 +127,17 @@ export function AboutPlatform({
         <p key={i} className={`mt-2 ${TEXT}`}>
           {t(`${base}.${b.p}`)}
         </p>
+      );
+    if ('named' in b)
+      return (
+        <ul key={i} className={`mt-2 space-y-2 ${TEXT}`}>
+          {b.named.map((k) => (
+            <li key={k} className="rounded-md border border-slate-200 px-3 py-2">
+              <span className="block font-bold text-slate-900">{t(`${base}.${k}.name`)}</span>
+              {t(`${base}.${k}.text`)}
+            </li>
+          ))}
+        </ul>
       );
     if ('ul' in b || 'ol' in b) {
       const items = 'ul' in b ? b.ul : b.ol;
@@ -228,15 +248,7 @@ export function AboutPlatform({
                 aria-labelledby={`about-tab-${k}`}
                 hidden={tab !== k}
               >
-                <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3">
-                  <p className="text-base font-bold text-slate-900">{t('summaryTitle')}</p>
-                  <ul className={`mt-1 list-disc space-y-1 pl-6 ${TEXT}`}>
-                    {['s1', 's2', 's3'].map((s) => (
-                      <li key={s}>{t(`${k}.summary.${s}`)}</li>
-                    ))}
-                  </ul>
-                </div>
-                <p className="mt-3 text-sm text-slate-600">{t('hint')}</p>
+                <p className="text-sm text-slate-600">{t('hint')}</p>
                 <div className="mt-2 divide-y divide-slate-200 border-y border-slate-200">
                   {SECTIONS[k].map((s, i) => (
                     <details key={s.key} open={i === 0} className="group">

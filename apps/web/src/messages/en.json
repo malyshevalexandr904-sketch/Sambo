@@ -56,15 +56,9 @@
       "platform": "About the platform",
       "rating": "Rating system"
     },
-    "summaryTitle": "In brief",
     "hint": "Click a section title to open or hide it.",
     "linkRating": "Open the rating table",
     "platform": {
-      "summary": {
-        "s1": "Digital Sambo is a single digital platform for running sambo competitions.",
-        "s2": "Tournaments, schedule, brackets, results and the rating are open to everyone without registration.",
-        "s3": "The personal account is available to organization heads, coaches, athletes and referees after their application is reviewed."
-      },
       "what": {
         "title": "What Digital Sambo is",
         "p1": "Digital Sambo is a digital platform for organizing and running sambo competitions and keeping sports results. Sports organizations, coaches, athletes and referees work on it.",
@@ -82,11 +76,28 @@
       "register": {
         "title": "How to register",
         "s1": "Create an account and confirm your email address.",
-        "s2": "Choose a role and fill in the application. You can save it as a draft and come back later.",
-        "s3": "If needed, attach documents confirming the application: a coach qualification document, a referee book, an extract from the state register or a document on the head's authority.",
-        "s4": "Submit the application for review. An application from a coach or athlete to join an organization is reviewed by its head; other applications are reviewed by the platform administration.",
+        "s2": "Choose a role: organization head, coach, referee or athlete.",
+        "s3": "Fill in the application and attach the documents the role requires. You can save it as a draft and come back later.",
+        "s4": "Submit the application for review.",
         "s5": "Wait for the decision. The application can be approved, rejected or returned for changes. After changes it is submitted again.",
-        "note": "The review progress is shown in the personal account. You get a notification on every status change."
+        "common": "For any role you give your full name, date of birth, gender, phone, email address and preferred contact channel: email, phone or Telegram. Below is what each role needs in addition.",
+        "head": {
+          "name": "Organization head",
+          "text": "A passport and organization details are needed: name, type (sports club, sports school, regional federation, competition organizer or other), legal status, country and city. A Russian legal entity also gives its INN, full name and legal address and attaches an extract from the state register (EGRUL). An organization is registered on the platform only once. The application is reviewed by the platform administration. Age 18 or over."
+        },
+        "coach": {
+          "name": "Coach",
+          "text": "A passport is needed. A coach with a qualification category attaches a document confirming it. The coach states whether they work in a sports organization and, if so, chooses it from the list. An application to work in an organization is reviewed by its head; other applications are reviewed by the platform administration. Age 18 or over."
+        },
+        "referee": {
+          "name": "Referee",
+          "text": "A passport, a referee book and the referee category are needed. The application is reviewed by the platform administration. Age 14 or over."
+        },
+        "athlete": {
+          "name": "Athlete",
+          "text": "The athlete states whether they train in a sports organization. If so, they choose the organization and their coach from the list, and the application is reviewed by the organization head or by a coach the head has allowed to do so. If the athlete is not in an organization, the platform administration reviews it. A passport or birth certificate can be attached if desired. Age 5 to 25. For a minor athlete the consent of a legal representative to personal data processing is required."
+        },
+        "note": "Review progress is shown in the personal account, and you get a notification on every status change. A registered coach or athlete can submit a separate application to join another organization."
       },
       "tournaments": {
         "title": "How tournaments run",
@@ -109,11 +120,6 @@
       }
     },
     "rating": {
-      "summary": {
-        "s1": "The rating shows a sambo athlete's level and is calculated with the Elo system.",
-        "s2": "Every athlete starts with 200 points; the rating changes only after bouts at rated tournaments.",
-        "s3": "The stronger the opponent and the more convincing the win, the bigger the gain."
-      },
       "how": {
         "title": "How the rating is calculated",
         "p1": "The rating uses the Elo system. It is used in chess and many other sports and makes it possible to compare athletes who have never met.",
