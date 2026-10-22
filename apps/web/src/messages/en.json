@@ -83,7 +83,7 @@
     },
     "register": {
       "title": "Sign up",
-      "displayName": "Your name",
+      "displayName": "Last name, first name, middle name",
       "passwordHint": "At least 10 characters. Common passwords are rejected.",
       "acceptTerms": "I accept the terms of use and the personal data processing policy",
       "submit": "Sign up",
@@ -511,7 +511,7 @@
   "athletes": {
     "title": "Athletes",
     "cardTitle": "Athlete",
-    "listHint": "Athletes of your clubs. Other clubs' data is not shown.",
+    "listHint": "Up-to-date data on the athletes of your organization",
     "import": "Import from file",
     "create": "Add athlete",
     "searchPlaceholder": "Last name, first name or number",
@@ -787,7 +787,7 @@
     "owner": "Owner",
     "discipline": "Discipline",
     "categoriesTitle": "Age groups and weight categories",
-    "categoriesHint": "Reference data for competition regulations. A competition copies categories from a template — changes here do not affect existing competitions.",
+    "categoriesHint": "The organizer can use ready-made templates of age groups and weight categories",
     "noGroups": "No age groups yet.",
     "ages": "{from}–{to} years",
     "policies": {
@@ -824,7 +824,7 @@
   },
   "rulesets": {
     "title": "Rule sets",
-    "hint": "Match durations, scores, penalties, tie-breakers and formats. A competition pins a published version.",
+    "hint": "The organizer publishes up-to-date information on the competition regulations",
     "empty": "No rule sets yet.",
     "published": "version {version} published",
     "notPublished": "no published versions",
@@ -857,7 +857,7 @@
   },
   "competitions": {
     "title": "Competitions",
-    "hint": "Competitions you organise or staff, and those open for entries.",
+    "hint": "Competitions where you are the organizer or a referee",
     "create": "Create competition",
     "scopes": {
       "mine": "Mine",
@@ -2036,7 +2036,7 @@
   },
   "referee": {
     "title": "Refereeing",
-    "hint": "The mat tablet and the confirmation of results. Competitions where you are staff and matches are under way.",
+    "hint": "The mat tablet and confirmation of bout results",
     "noCompetitions": "No competitions with matches under way.",
     "open": "Open",
     "mats": "Mats",
