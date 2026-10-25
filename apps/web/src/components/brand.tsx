@@ -6,7 +6,7 @@ import logo from '@/assets/logo.png';
 /**
  * Картинка с белым фоном (белые пояс и воротник сливаются с ним, поэтому фон не вырезан): `mix-blend-multiply`
  * делает белое невидимым на любом светлом фоне, цвета формы остаются прежними. Название платформы рядом читается
- * скринридером, сама картинка декоративна (alt="").
+ * скринридером, сама картинка декоративна (alt=""). В тёмной теме — на белой подложке (globals.css).
  */
 export function Brand({ className, logoClassName }: { className?: string; logoClassName?: string }) {
   return (
@@ -16,7 +16,7 @@ export function Brand({ className, logoClassName }: { className?: string; logoCl
         alt=""
         unoptimized
         priority
-        className={cn('h-8 w-auto mix-blend-multiply', logoClassName)}
+        className={cn('brand-logo h-8 w-auto mix-blend-multiply', logoClassName)}
       />
       <span>Digital Sambo</span>
     </span>

@@ -14,6 +14,7 @@ import { api, ApiError } from '@/lib/api';
 import { applyFieldErrors, useErrorMessage, useFieldMessage } from '@/lib/errors';
 import { closeLive } from '@/lib/live';
 import { qk } from '@/lib/queries';
+import { PasswordRequirements } from './password-requirements';
 import { ResendVerification } from './register-form';
 
 /** Переход после входа — только на внутренний путь (защита от открытого редиректа). */
@@ -149,7 +150,10 @@ export function ForgotPasswordForm() {
       <h1 className="mb-2 text-2xl font-semibold">{t('forgot.title')}</h1>
       <p className="mb-6 text-sm text-slate-600">{t('forgot.body')}</p>
       {sent ? (
-        <Alert tone="success">{t('forgot.sent')}</Alert>
+        <Alert tone="success">
+          {t('forgot.sent')}
+          <p className="mt-2 font-medium">{t('forgot.checkSpam')}</p>
+        </Alert>
       ) : (
         <form onSubmit={onSubmit} noValidate className="space-y-4">
           {error ? <Alert tone="danger">{error}</Alert> : null}
@@ -207,16 +211,17 @@ export function ResetPasswordForm() {
           <Field
             id="newPassword"
             label={t('reset.newPassword')}
-            hint={t('register.passwordHint')}
             error={fieldMessage(form.formState.errors.newPassword?.message)}
           >
             <Input
               id="newPassword"
               type="password"
               autoComplete="new-password"
+              aria-describedby="password-rules"
               {...form.register('newPassword')}
             />
           </Field>
+          <PasswordRequirements id="password-rules" value={form.watch('newPassword')} />
           <Button type="submit" className="w-full" loading={form.formState.isSubmitting}>
             {t('reset.submit')}
           </Button>

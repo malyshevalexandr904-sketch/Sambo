@@ -6,9 +6,10 @@ import { isOnboardingRole, ONBOARDING_ROLES, type OnboardingRole, RegisterReques
 import { Alert, Button, Card, Field, Input } from '@sde/ui';
 import { useLocale, useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { z } from 'zod';
+import { PasswordRequirements } from '@/components/password-requirements';
 import { Link } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { applyFieldErrors, useErrorMessage, useFieldMessage } from '@/lib/errors';
@@ -125,6 +126,14 @@ function RegisterRoleStep() {
   );
 }
 
+function LegalLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <Link href={href} target="_blank" className="text-blue-700 underline">
+      {children}
+    </Link>
+  );
+}
+
 function RegisterAccountStep({ role }: { role: OnboardingRole | null }) {
   const t = useTranslations('auth');
   const tRoles = useTranslations('cabinetRole.roles');
@@ -211,43 +220,33 @@ function RegisterAccountStep({ role }: { role: OnboardingRole | null }) {
             {...form.register('email')}
           />
         </Field>
-        <Field
-          id="password"
-          label={t('password')}
-          hint={t('register.passwordHint')}
-          error={fieldMessage(errors.password?.message)}
-        >
+        <Field id="password" label={t('password')} error={fieldMessage(errors.password?.message)}>
           <Input
             id="password"
             type="password"
             autoComplete="new-password"
             aria-invalid={!!errors.password}
+            aria-describedby="password-rules"
             {...form.register('password')}
           />
         </Field>
-        {/* Ознакомление с политикой и согласие на обработку ПДн — две отдельные отметки (152-ФЗ, ст. 9, ч. 1).
+        <PasswordRequirements id="password-rules" value={form.watch('password') ?? ''} />
+        {/* Пользовательское соглашение с политикой и согласие на обработку ПДн — две отдельные отметки (152-ФЗ, ст. 9, ч. 1).
             Тексты открываются в новой вкладке, чтобы не потерять заполненную форму. */}
-        {(
-          [
-            ['acceptTerms', '/privacy'],
-            ['acceptPersonalData', '/personal-data-consent'],
-          ] as const
-        ).map(([name, href]) => (
+        {(['acceptTerms', 'acceptPersonalData'] as const).map((name) => (
           <div key={name}>
             <label className="flex min-h-11 items-start gap-3 text-sm">
               <input
                 type="checkbox"
-                className="mt-1 h-5 w-5"
+                className="mt-1 h-5 w-5 shrink-0"
                 aria-invalid={!!errors[name]}
                 {...form.register(name)}
               />
               <span>
                 {t.rich(`register.${name}`, {
-                  link: (chunks) => (
-                    <Link href={href} target="_blank" className="text-blue-700 underline">
-                      {chunks}
-                    </Link>
-                  ),
+                  terms: (chunks) => <LegalLink href="/terms">{chunks}</LegalLink>,
+                  privacy: (chunks) => <LegalLink href="/privacy">{chunks}</LegalLink>,
+                  consent: (chunks) => <LegalLink href="/personal-data-consent">{chunks}</LegalLink>,
                 })}
               </span>
             </label>

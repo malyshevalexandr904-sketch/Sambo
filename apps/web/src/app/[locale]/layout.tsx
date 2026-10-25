@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from 'next';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { hasLocale, NextIntlClientProvider } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { routing } from '@/i18n/routing';
+import { THEME_COOKIE, themeOf } from '@/lib/theme';
 import { Providers } from '@/lib/providers';
 import '../globals.css';
 
@@ -37,8 +39,10 @@ export default async function LocaleLayout({
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
+  // Тема — из cookie, чтобы страница сразу пришла в выбранных цветах, без мигания и без инлайн-скрипта (CSP).
+  const theme = themeOf((await cookies()).get(THEME_COOKIE)?.value);
   return (
-    <html lang={locale}>
+    <html lang={locale} data-theme={theme}>
       <body>
         <NextIntlClientProvider>
           <Providers>{children}</Providers>

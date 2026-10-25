@@ -14,9 +14,11 @@ import { closeLive } from '@/lib/live';
 import { disablePushForLogout, syncPush } from '@/lib/push';
 import { useMe, useMyAthletes } from '@/lib/queries';
 import { ConsoleRoleBar, RoleChangedElsewhere, RoleSwitcher } from '@/features/cabinet-role';
+import { Avatar } from '@/features/avatar';
 import { NotificationBell } from '@/features/notifications/bell';
 import { Brand } from './brand';
 import { LocaleSwitcher } from './locale-switcher';
+import { ThemeSwitcher } from './theme-switcher';
 
 export function hasPlatformPermission(me: Me | undefined, permission: PermissionCode): boolean {
   return platformHas(me, permission);
@@ -185,7 +187,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
       <aside
         id="sidebar"
         className={cn(
-          'fixed inset-y-0 left-0 z-40 w-72 border-r border-slate-200 bg-white p-4 transition-transform lg:static lg:translate-x-0 print:hidden',
+          'fixed inset-y-0 left-0 z-40 w-72 overflow-y-auto overscroll-contain border-r border-slate-200 bg-white p-4 transition-transform lg:static lg:translate-x-0 lg:overflow-visible print:hidden',
           open ? 'translate-x-0' : '-translate-x-full',
         )}
       >
@@ -216,16 +218,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
               ))}
           </ul>
         </nav>
-        <div className="mt-8 border-t border-slate-200 pt-4 text-sm">
-          <p className="font-medium text-slate-900">{user.displayName}</p>
-          <p className="truncate text-slate-500">{user.email}</p>
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <LocaleSwitcher />
-            <Button variant="secondary" size="sm" onClick={() => void logout()}>
-              {t('common.logout')}
-            </Button>
-          </div>
-        </div>
+        <SidebarFooter me={user} onLogout={() => void logout()} />
       </aside>
       {open ? (
         <div
@@ -237,6 +230,31 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
       <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 print:p-0">
         {children}
       </main>
+    </div>
+  );
+}
+
+/** Низ меню: фото и имя (ссылка в «Мой аккаунт»), язык, тема, выход. */
+function SidebarFooter({ me, onLogout }: { me: Me; onLogout: () => void }) {
+  const t = useTranslations('common');
+  return (
+    <div className="mt-8 border-t border-slate-200 pt-4 text-sm">
+      <Link href="/account" className="flex items-center gap-3 rounded-md hover:bg-slate-50">
+        <Avatar me={me} />
+        <span className="min-w-0">
+          <span className="block font-medium text-slate-900">{me.displayName}</span>
+          <span className="block truncate text-slate-500">{me.email}</span>
+        </span>
+      </Link>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2">
+          <LocaleSwitcher />
+          <ThemeSwitcher />
+        </span>
+        <Button variant="secondary" size="sm" onClick={onLogout}>
+          {t('logout')}
+        </Button>
+      </div>
     </div>
   );
 }

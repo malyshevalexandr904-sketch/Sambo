@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { LegalLinks } from '@/components/legal-links';
 import { LocaleSwitcher } from '@/components/locale-switcher';
+import { ThemeSwitcher } from '@/components/theme-switcher';
 import { Link } from '@/i18n/navigation';
 
 export async function PublicShell({ children }: { children: ReactNode }) {
@@ -24,6 +25,7 @@ export async function PublicShell({ children }: { children: ReactNode }) {
               {t('login')}
             </Link>
             <LocaleSwitcher />
+            <ThemeSwitcher />
           </div>
         </div>
       </header>

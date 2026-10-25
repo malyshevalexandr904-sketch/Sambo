@@ -131,10 +131,12 @@ function Wizard({ initial }: { initial: OnboardingRequestDto }) {
     () => onboardingProblems(completenessOf(form, request), request.documentRules),
     [form, request],
   );
-  // Черновик открывается на первом незаполненном шаге (продолжение заполнения).
+  // Новая заявка открывается с первого шага, чтобы не пропустить «Вопросы»: на нём нет полей, которые проверка
+  // считала бы пустыми до ответа. Сохранённый черновик — на самом раннем незаполненном шаге (продолжение заполнения).
   const [step, setStep] = useState(() => {
-    const first = problems[0];
-    return first ? Math.max(0, steps.indexOf(stepOfPath(first.path))) : steps.length - 1;
+    if (initial.version === 1 && initial.status === 'DRAFT') return 0;
+    const indexes = problems.map((p) => steps.indexOf(stepOfPath(p.path))).filter((i) => i >= 0);
+    return indexes.length > 0 ? Math.min(...indexes) : steps.length - 1;
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -301,7 +303,7 @@ function ReviewStep({
         <label className="mt-3 flex min-h-11 items-start gap-3">
           <input
             type="checkbox"
-            className="mt-1 h-5 w-5"
+            className="mt-1 h-5 w-5 shrink-0"
             checked={consent}
             onChange={(e) => setConsent(e.target.checked)}
           />

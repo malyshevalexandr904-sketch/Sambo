@@ -1,7 +1,7 @@
 // auth и me (API.md, 3.1–3.2).
 import { z } from 'zod';
 import type { CabinetRole } from './cabinet-roles.js';
-import { Email, Locale, Password, Timezone } from './common.js';
+import { Email, Locale, Password, Timezone, Uuid } from './common.js';
 import { ONBOARDING_ROLES } from './onboarding.js';
 import type { RoleCode } from './roles.js';
 
@@ -94,6 +94,8 @@ export interface Me {
   status: UserStatus;
   personId: string | null;
   totpEnabled: boolean;
+  /** Фото профиля (запись «человек» пользователя); null — фото нет. */
+  avatarUrl: string | null;
   /**
    * Роли доступа, которые действуют в выбранной роли кабинета (0.13.0). Роли других ролей кабинета сюда не входят:
    * на сервере они в этой сессии не действуют.
@@ -113,6 +115,10 @@ export const UpdateMeRequest = z.object({
   timezone: Timezone.nullable().optional(),
 });
 export type UpdateMeRequest = z.infer<typeof UpdateMeRequest>;
+
+/** Фото профиля: файл, загруженный с целью AVATAR; null — убрать фото. */
+export const SetAvatarRequest = z.object({ fileId: Uuid.nullable() });
+export type SetAvatarRequest = z.infer<typeof SetAvatarRequest>;
 
 /** Заголовок, которым Bearer-клиент просит токены в теле ответа вместо cookie. */
 export const AUTH_MODE_HEADER = 'x-auth-mode';

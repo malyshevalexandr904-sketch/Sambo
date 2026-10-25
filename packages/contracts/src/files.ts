@@ -15,6 +15,7 @@ export const UPLOAD_PURPOSES = [
   'CONSENT_SCAN',
   'IMPORT',
   'ONBOARDING_DOCUMENT',
+  'AVATAR',
 ] as const;
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 
@@ -37,6 +38,12 @@ export const UPLOAD_POLICIES: Record<UploadPurpose, UploadPolicy> = {
     maxSizeBytes: 2 * MB,
   },
   COMPETITION_LOGO: {
+    bucket: 'PUBLIC_MEDIA',
+    mimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
+    maxSizeBytes: 2 * MB,
+  },
+  /** Фото профиля в личном кабинете: видно только по ссылке со случайным именем файла. */
+  AVATAR: {
     bucket: 'PUBLIC_MEDIA',
     mimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
     maxSizeBytes: 2 * MB,

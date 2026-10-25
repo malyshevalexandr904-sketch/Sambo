@@ -8,6 +8,7 @@ import {
   type PersonDto,
   type RoleCode,
   roleActiveIn,
+  type SetAvatarRequest,
   type UpdateMeRequest,
   type UpsertMyPersonRequest,
   isRoleCode,
@@ -16,6 +17,7 @@ import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CabinetRolesService } from '../../access';
 import { AuditService } from '../../audit';
+import { FilesService } from '../../files';
 import { PeopleService, personAudit, personDto } from '../../people';
 
 /**
@@ -35,6 +37,7 @@ export class MeService {
     private readonly audit: AuditService,
     private readonly people: PeopleService,
     private readonly cabinetRoles: CabinetRolesService,
+    private readonly files: FilesService,
   ) {}
 
   /**
@@ -46,6 +49,7 @@ export class MeService {
     const user = await this.db.user.findUniqueOrThrow({
       where: { id: userId },
       include: {
+        person: { select: { photo: { select: { status: true, bucket: true, storageKey: true } } } },
         platformRoles: { where: { revokedAt: null }, select: { role: { select: { code: true } } } },
         organizationMemberships: {
           where: { status: 'ACTIVE', OR: [{ validTo: null }, { validTo: { gte: today } }] },
@@ -66,6 +70,7 @@ export class MeService {
       user.organizationMemberships.map((m) => ({ id: m.organizationId, code: m.role.code })),
     );
     const comps = group(user.competitionMemberships.map((m) => ({ id: m.competitionId, code: m.role.code })));
+    const photo = user.person?.photo ?? null;
     const resolved = activeRole !== undefined ? activeRole : await this.cabinetRoles.resolve(user, sessionId);
     const { active, available } = await this.cabinetRoles.state({ ...user, activeRole: resolved }, sessionId);
     const keep = (r: RoleCode): boolean => roleActiveIn(active, r);
@@ -88,6 +93,10 @@ export class MeService {
       status: user.status,
       personId: user.personId,
       totpEnabled: user.totpEnabledAt !== null,
+      avatarUrl:
+        photo && photo.status === 'AVAILABLE' && photo.bucket === 'PUBLIC_MEDIA'
+          ? this.files.publicUrl(photo.storageKey)
+          : null,
       grants,
       activeRole: active,
       availableRoles: available,
@@ -115,6 +124,28 @@ export class MeService {
         entityId: userId,
         before: { displayName: before.displayName, locale: before.locale, timezone: before.timezone },
         after: { displayName: after.displayName, locale: after.locale, timezone: after.timezone },
+      });
+    });
+    return this.get(ref);
+  }
+
+  /**
+   * Фото профиля — в записи «человек» пользователя (у судьи, тренера, спортсмена она есть после одобрения анкеты или
+   * после «Мои данные»). Файл — свой, загруженный с целью AVATAR.
+   */
+  async setAvatar(ref: MeRef, input: SetAvatarRequest): Promise<Me> {
+    await this.db.tx(async (tx) => {
+      const user = await tx.user.findUniqueOrThrow({ where: { id: ref.userId }, include: { person: true } });
+      if (!user.person)
+        throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'fileId', code: 'person_required' }] });
+      if (input.fileId) await this.files.assertAttachable(tx, input.fileId, ref.userId, 'AVATAR', 'fileId');
+      await tx.person.update({ where: { id: user.person.id }, data: { photoFileId: input.fileId } });
+      await this.audit.record(tx, {
+        action: 'person.photo_updated',
+        entityType: 'Person',
+        entityId: user.person.id,
+        before: { photoFileId: user.person.photoFileId },
+        after: { photoFileId: input.fileId },
       });
     });
     return this.get(ref);
