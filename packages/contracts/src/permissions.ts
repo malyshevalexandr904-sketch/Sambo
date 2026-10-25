@@ -45,7 +45,10 @@ export const PERMISSIONS = {
   'category.manage': { scopes: [P, O], description: 'Возрастные группы, весовые категории, шаблоны' },
   'ruleset.manage': { scopes: [P, O], description: 'Наборы правил и их версии' },
   'venue.manage': { scopes: [O], description: 'Места проведения' },
-  'competition.create': { scopes: [O], description: 'Создание турнира от имени организации' },
+  'competition.request': {
+    scopes: [O],
+    description: 'Заявка администраторам платформы на проведение турнира от имени организации',
+  },
   'registration.create': { scopes: [O], description: 'Подача заявок от имени организации' },
   'ranking.manage': { scopes: [O], description: 'Рейтинговые системы' },
   'competition.view': { scopes: [C], description: 'Служебные данные турнира' },
@@ -95,7 +98,11 @@ export const PERMISSIONS = {
   'venue_node.manage': { scopes: [C], description: 'Площадочный узел' },
   'write_lease.recover': { scopes: [C], description: 'Аварийный возврат права записи' },
   // Рейтинг спортсменов (docs/RATING_ARCHITECTURE.md, 3.2): только платформа — у ролей турнира и организации их нет.
-  'competition.create_rated': { scopes: [P], description: 'Создание рейтингового турнира' },
+  // Все турниры рейтинговые (docs/RATED_ONLY.md): создаёт их и рассматривает заявки организаций только платформа.
+  'competition.create_rated': {
+    scopes: [P],
+    description: 'Создание турнира и рассмотрение заявок организаций на проведение',
+  },
   'competition.convert_to_rated': {
     scopes: [P],
     description: 'Включение рейтинга у турнира и административная смена типа турнира',
@@ -106,6 +113,7 @@ export const PERMISSIONS = {
   'competition.publish_rating_results': { scopes: [P], description: 'Публикация изменений рейтинга турнира' },
   'rating.correct': { scopes: [P], description: 'Корректировка и заморозка рейтинга спортсмена' },
   'rating.rebuild_apply': { scopes: [P], description: 'Применение пересборки рейтинга' },
+  'division.manage': { scopes: [P], description: 'Дивизионы спортсменов по возрасту' },
 } as const satisfies Record<string, PermissionDef>;
 
 export type PermissionCode = keyof typeof PERMISSIONS;

@@ -1,6 +1,6 @@
 'use client';
-// Карточка спортсмена (API.md, 4.1): данные, клуб и тренер, разряды, результаты (Phase 7b), представители,
-// согласия, документы.
+// Карточка спортсмена (API.md, 4.1): дивизион и трекер Elo, данные, клуб и тренер, разряды, результаты (Phase 7b),
+// представители, согласия, документы.
 // Доступные действия приходят с сервера (allowedActions): интерфейс лишь скрывает недоступное.
 import { type Athlete, type DataEnvelope, fullName } from '@sde/contracts';
 import { Alert, Badge, Button, Card, CardTitle, EmptyState, Field, Input, PageHeader } from '@sde/ui';
@@ -21,6 +21,7 @@ import { ConsentsPanel } from './consents';
 import { FollowButton } from './follow';
 import { GuardiansPanel } from './guardians';
 import { ClubPanel, RanksPanel } from './links';
+import { AthleteProgressCard } from './rating-progress';
 import { useAthleteCache } from './shared';
 
 export function AthleteDetail({ id }: { id: string }) {
@@ -67,6 +68,9 @@ export function AthleteDetail({ id }: { id: string }) {
                 </div>
               }
             />
+            <div className="mb-6">
+              <AthleteProgressCard athleteId={a.id} />
+            </div>
             <div className="grid gap-6 xl:grid-cols-2">
               <PersonPanel athlete={a} editable={can('athlete.update')} />
               <ClubPanel athlete={a} editable={can('athlete.update')} />

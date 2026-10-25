@@ -4,6 +4,9 @@ import {
   AdminCompetitionRatingController,
 } from './api/admin-athlete-rating.controller';
 import { AdminRatingController } from './api/admin-rating.controller';
+import { AthleteRatingProgressController } from './api/athlete-rating-progress.controller';
+import { AthletesModule } from '../athletes';
+import { DivisionsModule } from '../divisions';
 import { CompetitionRatingResultsService } from './application/competition-rating-results.service';
 import { CompetitionRatingService } from './application/competition-rating.service';
 import { RatingAdminService } from './application/rating-admin.service';
@@ -16,7 +19,13 @@ import { RatingSeasonService } from './application/rating-season.service';
 
 /** Рейтинг спортсменов (docs/RATING_ARCHITECTURE.md). */
 @Module({
-  controllers: [AdminRatingController, AdminAthleteRatingController, AdminCompetitionRatingController],
+  imports: [AthletesModule, DivisionsModule],
+  controllers: [
+    AdminRatingController,
+    AdminAthleteRatingController,
+    AdminCompetitionRatingController,
+    AthleteRatingProgressController,
+  ],
   providers: [
     RatingRulesService,
     RatingCalculationService,

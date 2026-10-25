@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { LocalDate, type LocalizedText, PageQuery, Reason, Uuid } from './common.js';
 import { COMPETITION_TYPES } from './competitions.js';
+import type { AthleteDivision } from './divisions.js';
 import { WIN_METHODS } from './draws.js';
 import { GENDERS } from './people.js';
 
@@ -540,4 +541,29 @@ export interface RatingAthleteHit {
   birthYear: number;
   rating: number | null;
   status: RatingStatus | null;
+}
+
+// ---- Кабинет спортсмена (docs/RATED_ONLY.md, 5): дивизион и трекер Elo от схватки к схватке ----
+
+/**
+ * Рейтинг спортсмена в его кабинете: видят сам спортсмен, подтверждённый представитель и тренер — без согласия на
+ * публикацию, в отличие от публичной карточки. Соперники без согласия скрыты, как на сайте.
+ */
+export interface AthleteRatingProgress {
+  athleteId: string;
+  division: AthleteDivision | null;
+  rating: {
+    rating: number;
+    level: number;
+    peakRating: number;
+    lowestRating: number;
+    ratedMatches: number;
+    wins: number;
+    losses: number;
+    status: RatingStatus;
+  } | null;
+  /** Схватки и корректировки по порядку, старые первыми: рейтинг до и после каждой. */
+  bouts: PublicRatingHistoryItem[];
+  /** Событий было больше, показаны последние. */
+  truncated: boolean;
 }

@@ -92,83 +92,85 @@ model User {
   updatedAt              DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt              DateTime?  @map("deleted_at") @db.Timestamptz(3)
 
-  person                    Person?                   @relation("UserPerson", fields: [personId], references: [id], onDelete: Restrict)
-  identities                AuthIdentity[]
-  refreshTokens             RefreshToken[]
-  sessionRoles              SessionRole[]
-  verificationTokens        VerificationToken[]
-  platformRoles             PlatformRoleAssignment[]  @relation("PlatformRoleUser")
-  grantedPlatformRoles      PlatformRoleAssignment[]  @relation("PlatformRoleGrantor")
-  organizationMemberships   OrganizationMembership[]  @relation("MembershipUser")
-  invitedMemberships        OrganizationMembership[]  @relation("MembershipInviter")
-  competitionMemberships    CompetitionMembership[]   @relation("CompetitionMembershipUser")
-  invitedCompetitionStaff   CompetitionMembership[]   @relation("CompetitionMembershipInviter")
-  createdOrganizations      Organization[]            @relation("OrganizationCreator")
-  createdPersons            Person[]                  @relation("PersonCreator")
-  uploadedFiles             StoredFile[]
-  auditEntries              AuditLog[]
-  dataAccessEntries         DataAccessLog[]
-  updatedSettings           SystemSetting[]
-  createdAthletes           AthleteProfile[]          @relation("AthleteCreator")
-  createdCoaches            CoachProfile[]            @relation("CoachCreator")
-  createdCoachMemberships   CoachMembership[]         @relation("CoachMembershipCreator")
-  createdReferees           RefereeProfile[]          @relation("RefereeCreator")
-  createdAthleteMemberships AthleteMembership[]       @relation("AthleteMembershipCreator")
-  createdAthleteCoaches     AthleteCoach[]            @relation("AthleteCoachCreator")
-  createdRanks              AthleteRankRecord[]       @relation("RankCreator")
-  revokedRanks              AthleteRankRecord[]       @relation("RankRevoker")
-  createdGuardians          Guardian[]                @relation("GuardianCreator")
-  verifiedGuardians         Guardian[]                @relation("GuardianVerifier")
-  endedGuardians            Guardian[]                @relation("GuardianEnder")
-  createdConsentTemplates   ConsentTemplate[]         @relation("ConsentTemplateCreator")
-  recordedConsents          Consent[]                 @relation("ConsentRecorder")
-  revokedConsents           Consent[]                 @relation("ConsentRevoker")
-  createdRuleSets           RuleSet[]                 @relation("RuleSetCreator")
-  createdRuleSetVersions    RuleSetVersion[]          @relation("RuleSetVersionCreator")
-  publishedRuleSetVersions  RuleSetVersion[]          @relation("RuleSetPublisher")
-  createdAgeGroups          AgeGroup[]                @relation("AgeGroupCreator")
-  createdCategoryTemplates  CategoryTemplate[]        @relation("CategoryTemplateCreator")
-  uploadedDocuments         Document[]                @relation("DocumentUploader")
-  reviewedDocuments         Document[]                @relation("DocumentReviewer")
-  importJobs                ImportJob[]               @relation("ImportCreator")
-  createdVenues             Venue[]                   @relation("VenueCreator")
-  createdCompetitions       Competition[]             @relation("CompetitionCreator")
-  updatedCompetitions       Competition[]             @relation("CompetitionUpdater")
-  createdApplications       Application[]             @relation("ApplicationCreator")
-  submittedApplications     Application[]             @relation("ApplicationSubmitter")
-  reviewedApplications      Application[]             @relation("ApplicationReviewer")
-  createdEntries            Entry[]                   @relation("EntryCreator")
-  decidedEntries            Entry[]                   @relation("EntryDecider")
-  withdrawnEntries          Entry[]                   @relation("EntryWithdrawer")
-  acquiredLeases            CompetitionWriteLease[]   @relation("LeaseAcquirer")
-  waivedAdmissionChecks     AdmissionCheck[]          @relation("AdmissionCheckUpdater")
-  checkInOperations         CheckIn[]                 @relation("CheckInOperator")
-  weighInAttempts           WeighInAttempt[]          @relation("WeighInOperator")
-  recordedClearances        MedicalClearance[]        @relation("ClearanceRecorder")
-  revokedClearances         MedicalClearance[]        @relation("ClearanceRevoker")
-  notifications             Notification[]
-  notificationPreferences   NotificationPreference[]
-  pushSubscriptions         PushSubscription[]
-  follows                   Follow[]
-  createdDraws              Draw[]                    @relation("DrawCreator")
-  publishedDraws            Draw[]                    @relation("DrawPublisher")
-  supersededDraws           Draw[]                    @relation("DrawSuperseder")
-  groupPlaceDecisions       GroupPlaceDecision[]      @relation("GroupPlaceDecider")
-  publishedSchedules        Schedule[]                @relation("SchedulePublisher")
-  matAssignments            MatAssignment[]
-  recordedMatchEvents       MatchEvent[]              @relation("MatchEventRecorder")
-  publishedCategoryResults  CategoryResult[]          @relation("CategoryResultPublisher")
-  matchResultRevisions      MatchResultRevision[]     @relation("MatchResultReviser")
-  medicalIncidents          MedicalIncident[]         @relation("MedicalIncidentRecorder")
-  proposedMatchResults      MatchResult[]             @relation("MatchResultProposer")
-  confirmedMatchResults     MatchResult[]             @relation("MatchResultConfirmer")
-  onboardingRequests        OnboardingRequest[]       @relation("OnboardingApplicant")
-  decidedOnboardingRequests OnboardingRequest[]       @relation("OnboardingDecider")
-  onboardingStatusChanges   OnboardingStatusChange[]  @relation("OnboardingStatusActor")
-  onboardingDocuments       OnboardingDocument[]      @relation("OnboardingDocumentUploader")
-  ratingConfigsEnabled      CompetitionRatingConfig[] @relation("CompetitionRatingEnabler")
-  ratingCorrections         RatingCorrection[]        @relation("RatingCorrectionCreator")
-  ratingSeasons             RatingSeason[]            @relation("RatingSeasonCreator")
+  person                     Person?                   @relation("UserPerson", fields: [personId], references: [id], onDelete: Restrict)
+  identities                 AuthIdentity[]
+  refreshTokens              RefreshToken[]
+  sessionRoles               SessionRole[]
+  verificationTokens         VerificationToken[]
+  platformRoles              PlatformRoleAssignment[]  @relation("PlatformRoleUser")
+  grantedPlatformRoles       PlatformRoleAssignment[]  @relation("PlatformRoleGrantor")
+  organizationMemberships    OrganizationMembership[]  @relation("MembershipUser")
+  invitedMemberships         OrganizationMembership[]  @relation("MembershipInviter")
+  competitionMemberships     CompetitionMembership[]   @relation("CompetitionMembershipUser")
+  invitedCompetitionStaff    CompetitionMembership[]   @relation("CompetitionMembershipInviter")
+  createdOrganizations       Organization[]            @relation("OrganizationCreator")
+  createdPersons             Person[]                  @relation("PersonCreator")
+  uploadedFiles              StoredFile[]
+  auditEntries               AuditLog[]
+  dataAccessEntries          DataAccessLog[]
+  updatedSettings            SystemSetting[]
+  createdAthletes            AthleteProfile[]          @relation("AthleteCreator")
+  createdCoaches             CoachProfile[]            @relation("CoachCreator")
+  createdCoachMemberships    CoachMembership[]         @relation("CoachMembershipCreator")
+  createdReferees            RefereeProfile[]          @relation("RefereeCreator")
+  createdAthleteMemberships  AthleteMembership[]       @relation("AthleteMembershipCreator")
+  createdAthleteCoaches      AthleteCoach[]            @relation("AthleteCoachCreator")
+  createdRanks               AthleteRankRecord[]       @relation("RankCreator")
+  revokedRanks               AthleteRankRecord[]       @relation("RankRevoker")
+  createdGuardians           Guardian[]                @relation("GuardianCreator")
+  verifiedGuardians          Guardian[]                @relation("GuardianVerifier")
+  endedGuardians             Guardian[]                @relation("GuardianEnder")
+  createdConsentTemplates    ConsentTemplate[]         @relation("ConsentTemplateCreator")
+  recordedConsents           Consent[]                 @relation("ConsentRecorder")
+  revokedConsents            Consent[]                 @relation("ConsentRevoker")
+  createdRuleSets            RuleSet[]                 @relation("RuleSetCreator")
+  createdRuleSetVersions     RuleSetVersion[]          @relation("RuleSetVersionCreator")
+  publishedRuleSetVersions   RuleSetVersion[]          @relation("RuleSetPublisher")
+  createdAgeGroups           AgeGroup[]                @relation("AgeGroupCreator")
+  createdCategoryTemplates   CategoryTemplate[]        @relation("CategoryTemplateCreator")
+  uploadedDocuments          Document[]                @relation("DocumentUploader")
+  reviewedDocuments          Document[]                @relation("DocumentReviewer")
+  importJobs                 ImportJob[]               @relation("ImportCreator")
+  createdVenues              Venue[]                   @relation("VenueCreator")
+  createdCompetitions        Competition[]             @relation("CompetitionCreator")
+  updatedCompetitions        Competition[]             @relation("CompetitionUpdater")
+  createdApplications        Application[]             @relation("ApplicationCreator")
+  submittedApplications      Application[]             @relation("ApplicationSubmitter")
+  reviewedApplications       Application[]             @relation("ApplicationReviewer")
+  createdEntries             Entry[]                   @relation("EntryCreator")
+  decidedEntries             Entry[]                   @relation("EntryDecider")
+  withdrawnEntries           Entry[]                   @relation("EntryWithdrawer")
+  acquiredLeases             CompetitionWriteLease[]   @relation("LeaseAcquirer")
+  waivedAdmissionChecks      AdmissionCheck[]          @relation("AdmissionCheckUpdater")
+  checkInOperations          CheckIn[]                 @relation("CheckInOperator")
+  weighInAttempts            WeighInAttempt[]          @relation("WeighInOperator")
+  recordedClearances         MedicalClearance[]        @relation("ClearanceRecorder")
+  revokedClearances          MedicalClearance[]        @relation("ClearanceRevoker")
+  notifications              Notification[]
+  notificationPreferences    NotificationPreference[]
+  pushSubscriptions          PushSubscription[]
+  follows                    Follow[]
+  createdDraws               Draw[]                    @relation("DrawCreator")
+  publishedDraws             Draw[]                    @relation("DrawPublisher")
+  supersededDraws            Draw[]                    @relation("DrawSuperseder")
+  groupPlaceDecisions        GroupPlaceDecision[]      @relation("GroupPlaceDecider")
+  publishedSchedules         Schedule[]                @relation("SchedulePublisher")
+  matAssignments             MatAssignment[]
+  recordedMatchEvents        MatchEvent[]              @relation("MatchEventRecorder")
+  publishedCategoryResults   CategoryResult[]          @relation("CategoryResultPublisher")
+  matchResultRevisions       MatchResultRevision[]     @relation("MatchResultReviser")
+  medicalIncidents           MedicalIncident[]         @relation("MedicalIncidentRecorder")
+  proposedMatchResults       MatchResult[]             @relation("MatchResultProposer")
+  confirmedMatchResults      MatchResult[]             @relation("MatchResultConfirmer")
+  onboardingRequests         OnboardingRequest[]       @relation("OnboardingApplicant")
+  decidedOnboardingRequests  OnboardingRequest[]       @relation("OnboardingDecider")
+  onboardingStatusChanges    OnboardingStatusChange[]  @relation("OnboardingStatusActor")
+  onboardingDocuments        OnboardingDocument[]      @relation("OnboardingDocumentUploader")
+  ratingConfigsEnabled       CompetitionRatingConfig[] @relation("CompetitionRatingEnabler")
+  ratingCorrections          RatingCorrection[]        @relation("RatingCorrectionCreator")
+  ratingSeasons              RatingSeason[]            @relation("RatingSeasonCreator")
+  competitionRequests        CompetitionRequest[]      @relation("CompetitionRequestSubmitter")
+  competitionRequestsDecided CompetitionRequest[]      @relation("CompetitionRequestDecider")
 
   @@index([status, createdAt])
   @@map("user")
@@ -483,21 +485,22 @@ model Organization {
   descendants  OrganizationClosure[]     @relation("ClosureAncestor")
   memberships  OrganizationMembership[]
 
-  athleteMemberships AthleteMembership[]
-  coachMemberships   CoachMembership[]
-  ruleSets           RuleSet[]           @relation("RuleSetOwner")
-  ageGroups          AgeGroup[]          @relation("AgeGroupOwner")
-  categoryTemplates  CategoryTemplate[]  @relation("CategoryTemplateOwner")
-  documents          Document[]          @relation("OrganizationDocument")
-  importJobs         ImportJob[]         @relation("ImportOrganization")
-  venues             Venue[]             @relation("VenueOwner")
-  competitions       Competition[]       @relation("CompetitionOrganizer")
-  applications       Application[]       @relation("ApplicationOrganization")
-  representedApps    Application[]       @relation("ApplicationRepresentation")
-  entrySnapClubs     Entry[]             @relation("EntrySnapClub")
-  representedEntries Entry[]             @relation("EntryRepresentation")
-  onboardingRequests OnboardingRequest[] @relation("OnboardingOrganization")
-  onboardingResults  OnboardingRequest[] @relation("OnboardingResultOrganization")
+  athleteMemberships  AthleteMembership[]
+  coachMemberships    CoachMembership[]
+  ruleSets            RuleSet[]            @relation("RuleSetOwner")
+  ageGroups           AgeGroup[]           @relation("AgeGroupOwner")
+  categoryTemplates   CategoryTemplate[]   @relation("CategoryTemplateOwner")
+  documents           Document[]           @relation("OrganizationDocument")
+  importJobs          ImportJob[]          @relation("ImportOrganization")
+  venues              Venue[]              @relation("VenueOwner")
+  competitions        Competition[]        @relation("CompetitionOrganizer")
+  applications        Application[]        @relation("ApplicationOrganization")
+  representedApps     Application[]        @relation("ApplicationRepresentation")
+  entrySnapClubs      Entry[]              @relation("EntrySnapClub")
+  representedEntries  Entry[]              @relation("EntryRepresentation")
+  onboardingRequests  OnboardingRequest[]  @relation("OnboardingOrganization")
+  onboardingResults   OnboardingRequest[]  @relation("OnboardingResultOrganization")
+  competitionRequests CompetitionRequest[] @relation("CompetitionRequestOrganization")
 
   @@index([parentId])
   @@index([regionId, type, status])
@@ -1410,6 +1413,7 @@ model Competition {
   tournamentSeeds     TournamentSeed[]
   groupPlaceDecisions GroupPlaceDecision[]
   ratingConfig        CompetitionRatingConfig?
+  request             CompetitionRequest?
 
   @@index([status, startDate])
   @@index([organizerOrganizationId, startDate])
@@ -3080,4 +3084,63 @@ model RatingSeason {
   createdBy User @relation("RatingSeasonCreator", fields: [createdById], references: [id], onDelete: Restrict)
 
   @@map("rating_season")
+}
+
+// ============================================================
+// Переход на рейтинговую систему (docs/RATED_ONLY.md): заявки организаций на проведение турнира, дивизионы
+// ============================================================
+
+enum CompetitionRequestStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+/// Заявка организации на проведение турнира (docs/RATED_ONLY.md, 2). Турнир создаёт только платформа: одобрение
+/// заявки создаёт черновик рейтингового турнира по предложению (`proposal` — CompetitionRequestProposal).
+model CompetitionRequest {
+  id                   String                   @id @default(uuid(7)) @db.Uuid
+  organizationId       String                   @map("organization_id") @db.Uuid
+  submittedById        String?                  @map("submitted_by_id") @db.Uuid
+  status               CompetitionRequestStatus @default(SUBMITTED)
+  name                 String
+  startDate            DateTime                 @map("start_date") @db.Date
+  endDate              DateTime                 @map("end_date") @db.Date
+  proposal             Json
+  expectedParticipants Int?                     @map("expected_participants")
+  comment              String?
+  decisionReason       String?                  @map("decision_reason")
+  decidedById          String?                  @map("decided_by_id") @db.Uuid
+  decidedAt            DateTime?                @map("decided_at") @db.Timestamptz(3)
+  competitionId        String?                  @unique @map("competition_id") @db.Uuid
+  version              Int                      @default(1)
+  createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation("CompetitionRequestOrganization", fields: [organizationId], references: [id], onDelete: Restrict)
+  submittedBy  User?        @relation("CompetitionRequestSubmitter", fields: [submittedById], references: [id], onDelete: Restrict)
+  decidedBy    User?        @relation("CompetitionRequestDecider", fields: [decidedById], references: [id], onDelete: Restrict)
+  competition  Competition? @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+
+  @@index([status, id])
+  @@index([organizationId, id])
+  @@map("competition_request")
+}
+
+/// Дивизион спортсменов по возрасту (docs/RATED_ONLY.md, 4): границы включительно, пустая — открыта. Дивизион
+/// спортсмена вычисляется по дате рождения и правилу счёта возраста (SystemSetting `divisions.age_policy`).
+/// Границы дивизионов не пересекаются — проверяет сервис.
+model Division {
+  id          String    @id @default(uuid(7)) @db.Uuid
+  name        String
+  minAge      Int?      @map("min_age")
+  maxAge      Int?      @map("max_age")
+  description String?
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  @@map("division")
 }

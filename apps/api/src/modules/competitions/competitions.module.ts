@@ -15,6 +15,8 @@ import { RegulationService } from './application/regulation.service';
 import { StaffService } from './application/staff.service';
 import { RatingModule } from '../rating';
 import { CompetitionRatingController } from './api/competition-rating.controller';
+import { CompetitionRequestsController } from './api/competition-requests.controller';
+import { CompetitionRequestsService } from './application/competition-requests.service';
 import { CompetitionTypeService } from './application/competition-type.service';
 
 /**
@@ -23,13 +25,19 @@ import { CompetitionTypeService } from './application/competition-type.service';
  */
 @Module({
   imports: [OrganizationsModule, FilesModule, AuthModule, RuleSetsModule, AuditModule, RatingModule],
-  controllers: [CompetitionsController, CompetitionInvitesController, CompetitionRatingController],
+  controllers: [
+    CompetitionsController,
+    CompetitionInvitesController,
+    CompetitionRatingController,
+    CompetitionRequestsController,
+  ],
   providers: [
     CompetitionScopeService,
     CompetitionExtensions,
     CompetitionReferences,
     CompetitionStatusWriter,
     CompetitionsService,
+    CompetitionRequestsService,
     CompetitionTypeService,
     RegulationService,
     StaffService,
@@ -47,7 +55,8 @@ export class CompetitionsModule implements OnModuleInit {
     const canUpload: UploadPurposePolicy = async (user) =>
       user.emailVerified &&
       ((await this.policy.holdsAnywhere(user, 'competition.update')) ||
-        (await this.policy.holdsAnywhere(user, 'competition.create')));
+        (await this.policy.holdsAnywhere(user, 'competition.create_rated')) ||
+        (await this.policy.holdsAnywhere(user, 'competition.request')));
     this.files.registerUploadPolicy('REGULATION', canUpload);
     this.files.registerUploadPolicy('COMPETITION_LOGO', canUpload);
   }

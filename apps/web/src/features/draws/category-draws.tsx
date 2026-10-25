@@ -38,6 +38,7 @@ function CreateDraft({
   const fieldMessage = useFieldMessage();
   const suggested = isDrawFormat(data.suggestedFormat) ? data.suggestedFormat : '';
   const [format, setFormat] = useState<DrawFormat | ''>(suggested);
+  const fixed = data.suggestedFormat === 'SPECIAL_GROUP_RATED';
   const [keys, setKeys] = useState<SeparationKey[]>(['ORGANIZATION', 'REGION']);
   const [seeds, setSeeds] = useState<Record<string, string>>({});
   const [randomSeed, setRandomSeed] = useState('');
@@ -80,24 +81,33 @@ function CreateDraft({
       <CardTitle>{t('title')}</CardTitle>
       <p className="mb-3 text-sm text-slate-600">{t('hint')}</p>
       <div className="grid gap-4 md:grid-cols-2">
-        <Field
-          id="draw-format"
-          label={t('format')}
-          hint={suggested ? t('suggested', { format: formatLabel(suggested) }) : t('noSuggestion')}
-        >
-          <Select
+        {fixed ? (
+          // Рейтинговый турнир — один формат (docs/RATED_ONLY.md, 3): группы по рейтингу, змейка, плей-офф.
+          <div>
+            <p className="text-sm font-medium">{t('format')}</p>
+            <p className="mt-1">{formatLabel('SPECIAL_GROUP_RATED')}</p>
+            <p className="mt-1 text-sm text-slate-600">{t('ratedOnly')}</p>
+          </div>
+        ) : (
+          <Field
             id="draw-format"
-            value={format}
-            onChange={(e) => setFormat(e.target.value as DrawFormat | '')}
+            label={t('format')}
+            hint={suggested ? t('suggested', { format: formatLabel(suggested) }) : t('noSuggestion')}
           >
-            {suggested ? null : <option value="">{t('chooseFormat')}</option>}
-            {DRAW_FORMATS.map((f) => (
-              <option key={f} value={f}>
-                {formatLabel(f)}
-              </option>
-            ))}
-          </Select>
-        </Field>
+            <Select
+              id="draw-format"
+              value={format}
+              onChange={(e) => setFormat(e.target.value as DrawFormat | '')}
+            >
+              {suggested ? null : <option value="">{t('chooseFormat')}</option>}
+              {DRAW_FORMATS.map((f) => (
+                <option key={f} value={f}>
+                  {formatLabel(f)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
         {rated ? (
           <p className="text-sm text-slate-600">{t('ratedSeeding')}</p>
         ) : (

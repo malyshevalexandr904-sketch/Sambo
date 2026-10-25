@@ -97,6 +97,12 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
     },
     { href: '/competitions', label: t('nav.competitions'), visible: true },
     {
+      href: '/competition-requests',
+      label: t('nav.competitionRequests'),
+      visible:
+        hasAnywhere(user, 'competition.request') || hasPlatformPermission(user, 'competition.create_rated'),
+    },
+    {
       href: '/referee',
       label: t('nav.referee'),
       visible: user.grants.competitions.length > 0 || hasAnywhere(user, 'result.confirm'),
@@ -124,6 +130,11 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
       href: '/admin/rating',
       label: t('nav.rating'),
       visible: hasPlatformPermission(user, 'competition.view_rating_audit'),
+    },
+    {
+      href: '/admin/divisions',
+      label: t('nav.divisions'),
+      visible: hasPlatformPermission(user, 'division.manage'),
     },
     { href: '/admin/audit', label: t('nav.audit'), visible: hasPlatformPermission(user, 'audit.view') },
     {

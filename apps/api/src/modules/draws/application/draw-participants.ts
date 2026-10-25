@@ -58,6 +58,8 @@ export interface CategoryContext {
   admitted: ParticipantInfo[];
   admissionPending: number;
   suggestedFormat: CompetitionFormatCode | null;
+  /** Рейтинговый турнир: формат один — SPECIAL_GROUP_RATED (docs/RATED_ONLY.md, 3). */
+  rated: boolean;
   durations: MatchDurations;
 }
 
@@ -178,14 +180,14 @@ export class DrawParticipantsService {
         category,
         admitted,
         admissionPending: own.filter((r) => !r.admission || r.admission.status === 'PENDING').length,
-        // Рейтинговый турнир по умолчанию — свой формат (docs/RATED_TOURNAMENT_FORMAT.md); формат категории важнее.
+        // Рейтинговый турнир — только свой формат (docs/RATED_ONLY.md, 3): группы по рейтингу, змейка, плей-офф.
+        // Прочие форматы остаются только у турниров, созданных до перехода на рейтинговую систему.
         suggestedFormat:
-          category.formatOverride ??
-          (competition.competitionType === 'RATED'
+          competition.competitionType === 'RATED'
             ? 'SPECIAL_GROUP_RATED'
-            : params.success
-              ? formatForCount(params.data.formatSelection, admitted.length)
-              : null),
+            : (category.formatOverride ??
+              (params.success ? formatForCount(params.data.formatSelection, admitted.length) : null)),
+        rated: competition.competitionType === 'RATED',
         durations: params.success
           ? {
               main: matchDurationSeconds(params.data, age, false),

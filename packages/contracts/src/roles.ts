@@ -159,7 +159,7 @@ const MATRIX: Record<PermissionCode, string> = {
   'category.manage':              'xxxx.......',
   'ruleset.manage':               'xxxx.......',
   'venue.manage':                 'x.xx.......',
-  'competition.create':           'x.xx.......',
+  'competition.request':          'x.xx......x',
   'registration.create':          'x........xx',
   'ranking.manage':               'x.x........',
   'competition.view':             'xxxixxxrr..',
@@ -216,6 +216,7 @@ const MATRIX: Record<PermissionCode, string> = {
   'competition.publish_rating_results': 'xx.........',
   'rating.correct':               'xx.........',
   'rating.rebuild_apply':         'x..........',
+  'division.manage':              'xx.........',
 };
 
 export type RolePermissionMap = Record<RoleCode, Partial<Record<PermissionCode, GrantMode>>>;

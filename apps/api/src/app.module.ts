@@ -41,6 +41,7 @@ import { OutboxModule } from './modules/outbox';
 import { PeopleModule } from './modules/people';
 import { PublicModule } from './modules/public';
 import { RatingModule } from './modules/rating';
+import { DivisionsModule } from './modules/divisions';
 import { RegistrationsModule } from './modules/registrations';
 import { RefereesModule } from './modules/referees';
 import { RuleSetsModule } from './modules/rulesets';
@@ -118,6 +119,7 @@ import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
     FollowsModule,
     PublicModule,
     RatingModule,
+    DivisionsModule,
     LiveModule,
     AdminModule,
     DictionariesModule,

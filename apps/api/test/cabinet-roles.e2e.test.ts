@@ -212,11 +212,10 @@ describe('роль в кабинете', () => {
     });
   });
 
-  it('федерация создала турнир — сессия в роли «Судья», им можно управлять сразу; организатор остаётся', async () => {
+  it('федерация подаёт заявку на турнир; после одобрения ведёт его в роли «Судья»; организатор — в своей роли', async () => {
     const start = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-    const body = (organizerOrganizationId: string) => ({
+    const body = (organizationId: string) => ({
       name: 'Первенство федерации',
-      organizerOrganizationId,
       level: 'REGIONAL',
       disciplineCode: 'SPORT_SAMBO',
       timezone: 'Europe/Moscow',
@@ -224,6 +223,10 @@ describe('роль в кабинете', () => {
       endDate: start,
       registrationStartsAt: new Date(Date.now() - 86_400_000).toISOString(),
       registrationEndsAt: new Date(Date.now() + 20 * 86_400_000).toISOString(),
+      organizationId,
+    });
+    const admin = await login(t, (await createUser(t, { platform: ['PLATFORM_ADMIN'] })).email, {
+      totp: true,
     });
     const fed = await createOrg(t, { type: 'REGIONAL_FEDERATION' });
     const fa = await login(
@@ -231,28 +234,53 @@ describe('роль в кабинете', () => {
       (await createUser(t, { orgs: [{ organizationId: fed, role: 'FEDERATION_ADMIN' }] })).email,
     );
     expect((await me(fa)).activeRole).toBe('ORGANIZATION_HEAD');
-    const created = await send(fa, 'post', '/api/v1/competitions', body(fed));
-    expect(created.status, JSON.stringify(created.body)).toBe(201);
-    expect(created.body.data.allowedActions).toContain('competition.update');
-    expect(await me(fa)).toMatchObject({
-      activeRole: 'REFEREE',
-      availableRoles: ['ORGANIZATION_HEAD', 'REFEREE'],
-    });
-    const c = created.body.data as { id: string; version: number };
+    // Турнир создаёт только платформа (docs/RATED_ONLY.md); федерация подаёт заявку.
+    const { organizationId: _o, ...direct } = body(fed);
     expect(
-      (await send(fa, 'patch', `/api/v1/competitions/${c.id}`, { name: 'Первенство' }, c.version)).status,
-    ).toBe(200);
+      (await send(fa, 'post', '/api/v1/competitions', { ...direct, organizerOrganizationId: fed })).status,
+    ).toBe(403);
+    const request = await send(fa, 'post', '/api/v1/competition-requests', body(fed));
+    expect(request.status, JSON.stringify(request.body)).toBe(201);
+    expect((await me(fa)).activeRole).toBe('ORGANIZATION_HEAD');
+    const approved = await send(
+      admin,
+      'post',
+      `/api/v1/competition-requests/${request.body.data.id}/approve`,
+      {},
+      request.body.data.version,
+    );
+    expect(approved.status, JSON.stringify(approved.body)).toBe(200);
+    // Руководитель турнира действует в кабинете «Судья».
+    expect(await me(fa)).toMatchObject({ availableRoles: ['ORGANIZATION_HEAD', 'REFEREE'] });
+    expect((await selectRole(fa, 'REFEREE')).status).toBe(200);
+    const competitionId = approved.body.data.competitionId as string;
+    const view = await fa.agent.get(`/api/v1/competitions/${competitionId}`).expect(200);
+    expect(view.body.data.allowedActions).toContain('competition.update');
 
-    // Организатор управляет турниром своей организации и в роли руководителя — роль не меняется.
+    // Организатор управляет турниром своей организации в роли руководителя: руководитель турнира не нужен.
     const org = await createOrg(t, { type: 'ORGANIZER' });
     const organizer = await login(
       t,
       (await createUser(t, { orgs: [{ organizationId: org, role: 'ORGANIZER' }] })).email,
     );
-    const own = await send(organizer, 'post', '/api/v1/competitions', body(org));
+    const own = await send(organizer, 'post', '/api/v1/competition-requests', body(org));
     expect(own.status).toBe(201);
-    expect(own.body.data.allowedActions).toContain('competition.update');
-    expect((await me(organizer)).activeRole).toBe('ORGANIZATION_HEAD');
+    const ownApproved = await send(
+      admin,
+      'post',
+      `/api/v1/competition-requests/${own.body.data.id}/approve`,
+      {},
+      own.body.data.version,
+    );
+    expect(ownApproved.status).toBe(200);
+    const ownView = await organizer.agent
+      .get(`/api/v1/competitions/${ownApproved.body.data.competitionId}`)
+      .expect(200);
+    expect(ownView.body.data.allowedActions).toContain('competition.update');
+    expect(await me(organizer)).toMatchObject({
+      activeRole: 'ORGANIZATION_HEAD',
+      availableRoles: ['ORGANIZATION_HEAD'],
+    });
   });
 
   it('администратор платформы — только в роли «Администратор»', async () => {

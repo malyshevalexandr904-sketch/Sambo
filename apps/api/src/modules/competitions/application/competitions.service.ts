@@ -9,14 +9,16 @@ import {
   type CompetitionStatus,
   type CompetitionSummary,
   type CompetitionTransitionRequest,
+  isRoleCode,
   type Page,
+  ROLE_PERMISSIONS,
 } from '@sde/contracts';
 import { type Tx, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
 import { toPage } from '../../../common/http/http';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { CabinetRolesService, PolicyService } from '../../access';
+import { PolicyService } from '../../access';
 import { AuditService } from '../../audit';
 import { FilesService } from '../../files';
 import { OrganizationScopeService } from '../../organizations';
@@ -70,7 +72,6 @@ export class CompetitionsService {
     private readonly refs: CompetitionReferences,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
-    private readonly cabinetRoles: CabinetRolesService,
     private readonly rating: CompetitionRatingService,
   ) {}
 
@@ -149,69 +150,66 @@ export class CompetitionsService {
   // ---------- Команды ----------
 
   /**
-   * Турнир создаёт организация с `competition.create`; организация должна быть активной. Создатель становится
-   * руководителем турнира (TOURNAMENT_MANAGER), если действует не через платформенную роль.
+   * Турнир создаёт только платформа (`competition.create_rated`), и он всегда рейтинговый (docs/RATED_ONLY.md):
+   * сам или по одобренной заявке организации. Организация-организатор должна быть активной.
    */
   async create(user: AuthUser, input: CompetitionCreate): Promise<Competition> {
-    const orgScope = await this.orgScopes.scopeOf(input.organizerOrganizationId);
-    const access = await this.policy.assert(user, 'competition.create', orgScope);
-    // Рейтинговый турнир — только платформа; явный отказ, а не тихая замена типа (docs/RATING_ARCHITECTURE.md, 3.1).
-    if (
-      input.competitionType === 'RATED' &&
-      !(await this.policy.can(user, 'competition.create_rated', { kind: 'PLATFORM' }))
-    )
+    // Явный отказ с подсказкой про заявку на проведение, а не общий 403.
+    if (!(await this.policy.can(user, 'competition.create_rated', { kind: 'PLATFORM' })))
       throw new DomainError('RATED_COMPETITION_FORBIDDEN');
+    const orgScope = await this.orgScopes.scopeOf(input.organizerOrganizationId);
     if (!orgScope.visibleToAll)
       throw new DomainError('ORGANIZATION_NOT_ACTIVE', { organizationId: input.organizerOrganizationId });
-    const id = await this.db.tx(async (tx) => {
-      await this.refs.assertDiscipline(tx, input.disciplineCode);
-      if (input.venueId) await this.refs.assertVenue(tx, input.venueId, input.organizerOrganizationId);
-      if (input.ruleSetVersionId)
-        await this.refs.assertRuleSetVersion(
-          tx,
-          input.ruleSetVersionId,
-          input.disciplineCode,
-          input.organizerOrganizationId,
-        );
-      if (input.logoFileId) await this.refs.assertLogo(tx, input.logoFileId, user);
-      const competitionId = uuidv7();
-      const slug = await this.refs.uniqueSlug(tx, input.name, input.startDate, input.slug);
-      await tx.competition.create({ data: createData(input, competitionId, slug, user.id) });
-      const ruleSet =
-        input.competitionType === 'RATED'
-          ? await this.rating.pin(tx, competitionId, { publicDeltas: true, reason: null }, user.id)
-          : null;
-      await this.leases.createCloudLease(tx, competitionId, user.id);
-      if (!access.viaPlatform) await this.grantManager(tx, competitionId, user.id);
-      await this.audit.record(tx, {
-        action: 'competition.created',
-        entityType: 'Competition',
-        entityId: competitionId,
-        competitionId,
-        organizationId: input.organizerOrganizationId,
-        after: {
-          slug,
-          name: input.name,
-          status: 'DRAFT',
-          startDate: input.startDate,
-          endDate: input.endDate,
-          competitionType: input.competitionType,
-          ...(ruleSet ? { ratingCalculationVersion: ruleSet.calculationVersion } : {}),
-        },
-        platformIntervention: input.competitionType === 'RATED',
-      });
-      return competitionId;
+    const id = await this.db.tx((tx) => this.insert(tx, user, input));
+    return this.toDto(user, await this.loadRow(id));
+  }
+
+  /**
+   * Вставка рейтингового турнира в транзакции вызывающего: создание платформой и одобрение заявки организации.
+   * Права и активность организатора проверяет вызывающий.
+   */
+  async insert(
+    tx: Tx,
+    user: AuthUser,
+    input: Omit<CompetitionCreate, 'competitionType'>,
+    extra: { requestId?: string } = {},
+  ): Promise<string> {
+    await this.refs.assertDiscipline(tx, input.disciplineCode);
+    if (input.venueId) await this.refs.assertVenue(tx, input.venueId, input.organizerOrganizationId);
+    if (input.ruleSetVersionId)
+      await this.refs.assertRuleSetVersion(
+        tx,
+        input.ruleSetVersionId,
+        input.disciplineCode,
+        input.organizerOrganizationId,
+      );
+    if (input.logoFileId) await this.refs.assertLogo(tx, input.logoFileId, user);
+    const competitionId = uuidv7();
+    const slug = await this.refs.uniqueSlug(tx, input.name, input.startDate, input.slug);
+    await tx.competition.create({
+      data: createData({ ...input, competitionType: 'RATED' }, competitionId, slug, user.id),
     });
-    if (access.viaPlatform) return this.toDto(user, await this.loadRow(id));
-    // Роль руководителя турнира уже выдана: права пересчитываются по новой версии (новый объект пользователя).
-    // Она действует в роли кабинета «Судья»: организатор управляет турниром и так (наследование на турниры своей
-    // организации), а федерация — нет; тогда сессия переходит в роль «Судья».
-    let viewer: AuthUser = { ...user, permissionsVersion: user.permissionsVersion + 1 };
-    if (!(await this.policy.can(viewer, 'competition.update', await this.scopes.scopeOf(id)))) {
-      const switched = await this.cabinetRoles.selectIfHeld(user.id, user.sessionId, 'REFEREE');
-      if (switched) viewer = { ...viewer, activeRole: 'REFEREE' };
-    }
-    return this.toDto(viewer, await this.loadRow(id));
+    const ruleSet = await this.rating.pin(tx, competitionId, { publicDeltas: true, reason: null }, user.id);
+    await this.leases.createCloudLease(tx, competitionId, user.id);
+    await this.audit.record(tx, {
+      action: 'competition.created',
+      entityType: 'Competition',
+      entityId: competitionId,
+      competitionId,
+      organizationId: input.organizerOrganizationId,
+      after: {
+        slug,
+        name: input.name,
+        status: 'DRAFT',
+        startDate: input.startDate,
+        endDate: input.endDate,
+        competitionType: 'RATED',
+        ratingCalculationVersion: ruleSet.calculationVersion,
+        ...(extra.requestId ? { requestId: extra.requestId } : {}),
+      },
+      platformIntervention: true,
+    });
+    return competitionId;
   }
 
   async update(user: AuthUser, id: string, version: number, patch: CompetitionPatch): Promise<Competition> {
@@ -368,13 +366,37 @@ export class CompetitionsService {
     return checks.warnings;
   }
 
-  /** Создатель турнира — его руководитель; права пересчитываются по новой версии пользователя. */
-  private async grantManager(tx: Tx, competitionId: string, userId: string): Promise<void> {
+  /**
+   * Руководитель турнира (TOURNAMENT_MANAGER) — автору одобренной заявки, если своей ролью в организации-организаторе
+   * он турниром не управляет (организатор управляет по наследованию, федерация и клуб — нет). Роль действует в
+   * кабинете «Судья»; права пересчитываются по новой версии пользователя.
+   */
+  async grantManagerIfNeeded(
+    tx: Tx,
+    competitionId: string,
+    organizationId: string,
+    userId: string,
+    grantedById: string,
+  ): Promise<boolean> {
+    const own = await tx.organizationMembership.findMany({
+      where: { organizationId, userId, status: 'ACTIVE' },
+      select: { role: { select: { code: true } } },
+    });
+    if (own.some((m) => isRoleCode(m.role.code) && ROLE_PERMISSIONS[m.role.code]['competition.update']))
+      return false;
     const role = await tx.role.findUniqueOrThrow({ where: { code: 'TOURNAMENT_MANAGER' } });
     await tx.competitionMembership.create({
-      data: { id: uuidv7(), competitionId, userId, roleId: role.id, status: 'ACTIVE', invitedById: userId },
+      data: {
+        id: uuidv7(),
+        competitionId,
+        userId,
+        roleId: role.id,
+        status: 'ACTIVE',
+        invitedById: grantedById,
+      },
     });
     await tx.user.update({ where: { id: userId }, data: { permissionsVersion: { increment: 1 } } });
+    return true;
   }
 
   /** Условия самого турнира: правила и сроки при публикации, новый срок при продлении регистрации. */

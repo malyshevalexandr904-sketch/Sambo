@@ -202,5 +202,14 @@ export const AUDIT_ACTIONS = [
   // Тип турнира меняет только платформа (docs/RATING_ARCHITECTURE.md, 3.1).
   'competition.rating_enabled',
   'competition.type_changed',
+  // Переход на рейтинговую систему (docs/RATED_ONLY.md): заявки организаций на проведение, дивизионы.
+  'competition_request.submitted',
+  'competition_request.withdrawn',
+  'competition_request.approved',
+  'competition_request.rejected',
+  'division.created',
+  'division.updated',
+  'division.deleted',
+  'division.policy_changed',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

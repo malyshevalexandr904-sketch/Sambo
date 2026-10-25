@@ -1,7 +1,8 @@
 // Тип турнира (docs/RATING_ARCHITECTURE.md, 3.1): RATED / NON_RATED меняет только платформа
 // (`competition.convert_to_rated`), с причиной и записью аудита. Организатор тип не меняет: изменение турнира поле
 // не принимает. После публикации — только административной процедурой, после первого расчёта рейтинга — никак
-// (это же проверяет триггер БД `competition_type_guard`).
+// (это же проверяет триггер БД `competition_type_guard`). С переходом на рейтинговую систему (docs/RATED_ONLY.md) новые
+// турниры только RATED; NON_RATED остаётся у прежних, и их можно только перевести в RATED.
 import { Injectable } from '@nestjs/common';
 import type { CompetitionRatingEnable, CompetitionType, CompetitionTypeChange } from '@sde/contracts';
 import type { Tx } from '@sde/db';
@@ -34,6 +35,8 @@ export class CompetitionTypeService {
    * Начисленный рейтинг сменой типа не отменяется: для этого — корректировки.
    */
   async changeType(competitionId: string, userId: string, input: CompetitionTypeChange): Promise<void> {
+    // Все турниры рейтинговые (docs/RATED_ONLY.md): смена типа только переводит прежний турнир в рейтинговый.
+    if (input.competitionType === 'NON_RATED') throw new DomainError('NON_RATED_COMPETITION_FORBIDDEN');
     await this.db.tx(async (tx) => {
       const current = await this.lock(tx, competitionId);
       if (current.competitionType === input.competitionType)

@@ -12,7 +12,13 @@ import {
   type TestApp,
 } from './helpers/app';
 import { competitionStaff, givePerson, publishConsentTemplates, send } from './helpers/phase3';
-import { categoryTemplate, clubAthlete, isoDate, publishedRuleSet } from './helpers/phase4';
+import {
+  categoryTemplate,
+  clubAthlete,
+  isoDate,
+  platformAdminSession,
+  publishedRuleSet,
+} from './helpers/phase4';
 
 let t: TestApp;
 let consents: Record<string, string>;
@@ -73,7 +79,8 @@ async function world(opts: { maxCategories?: number } = {}): Promise<World> {
   const ruleSetVersionId = await publishedRuleSet(t);
   const { templateId } = await categoryTemplate(t);
   const start = new Date(Date.now() + 30 * day);
-  const created = await send(organizer, 'post', '/api/v1/competitions', {
+  // Турнир создаёт платформа (docs/RATED_ONLY.md); организатор ведёт его по наследованию прав.
+  const created = await send(await platformAdminSession(t), 'post', '/api/v1/competitions', {
     name: `Первенство ${uuidv7().slice(-6)}`,
     organizerOrganizationId: organizerOrgId,
     level: 'CLUB',

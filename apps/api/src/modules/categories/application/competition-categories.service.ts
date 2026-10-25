@@ -203,6 +203,26 @@ export class CompetitionCategoriesService {
       throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'ageGroupId', code: 'not_found' }] });
   }
 
+  /**
+   * Рейтинговый турнир — один формат (docs/RATED_ONLY.md, 3): у категории нельзя задать другой. Прочие форматы
+   * остаются только у турниров, созданных до перехода на рейтинговую систему.
+   */
+  private async assertFormat(
+    tx: Tx,
+    competitionId: string,
+    format: string | null | undefined,
+  ): Promise<void> {
+    if (!format || format === 'SPECIAL_GROUP_RATED') return;
+    const { competitionType } = await tx.competition.findUniqueOrThrow({
+      where: { id: competitionId },
+      select: { competitionType: true },
+    });
+    if (competitionType === 'RATED')
+      throw new DomainError('VALIDATION_FAILED', {
+        fields: [{ path: 'formatOverride', code: 'format_not_available' }],
+      });
+  }
+
   private boundsData(input: Pick<CategoryInput, 'age' | 'weight'>): BoundsData {
     return {
       agePolicy: input.age.policy,
@@ -225,6 +245,7 @@ export class CompetitionCategoriesService {
       const status = await this.lockCompetition(tx, competitionId);
       if (!REGISTRATION_PHASE.includes(status)) throw blocked('competition_status');
       if (input.ageGroupId) await this.assertAgeGroup(tx, input.ageGroupId, competition);
+      await this.assertFormat(tx, competitionId, input.formatOverride);
       const created = await tx.competitionCategory.create({
         data: {
           id: uuidv7(),
@@ -282,6 +303,7 @@ export class CompetitionCategoriesService {
         if ((await this.extensions.statsOf(tx, categoryId)).approved > 0)
           throw blocked('category_has_approved_entries');
       }
+      await this.assertFormat(tx, competitionId, patch.formatOverride);
       const current = boundsOf(row);
       const data: Prisma.CompetitionCategoryUncheckedUpdateInput = {
         code: patch.code,

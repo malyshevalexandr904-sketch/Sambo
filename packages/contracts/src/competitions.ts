@@ -76,7 +76,7 @@ export const CompetitionContactInfo = z.object({
 });
 export type CompetitionContactInfo = z.infer<typeof CompetitionContactInfo>;
 
-const CompetitionFields = {
+export const CompetitionFields = {
   name: z.string().trim().min(3, { error: 'too_short' }).max(200, { error: 'too_long' }),
   shortName: z.string().trim().max(60).optional(),
   slug: Slug.optional(),
@@ -135,14 +135,15 @@ export const COMPETITION_TYPES = ['NON_RATED', 'RATED'] as const;
 export type CompetitionType = (typeof COMPETITION_TYPES)[number];
 
 /**
- * Создание турнира. Рейтинговый (`RATED`) — только с правом платформы `competition.create_rated`, иначе 403
- * `RATED_COMPETITION_FORBIDDEN` (docs/RATING_ARCHITECTURE.md, 3.1). Изменением турнира тип не меняется.
+ * Создание турнира (docs/RATED_ONLY.md): все турниры рейтинговые, создаёт их только платформа (право
+ * `competition.create_rated`). Организация не создаёт турнир, а подаёт заявку на проведение (competition-requests.ts).
+ * `competitionType` оставлен для совместимости клиентов: допустимо только `RATED`.
  */
 export const CompetitionCreate = z
   .object({
     ...CompetitionFields,
     organizerOrganizationId: Uuid,
-    competitionType: z.enum(COMPETITION_TYPES).default('NON_RATED'),
+    competitionType: z.literal('RATED').default('RATED'),
   })
   .superRefine((v, ctx) => {
     for (const i of scheduleIssues(v)) ctx.addIssue({ code: 'custom', path: [i.path], message: i.code });
