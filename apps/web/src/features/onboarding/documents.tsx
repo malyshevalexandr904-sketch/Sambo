@@ -13,6 +13,7 @@ import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { FilePicker } from '@/components/file-picker';
 import { useDocumentTypeName } from '@/features/documents/shared';
+import { Link } from '@/i18n/navigation';
 import { api, uploadFile } from '@/lib/api';
 import { useErrorMessage } from '@/lib/errors';
 import { useOnboardingFieldMessage } from './shared';
@@ -107,7 +108,12 @@ export function DocumentsStep({
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-slate-600">{t('documents.hint', { mb: MAX_MB })}</p>
+      <p className="text-sm text-slate-600">
+        {t('documents.hint', { mb: MAX_MB })}{' '}
+        <Link href="/documents-guide" target="_blank" className="font-medium text-blue-700 underline">
+          {t('documents.guideLink')}
+        </Link>
+      </p>
       {error ? <Alert tone="danger">{error}</Alert> : null}
       <ul className="space-y-3">
         {r.documentRules.map((rule) => {
@@ -123,6 +129,14 @@ export function DocumentsStep({
                 </Badge>
                 {attached.length > 0 ? <Badge tone="success">✓ {t('documents.attached')}</Badge> : null}
               </div>
+              {rule.typeCodes.some((c) => t.has(`documents.typeHints.${c}`)) ? (
+                <p className="mt-1 text-sm text-slate-600">
+                  {rule.typeCodes
+                    .filter((c) => t.has(`documents.typeHints.${c}`))
+                    .map((c) => t(`documents.typeHints.${c}`))
+                    .join(' ')}
+                </p>
+              ) : null}
               {attached.length > 0 ? (
                 <ul className="mt-2 space-y-1 text-sm">
                   {attached.map((d) => (

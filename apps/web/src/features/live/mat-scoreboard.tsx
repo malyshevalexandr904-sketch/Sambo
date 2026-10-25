@@ -351,13 +351,13 @@ export function MatScoreboard({ matId }: { matId: string }) {
 
   if (notFound)
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-center text-white">
+      <main className="theme-light flex min-h-screen items-center justify-center bg-slate-950 p-6 text-center text-white">
         <p className="max-w-3xl text-2xl font-semibold">{t('notFound')}</p>
       </main>
     );
   if (!state)
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 text-2xl text-white/70">
+      <main className="theme-light flex min-h-screen items-center justify-center bg-slate-950 text-2xl text-white/70">
         {t('loading')}
       </main>
     );
@@ -367,7 +367,7 @@ export function MatScoreboard({ matId }: { matId: string }) {
   const match = 'match' in view ? view.match : null;
   const winnerSide = view.kind === 'result' ? (view.match.result?.winnerSide ?? null) : null;
   return (
-    <main className="flex h-screen min-h-[320px] select-none flex-col overflow-hidden bg-slate-950 text-white">
+    <main className="theme-light flex h-screen min-h-[320px] select-none flex-col overflow-hidden bg-slate-950 text-white">
       <header className="flex items-center justify-between gap-[2vw] bg-slate-900 px-[3vw] py-[1.2vh]">
         <p className="min-w-0 truncate text-[min(3.6vh,2.4vw)] font-bold">
           {t('mat', { number: state.mat.number })}

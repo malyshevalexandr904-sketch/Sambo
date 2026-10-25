@@ -2,11 +2,13 @@
 // Профиль: имя и язык, смена пароля, сеансы, двухфакторная аутентификация (API.md, 3.1–3.2).
 import type { DataEnvelope, Me, SessionDto } from '@sde/contracts';
 import { Alert, Badge, Button, Card, CardTitle, Field, Input, PageHeader, Select } from '@sde/ui';
+import { AvatarCard } from './avatar';
 import { MyPersonCard } from './my-person';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { QueryState } from '@/components/common';
+import { PasswordRequirements } from '@/components/password-requirements';
 import { api } from '@/lib/api';
 import { useErrorMessage } from '@/lib/errors';
 import { describeUserAgent, formatDateTime } from '@/lib/format';
@@ -110,9 +112,11 @@ function PasswordCard() {
             type="password"
             autoComplete="new-password"
             value={newPassword}
+            aria-describedby="password-rules"
             onChange={(e) => setNext(e.target.value)}
           />
         </Field>
+        <PasswordRequirements id="password-rules" value={newPassword} />
         <Button type="submit">{t('password')}</Button>
       </form>
     </Card>
@@ -280,6 +284,7 @@ export function Account() {
       <PageHeader title={t('title')} description={me.data.email ?? undefined} />
       <div className="grid gap-6 xl:grid-cols-2">
         <ProfileCard me={me.data} />
+        <AvatarCard me={me.data} />
         <TotpCard me={me.data} />
         <MyPersonCard />
         <PasswordCard />

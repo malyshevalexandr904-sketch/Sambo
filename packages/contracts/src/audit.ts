@@ -48,6 +48,7 @@ export const AUDIT_ACTIONS = [
   'user.platform_role_granted',
   'user.platform_role_revoked',
   'person.upserted',
+  'person.photo_updated',
   'organization.created',
   'organization.updated',
   'organization.status_changed',

@@ -43,6 +43,8 @@ export class FilesService {
     // Phase 2: логотип организации может загрузить любой вошедший с подтверждённым email —
     // файл привязывается к организации отдельно, при проверке права organization.update.
     this.registerUploadPolicy('ORGANIZATION_LOGO', (user) => Promise.resolve(user.emailVerified));
+    // Фото профиля — своё: привязывается только к записи «человек» самого загрузившего (PUT /me/avatar).
+    this.registerUploadPolicy('AVATAR', (user) => Promise.resolve(user.emailVerified));
   }
 
   registerUploadPolicy(purpose: UploadPurpose, policy: UploadPurposePolicy): void {

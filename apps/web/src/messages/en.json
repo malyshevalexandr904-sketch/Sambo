@@ -30,7 +30,11 @@
     "details": "Details",
     "copied": "Copied",
     "edit": "Edit",
-    "searchOrganization": "Search organisation"
+    "searchOrganization": "Search organisation",
+    "theme": {
+      "toDark": "Switch to dark theme",
+      "toLight": "Switch to light theme"
+    }
   },
   "home": {
     "title": "Digital Sambo",
@@ -84,9 +88,8 @@
     "register": {
       "title": "Sign up",
       "displayName": "Last name, first name, middle name",
-      "passwordHint": "At least 10 characters. Common passwords are rejected.",
-      "acceptTerms": "I have read the <link>Personal data processing policy</link>",
-      "acceptPersonalData": "I give my <link>consent to personal data processing</link>",
+      "acceptTerms": "I accept the <terms>Terms of use</terms> and have read the <privacy>Personal data processing policy</privacy>",
+      "acceptPersonalData": "I give my <consent>consent to personal data processing</consent>",
       "submit": "Sign up",
       "haveAccount": "Already have an account?",
       "sentTitle": "Check your inbox",
@@ -117,7 +120,8 @@
       "title": "Password recovery",
       "body": "Enter your account email and we will send a password reset link.",
       "submit": "Send link",
-      "sent": "If an account with this address exists, the email is on its way. The link is valid for 1 hour."
+      "sent": "If an account with this address exists, the email is on its way. The link is valid for 1 hour.",
+      "checkSpam": "The email may land in your Spam or Promotions folder — check it if nothing arrives in your inbox within a few minutes."
     },
     "reset": {
       "title": "New password",
@@ -139,6 +143,12 @@
       "waitMinutes": "You can send again in {minutes} min",
       "limited": "Several emails have already been sent — the next one can be sent later (see the button). Check your spam folder.",
       "limitedShort": "Too many requests — try again a bit later."
+    },
+    "passwordRules": {
+      "title": "Password requirements:",
+      "length": "{min} to {max} characters — any mix of letters, digits and symbols",
+      "common": "not a common password (e.g. not “1234567890” or “qwerty12345”) — those are rejected",
+      "done": "met"
     }
   },
   "dashboard": {
@@ -304,6 +314,16 @@
       "duplicate": "A person with the same name and date of birth already exists. If it is you, ask your coach or club to link that record to your account.",
       "notMe": "It is not me — save",
       "save": "Save"
+    },
+    "avatar": {
+      "title": "Profile photo",
+      "upload": "Upload photo",
+      "change": "Change photo",
+      "remove": "Remove photo",
+      "hint": "JPG, PNG or WebP, up to {mb} MB. The photo is shown in your account.",
+      "wrongType": "Use a JPG, PNG or WebP photo.",
+      "tooLarge": "The file is larger than {mb} MB.",
+      "needPerson": "You can add a photo once your personal details are in the profile: fill in “My details” below or wait for your application to be approved."
     }
   },
   "roles": {
@@ -2632,7 +2652,12 @@
       "remove": "Remove",
       "download": "Open",
       "wrongType": "Only PDF and JPG or PNG photos are accepted.",
-      "tooLarge": "The file is larger than {mb} MB."
+      "tooLarge": "The file is larger than {mb} MB.",
+      "guideLink": "Where to get the documents — guide",
+      "typeHints": {
+        "BIRTH_CERTIFICATE": "A birth certificate if there is no passport yet.",
+        "OTHER": "For example, a birth certificate if there is no passport yet, a sports rank certificate or a medical note."
+      }
     },
     "history": {
       "title": "Request history",
@@ -2930,7 +2955,7 @@
     "seasonCodeHint": "Latin letters and digits, for example 2026."
   },
   "legal": {
-    "nav": "Personal data documents",
+    "nav": "Legal documents",
     "version": "Version of {version}",
     "russianOnly": "This document is available in Russian only; the Russian text is legally binding.",
     "privacy": {
@@ -2938,6 +2963,53 @@
     },
     "consent": {
       "title": "Consent to personal data processing"
+    },
+    "terms": {
+      "title": "Terms of use"
+    }
+  },
+  "documentsGuide": {
+    "title": "Registration documents: where to get them",
+    "lead": "Which documents the role application needs, where to get them and how to upload them. The list for your role is on the “Documents” step of the application, with the required ones marked.",
+    "who": "Who needs it",
+    "where": "Where to get it",
+    "items": {
+      "PASSPORT": {
+        "title": "Passport",
+        "who": "Organization heads, coaches, referees; athletes aged 14 and over.",
+        "where": "Your Russian passport: photograph or scan the page with your photo. If it is lost or due for replacement, apply via <gosuslugi>Gosuslugi</gosuslugi> or at an MFC office."
+      },
+      "BIRTH_CERTIFICATE": {
+        "title": "Birth certificate",
+        "who": "Athletes who do not have a passport yet (usually under 14). Upload it as “Birth certificate” or, if there is no such item, as “Other document”.",
+        "where": "Issued by the civil registry office (ZAGS) when the birth is registered. A duplicate can be ordered via <gosuslugi>Gosuslugi</gosuslugi>, at an MFC office or at ZAGS."
+      },
+      "EGRUL_EXTRACT": {
+        "title": "Extract from the Unified State Register of Legal Entities",
+        "who": "Heads of Russian organizations (legal entities).",
+        "where": "Free on the Federal Tax Service website: <egrul>egrul.nalog.ru</egrul> — find the organization by INN or OGRN and download the PDF extract."
+      },
+      "REFEREE_BOOK": {
+        "title": "Referee record book",
+        "who": "Referees.",
+        "where": "The referee record book is issued by the regional sambo federation (referee board) when a referee category is awarded. Upload the pages with your name, photo and latest category."
+      },
+      "COACH_QUALIFICATION": {
+        "title": "Coach qualification document",
+        "who": "Coaches who state a qualification in the application.",
+        "where": "A degree in physical education and sport, or a professional development certificate or retraining diploma."
+      },
+      "OTHER": {
+        "title": "Other document",
+        "who": "Optional, any role.",
+        "where": "For example, the birth certificate of an athlete who has no passport yet, a sports rank certificate or a medical note — anything that helps verify the application."
+      }
+    },
+    "uploadTitle": "How to upload",
+    "upload": {
+      "format": "PDF or JPG/PNG photos up to 10 MB are accepted.",
+      "photo": "Take the photo in good light: the whole document, all corners visible, text readable.",
+      "privacy": "Files are stored privately: only you and the reviewer can see them."
     }
   }
 }

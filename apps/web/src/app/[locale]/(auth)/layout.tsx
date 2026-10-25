@@ -3,6 +3,7 @@ import { Link } from '@/i18n/navigation';
 import { Brand } from '@/components/brand';
 import { LegalLinks } from '@/components/legal-links';
 import { LocaleSwitcher } from '@/components/locale-switcher';
+import { ThemeSwitcher } from '@/components/theme-switcher';
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
@@ -11,7 +12,10 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
         <Link href="/" className="text-lg font-bold text-slate-900">
           <Brand />
         </Link>
-        <LocaleSwitcher />
+        <div className="flex items-center gap-2">
+          <LocaleSwitcher />
+          <ThemeSwitcher />
+        </div>
       </header>
       <main className="flex flex-1 items-start justify-center px-4 pb-12 pt-4 sm:items-center">
         <div className="w-full max-w-md">{children}</div>

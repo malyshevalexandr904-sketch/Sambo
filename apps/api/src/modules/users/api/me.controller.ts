@@ -4,6 +4,7 @@ import {
   type Me,
   type PersonDto,
   SelectCabinetRoleRequest,
+  SetAvatarRequest,
   UpdateMeRequest,
   UpsertMyPersonRequest,
 } from '@sde/contracts';
@@ -47,6 +48,21 @@ export class MeController {
   ): Promise<DataEnvelope<Me>> {
     return ok(
       await this.me.update({ userId: user.id, sessionId: user.sessionId, activeRole: user.activeRole }, body),
+    );
+  }
+
+  /** Фото профиля (своё). */
+  @Put('avatar')
+  @Authenticated()
+  async setAvatar(
+    @CurrentUser() user: AuthUser,
+    @ValidBody(SetAvatarRequest) body: SetAvatarRequest,
+  ): Promise<DataEnvelope<Me>> {
+    return ok(
+      await this.me.setAvatar(
+        { userId: user.id, sessionId: user.sessionId, activeRole: user.activeRole },
+        body,
+      ),
     );
   }
 
