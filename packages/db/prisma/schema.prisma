@@ -83,6 +83,11 @@ model User {
   /// до заполнения формы (после подтверждения email сразу открывается анкета этой роли).
   preferredRole          String?    @map("preferred_role")
   lastLoginAt            DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  /// Принятие условий использования и согласие на обработку ПДн при регистрации (152-ФЗ, ст. 9): время и редакция
+  /// текста согласия (`PD_CONSENT_VERSION` на сайте). У учётных записей до 0.13.x и созданных по приглашению — null.
+  termsAcceptedAt        DateTime?  @map("terms_accepted_at") @db.Timestamptz(3)
+  pdConsentAt            DateTime?  @map("pd_consent_at") @db.Timestamptz(3)
+  pdConsentVersion       String?    @map("pd_consent_version")
   createdAt              DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt              DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt              DateTime?  @map("deleted_at") @db.Timestamptz(3)

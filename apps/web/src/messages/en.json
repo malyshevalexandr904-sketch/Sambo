@@ -85,7 +85,8 @@
       "title": "Sign up",
       "displayName": "Last name, first name, middle name",
       "passwordHint": "At least 10 characters. Common passwords are rejected.",
-      "acceptTerms": "I accept the terms of use and the personal data processing policy",
+      "acceptTerms": "I have read the <link>Personal data processing policy</link>",
+      "acceptPersonalData": "I give my <link>consent to personal data processing</link>",
       "submit": "Sign up",
       "haveAccount": "Already have an account?",
       "sentTitle": "Check your inbox",
@@ -344,6 +345,7 @@
     "password_too_long": "Password is longer than 128 characters",
     "password_leaked": "This password is too common — choose another",
     "terms_not_accepted": "You must accept the terms",
+    "pd_consent_not_accepted": "You must consent to the processing of personal data",
     "invalid_totp": "Enter 6 digits",
     "invalid_slug": "Latin letters, digits and hyphens, 3–80 characters",
     "invalid_phone": "Format +79991234567",
@@ -2926,5 +2928,16 @@
     "saveSeason": "Save",
     "seasonSaved": "Season saved.",
     "seasonCodeHint": "Latin letters and digits, for example 2026."
+  },
+  "legal": {
+    "nav": "Personal data documents",
+    "version": "Version of {version}",
+    "russianOnly": "This document is available in Russian only; the Russian text is legally binding.",
+    "privacy": {
+      "title": "Personal data processing policy"
+    },
+    "consent": {
+      "title": "Consent to personal data processing"
+    }
   }
 }

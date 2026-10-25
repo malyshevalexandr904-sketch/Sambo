@@ -1,6 +1,12 @@
 // Вход, регистрация, подтверждение email, восстановление и смена пароля (API.md, 3.1).
 import { Inject, Injectable } from '@nestjs/common';
-import type { Locale, LoginRequest, Me, RegisterRequest } from '@sde/contracts';
+import {
+  type Locale,
+  type LoginRequest,
+  type Me,
+  PD_CONSENT_VERSION,
+  type RegisterRequest,
+} from '@sde/contracts';
 import { Prisma, type Tx, uuidv7 } from '@sde/db';
 import {
   burnPasswordCheck,
@@ -94,6 +100,10 @@ export class AuthService {
             status: 'PENDING_VERIFICATION',
             // Роль, выбранная до формы (0.13.0): после подтверждения сразу открывается её анкета.
             preferredRole: input.role ?? null,
+            // Отметки формы обязательны (схема запроса): время и редакция текста согласия (152-ФЗ, ст. 9).
+            termsAcceptedAt: new Date(),
+            pdConsentAt: new Date(),
+            pdConsentVersion: PD_CONSENT_VERSION,
           },
         });
         await tx.authIdentity.create({

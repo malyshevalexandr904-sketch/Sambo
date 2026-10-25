@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import logo from '@/assets/logo.png';
 import { HomeLoginAction } from '@/components/home-login-action';
+import { LegalLinks } from '@/components/legal-links';
 import { Link } from '@/i18n/navigation';
 
 /**
@@ -58,6 +59,7 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
           </Link>
         </section>
       </div>
+      <LegalLinks className="mt-8" />
     </main>
   );
 }

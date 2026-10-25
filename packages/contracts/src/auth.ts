@@ -8,12 +8,23 @@ import type { RoleCode } from './roles.js';
 export const USER_STATUSES = ['PENDING_VERIFICATION', 'ACTIVE', 'BLOCKED'] as const;
 export type UserStatus = (typeof USER_STATUSES)[number];
 
+/**
+ * Редакция текстов «Политика обработки ПДн» и «Согласие на обработку ПДн» на сайте (/privacy, /personal-data-consent).
+ * Меняется вместе с текстом; при регистрации сохраняется в учётной записи — видно, с какой редакцией согласился человек.
+ */
+export const PD_CONSENT_VERSION = '2026-10-25';
+
 export const RegisterRequest = z.object({
   email: Email,
   password: Password,
   displayName: z.string().trim().min(1).max(100),
   locale: Locale,
   acceptTerms: z.literal(true, { error: 'terms_not_accepted' }),
+  /**
+   * Согласие на обработку ПДн — отдельной отметкой, не в составе условий использования (152-ФЗ, ст. 9, ч. 1,
+   * с 01.09.2025). Время и редакция текста сохраняются в учётной записи.
+   */
+  acceptPersonalData: z.literal(true, { error: 'pd_consent_not_accepted' }),
   /**
    * Роль, выбранная до заполнения формы (0.13.0): после подтверждения email сразу открывается анкета этой роли.
    * Ничего не выдаёт — роль появляется только после одобрения заявки.

@@ -190,6 +190,11 @@ services:
     environment:
       API_INTERNAL_URL: http://api:4000
       STORAGE_UPLOAD_ORIGIN: https://s3.${DOMAIN}
+      # Оператор ПДн для /privacy и /personal-data-consent (docs/DEPLOYMENT.md, «Персональные данные»).
+      OPERATOR_NAME: ${OPERATOR_NAME:-}
+      OPERATOR_REGISTRY: ${OPERATOR_REGISTRY:-}
+      OPERATOR_ADDRESS: ${OPERATOR_ADDRESS:-}
+      OPERATOR_EMAIL: ${OPERATOR_EMAIL:-}
     depends_on:
       api: { condition: service_healthy }
     <<: *logging
