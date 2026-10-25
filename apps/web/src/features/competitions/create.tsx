@@ -1,6 +1,7 @@
 'use client';
 // Мастер создания турнира, шаг 1 (API.md, 5.1): организатор, название, сроки в часовом поясе турнира, место и
 // правила. Дальше — положение, категории и публикация на странице турнира (контрольный список готовности).
+// Турнир создаёт только администратор платформы, и он всегда рейтинговый (docs/RATED_ONLY.md).
 import {
   COMPETITION_LEVELS,
   type Competition,
@@ -15,12 +16,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { OrganizationPicker } from '@/components/organization-picker';
-import { afterServerRoleChange, roleBefore } from '@/features/cabinet-role';
-import { platformHas } from '@/lib/access';
 import { useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useFieldMessage } from '@/lib/errors';
-import { pickName, qk, useDisciplines, useMe } from '@/lib/queries';
+import { pickName, qk, useDisciplines } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 import { ActiveRatingRules } from './rating-card';
 import { VenueSelect } from './venue-select';
@@ -42,23 +41,26 @@ export const TIME_ZONES = [
   'UTC',
 ];
 
-interface FormValues {
-  organizerOrganizationId: string;
-  name: string;
-  shortName: string;
-  disciplineCode: string;
-  level: string;
+/** Сроки в форме: даты — календарные, окно регистрации — местное время в поясе турнира. */
+export interface ScheduleValues {
   timezone: string;
   startDate: string;
   endDate: string;
   registrationStartsLocal: string;
   registrationEndsLocal: string;
-  venueId: string;
-  ruleSetVersionId: string;
-  competitionType: 'NON_RATED' | 'RATED';
 }
 
-const today = (): string => new Date().toISOString().slice(0, 10);
+interface FormValues extends ScheduleValues {
+  organizerOrganizationId: string;
+  name: string;
+  shortName: string;
+  disciplineCode: string;
+  level: string;
+  venueId: string;
+  ruleSetVersionId: string;
+}
+
+export const today = (): string => new Date().toISOString().slice(0, 10);
 
 export function CompetitionCreateForm() {
   const t = useTranslations();
@@ -81,10 +83,7 @@ export function CompetitionCreateForm() {
     registrationEndsLocal: '',
     venueId: '',
     ruleSetVersionId: '',
-    competitionType: 'NON_RATED',
   });
-  // Рейтинговый турнир создаёт только платформа; сервер проверяет право сам (docs/RATING_ARCHITECTURE.md, 3.1).
-  const canRated = platformHas(useMe().data, 'competition.create_rated');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const organizer = v.organizerOrganizationId;
   const rulesets = useQuery({
@@ -119,7 +118,6 @@ export function CompetitionCreateForm() {
       registrationEndsAt: toInstant(v.registrationEndsLocal),
       venueId: v.venueId || undefined,
       ruleSetVersionId: v.ruleSetVersionId || undefined,
-      competitionType: canRated ? v.competitionType : 'NON_RATED',
     };
     const local: Record<string, string> = {};
     if (!body.name || body.name.length < 3) local.name = 'too_short';
@@ -131,10 +129,8 @@ export function CompetitionCreateForm() {
     if (Object.keys(local).length > 0) return;
     void action.run(async () => {
       try {
-        const before = await roleBefore(queryClient);
         const res = await api<DataEnvelope<Competition>>('/competitions', { method: 'POST', body });
-        // Федерация, создавшая турнир, переходит в роль «Судья», где действует роль руководителя турнира.
-        await afterServerRoleChange(queryClient, before);
+        await queryClient.invalidateQueries({ queryKey: ['competitions'] });
         router.push(`/competitions/${res.data.id}`);
       } catch (e) {
         if (e instanceof ApiError && e.fields.length > 0) {
@@ -170,7 +166,7 @@ export function CompetitionCreateForm() {
             <OrganizationPicker
               id="c-org"
               label={t('competitions.organizer')}
-              permission="competition.create"
+              permission="competition.create_rated"
               value={organizer}
               onChange={setOrganizer}
               className="sm:col-span-2"
@@ -221,20 +217,13 @@ export function CompetitionCreateForm() {
             </Field>
           </div>
         </Card>
-        {canRated ? (
-          <Card>
-            <CardTitle>{t('competitions.rating.title')}</CardTitle>
-            <Field id="c-type" label={t('competitions.rating.type')} hint={t('competitions.rating.typeHint')}>
-              <Select id="c-type" value={v.competitionType} onChange={set('competitionType')}>
-                <option value="NON_RATED">{t('competitions.rating.types.NON_RATED')}</option>
-                <option value="RATED">{t('competitions.rating.types.RATED')}</option>
-              </Select>
-            </Field>
-            <div className="mt-4">
-              <ActiveRatingRules enabled={v.competitionType === 'RATED'} />
-            </div>
-          </Card>
-        ) : null}
+        <Card>
+          <CardTitle>{t('competitions.rating.title')}</CardTitle>
+          <p className="text-sm text-slate-700">{t('competitions.rating.allRated')}</p>
+          <div className="mt-4">
+            <ActiveRatingRules enabled />
+          </div>
+        </Card>
         <ScheduleCard values={v} errors={errors} set={set} />
         <Card>
           <CardTitle>{t('competitions.venue')}</CardTitle>
@@ -262,14 +251,14 @@ export function CompetitionCreateForm() {
 }
 
 /** Сроки турнира: даты — календарные в его часовом поясе, окно регистрации — моменты в этом же поясе (ADR-13). */
-function ScheduleCard({
+export function ScheduleCard({
   values: v,
   errors,
   set,
 }: {
-  values: FormValues;
+  values: ScheduleValues;
   errors: Record<string, string>;
-  set: (k: keyof FormValues) => (e: { target: { value: string } }) => void;
+  set: (k: keyof ScheduleValues) => (e: { target: { value: string } }) => void;
 }) {
   const t = useTranslations();
   const tf = useFieldMessage();

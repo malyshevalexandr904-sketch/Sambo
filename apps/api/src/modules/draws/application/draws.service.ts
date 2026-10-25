@@ -74,6 +74,9 @@ export class DrawsService {
   }
 
   private formatFor(req: DrawCreate, ctx: CategoryContext): NonNullable<DrawCreate['format']> {
+    // Рейтинговый турнир — один формат (docs/RATED_ONLY.md, 3): другой формат не выбирается.
+    if (ctx.rated && req.format && req.format !== 'SPECIAL_GROUP_RATED')
+      throw invalid('format', 'format_not_available', { suggested: 'SPECIAL_GROUP_RATED' });
     const format = req.format ?? ctx.suggestedFormat;
     if (format === 'SPECIAL_GROUP_RATED') this.assertRated(req, ctx);
     if (!isDrawFormat(format))

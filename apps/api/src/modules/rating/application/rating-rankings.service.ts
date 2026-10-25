@@ -4,6 +4,7 @@
 // Место — общее по таблице (фильтры сужают список), изменение места — от последнего ежедневного снимка.
 import { Injectable } from '@nestjs/common';
 import {
+  type AthleteRatingProgress,
   type LocalizedText,
   type Page,
   type PublicAthleteRating,
@@ -123,7 +124,45 @@ export class RatingRankingsService {
   async history(publicId: string, q: RatingHistoryQuery): Promise<Page<PublicRatingHistoryItem>> {
     const athleteId = await this.publicAthlete(publicId);
     const rows = await this.historyRows(athleteId, q);
-    const page = rows.slice(0, q.limit);
+    const toItem = await this.historyMapper(rows.slice(0, q.limit));
+    return toPage(rows, q.limit, (h) => ({ k: h.at.toISOString(), id: h.id }), toItem);
+  }
+
+  /**
+   * Рейтинг в кабинете спортсмена (docs/RATED_ONLY.md, 5): текущий рейтинг и последние события по порядку, старые
+   * первыми, — трекер Elo от схватки к схватке. Доступ проверяет вызывающий; согласие на публикацию не требуется,
+   * соперники без согласия скрыты, как на сайте.
+   */
+  async progress(athleteId: string, limit: number): Promise<Omit<AthleteRatingProgress, 'division'>> {
+    const [rating, rows] = await Promise.all([
+      this.db.athleteRating.findUnique({ where: { athleteId } }),
+      this.historyRows(athleteId, { limit }),
+    ]);
+    const page = rows.slice(0, limit);
+    const toItem = await this.historyMapper(page);
+    const rules = rating ? await this.rules() : null;
+    return {
+      athleteId,
+      rating:
+        rating && rules
+          ? {
+              rating: rating.rating,
+              level: ratingLevel(rules, rating.rating),
+              peakRating: rating.peakRating,
+              lowestRating: rating.lowestRating,
+              ratedMatches: rating.ratedMatches,
+              wins: rating.wins,
+              losses: rating.losses,
+              status: rating.status,
+            }
+          : null,
+      bouts: page.map(toItem).reverse(),
+      truncated: rows.length > limit,
+    };
+  }
+
+  /** Строки истории → элементы: соперник — по правилу имён, турнир — только опубликованный. */
+  private async historyMapper(page: HistoryRow[]): Promise<(h: HistoryRow) => PublicRatingHistoryItem> {
     const competitions = await this.db.competition.findMany({
       where: {
         id: { in: [...new Set(page.map((h) => h.competition_id).filter((x): x is string => !!x))] },
@@ -138,27 +177,22 @@ export class RatingRankingsService {
     const visible = await this.distribution([...opponents.values()].map((o) => o.personId));
     const rules = await this.rules();
     const byCompetition = new Map(competitions.map((c) => [c.id, { slug: c.slug, name: c.name }]));
-    return toPage(
-      rows,
-      q.limit,
-      (h) => ({ k: h.at.toISOString(), id: h.id }),
-      (h): PublicRatingHistoryItem => {
-        const opponent = h.opponent_athlete_id ? opponents.get(h.opponent_athlete_id) : undefined;
-        return {
-          kind: h.kind,
-          at: h.at.toISOString(),
-          ratingBefore: h.rating_before,
-          ratingAfter: h.rating_after,
-          delta: h.delta,
-          levelAfter: h.level_after ?? ratingLevel(rules, h.rating_after),
-          outcome: h.outcome,
-          competition: h.competition_id ? (byCompetition.get(h.competition_id) ?? null) : null,
-          opponent: opponent
-            ? { ...athleteLabel(opponent, visible), ratingBefore: h.opponent_rating_before ?? 0 }
-            : null,
-        };
-      },
-    );
+    return (h) => {
+      const opponent = h.opponent_athlete_id ? opponents.get(h.opponent_athlete_id) : undefined;
+      return {
+        kind: h.kind,
+        at: h.at.toISOString(),
+        ratingBefore: h.rating_before,
+        ratingAfter: h.rating_after,
+        delta: h.delta,
+        levelAfter: h.level_after ?? ratingLevel(rules, h.rating_after),
+        outcome: h.outcome,
+        competition: h.competition_id ? (byCompetition.get(h.competition_id) ?? null) : null,
+        opponent: opponent
+          ? { ...athleteLabel(opponent, visible), ratingBefore: h.opponent_rating_before ?? 0 }
+          : null,
+      };
+    };
   }
 
   /** Спортсмен с рейтингом и согласием на публикацию; иначе — «не найдено». */
@@ -177,7 +211,10 @@ export class RatingRankingsService {
     return athlete.id;
   }
 
-  private historyRows(athleteId: string, q: RatingHistoryQuery): Promise<HistoryRow[]> {
+  private historyRows(
+    athleteId: string,
+    q: Pick<RatingHistoryQuery, 'limit'> & { cursor?: string },
+  ): Promise<HistoryRow[]> {
     const cursor = decodeCursor(q.cursor);
     const before = cursor
       ? Prisma.sql`AND (h.at, h.id) < (${new Date(cursor.k)}::timestamptz, ${cursor.id}::uuid)`

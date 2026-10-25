@@ -67,7 +67,7 @@ export async function resetData(t: TestApp): Promise<void> {
     import_job, document, consent, consent_template, guardian, athlete_rank_record, athlete_coach,
     athlete_membership, athlete_profile, coach_membership, coach_profile, referee_profile,
     category_template_item, category_template, weight_category, age_group, rule_set_version, rule_set,
-    organization, "user", person CASCADE`;
+    organization, "user", person, competition_request, division CASCADE`;
   await t.redis.flushdb();
 }
 

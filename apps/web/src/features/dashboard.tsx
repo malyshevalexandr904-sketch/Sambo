@@ -4,6 +4,7 @@ import { Alert, Card, CardTitle, PageHeader } from '@sde/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { StatusBadge } from '@/components/common';
+import { AthleteProgressCard } from '@/features/athletes/rating-progress';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { hasAnywhere } from '@/lib/access';
@@ -84,6 +85,32 @@ function WorkCard() {
   );
 }
 
+/**
+ * Кабинет спортсмена и представителя (docs/RATED_ONLY.md, 4, 5): дивизион и трекер Elo — свои или каждого
+ * подтверждённого ребёнка.
+ */
+function MyProgress() {
+  const t = useTranslations();
+  const mine = useMyAthletes();
+  const shown = (mine.data ?? []).filter((a) => a.relation === 'SELF' || a.verified);
+  if (shown.length === 0) return null;
+  return (
+    <div className="mb-6 grid gap-6">
+      {shown.map((a) => (
+        <AthleteProgressCard
+          key={`${a.relation}-${a.athleteId}`}
+          athleteId={a.athleteId}
+          title={
+            a.relation === 'SELF'
+              ? t('athleteProgress.myTitle')
+              : t('athleteProgress.childTitle', { name: a.publicName })
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
 export function Dashboard() {
   const t = useTranslations();
   const { data: me } = useMe();
@@ -118,6 +145,7 @@ export function Dashboard() {
           </Link>
         </Alert>
       ) : null}
+      {role === 'ATHLETE' || role === 'GUARDIAN' ? <MyProgress /> : null}
       <div className="grid gap-6 xl:grid-cols-2">
         <WorkCard />
         {showOrganizations ? (

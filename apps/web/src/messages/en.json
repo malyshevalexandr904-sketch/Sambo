@@ -71,7 +71,9 @@
     "notifications": "Notifications",
     "referee": "Refereeing",
     "onboarding": "Registration",
-    "onboardingReview": "Review requests"
+    "onboardingReview": "Review requests",
+    "competitionRequests": "Hosting requests",
+    "divisions": "Divisions"
   },
   "auth": {
     "email": "Email",
@@ -506,7 +508,7 @@
     "MATCH_RESULT_INCOMPLETE": "Record the result of the match first: the winner and the method.",
     "RESULT_NOT_CONFIRMED": "Some matches in the category have no confirmed result — the results cannot be published.",
     "ORGANIZATION_ALREADY_REGISTERED": "This organization is already registered or its registration is under review by the platform team. If you are its head, please contact support.",
-    "RATED_COMPETITION_FORBIDDEN": "Only a platform administrator can create a rated competition.",
+    "RATED_COMPETITION_FORBIDDEN": "Only the platform administrator can create a competition. Organizations submit a hosting request.",
     "COMPETITION_TYPE_LOCKED": "The type of a published competition can only be changed by an administrative procedure.",
     "COMPETITION_TYPE_UNCHANGED": "The competition already has this type.",
     "RATING_CALCULATIONS_EXIST": "Ratings have already been calculated for this competition, so its type cannot change. Use rating corrections instead.",
@@ -517,7 +519,10 @@
     "RATING_CHANGED": "The athlete's rating changed while you were looking: reload the page and check the value.",
     "RATING_UNCHANGED": "The rating already has this value: nothing to correct.",
     "COMPETITION_NOT_RATED": "The competition is not rated, so no rating is calculated for it.",
-    "RATING_SEASON_OVERLAP": "Rating seasons cannot overlap: change the dates."
+    "RATING_SEASON_OVERLAP": "Rating seasons cannot overlap: change the dates.",
+    "NON_RATED_COMPETITION_FORBIDDEN": "All competitions are rated: a competition cannot be made non-rated.",
+    "COMPETITION_REQUEST_NOT_PENDING": "The request has already been reviewed or withdrawn.",
+    "DIVISION_OVERLAP": "The age range overlaps another division."
   },
   "people": {
     "lastName": "Last name",
@@ -879,7 +884,7 @@
   },
   "competitions": {
     "title": "Competitions",
-    "hint": "Competitions where you are the organizer or a referee",
+    "hint": "All competitions are rated: the platform administrator creates them, organizations request to host",
     "create": "Create competition",
     "scopes": {
       "mine": "Mine",
@@ -1241,8 +1246,10 @@
       "levels": "Levels",
       "levelsRange": "1 to {count}",
       "format": "Format",
-      "formatHint": "The rated tournament group scheme will be added at the next stage."
-    }
+      "formatHint": "The rated tournament group scheme will be added at the next stage.",
+      "allRated": "All competitions on the platform are rated: confirmed bouts change the Elo rating. There is one format: rating-based groups with snake seeding and a playoff."
+    },
+    "requestCreate": "Request to host"
   },
   "applications": {
     "cardTitle": "Competition application",
@@ -1806,7 +1813,8 @@
       "randomSeedInvalid": "32 characters 0–9 and a–f, not all zeros",
       "submit": "Hold the draw",
       "ratedSeeding": "Seeding follows the athletes’ ratings at the time of the draw (1 is the highest); equal ratings are ordered by the draw seed. Groups are filled snake-wise; clubs and regions are not separated.",
-      "ratingColumn": "Rating"
+      "ratingColumn": "Rating",
+      "ratedOnly": "A rated competition uses only this format: participants are seeded into groups by rating (snake), the best advance to the playoff."
     },
     "details": {
       "format": "Format",
@@ -3011,5 +3019,99 @@
       "photo": "Take the photo in good light: the whole document, all corners visible, text readable.",
       "privacy": "Files are stored privately: only you and the reviewer can see them."
     }
+  },
+  "competitionRequests": {
+    "title": "Competition hosting requests",
+    "cardTitle": "Hosting request",
+    "hint": "Competitions are created by the platform administrator. Submit a request; once approved, the competition appears in the system.",
+    "hintReviewer": "Organizations’ requests to host competitions. Approval creates a draft rated competition.",
+    "new": "Submit a request",
+    "newTitle": "Request to host a competition",
+    "newHint": "Give the name, dates and venue. The platform administrator reviews the request and creates the competition.",
+    "formatNote": "All competitions are rated and use one format: rating-based groups with snake seeding and a playoff.",
+    "organization": "Organizing organization",
+    "expectedParticipants": "Expected number of participants",
+    "details": "Details",
+    "description": "Competition description",
+    "comment": "Comment for the administrator",
+    "commentHint": "For example, wishes about referees or participant ages.",
+    "submit": "Submit request",
+    "all": "All",
+    "statuses": {
+      "SUBMITTED": "Under review",
+      "APPROVED": "Approved",
+      "REJECTED": "Rejected",
+      "WITHDRAWN": "Withdrawn"
+    },
+    "empty": "No requests",
+    "emptyHint": "Submit a request to host a competition on the platform.",
+    "emptyReviewer": "No new requests from organizations.",
+    "loadMore": "Show more",
+    "fromOrganization": "Request from “{name}”",
+    "approvedTitle": "Request approved",
+    "approvedText": "The competition was created as a draft: the administrator prepares rules, categories and publication.",
+    "openCompetition": "Open competition",
+    "rejectedTitle": "Request rejected",
+    "proposal": "Organization’s proposal",
+    "noVenue": "not specified",
+    "submittedBy": "Submitted by",
+    "approve": "Approve and create competition",
+    "reject": "Reject",
+    "rejectTitle": "Reject request",
+    "withdraw": "Withdraw request"
+  },
+  "divisions": {
+    "title": "Divisions",
+    "hint": "Every athlete belongs to a division by age. The division is shown in the athlete’s cabinet and changes automatically as the athlete gets older.",
+    "listTitle": "Divisions and age limits",
+    "empty": "No divisions yet",
+    "emptyHint": "Add divisions below: a name and an age range.",
+    "policyTitle": "How age is counted",
+    "policy": "Athlete age",
+    "policies": {
+      "BY_BIRTH_YEAR": "By year of birth",
+      "EXACT_ON_DATE": "Full years today"
+    },
+    "policyHints": {
+      "BY_BIRTH_YEAR": "The age the athlete turns this year: athletes move to the next division on January 1.",
+      "EXACT_ON_DATE": "Full years today: athletes move to the next division on their birthday."
+    },
+    "name": "Name",
+    "minAge": "Age from",
+    "maxAge": "Age to",
+    "openHint": "Inclusive. Leave empty for no limit.",
+    "description": "Note",
+    "addTitle": "New division",
+    "add": "Add division",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "remove": "Delete",
+    "removeConfirm": "Delete division “{name}”? Athletes of this age will have no division.",
+    "range": "{from}–{to} years",
+    "upTo": "up to {to} years",
+    "from": "{from} years and older",
+    "anyAge": "any age"
+  },
+  "athleteProgress": {
+    "title": "Division and rating",
+    "myTitle": "My division and rating",
+    "childTitle": "{name}: division and rating",
+    "division": "Division",
+    "noDivision": "not assigned",
+    "ageByYear": "age by year of birth: {age}",
+    "ageExact": "full years: {age}",
+    "noRating": "The rating appears after the first bout at a competition.",
+    "tracker": "Elo tracker",
+    "truncated": "The last 500 changes are shown.",
+    "recent": "Recent bouts",
+    "noBouts": "No rated bouts yet.",
+    "chartLabel": "Elo rating over {count} bouts: from {from} to {to}, best {peak}",
+    "start": "start",
+    "bout": "Bout {n}",
+    "opponent": "opponent: {name} ({rating})",
+    "legendWin": "win",
+    "legendLoss": "loss",
+    "legendAxis": "horizontal axis: bout number"
   }
 }

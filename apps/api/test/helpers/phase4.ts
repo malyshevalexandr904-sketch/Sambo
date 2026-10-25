@@ -1,7 +1,7 @@
 // Фикстуры Phase 4a: турнир (напрямую в БД — для тестов других модулей), правила, категории, спортсмены клуба.
 import { uuidv7 } from '@sde/db';
-import type { TestApp } from './app';
-import { createOrg } from './app';
+import type { Session, TestApp } from './app';
+import { createOrg, createUser, login } from './app';
 
 const day = 24 * 60 * 60 * 1000;
 export const isoDate = (d: Date): string => d.toISOString().slice(0, 10);
@@ -175,4 +175,13 @@ export async function clubAthlete(
       },
     });
   return { athleteId, personId };
+}
+
+/**
+ * Администратор платформы: турнир создаёт только платформа, и он рейтинговый (docs/RATED_ONLY.md). Организатор
+ * управляет созданным для его организации турниром по наследованию прав (▲).
+ */
+export async function platformAdminSession(t: TestApp): Promise<Session> {
+  const admin = await createUser(t, { platform: ['PLATFORM_ADMIN'] });
+  return login(t, admin.email, { totp: true });
 }

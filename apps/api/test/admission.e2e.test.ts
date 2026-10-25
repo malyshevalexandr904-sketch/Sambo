@@ -13,7 +13,13 @@ import {
   type TestApp,
 } from './helpers/app';
 import { competitionStaff, givePerson, PDF, publishConsentTemplates, send, upload } from './helpers/phase3';
-import { categoryTemplate, clubAthlete, isoDate, publishedRuleSet } from './helpers/phase4';
+import {
+  categoryTemplate,
+  clubAthlete,
+  isoDate,
+  platformAdminSession,
+  publishedRuleSet,
+} from './helpers/phase4';
 import { TEST_ENV } from './test-env';
 
 let t: TestApp;
@@ -89,7 +95,8 @@ async function world(opts: { outcome?: 'WITHDRAW' | 'RECHECK' | 'TRANSFER' } = {
   const organizer = await login(t, organizerUser.email);
   const { templateId } = await categoryTemplate(t);
   const start = new Date(Date.now() + 30 * day);
-  const created = await send(organizer, 'post', '/api/v1/competitions', {
+  // Турнир создаёт платформа (docs/RATED_ONLY.md); организатор ведёт его по наследованию прав.
+  const created = await send(await platformAdminSession(t), 'post', '/api/v1/competitions', {
     name: `Первенство ${uuidv7().slice(-6)}`,
     organizerOrganizationId: organizerOrgId,
     level: 'CLUB',

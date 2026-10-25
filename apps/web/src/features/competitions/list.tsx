@@ -8,7 +8,7 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { QueryState } from '@/components/common';
 import { Link } from '@/i18n/navigation';
-import { hasAnywhere } from '@/lib/access';
+import { hasAnywhere, platformHas } from '@/lib/access';
 import { api } from '@/lib/api';
 import { qk, useMe } from '@/lib/queries';
 import { CompetitionTypeBadge } from './rating-card';
@@ -19,7 +19,9 @@ type Scope = 'mine' | 'open' | 'all';
 export function CompetitionsList() {
   const t = useTranslations('competitions');
   const { data: me } = useMe();
-  const staff = hasAnywhere(me, 'competition.view') || hasAnywhere(me, 'competition.create');
+  const canCreate = platformHas(me, 'competition.create_rated');
+  const canRequest = hasAnywhere(me, 'competition.request');
+  const staff = hasAnywhere(me, 'competition.view') || canCreate || canRequest;
   const [scope, setScope] = useState<Scope>(staff ? 'mine' : 'open');
   const params = {
     mine: scope === 'mine' ? 'true' : undefined,
@@ -40,12 +42,20 @@ export function CompetitionsList() {
         title={t('title')}
         description={t('hint')}
         actions={
-          hasAnywhere(me, 'competition.create') ? (
+          // Турнир создаёт только платформа; организация подаёт заявку на проведение (docs/RATED_ONLY.md).
+          canCreate ? (
             <Link
               href="/competitions/new"
               className="inline-flex min-h-11 items-center rounded-md bg-blue-700 px-4 font-medium text-white hover:bg-blue-800"
             >
               {t('create')}
+            </Link>
+          ) : canRequest ? (
+            <Link
+              href="/competition-requests/new"
+              className="inline-flex min-h-11 items-center rounded-md bg-blue-700 px-4 font-medium text-white hover:bg-blue-800"
+            >
+              {t('requestCreate')}
             </Link>
           ) : null
         }

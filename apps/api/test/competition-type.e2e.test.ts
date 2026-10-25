@@ -1,6 +1,8 @@
-// Рейтинговый турнир (фаза 8, docs/RATING_ARCHITECTURE.md, 3): тип турнира — решение платформы. Организатор не
-// создаёт рейтинговый турнир и не меняет тип; администратор включает рейтинг до публикации, после публикации —
-// только административной процедурой с причиной, после первого расчёта рейтинга — никак (и на уровне БД).
+// Рейтинговый турнир (фаза 8, docs/RATING_ARCHITECTURE.md, 3; docs/RATED_ONLY.md): все новые турниры рейтинговые,
+// создаёт их только платформа. Прежний нерейтинговый турнир администратор переводит в рейтинговый до публикации,
+// после публикации — административной процедурой с причиной; обратно в нерейтинговый — никогда, а после первого
+// расчёта рейтинга тип не меняется и на уровне БД.
+import { uuidv7 } from '@sde/db';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { RatingCalculationService, RatingRulesService } from '../src/modules/rating';
 import {
@@ -13,7 +15,7 @@ import {
   type TestApp,
 } from './helpers/app';
 import { send } from './helpers/phase3';
-import { isoDate, publishedRuleSet } from './helpers/phase4';
+import { ensureCompetition, isoDate, publishedRuleSet } from './helpers/phase4';
 import { confirm, playToResult, refereeWorld, scheduledMatches } from './helpers/phase7';
 
 let t: TestApp;
@@ -63,9 +65,10 @@ interface CompetitionBody {
   allowedActions: string[];
 }
 
-async function draft(s: Session = organizer): Promise<CompetitionBody> {
-  const res = await send(s, 'post', '/api/v1/competitions', input());
-  expect(res.status, JSON.stringify(res.body)).toBe(201);
+/** Нерейтинговый черновик, созданный до перехода на рейтинговую систему (напрямую в БД: через API его не создать). */
+async function legacyDraft(): Promise<CompetitionBody> {
+  const id = await ensureCompetition(t, uuidv7(), { organizerId: orgId });
+  const res = await organizer.agent.get(`/api/v1/competitions/${id}`).expect(200);
   return res.body.data as CompetitionBody;
 }
 
@@ -73,14 +76,16 @@ const audits = (competitionId: string, action: string) =>
   t.admin.auditLog.findMany({ where: { competitionId, action }, orderBy: { occurredAt: 'asc' } });
 
 describe('rated competition permissions', () => {
-  it('an organizer creates only non-rated competitions and cannot change the type', async () => {
+  it('an organizer creates no competition and cannot change the type of a prior one', async () => {
     const before = await t.admin.competition.count();
-    const rated = await send(organizer, 'post', '/api/v1/competitions', input({ competitionType: 'RATED' }));
-    expect(rated.status).toBe(403);
-    expect(rated.body.error.code).toBe('RATED_COMPETITION_FORBIDDEN');
+    for (const competitionType of [undefined, 'RATED', 'NON_RATED']) {
+      const res = await send(organizer, 'post', '/api/v1/competitions', input({ competitionType }));
+      expect(res.status).toBe(competitionType === 'NON_RATED' ? 400 : 403);
+      if (res.status === 403) expect(res.body.error.code).toBe('RATED_COMPETITION_FORBIDDEN');
+    }
     expect(await t.admin.competition.count()).toBe(before);
 
-    const c = await draft();
+    const c = await legacyDraft();
     expect(c).toMatchObject({ competitionType: 'NON_RATED', rating: null });
     expect(c.allowedActions).not.toContain('competition.convert_to_rated');
     // Изменение турнира тип не принимает.
@@ -119,8 +124,8 @@ describe('rated competition permissions', () => {
     expect(created!.after).toMatchObject({ competitionType: 'RATED' });
   });
 
-  it('a platform admin enables rating before publication, with a reason', async () => {
-    const c = await draft();
+  it('a platform admin enables rating of a prior competition before publication, with a reason', async () => {
+    const c = await legacyDraft();
     const noReason = await send(platformAdmin, 'post', `/api/v1/admin/competitions/${c.id}/rating`, {});
     expect(noReason.status).toBe(400);
     const res = await send(platformAdmin, 'post', `/api/v1/admin/competitions/${c.id}/rating`, {
@@ -153,8 +158,8 @@ describe('rated competition permissions', () => {
     });
   });
 
-  it('after publication the type changes only by the administrative procedure', async () => {
-    const c = await draft();
+  it('after publication the type changes only by the administrative procedure, and never back', async () => {
+    const c = await legacyDraft();
     await t.admin.competition.update({
       where: { id: c.id },
       data: {
@@ -187,7 +192,7 @@ describe('rated competition permissions', () => {
       competitionType: 'NON_RATED',
       reason: 'Решение отменено комиссией',
     });
-    expect(back.body.data).toMatchObject({ competitionType: 'NON_RATED', rating: null });
+    expect(back.body.error.code).toBe('NON_RATED_COMPETITION_FORBIDDEN');
     expect(
       (await audits(c.id, 'competition.type_changed')).map((a) => [a.before, a.after, a.reason]),
     ).toEqual([
@@ -196,7 +201,6 @@ describe('rated competition permissions', () => {
         expect.objectContaining({ competitionType: 'RATED' }),
         'Решение комиссии платформы',
       ],
-      [{ competitionType: 'RATED' }, { competitionType: 'NON_RATED' }, 'Решение отменено комиссией'],
     ]);
   });
 
@@ -219,7 +223,7 @@ describe('rated competition permissions', () => {
       `/api/v1/admin/competitions/${w.competitionId}/rating-type-change`,
       { competitionType: 'NON_RATED', reason: 'Отменить рейтинг турнира' },
     );
-    expect(res.body.error.code).toBe('RATING_CALCULATIONS_EXIST');
+    expect(res.body.error.code).toBe('NON_RATED_COMPETITION_FORBIDDEN');
     await expect(
       t.admin.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT set_config('sde.rating_type_change', 'on', true)`;

@@ -99,12 +99,34 @@ describe('rated tournament format', () => {
     expect(r.body.error.code).toBe('TOO_MANY_PARTICIPANTS');
   });
 
-  it('a category format override wins over the rated default', async () => {
+  it('a rated competition has one format: no other format for a category or a draw (docs/RATED_ONLY.md)', async () => {
+    // Прежнее значение формата у категории (до перехода) не действует: формат — только рейтинговый.
     const cat = await drawCategory(t, rated, 4, { formatOverride: 'ROUND_ROBIN' });
     const d = await draws(rated, cat.categoryId);
-    expect(d).toMatchObject({ suggestedFormat: 'ROUND_ROBIN', ratedPlan: null });
+    expect(d).toMatchObject({ suggestedFormat: 'SPECIAL_GROUP_RATED', ratedPlan: { ok: true } });
+    const other = await send(rated.staff.manager, 'post', `/api/v1/categories/${cat.categoryId}/draws`, {
+      format: 'ROUND_ROBIN',
+    });
+    expect(other.status).toBe(400);
+    expect(other.body.error.details.fields).toEqual([{ path: 'format', code: 'format_not_available' }]);
+
+    const path = `/api/v1/competitions/${rated.competitionId}/categories/${cat.categoryId}`;
+    const current = await rated.staff.manager.agent.get(path).expect(200);
+    const patch = await send(
+      rated.staff.manager,
+      'patch',
+      path,
+      { formatOverride: 'SINGLE_ELIMINATION' },
+      current.body.data.version,
+    );
+    expect(patch.status).toBe(400);
+    expect(patch.body.error.details.fields).toEqual([
+      { path: 'formatOverride', code: 'format_not_available' },
+    ]);
+
     const r = await send(rated.staff.manager, 'post', `/api/v1/categories/${cat.categoryId}/draws`, {});
     expect(r.status, JSON.stringify(r.body)).toBe(201);
+    expect(r.body.data.format).toBe('SPECIAL_GROUP_RATED');
   });
 
   it('a non-rated competition keeps the format chosen by its rules', async () => {

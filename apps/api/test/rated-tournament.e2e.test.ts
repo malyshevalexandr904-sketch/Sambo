@@ -4,6 +4,7 @@
 // берутся из финальной части; Elo, история, уровни, пересборка, публичные страницы и аудит сходятся. Нерейтинговый
 // турнир того же вида Elo не трогает.
 import type {
+  AthleteRatingProgress,
   BracketViewDto,
   CategoryBracketDto,
   CategoryResultsDto,
@@ -290,6 +291,47 @@ describe('rated tournament end to end', { timeout: HEAVY }, () => {
     }
   });
 
+  it("shows the athlete's division and the Elo tracker bout by bout in the cabinet (docs/RATED_ONLY.md)", async () => {
+    const championEntry = [...seed.entries()].find(([, s]) => s === 1)![0];
+    const athleteId = athleteOf.get(championEntry)!;
+    const athlete = await t.admin.athleteProfile.findUniqueOrThrow({
+      where: { id: athleteId },
+      include: { person: true },
+    });
+    const age = new Date().getUTCFullYear() - athlete.person.birthDate.getUTCFullYear();
+    // Дивизионы задаёт администратор: возраст спортсмена — внутри «своего», соседние не пересекаются.
+    for (const [name, minAge, maxAge] of [
+      ['Младший', null, age - 1],
+      ['Основной', age, age + 1],
+      ['Старший', age + 2, null],
+    ] as const)
+      expect(
+        (await send(platformAdmin, 'post', '/api/v1/admin/divisions', { name, minAge, maxAge })).status,
+      ).toBe(201);
+
+    const r = await platformAdmin.agent.get(`/api/v1/athletes/${athleteId}/rating-progress`).expect(200);
+    const p = r.body.data as AthleteRatingProgress;
+    expect(p.division).toMatchObject({ name: 'Основной', age, agePolicy: 'BY_BIRTH_YEAR' });
+    const current = await t.admin.athleteRating.findUniqueOrThrow({ where: { athleteId } });
+    expect(p.rating).toMatchObject({ rating: current.rating, ratedMatches: current.ratedMatches });
+    // Трекер: схватки по порядку, рейтинг после одной — рейтинг до следующей; последняя точка — текущий рейтинг.
+    const matches = p.bouts.filter((b) => b.kind === 'MATCH');
+    expect(matches).toHaveLength(current.ratedMatches);
+    expect(p.bouts[0]!.ratingBefore).toBe(SAMBO_ELO_V1.initialRating);
+    for (let i = 1; i < p.bouts.length; i++)
+      expect(p.bouts[i]!.ratingBefore).toBe(p.bouts[i - 1]!.ratingAfter);
+    expect(p.bouts.at(-1)!.ratingAfter).toBe(current.rating);
+    for (const b of matches) {
+      expect(b.ratingAfter - b.ratingBefore).toBe(b.delta);
+      expect(b.competition).not.toBeNull();
+      expect(b.outcome).not.toBeNull();
+    }
+
+    // Чужой спортсмен — как отсутствующий.
+    const stranger = await login(t, (await createUser(t)).email);
+    await stranger.agent.get(`/api/v1/athletes/${athleteId}/rating-progress`).expect(404);
+  });
+
   it('shows the tournament and the athletes publicly', async () => {
     const competition = await t.admin.competition.findUniqueOrThrow({ where: { id: w.competitionId } });
     const summary = await pub<{ data: PublicCompetitionRatingSummary }>(
@@ -323,7 +365,7 @@ describe('rated tournament end to end', { timeout: HEAVY }, () => {
     ]);
   });
 
-  it('cannot change the tournament type once ratings exist', async () => {
+  it('cannot make the tournament non-rated (and not at all once ratings exist)', async () => {
     const r = await send(
       superAdmin,
       'post',
@@ -331,7 +373,7 @@ describe('rated tournament end to end', { timeout: HEAVY }, () => {
       { competitionType: 'NON_RATED', reason },
     );
     expect(r.status).toBe(422);
-    expect(r.body.error.code).toBe('RATING_CALCULATIONS_EXIST');
+    expect(r.body.error.code).toBe('NON_RATED_COMPETITION_FORBIDDEN');
   });
 
   it('a new formula applies to new tournaments only; earlier ratings stay as calculated', async () => {

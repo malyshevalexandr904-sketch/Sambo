@@ -13,7 +13,7 @@ import {
   type TestApp,
 } from './helpers/app';
 import { PDF, send, upload } from './helpers/phase3';
-import { categoryTemplate, isoDate, publishedRuleSet } from './helpers/phase4';
+import { categoryTemplate, isoDate, platformAdminSession, publishedRuleSet } from './helpers/phase4';
 
 let t: TestApp;
 
@@ -30,6 +30,8 @@ const day = 24 * 60 * 60 * 1000;
 interface World {
   organizerOrgId: string;
   organizer: Session;
+  /** Турнир создаёт только платформа (docs/RATED_ONLY.md). */
+  admin: Session;
   organizerUser: { id: string; email: string };
   ruleSetVersionId: string;
   templateId: string;
@@ -43,7 +45,8 @@ async function world(): Promise<World> {
   const organizer = await login(t, organizerUser.email);
   const ruleSetVersionId = await publishedRuleSet(t);
   const { templateId } = await categoryTemplate(t);
-  return { organizerOrgId, organizer, organizerUser, ruleSetVersionId, templateId };
+  const admin = await platformAdminSession(t);
+  return { organizerOrgId, organizer, organizerUser, admin, ruleSetVersionId, templateId };
 }
 
 const schedule = (startInDays = 30) => {
@@ -57,8 +60,9 @@ const schedule = (startInDays = 30) => {
   };
 };
 
+/** Черновик создаёт платформа для организации; дальше — глазами организатора (он управляет им по наследованию). */
 async function draft(w: World, over: Record<string, unknown> = {}) {
-  const res = await send(w.organizer, 'post', '/api/v1/competitions', {
+  const res = await send(w.admin, 'post', '/api/v1/competitions', {
     name: 'Открытое первенство клуба',
     organizerOrganizationId: w.organizerOrgId,
     level: 'CLUB',
@@ -67,7 +71,8 @@ async function draft(w: World, over: Record<string, unknown> = {}) {
     ...over,
   });
   expect(res.status, JSON.stringify(res.body)).toBe(201);
-  return res.body.data as {
+  const view = await w.organizer.agent.get(`/api/v1/competitions/${res.body.data.id}`).expect(200);
+  return view.body.data as {
     id: string;
     slug: string;
     version: number;
@@ -94,16 +99,18 @@ async function publish(w: World): Promise<{ id: string; slug: string; version: n
 }
 
 describe('competition lifecycle', () => {
-  it('an organizer creates a draft and becomes its tournament manager; schedule is validated in its timezone', async () => {
+  it('the platform creates a rated draft for an organization; the organizer manages it; schedule is validated in its timezone', async () => {
     const w = await world();
     const c = await draft(w);
     expect(c.status).toBe('DRAFT');
     expect(c.slug).toMatch(/^otkrytoe-pervenstvo-kluba-\d{4}$/);
+    expect(c).toMatchObject({ competitionType: 'RATED' });
     expect(c.allowedActions).toEqual(
       expect.arrayContaining(['competition.update', 'transition:REGISTRATION_OPEN']),
     );
+    // Создатель — платформа: руководитель турнира не назначается, организатор управляет по наследованию.
     const staff = await w.organizer.agent.get(`/api/v1/competitions/${c.id}/members`).expect(200);
-    expect(staff.body.data.map((m: { roleCode: string }) => m.roleCode)).toEqual(['TOURNAMENT_MANAGER']);
+    expect(staff.body.data).toEqual([]);
     const lease = await t.admin.competitionWriteLease.findUniqueOrThrow({ where: { competitionId: c.id } });
     expect(lease).toMatchObject({ holderType: 'CLOUD', epoch: 1 });
 
@@ -111,7 +118,7 @@ describe('competition lifecycle', () => {
     // следующего дня (21:30Z дня начала) — позже даты начала в timezone турнира.
     const s = schedule();
     const lateInMoscow = new Date(`${s.startDate}T21:30:00Z`).toISOString();
-    const bad = await send(w.organizer, 'post', '/api/v1/competitions', {
+    const bad = await send(w.admin, 'post', '/api/v1/competitions', {
       name: 'Турнир с ошибкой',
       organizerOrganizationId: w.organizerOrgId,
       level: 'CLUB',
@@ -132,20 +139,26 @@ describe('competition lifecycle', () => {
     expect(list.body.data.map((x: { id: string }) => x.id)).not.toContain(c.id);
   });
 
-  it('a coach without competition.create cannot create a competition for an organization', async () => {
+  it('nobody but the platform creates a competition: an organizer and a coach get 403', async () => {
     const w = await world();
     const clubId = await createOrg(t);
     const coach = await createUser(t, { orgs: [{ organizationId: clubId, role: 'COACH' }] });
     const s = await login(t, coach.email);
-    const res = await send(s, 'post', '/api/v1/competitions', {
-      name: 'Самодеятельный турнир',
-      organizerOrganizationId: clubId,
-      level: 'CLUB',
-      disciplineCode: 'SPORT_SAMBO',
-      ...schedule(),
-    });
-    expect(res.status).toBe(403);
-    void w;
+    const before = await t.admin.competition.count();
+    for (const [session, organizerOrganizationId] of [
+      [s, clubId],
+      [w.organizer, w.organizerOrgId],
+    ] as const) {
+      const res = await send(session, 'post', '/api/v1/competitions', {
+        name: 'Самодеятельный турнир',
+        organizerOrganizationId,
+        level: 'CLUB',
+        disciplineCode: 'SPORT_SAMBO',
+        ...schedule(),
+      });
+      expect(res.status).toBe(403);
+    }
+    expect(await t.admin.competition.count()).toBe(before);
   });
 
   it('publication pins a published rule set version and needs categories; afterwards rules and discipline are frozen', async () => {
@@ -456,6 +469,10 @@ describe('competition lifecycle', () => {
   it('only a draft can be deleted; its staff lose their roles', async () => {
     const w = await world();
     const c = await draft(w);
+    await send(w.organizer, 'post', `/api/v1/competitions/${c.id}/members`, {
+      email: 'judge.for.draft@test.local',
+      roleCode: 'CHIEF_REFEREE',
+    }).expect(201);
     await send(w.organizer, 'delete', `/api/v1/competitions/${c.id}`).expect(204);
     await w.organizer.agent.get(`/api/v1/competitions/${c.id}`).expect(404);
     const staff = await t.admin.competitionMembership.findMany({ where: { competitionId: c.id } });
@@ -675,7 +692,7 @@ describe('venues', () => {
     expect(view.body.data.venue).toMatchObject({ name: 'Дворец спорта', city: 'Москва' });
 
     const other = await world();
-    const foreign = await send(other.organizer, 'post', '/api/v1/competitions', {
+    const foreign = await send(other.admin, 'post', '/api/v1/competitions', {
       name: 'Чужое место',
       organizerOrganizationId: other.organizerOrgId,
       level: 'CLUB',
