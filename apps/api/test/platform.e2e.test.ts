@@ -414,6 +414,7 @@ describe('dictionaries and settings', () => {
         displayName: 'X',
         locale: 'ru',
         acceptTerms: true,
+        acceptPersonalData: true,
       });
       expect(res.status).toBe(403);
     } finally {

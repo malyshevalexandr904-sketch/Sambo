@@ -81,7 +81,7 @@
 |---|---|---|---|
 | GET | `/api/v1/me` | вход | + `activeRole`, `availableRoles` (порядок переключателя), `preferredRole`; `grants` — только роли выбранной роли кабинета. Выбранной роли у пользователя больше нет — выбирается роль по умолчанию |
 | PUT | `/api/v1/me/role` | вход | `{ role }` — переключение роли кабинета этой сессии, она же — роль новых сессий. Роли нет у пользователя — 403 `FORBIDDEN` (`reason: cabinet_role_not_held`) → `Me` |
-| POST | `/api/v1/auth/register` | — | + необязательное `role` (`ORGANIZATION_HEAD`, `COACH`, `ATHLETE`, `REFEREE`; роль администратора — 400): запоминается в `preferred_role`, ничего не выдаёт |
+| POST | `/api/v1/auth/register` | — | + необязательное `role` (`ORGANIZATION_HEAD`, `COACH`, `ATHLETE`, `REFEREE`; роль администратора — 400): запоминается в `preferred_role`, ничего не выдаёт. Обязательные `acceptTerms` (ознакомление с политикой ПДн) и `acceptPersonalData` (согласие на обработку ПДн, 152-ФЗ, ст. 9): время и редакция `PD_CONSENT_VERSION` — в `user.terms_accepted_at`, `pd_consent_at`, `pd_consent_version` |
 | POST | `/api/v1/auth/verify-email/resend` | — | `{ email, locale }` → 202 всегда (адрес не раскрывается). Письмо — только учётной записи, ждущей подтверждения; прежние ссылки действуют до срока, после подтверждения гаснут все (0.13.1). Лимит `verifyResend` — 3 за 15 минут на адрес, плюс `auth` по IP |
 | GET | `/api/v1/admin/settings/email-delivery` | `platform.settings.manage` | `{ mode: SMTP\|LOG, internal, host, from }` — `internal`: письма не покидают сервер (журнал, Mailpit, localhost) |
 

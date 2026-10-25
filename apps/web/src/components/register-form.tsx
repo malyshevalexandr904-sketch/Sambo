@@ -150,7 +150,15 @@ function RegisterAccountStep({ role }: { role: OnboardingRole | null }) {
       await api('/auth/register', { method: 'POST', body: values, noRefresh: true });
       setSentTo(values.email);
     } catch (e) {
-      if (!applyFieldErrors(e, form.setError, ['email', 'password', 'displayName', 'acceptTerms']))
+      if (
+        !applyFieldErrors(e, form.setError, [
+          'email',
+          'password',
+          'displayName',
+          'acceptTerms',
+          'acceptPersonalData',
+        ])
+      )
         setError(errorMessage(e));
     }
   });
@@ -217,17 +225,39 @@ function RegisterAccountStep({ role }: { role: OnboardingRole | null }) {
             {...form.register('password')}
           />
         </Field>
-        <div>
-          <label className="flex min-h-11 items-start gap-3 text-sm">
-            <input type="checkbox" className="mt-1 h-5 w-5" {...form.register('acceptTerms')} />
-            <span>{t('register.acceptTerms')}</span>
-          </label>
-          {errors.acceptTerms ? (
-            <p role="alert" className="text-sm text-red-700">
-              {fieldMessage(errors.acceptTerms.message)}
-            </p>
-          ) : null}
-        </div>
+        {/* Ознакомление с политикой и согласие на обработку ПДн — две отдельные отметки (152-ФЗ, ст. 9, ч. 1).
+            Тексты открываются в новой вкладке, чтобы не потерять заполненную форму. */}
+        {(
+          [
+            ['acceptTerms', '/privacy'],
+            ['acceptPersonalData', '/personal-data-consent'],
+          ] as const
+        ).map(([name, href]) => (
+          <div key={name}>
+            <label className="flex min-h-11 items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1 h-5 w-5"
+                aria-invalid={!!errors[name]}
+                {...form.register(name)}
+              />
+              <span>
+                {t.rich(`register.${name}`, {
+                  link: (chunks) => (
+                    <Link href={href} target="_blank" className="text-blue-700 underline">
+                      {chunks}
+                    </Link>
+                  ),
+                })}
+              </span>
+            </label>
+            {errors[name] ? (
+              <p role="alert" className="text-sm text-red-700">
+                {fieldMessage(errors[name].message)}
+              </p>
+            ) : null}
+          </div>
+        ))}
         <Button type="submit" className="w-full" loading={isSubmitting}>
           {t('register.submit')}
         </Button>

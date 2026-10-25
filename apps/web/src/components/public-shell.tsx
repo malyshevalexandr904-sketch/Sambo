@@ -2,6 +2,7 @@
 import type { PublicCompetitionSummary } from '@sde/contracts';
 import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
+import { LegalLinks } from '@/components/legal-links';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { Link } from '@/i18n/navigation';
 
@@ -29,6 +30,9 @@ export async function PublicShell({ children }: { children: ReactNode }) {
       <main id="main" className="mx-auto max-w-5xl px-4 py-8">
         {children}
       </main>
+      <footer className="border-t border-slate-200 bg-white">
+        <LegalLinks className="mx-auto max-w-5xl px-4 py-2" />
+      </footer>
     </div>
   );
 }

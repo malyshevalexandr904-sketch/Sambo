@@ -292,6 +292,7 @@ describe('регистрация с ролью и повторное письм�
       displayName: 'Новичок',
       locale: 'ru',
       acceptTerms: true,
+      acceptPersonalData: true,
       role,
     });
 

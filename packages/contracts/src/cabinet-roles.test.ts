@@ -47,6 +47,7 @@ describe('роли кабинета', () => {
       displayName: 'А',
       locale: 'ru',
       acceptTerms: true,
+      acceptPersonalData: true,
     };
     expect(RegisterRequest.safeParse({ ...base, role: 'COACH' }).success).toBe(true);
     expect(RegisterRequest.safeParse(base).success).toBe(true);

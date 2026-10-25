@@ -1,4 +1,5 @@
 // Integration: полный цикл входа (IMPLEMENTATION_PLAN, Phase 2; API.md, 3.1).
+import { PD_CONSENT_VERSION } from '@sde/contracts';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   createTestApp,
@@ -43,8 +44,18 @@ describe('registration and email verification', () => {
         displayName: 'Тренер',
         locale: 'ru',
         acceptTerms: true,
+        acceptPersonalData: true,
       })
       .expect(202, { data: { status: 'VERIFICATION_SENT' } });
+
+    // Согласие на обработку ПДн сохранено отдельно от условий, с редакцией текста (152-ФЗ, ст. 9).
+    const consent = await t.admin.user.findUniqueOrThrow({
+      where: { email: 'coach@test.local' },
+      select: { termsAcceptedAt: true, pdConsentAt: true, pdConsentVersion: true },
+    });
+    expect(consent.termsAcceptedAt).toBeInstanceOf(Date);
+    expect(consent.pdConsentAt).toBeInstanceOf(Date);
+    expect(consent.pdConsentVersion).toBe(PD_CONSENT_VERSION);
 
     // До подтверждения войти нельзя.
     const early = await s.agent
@@ -92,6 +103,7 @@ describe('registration and email verification', () => {
         displayName: 'X',
         locale: 'ru',
         acceptTerms: true,
+        acceptPersonalData: true,
       })
       .expect(202, { data: { status: 'VERIFICATION_SENT' } });
     const mails = await sentEmails(t);
@@ -107,6 +119,7 @@ describe('registration and email verification', () => {
       displayName: 'X',
       locale: 'ru',
       acceptTerms: true,
+      acceptPersonalData: true,
     });
     expect(leaked.status).toBe(400);
     expect(leaked.body.error.details.fields).toEqual([{ path: 'password', code: 'password_leaked' }]);
@@ -119,7 +132,14 @@ describe('registration and email verification', () => {
     expect(invalid.body.error.code).toBe('VALIDATION_FAILED');
     const paths = (invalid.body.error.details.fields as { path: string }[]).map((f) => f.path);
     expect(paths).toEqual(
-      expect.arrayContaining(['email', 'password', 'displayName', 'locale', 'acceptTerms']),
+      expect.arrayContaining([
+        'email',
+        'password',
+        'displayName',
+        'locale',
+        'acceptTerms',
+        'acceptPersonalData',
+      ]),
     );
     expect(invalid.body.error.traceId).toBeTruthy();
   });
