@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { PageQuery, Reason, Uuid } from './common.js';
 import { type CompetitionLevel, CompetitionFields, scheduleIssues, type VenueRef } from './competitions.js';
 import type { OrganizationRef } from './organizations.js';
-import { RefereeRecruitmentInput } from './referee-recruitment.js';
+import { RefereeRecruitmentInput } from './referee-recruitment-input.js';
 
 export const COMPETITION_REQUEST_STATUSES = ['SUBMITTED', 'APPROVED', 'REJECTED', 'WITHDRAWN'] as const;
 export type CompetitionRequestStatus = (typeof COMPETITION_REQUEST_STATUSES)[number];

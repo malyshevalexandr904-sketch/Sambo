@@ -5,7 +5,7 @@ import { CONSENT_KINDS, type ConsentKind } from './athletes.js';
 import { CATEGORY_RULE_KINDS, CATEGORY_RULE_PARAMS, type CategoryRuleKind } from './categories.js';
 import { E164, Email, Instant, LocalDate, PageQuery, Reason, Slug, Timezone, Uuid } from './common.js';
 import type { OrganizationRef } from './organizations.js';
-import { RefereeRecruitmentInput } from './referee-recruitment.js';
+import { RefereeRecruitmentInput } from './referee-recruitment-input.js';
 import { COMPETITION_ROLE_CODES, type RoleCode } from './roles.js';
 import { localDateIn } from './time.js';
 
