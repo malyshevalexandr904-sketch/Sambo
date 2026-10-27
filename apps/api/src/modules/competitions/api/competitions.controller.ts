@@ -15,6 +15,10 @@ import {
   CompetitionTransitionRequest,
   type DataEnvelope,
   type Page,
+  RefereeApplicationDecision,
+  RefereeRecruitmentPositionInput,
+  RefereeRecruitmentPositionPatch,
+  type RefereeRecruitmentPositionDto,
   RegulationUpdate,
 } from '@sde/contracts';
 import type { Response } from 'express';
@@ -26,6 +30,7 @@ import { Authenticated, RequirePermission } from '../../access';
 import { AuditQueryService } from '../../audit';
 import { WriteAuthority } from '../../venue-sync';
 import { CompetitionsService } from '../application/competitions.service';
+import { RefereeRecruitmentService } from '../application/referee-recruitment.service';
 import { RegulationService } from '../application/regulation.service';
 import { StaffService } from '../application/staff.service';
 
@@ -42,6 +47,7 @@ export class CompetitionsController {
     private readonly regulation: RegulationService,
     private readonly staff: StaffService,
     private readonly audit: AuditQueryService,
+    private readonly recruitment: RefereeRecruitmentService,
   ) {}
 
   private send(res: Response, c: Competition): DataEnvelope<Competition> {
@@ -156,6 +162,47 @@ export class CompetitionsController {
     @ValidBody(CompetitionMemberPatch) body: CompetitionMemberPatch,
   ): Promise<DataEnvelope<CompetitionMember>> {
     return ok(await this.staff.update(user, id, membershipId, version, body));
+  }
+
+  /** Открытый набор судей (правки 27.10.2026): должности, требования и поступившие заявки. */
+  @Get(':id/referee-recruitment')
+  @RequirePermission('competition.members.manage', COMP)
+  async recruitmentList(@UuidParam('id') id: string): Promise<DataEnvelope<RefereeRecruitmentPositionDto[]>> {
+    return ok(await this.recruitment.listForCompetition(id));
+  }
+
+  @Post(':id/referee-recruitment')
+  @RequirePermission('competition.members.manage', COMP)
+  async recruitmentAdd(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @ValidBody(RefereeRecruitmentPositionInput) body: RefereeRecruitmentPositionInput,
+  ): Promise<DataEnvelope<RefereeRecruitmentPositionDto[]>> {
+    return ok(await this.recruitment.addPosition(user, id, body));
+  }
+
+  @Patch(':id/referee-recruitment/:positionId')
+  @RequirePermission('competition.members.manage', COMP)
+  async recruitmentUpdate(
+    @UuidParam('id') id: string,
+    @UuidParam('positionId') positionId: string,
+    @IfMatchVersion() version: number,
+    @ValidBody(RefereeRecruitmentPositionPatch) body: RefereeRecruitmentPositionPatch,
+  ): Promise<DataEnvelope<RefereeRecruitmentPositionDto[]>> {
+    return ok(await this.recruitment.updatePosition(id, positionId, version, body));
+  }
+
+  @Post(':id/referee-recruitment/applications/:applicationId/decision')
+  @RequirePermission('competition.members.manage', COMP)
+  @HttpCode(200)
+  async recruitmentDecide(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @UuidParam('applicationId') applicationId: string,
+    @IfMatchVersion() version: number,
+    @ValidBody(RefereeApplicationDecision) body: RefereeApplicationDecision,
+  ): Promise<DataEnvelope<RefereeRecruitmentPositionDto[]>> {
+    return ok(await this.recruitment.decide(user, id, applicationId, version, body));
   }
 
   /** Журнал аудита турнира (API.md, 3.6). */

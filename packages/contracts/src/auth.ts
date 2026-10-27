@@ -107,6 +107,8 @@ export interface Me {
   availableRoles: CabinetRole[];
   /** Последняя выбранная роль (при регистрации — выбранная до заполнения формы). */
   preferredRole: CabinetRole | null;
+  /** Демо-вход (правки 27.10.2026): все роли и разделы для просмотра, любое действие запрещено. */
+  demo: boolean;
 }
 
 export const UpdateMeRequest = z.object({

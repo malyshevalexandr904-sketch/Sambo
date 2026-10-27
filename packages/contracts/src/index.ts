@@ -36,3 +36,4 @@ export * from './live.js';
 export * from './onboarding.js';
 export * from './rating.js';
 export * from './divisions.js';
+export * from './referee-recruitment.js';

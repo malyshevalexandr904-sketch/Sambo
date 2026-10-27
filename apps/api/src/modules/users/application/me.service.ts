@@ -101,6 +101,7 @@ export class MeService {
       activeRole: active,
       availableRoles: available,
       preferredRole: isCabinetRole(user.preferredRole) ? user.preferredRole : null,
+      demo: user.isDemo,
     };
   }
 

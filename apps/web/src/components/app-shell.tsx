@@ -10,6 +10,7 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { hasAnywhere, platformHas } from '@/lib/access';
+import { setDemoMode } from '@/lib/demo';
 import { closeLive } from '@/lib/live';
 import { disablePushForLogout, syncPush } from '@/lib/push';
 import { useMe, useMyAthletes } from '@/lib/queries';
@@ -28,6 +29,93 @@ interface NavItem {
   href: string;
   label: string;
   visible: boolean;
+  /** Виден ли пункт в демо-входе (по умолчанию — да: в демо открыты все разделы). */
+  inDemo?: boolean;
+}
+
+type Translate = ReturnType<typeof useTranslations>;
+
+/** Пункты меню по правам выбранной роли; `inDemo` — видимость в демо-входе. */
+function navItems(t: Translate, user: Me, myAthleteCount: number): NavItem[] {
+  const role = user.activeRole;
+  // Правки 27.10.2026: «Организации» — только у супер-администратора; у судьи нет «Проверки документов»,
+  // у спортсмена — «Моих спортсменов»; «Регистрация в системе» убрана — роль добавляется кнопкой «Добавить роль».
+  // В демо-входе видны все разделы (с теми же исключениями по ролям); роль «Администратор» — как супер-администратор.
+  const isSuperAdmin = role === 'ADMIN' && (user.demo || user.grants.platform.includes('SUPER_ADMIN'));
+  return [
+    { href: '/admin', label: t('nav.dashboard'), visible: true },
+    {
+      href: '/onboarding/review',
+      label: t('nav.onboardingReview'),
+      visible:
+        hasAnywhere(user, 'onboarding.review') ||
+        user.grants.organizations.some((g) => g.roles.includes('COACH')),
+    },
+    { href: '/competitions', label: t('nav.competitions'), visible: true },
+    {
+      href: '/competition-requests',
+      label: t('nav.competitionRequests'),
+      visible:
+        hasAnywhere(user, 'competition.request') || hasPlatformPermission(user, 'competition.create_rated'),
+    },
+    {
+      href: '/referee',
+      label: t('nav.referee'),
+      visible:
+        role === 'REFEREE' || user.grants.competitions.length > 0 || hasAnywhere(user, 'result.confirm'),
+    },
+    {
+      href: '/applications',
+      label: t('nav.applications'),
+      visible: hasAnywhere(user, 'registration.create'),
+    },
+    { href: '/athletes', label: t('nav.athletes'), visible: hasAnywhere(user, 'athlete.view') },
+    {
+      href: '/children',
+      label: t('nav.children'),
+      visible: role !== 'ATHLETE' && myAthleteCount > 0,
+      inDemo: role !== 'ATHLETE',
+    },
+    { href: '/coaches', label: t('nav.coaches'), visible: hasAnywhere(user, 'coach.manage') },
+    {
+      href: '/documents',
+      label: t('nav.documents'),
+      visible: role !== 'REFEREE' && hasAnywhere(user, 'document.verify'),
+      inDemo: role !== 'REFEREE',
+    },
+    {
+      href: '/admin/organizations',
+      label: t('nav.organizations'),
+      visible: isSuperAdmin,
+      inDemo: isSuperAdmin,
+    },
+    { href: '/admin/referees', label: t('nav.referees'), visible: hasAnywhere(user, 'referee.manage') },
+    { href: '/admin/categories', label: t('nav.categories'), visible: hasAnywhere(user, 'category.manage') },
+    { href: '/admin/rulesets', label: t('nav.rulesets'), visible: hasAnywhere(user, 'ruleset.manage') },
+    {
+      href: '/admin/consent-templates',
+      label: t('nav.consentTemplates'),
+      visible: hasPlatformPermission(user, 'consent_template.manage'),
+    },
+    { href: '/admin/users', label: t('nav.users'), visible: hasPlatformPermission(user, 'user.view') },
+    {
+      href: '/admin/rating',
+      label: t('nav.rating'),
+      visible: hasPlatformPermission(user, 'competition.view_rating_audit'),
+    },
+    {
+      href: '/admin/divisions',
+      label: t('nav.divisions'),
+      visible: hasPlatformPermission(user, 'division.manage'),
+    },
+    { href: '/admin/audit', label: t('nav.audit'), visible: hasPlatformPermission(user, 'audit.view') },
+    {
+      href: '/admin/settings',
+      label: t('nav.settings'),
+      visible: hasPlatformPermission(user, 'platform.settings.manage'),
+    },
+    { href: '/notifications', label: t('nav.notifications'), visible: true },
+  ];
 }
 
 /**
@@ -76,6 +164,8 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
   }
 
   const user = me.data;
+  // Демо-вход: действия перехватываются до запроса (lib/demo.ts).
+  setDemoMode(user.demo);
   if (bare) {
     return (
       <main id="main" className="min-h-screen bg-slate-100">
@@ -85,72 +175,10 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
       </main>
     );
   }
-  const nav: NavItem[] = [
-    { href: '/admin', label: t('nav.dashboard'), visible: true },
-    { href: '/onboarding', label: t('nav.onboarding'), visible: true },
-    {
-      href: '/onboarding/review',
-      label: t('nav.onboardingReview'),
-      visible:
-        hasAnywhere(user, 'onboarding.review') ||
-        user.grants.organizations.some((g) => g.roles.includes('COACH')),
-    },
-    { href: '/competitions', label: t('nav.competitions'), visible: true },
-    {
-      href: '/competition-requests',
-      label: t('nav.competitionRequests'),
-      visible:
-        hasAnywhere(user, 'competition.request') || hasPlatformPermission(user, 'competition.create_rated'),
-    },
-    {
-      href: '/referee',
-      label: t('nav.referee'),
-      visible: user.grants.competitions.length > 0 || hasAnywhere(user, 'result.confirm'),
-    },
-    {
-      href: '/applications',
-      label: t('nav.applications'),
-      visible: hasAnywhere(user, 'registration.create'),
-    },
-    { href: '/athletes', label: t('nav.athletes'), visible: hasAnywhere(user, 'athlete.view') },
-    { href: '/children', label: t('nav.children'), visible: (myAthletes.data?.length ?? 0) > 0 },
-    { href: '/coaches', label: t('nav.coaches'), visible: hasAnywhere(user, 'coach.manage') },
-    { href: '/documents', label: t('nav.documents'), visible: hasAnywhere(user, 'document.verify') },
-    { href: '/admin/organizations', label: t('nav.organizations'), visible: true },
-    { href: '/admin/referees', label: t('nav.referees'), visible: hasAnywhere(user, 'referee.manage') },
-    { href: '/admin/categories', label: t('nav.categories'), visible: hasAnywhere(user, 'category.manage') },
-    { href: '/admin/rulesets', label: t('nav.rulesets'), visible: hasAnywhere(user, 'ruleset.manage') },
-    {
-      href: '/admin/consent-templates',
-      label: t('nav.consentTemplates'),
-      visible: hasPlatformPermission(user, 'consent_template.manage'),
-    },
-    { href: '/admin/users', label: t('nav.users'), visible: hasPlatformPermission(user, 'user.view') },
-    {
-      href: '/admin/rating',
-      label: t('nav.rating'),
-      visible: hasPlatformPermission(user, 'competition.view_rating_audit'),
-    },
-    {
-      href: '/admin/divisions',
-      label: t('nav.divisions'),
-      visible: hasPlatformPermission(user, 'division.manage'),
-    },
-    { href: '/admin/audit', label: t('nav.audit'), visible: hasPlatformPermission(user, 'audit.view') },
-    {
-      href: '/admin/settings',
-      label: t('nav.settings'),
-      visible: hasPlatformPermission(user, 'platform.settings.manage'),
-    },
-    { href: '/notifications', label: t('nav.notifications'), visible: true },
-    { href: '/account', label: t('nav.account'), visible: true },
-  ];
+  const demo = user.demo;
+  const nav = navItems(t, user, myAthletes.data?.length ?? 0);
   const isActive = (href: string): boolean =>
-    href === '/admin'
-      ? pathname === '/admin'
-      : href === '/onboarding'
-        ? pathname.startsWith('/onboarding') && !pathname.startsWith('/onboarding/review')
-        : pathname.startsWith(href);
+    href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
 
   const logout = async (): Promise<void> => {
     try {
@@ -212,7 +240,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
         <nav aria-label={t('common.menu')}>
           <ul className="space-y-1">
             {nav
-              .filter((i) => i.visible)
+              .filter((i) => (demo ? (i.inDemo ?? true) : i.visible))
               .map((item) => (
                 <li key={item.href}>
                   <Link
@@ -245,12 +273,12 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
   );
 }
 
-/** Низ меню: фото и имя (ссылка в «Мой аккаунт»), язык, тема, выход. */
+/** Низ меню: фото и имя (ссылка в личный кабинет), язык, тема, выход. */
 function SidebarFooter({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const t = useTranslations('common');
   return (
     <div className="mt-8 border-t border-slate-200 pt-4 text-sm">
-      <Link href="/account" className="flex items-center gap-3 rounded-md hover:bg-slate-50">
+      <Link href="/admin" className="flex items-center gap-3 rounded-md hover:bg-slate-50">
         <Avatar me={me} />
         <span className="min-w-0">
           <span className="block font-medium text-slate-900">{me.displayName}</span>

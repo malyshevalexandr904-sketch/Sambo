@@ -170,7 +170,7 @@ describe('onboarding notifications', () => {
     });
     for (const j of queue.jobs) await c.handle(job(j));
     const toApplicant = mailer.sent.find((m) => m.to === 'referee@test.local');
-    expect(toApplicant?.email.subject).toBe('Заявка на регистрацию отправлена — Digital Sambo');
+    expect(toApplicant?.email.subject).toBe('Заявка на регистрацию отправлена — Цифровое самбо');
     expect(toApplicant?.email.text).toContain('(роль: судья)');
     expect(toApplicant?.email.text).toContain('https://sambo.test/ru/onboarding');
     const toAdmin = mailer.sent.find((m) => m.to === 'admin@test.local');

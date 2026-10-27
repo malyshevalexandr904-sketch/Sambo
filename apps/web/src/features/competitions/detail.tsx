@@ -22,6 +22,7 @@ import { OtherRolesHint } from '@/features/cabinet-role';
 import { ApplicationsTab, EntriesTab } from './registrations-tabs';
 import { CategoriesTab } from './categories';
 import { OverviewTab } from './overview';
+import { RecruitmentTab } from './recruitment';
 import { RegulationTab } from './regulation';
 import { CompetitionStatusBadge, formatDates, useCompetition } from './shared';
 import { StaffTab } from './staff';
@@ -31,6 +32,7 @@ const TABS = [
   'regulation',
   'categories',
   'staff',
+  'recruitment',
   'applications',
   'entries',
   'admission',
@@ -51,6 +53,7 @@ function visibleTabs(c: Competition): Tab[] {
   const can = (a: string): boolean => c.allowedActions.includes(a);
   return TABS.filter((tab) => {
     if (tab === 'staff') return can('competition.view');
+    if (tab === 'recruitment') return can('competition.members.manage');
     if (tab === 'entries') return can('registration.view');
     if (tab === 'admission') return can('admission.view') && c.status !== 'DRAFT';
     if (tab === 'checkin') return can('checkin.view') && c.status !== 'DRAFT';
@@ -142,6 +145,7 @@ export function CompetitionPage({ id }: { id: string }) {
             {tab === 'regulation' ? <RegulationTab competition={c} /> : null}
             {tab === 'categories' ? <CategoriesTab competition={c} /> : null}
             {tab === 'staff' ? <StaffTab competition={c} /> : null}
+            {tab === 'recruitment' ? <RecruitmentTab competition={c} /> : null}
             {tab === 'applications' ? <ApplicationsTab competition={c} /> : null}
             {tab === 'entries' ? <EntriesTab competition={c} /> : null}
             {tab === 'admission' ? <AdmissionTab competition={c} /> : null}

@@ -22,6 +22,13 @@ import { useFieldMessage } from '@/lib/errors';
 import { pickName, qk, useDisciplines } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 import { ActiveRatingRules } from './rating-card';
+import {
+  emptyRecruitment,
+  type RecruitmentDraft,
+  RecruitmentDraftCard,
+  recruitmentBody,
+  recruitmentIssues,
+} from './recruitment';
 import { VenueSelect } from './venue-select';
 
 /** Часовые пояса России (и UTC); турнир может быть и в другом — поле принимает любой пояс IANA. */
@@ -85,6 +92,7 @@ export function CompetitionCreateForm() {
     ruleSetVersionId: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [recruitment, setRecruitment] = useState<RecruitmentDraft>(emptyRecruitment);
   const organizer = v.organizerOrganizationId;
   const rulesets = useQuery({
     queryKey: [...qk.rulesets, v.disciplineCode],
@@ -118,8 +126,9 @@ export function CompetitionCreateForm() {
       registrationEndsAt: toInstant(v.registrationEndsLocal),
       venueId: v.venueId || undefined,
       ruleSetVersionId: v.ruleSetVersionId || undefined,
+      refereeRecruitment: recruitmentBody(recruitment),
     };
-    const local: Record<string, string> = {};
+    const local: Record<string, string> = recruitmentIssues(recruitment);
     if (!body.name || body.name.length < 3) local.name = 'too_short';
     if (!body.startDate) local.startDate = 'required';
     if (!body.registrationStartsAt) local.registrationStartsAt = 'required';
@@ -237,6 +246,7 @@ export function CompetitionCreateForm() {
             />
           ) : null}
         </Card>
+        <RecruitmentDraftCard value={recruitment} onChange={setRecruitment} errors={errors} />
         <div className="flex gap-3">
           <Button type="submit" loading={action.busy} disabled={!organizer}>
             {t('competitions.createSubmit')}

@@ -6,6 +6,8 @@ import { FilesModule, FilesService, type UploadPurposePolicy } from '../files';
 import { OrganizationsModule } from '../organizations';
 import { RuleSetsModule } from '../rulesets';
 import { CompetitionInvitesController, CompetitionsController } from './api/competitions.controller';
+import { RefereeRecruitmentController } from './api/referee-recruitment.controller';
+import { RefereeRecruitmentService } from './application/referee-recruitment.service';
 import { CompetitionExtensions } from './application/competition-extensions';
 import { CompetitionScopeService } from './application/competition-scope.service';
 import { CompetitionStatusWriter } from './application/competition-status.writer';
@@ -30,6 +32,7 @@ import { CompetitionTypeService } from './application/competition-type.service';
     CompetitionInvitesController,
     CompetitionRatingController,
     CompetitionRequestsController,
+    RefereeRecruitmentController,
   ],
   providers: [
     CompetitionScopeService,
@@ -41,6 +44,7 @@ import { CompetitionTypeService } from './application/competition-type.service';
     CompetitionTypeService,
     RegulationService,
     StaffService,
+    RefereeRecruitmentService,
   ],
   exports: [CompetitionScopeService, CompetitionExtensions, CompetitionStatusWriter, CompetitionsService],
 })

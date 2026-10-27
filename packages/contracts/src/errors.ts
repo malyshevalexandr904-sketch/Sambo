@@ -45,6 +45,8 @@ export const ERROR_CODES = {
     'ACCOUNT_BLOCKED',
     'EMAIL_NOT_VERIFIED',
     'RATED_COMPETITION_FORBIDDEN',
+    /** Демо-вход (правки 27.10.2026): только просмотр, любое действие запрещено. */
+    'DEMO_READ_ONLY',
   ] as const),
   ...codes('NOT_FOUND', ['NOT_FOUND'] as const),
   ...codes('CONFLICT', [

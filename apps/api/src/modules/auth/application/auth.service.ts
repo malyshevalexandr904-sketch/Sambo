@@ -31,6 +31,9 @@ import { VerificationTokenService } from './verification-token.service';
 
 export const LEAKED_PASSWORD_CHECKER = Symbol('LEAKED_PASSWORD_CHECKER');
 
+/** Общая демо-учётная запись (миграция 20261027100000_referee_recruitment_demo). */
+export const DEMO_USER_ID = '019a2f00-de00-7000-8000-000000000001';
+
 export interface LoginResult {
   me: Me;
   session: IssuedSession;
@@ -217,6 +220,21 @@ export class AuthService {
       }
       return this.sessions.create(tx, user);
     });
+    return { me: await this.me.get({ userId: user.id, sessionId: session.sessionId }), session };
+  }
+
+  /**
+   * Демо-вход (правки 27.10.2026): новая сессия общей демо-учётной записи. Запись создаёт миграция; если её нет —
+   * создаётся здесь (без email, пароля и данных человека).
+   */
+  async demoLogin(): Promise<LoginResult> {
+    const user = await this.db.user.upsert({
+      where: { id: DEMO_USER_ID },
+      update: {},
+      create: { id: DEMO_USER_ID, displayName: 'Гость', status: 'ACTIVE', isDemo: true },
+    });
+    if (!user.isDemo || user.status !== 'ACTIVE') throw new DomainError('NOT_FOUND', { resource: 'demo' });
+    const session = await this.db.tx((tx) => this.sessions.create(tx, user));
     return { me: await this.me.get({ userId: user.id, sessionId: session.sessionId }), session };
   }
 

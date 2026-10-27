@@ -59,6 +59,7 @@ export class AccessTokenAuthenticator {
           emailVerifiedAt: true,
           locale: true,
           preferredRole: true,
+          isDemo: true,
         },
       }),
       this.cabinetRoles.read(sessionId),
@@ -78,6 +79,7 @@ export class AccessTokenAuthenticator {
         emailVerified: user.emailVerifiedAt !== null,
         via,
         activeRole,
+        demo: user.isDemo,
       },
       locale: user.locale === 'en' ? 'en' : 'ru',
     };

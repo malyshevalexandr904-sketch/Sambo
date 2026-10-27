@@ -11,6 +11,7 @@ import { formatDates, formatInZone } from '@/features/competitions/shared';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { useAction } from '@/lib/use-action';
+import { RecruitmentSummary } from '@/features/competitions/recruitment';
 import { RequestStatusBadge } from './shared';
 
 export function CompetitionRequestDetail({ id }: { id: string }) {
@@ -111,6 +112,7 @@ function RequestView({ request: r }: { request: CompetitionRequestDto }) {
             </p>
           ) : null}
         </Card>
+        <RecruitmentSummary positions={p.refereeRecruitment ?? []} />
         {r.allowedActions.length > 0 ? (
           <div className="flex flex-wrap items-start gap-3">
             {r.allowedActions.includes('approve') ? (

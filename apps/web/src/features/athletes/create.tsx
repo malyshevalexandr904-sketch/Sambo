@@ -109,7 +109,7 @@ export function AthleteCreate() {
       {iAmCoach && !me?.personId ? (
         <Alert tone="warning" className="mb-4">
           {t('athletes.coachProfileRequired')}{' '}
-          <Link href="/account" className="font-medium underline">
+          <Link href="/admin" className="font-medium underline">
             {t('nav.account')}
           </Link>
         </Alert>

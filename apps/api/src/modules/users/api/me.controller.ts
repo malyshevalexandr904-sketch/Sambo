@@ -11,6 +11,7 @@ import {
 import { CurrentUser } from '../../../common/context/current-user';
 import type { AuthUser } from '../../../common/context/request-context';
 import { ok } from '../../../common/http/http';
+import { DemoAllowed } from '../../../common/security/demo';
 import { ValidBody } from '../../../common/validation/zod.pipe';
 import { Authenticated } from '../../access';
 import { MeService } from '../application/me.service';
@@ -28,6 +29,7 @@ export class MeController {
   /** Роль кабинета этой сессии (0.13.0): права и меню — только для неё. */
   @Put('role')
   @Authenticated()
+  @DemoAllowed()
   async selectRole(
     @CurrentUser() user: AuthUser,
     @ValidBody(SelectCabinetRoleRequest) body: SelectCabinetRoleRequest,

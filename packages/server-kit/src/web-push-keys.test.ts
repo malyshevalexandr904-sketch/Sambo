@@ -2,7 +2,7 @@ import { createECDH, createSign, createVerify, generateKeyPairSync } from 'node:
 import { describe, expect, it } from 'vitest';
 import { WebPushKeyError, webPushKeys } from './web-push-keys.js';
 
-const base = { AUTH_SECRET: 'a'.repeat(48), EMAIL_FROM: 'Digital Sambo <no-reply@digitalsambo.ru>' };
+const base = { AUTH_SECRET: 'a'.repeat(48), EMAIL_FROM: 'Цифровое самбо <no-reply@digitalsambo.ru>' };
 
 /** Пара ключей подписывает и проверяет — ключи согласованы (как их проверит push-служба). */
 function signsAndVerifies(publicKey: string, privateKey: string): boolean {

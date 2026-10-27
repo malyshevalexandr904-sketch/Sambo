@@ -6,7 +6,7 @@ import { renderPush } from './push-templates';
 
 /** Письмо о схватке (Phase 8b): та же строка, что в push, — ковёр, номер, время, турнир; без имён. */
 const matchDay = (subject: string, more: string, action: string): TemplateDef => ({
-  subject: `${subject} — Digital Sambo`,
+  subject: `${subject} — Цифровое самбо`,
   lines: ['{details}.', more],
   action: { label: action, param: 'url' },
   required: ['details', 'url'],
@@ -44,7 +44,7 @@ const ONBOARDING_RU: Record<
   TemplateDef
 > = {
   'onboarding.submitted': {
-    subject: 'Заявка на регистрацию отправлена — Digital Sambo',
+    subject: 'Заявка на регистрацию отправлена — Цифровое самбо',
     lines: [
       'Ваша заявка на регистрацию (роль: {roleText}) отправлена и ожидает проверки командой платформы.',
       'О решении мы сообщим отдельно.',
@@ -53,7 +53,7 @@ const ONBOARDING_RU: Record<
     required: ['roleText', 'url'],
   },
   'onboarding.forwarded': {
-    subject: 'Заявка передана на проверку организации — Digital Sambo',
+    subject: 'Заявка передана на проверку организации — Цифровое самбо',
     lines: [
       'Ваша заявка (роль: {roleText}) передана на проверку организации «{organizationName}».',
       'О решении мы сообщим отдельно.',
@@ -62,7 +62,7 @@ const ONBOARDING_RU: Record<
     required: ['roleText', 'organizationName', 'url'],
   },
   'onboarding.awaiting_review': {
-    subject: 'Новая заявка ждёт проверки — Digital Sambo',
+    subject: 'Новая заявка ждёт проверки — Цифровое самбо',
     lines: [
       'Поступила заявка на регистрацию (роль: {roleText}).',
       'Откройте её, чтобы одобрить, отклонить или запросить исправления.',
@@ -71,7 +71,7 @@ const ONBOARDING_RU: Record<
     required: ['roleText', 'url'],
   },
   'onboarding.changes_requested': {
-    subject: 'Нужно исправить заявку — Digital Sambo',
+    subject: 'Нужно исправить заявку — Цифровое самбо',
     lines: [
       'Проверяющий просит исправить вашу заявку на регистрацию (роль: {roleText}).',
       'Комментарий: {reason}',
@@ -81,13 +81,13 @@ const ONBOARDING_RU: Record<
     required: ['roleText', 'url'],
   },
   'onboarding.decided': {
-    subject: 'Заявка на регистрацию {statusText} — Digital Sambo',
+    subject: 'Заявка на регистрацию {statusText} — Цифровое самбо',
     lines: ['Ваша заявка на регистрацию (роль: {roleText}) {statusText}.', 'Комментарий: {reason}'],
     action: { label: 'Открыть личный кабинет', param: 'url' },
     required: ['roleText', 'statusText', 'url'],
   },
   'onboarding.linked': {
-    subject: 'В организации новый участник — Digital Sambo',
+    subject: 'В организации новый участник — Цифровое самбо',
     lines: ['Заявка (роль: {roleText}) одобрена: участник присоединён к организации «{organizationName}».'],
     action: { label: 'Открыть', param: 'url' },
     required: ['roleText', 'organizationName', 'url'],
@@ -96,7 +96,7 @@ const ONBOARDING_RU: Record<
 
 const ONBOARDING_EN: typeof ONBOARDING_RU = {
   'onboarding.submitted': {
-    subject: 'Registration request submitted — Digital Sambo',
+    subject: 'Registration request submitted — Цифровое самбо',
     lines: [
       'Your registration request (role: {roleText}) has been submitted and awaits review by the platform team.',
       'We will let you know about the decision.',
@@ -105,7 +105,7 @@ const ONBOARDING_EN: typeof ONBOARDING_RU = {
     required: ['roleText', 'url'],
   },
   'onboarding.forwarded': {
-    subject: 'Request forwarded to the organization — Digital Sambo',
+    subject: 'Request forwarded to the organization — Цифровое самбо',
     lines: [
       'Your request (role: {roleText}) has been forwarded to “{organizationName}” for review.',
       'We will let you know about the decision.',
@@ -114,7 +114,7 @@ const ONBOARDING_EN: typeof ONBOARDING_RU = {
     required: ['roleText', 'organizationName', 'url'],
   },
   'onboarding.awaiting_review': {
-    subject: 'A new request awaits review — Digital Sambo',
+    subject: 'A new request awaits review — Цифровое самбо',
     lines: [
       'A new registration request (role: {roleText}) has arrived.',
       'Open it to approve, reject or request changes.',
@@ -123,7 +123,7 @@ const ONBOARDING_EN: typeof ONBOARDING_RU = {
     required: ['roleText', 'url'],
   },
   'onboarding.changes_requested': {
-    subject: 'Please correct your request — Digital Sambo',
+    subject: 'Please correct your request — Цифровое самбо',
     lines: [
       'The reviewer asks you to correct your registration request (role: {roleText}).',
       'Comment: {reason}',
@@ -133,13 +133,13 @@ const ONBOARDING_EN: typeof ONBOARDING_RU = {
     required: ['roleText', 'url'],
   },
   'onboarding.decided': {
-    subject: 'Registration request {statusText} — Digital Sambo',
+    subject: 'Registration request {statusText} — Цифровое самбо',
     lines: ['Your registration request (role: {roleText}) has been {statusText}.', 'Comment: {reason}'],
     action: { label: 'Open your account', param: 'url' },
     required: ['roleText', 'statusText', 'url'],
   },
   'onboarding.linked': {
-    subject: 'A new member in your organization — Digital Sambo',
+    subject: 'A new member in your organization — Цифровое самбо',
     lines: ['A request (role: {roleText}) has been approved: the member joined “{organizationName}”.'],
     action: { label: 'Open', param: 'url' },
     required: ['roleText', 'organizationName', 'url'],
@@ -149,7 +149,7 @@ const ONBOARDING_EN: typeof ONBOARDING_RU = {
 const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
   ru: {
     'application.returned': {
-      subject: 'Заявка возвращена на исправление — Digital Sambo',
+      subject: 'Заявка возвращена на исправление — Цифровое самбо',
       lines: [
         'Заявка {organizationName} на турнир «{competitionName}» возвращена на исправление.',
         'Комментарий секретариата: {reason}',
@@ -159,7 +159,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       required: ['competitionName', 'organizationName', 'url'],
     },
     'application.decided': {
-      subject: 'Заявка {statusText} — Digital Sambo',
+      subject: 'Заявка {statusText} — Цифровое самбо',
       lines: [
         'Заявка {organizationName} на турнир «{competitionName}» {statusText}.',
         'Комментарий секретариата: {reason}',
@@ -168,7 +168,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       required: ['competitionName', 'organizationName', 'statusText', 'url'],
     },
     'entry.rejected': {
-      subject: 'Участие отклонено — Digital Sambo',
+      subject: 'Участие отклонено — Цифровое самбо',
       lines: [
         'В заявке {organizationName} на турнир «{competitionName}» отклонено участие спортсмена.',
         'Причина: {reason}',
@@ -177,7 +177,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       required: ['competitionName', 'organizationName', 'url'],
     },
     'document.rejected': {
-      subject: 'Документ отклонён — Digital Sambo',
+      subject: 'Документ отклонён — Цифровое самбо',
       lines: [
         'Загруженный вами документ «{documentType}» отклонён при проверке.',
         'Причина: {reason}',
@@ -187,7 +187,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       required: ['documentType', 'url'],
     },
     'schedule.changed': {
-      subject: 'Расписание турнира изменилось — Digital Sambo',
+      subject: 'Расписание турнира изменилось — Цифровое самбо',
       lines: [
         'В расписании турнира «{competitionName}» изменилось время или ковёр у ваших спортсменов.',
         'Проверьте актуальное расписание в заявке.',
@@ -196,7 +196,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       required: ['competitionName', 'url'],
     },
     'results.published': {
-      subject: 'Опубликованы результаты — Digital Sambo',
+      subject: 'Опубликованы результаты — Цифровое самбо',
       lines: [
         'Опубликованы результаты категории «{categoryName}» турнира «{competitionName}».',
         'Места и медали ваших спортсменов — в разделе «Результаты» карточки спортсмена.',
@@ -211,7 +211,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
   },
   en: {
     'application.returned': {
-      subject: 'Application returned for correction — Digital Sambo',
+      subject: 'Application returned for correction — Цифровое самбо',
       lines: [
         'The application of {organizationName} for “{competitionName}” has been returned for correction.',
         'Secretariat comment: {reason}',
@@ -221,7 +221,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       required: ['competitionName', 'organizationName', 'url'],
     },
     'application.decided': {
-      subject: 'Application {statusText} — Digital Sambo',
+      subject: 'Application {statusText} — Цифровое самбо',
       lines: [
         'The application of {organizationName} for “{competitionName}” has been {statusText}.',
         'Secretariat comment: {reason}',
@@ -230,7 +230,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       required: ['competitionName', 'organizationName', 'statusText', 'url'],
     },
     'entry.rejected': {
-      subject: 'Entry rejected — Digital Sambo',
+      subject: 'Entry rejected — Цифровое самбо',
       lines: [
         'An athlete entry in the application of {organizationName} for “{competitionName}” has been rejected.',
         'Reason: {reason}',
@@ -239,7 +239,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       required: ['competitionName', 'organizationName', 'url'],
     },
     'document.rejected': {
-      subject: 'Document rejected — Digital Sambo',
+      subject: 'Document rejected — Цифровое самбо',
       lines: [
         'The document “{documentType}” you uploaded was rejected during review.',
         'Reason: {reason}',
@@ -249,7 +249,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       required: ['documentType', 'url'],
     },
     'schedule.changed': {
-      subject: 'Tournament schedule changed — Digital Sambo',
+      subject: 'Tournament schedule changed — Цифровое самбо',
       lines: [
         'The schedule of “{competitionName}” has changed: mat or time for your athletes has been updated.',
         'Check the current schedule in your application.',
@@ -258,7 +258,7 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       required: ['competitionName', 'url'],
     },
     'results.published': {
-      subject: 'Results published — Digital Sambo',
+      subject: 'Results published — Цифровое самбо',
       lines: [
         'Results of the category “{categoryName}” at “{competitionName}” have been published.',
         'Places and medals of your athletes are in the Results section of the athlete card.',

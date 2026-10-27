@@ -9,6 +9,7 @@ import { RequestContextStore } from './common/context/request-context';
 import { AllExceptionsFilter } from './common/errors/exception.filter';
 import { IdempotencyInterceptor } from './common/http/idempotency';
 import { CsrfGuard } from './common/security/csrf';
+import { DemoReadOnlyGuard } from './common/security/demo';
 import { RateLimitGuard } from './common/security/rate-limit';
 import { SecurityModule } from './common/security/security.module';
 import { ConfigModule } from './config/config.module';
@@ -131,6 +132,8 @@ import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
     { provide: APP_GUARD, useExisting: AuthGuard },
     { provide: APP_GUARD, useExisting: RateLimitGuard },
     { provide: APP_GUARD, useExisting: CsrfGuard },
+    // Демо-вход: только просмотр (правки 27.10.2026) — до проверки прав, чтобы ответ был одинаковым.
+    { provide: APP_GUARD, useExisting: DemoReadOnlyGuard },
     { provide: APP_GUARD, useExisting: PermissionGuard },
     // Право записи турнира (ADR-21): после прав, до разбора тела запроса.
     { provide: APP_GUARD, useExisting: WriteAuthorityGuard },

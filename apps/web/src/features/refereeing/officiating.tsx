@@ -18,6 +18,7 @@ import { CompetitionStatusBadge, formatDates } from '@/features/competitions/sha
 import { timeInZone, useRoundLabel } from '@/features/scheduling/shared';
 import { confirmResult, refereeKeys, useOfficiating, usePendingConfirmations } from './api';
 import { useRefereeLabels } from './labels';
+import { RefereeSubnav } from './recruitment';
 
 const LINK_BUTTON =
   'inline-flex min-h-12 items-center justify-center rounded-md px-4 text-base font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2';
@@ -44,6 +45,7 @@ export function RefereeHome() {
   return (
     <>
       <PageHeader title={t('title')} description={t('hint')} />
+      <RefereeSubnav />
       <QueryState isPending={query.isPending} error={query.error}>
         {() =>
           (query.data ?? []).length === 0 ? (
