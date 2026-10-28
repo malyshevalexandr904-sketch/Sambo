@@ -48,7 +48,8 @@
     "guestTitle": "Demo access",
     "guestHint": "Look around the platform: the head, coach, athlete and referee roles are open for viewing without signing up.",
     "continue": "Continue",
-    "openCabinet": "Open my account"
+    "openCabinet": "Open my account",
+    "aboutLink": "About the platform"
   },
   "nav": {
     "dashboard": "My account",
@@ -3182,5 +3183,505 @@
     "openHint": "Tournaments where organizers are recruiting referees: positions and requirements. Apply for a position and the organizer will review it.",
     "noOpen": "There is no open recruitment right now.",
     "apply": "Apply"
+  },
+  "demoGuide": {
+    "badge": "Demo mode",
+    "viewingAs": "Viewing as: {role}",
+    "featuresTitle": "What opens after you sign up",
+    "featuresHint": "Click an item to learn more.",
+    "featureOf": "Feature {n} of {total}",
+    "prev": "Back",
+    "next": "Next",
+    "ctaTitle": "Unlock every feature",
+    "ctaText": "Signing up takes a few minutes. Once your profile is reviewed, this section works with your own data.",
+    "step": "Step {n}",
+    "steps": {
+      "role": "Choose a role",
+      "account": "Account and password",
+      "profile": "Role profile",
+      "access": "Review and access"
+    },
+    "ctaButton": "Sign up",
+    "privacyNote": "In demo mode sections show a guide instead of data: this keeps athletes' personal data safe.",
+    "sections": {
+      "cabinet": {
+        "ORGANIZATION_HEAD": {
+          "title": "Organization head's dashboard",
+          "lead": "All of your organization's work on one screen: tournaments, coaches, athletes and applications.",
+          "f1": {
+            "title": "Organization profile",
+            "text": "Details, logo and contacts of the club or federation. The platform reviews them, then the organization appears in applications and tournaments."
+          },
+          "f2": {
+            "title": "Daily summary",
+            "text": "Upcoming tournaments, applications in progress and athlete documents about to expire, all in one place."
+          },
+          "f3": {
+            "title": "Request to host a tournament",
+            "text": "Submit a request and, once approved, create the tournament: regulations, categories, rules and referee requirements."
+          },
+          "f4": {
+            "title": "Notifications",
+            "text": "Decisions on applications, new participants and referee responses arrive in the feed and on your phone."
+          }
+        },
+        "COACH": {
+          "title": "Coach's dashboard",
+          "lead": "Your athletes, their documents and results in one place.",
+          "f1": {
+            "title": "Coach profile",
+            "text": "Qualification, club and experience. The profile is reviewed by the organization head or the platform."
+          },
+          "f2": {
+            "title": "Athlete summary",
+            "text": "Who is admitted to a tournament, who is missing documents and when the next bouts are."
+          },
+          "f3": {
+            "title": "Tournament applications",
+            "text": "The status of each team application: accepted, under review or needs changes."
+          },
+          "f4": {
+            "title": "Bout notifications",
+            "text": "“Bout coming up” goes to you and the athlete, with the mat number and time."
+          }
+        },
+        "ATHLETE": {
+          "title": "Athlete's dashboard",
+          "lead": "Your profile, rating and results in one place.",
+          "f1": {
+            "title": "Athlete profile",
+            "text": "Grade, club and coach. The profile is confirmed by the coach or the organization."
+          },
+          "f2": {
+            "title": "Rating and level",
+            "text": "Your current rating, level from 1 to 10 and the change after every rated bout."
+          },
+          "f3": {
+            "title": "My tournaments",
+            "text": "Applications, admission, weigh-in and your bout schedule."
+          },
+          "f4": {
+            "title": "Documents",
+            "text": "Upload documents and consents; the platform reminds you before they expire."
+          }
+        },
+        "REFEREE": {
+          "title": "Referee's dashboard",
+          "lead": "Referee recruitment, assignments and work on the mat.",
+          "f1": {
+            "title": "Referee profile",
+            "text": "Referee category and experience. The platform reviews the profile."
+          },
+          "f2": {
+            "title": "Open recruitment",
+            "text": "Tournaments that need referees, with positions and requirements. Respond and the organizer will consider you."
+          },
+          "f3": {
+            "title": "My assignments",
+            "text": "Tournaments, mats and roles: referee, tournament head or secretary."
+          },
+          "f4": {
+            "title": "Refereeing",
+            "text": "Mat tablet and protocols: points, penalties and the bout result go straight into results and the rating."
+          }
+        }
+      },
+      "competitions": {
+        "ORGANIZATION_HEAD": {
+          "title": "Organization tournaments",
+          "lead": "The whole tournament runs in the system, from regulations to results.",
+          "f1": {
+            "title": "Creating a tournament",
+            "text": "Regulations, weight and age categories, rules and referee requirements."
+          },
+          "f2": {
+            "title": "Club applications",
+            "text": "Accept applications and decide on participants, checked against the regulations."
+          },
+          "f3": {
+            "title": "Credentials committee",
+            "text": "Admission by documents, QR check-in, weigh-in and medical clearance."
+          },
+          "f4": {
+            "title": "Draw and results",
+            "text": "Reproducible draw, brackets, mat schedule, published results and rating calculation."
+          }
+        },
+        "COACH": {
+          "title": "Tournaments for your team",
+          "lead": "Find tournaments and enter athletes in a couple of clicks.",
+          "f1": {
+            "title": "Tournament calendar",
+            "text": "Search tournaments and read their regulations."
+          },
+          "f2": {
+            "title": "Team application",
+            "text": "Pick athletes by category; the platform checks age, weight and documents right away."
+          },
+          "f3": {
+            "title": "Participant status",
+            "text": "Admission, weigh-in and medical clearance for every athlete."
+          },
+          "f4": {
+            "title": "Bouts and results",
+            "text": "Brackets, mat schedule and live results."
+          }
+        },
+        "ATHLETE": {
+          "title": "My tournaments",
+          "lead": "Everything about your bouts: where, when and against whom.",
+          "f1": {
+            "title": "Calendar",
+            "text": "Upcoming tournaments and their regulations."
+          },
+          "f2": {
+            "title": "My participation",
+            "text": "Category, admission, mat and bout time."
+          },
+          "f3": {
+            "title": "Brackets and results",
+            "text": "Your category bracket and bout results as soon as they finish."
+          },
+          "f4": {
+            "title": "Rated tournaments",
+            "text": "Every bout of a rated tournament changes your rating."
+          }
+        },
+        "REFEREE": {
+          "title": "Referee's tournaments",
+          "lead": "Tournaments you referee and recruitment you can respond to.",
+          "f1": {
+            "title": "My tournaments",
+            "text": "Tournaments you take part in and your role in each."
+          },
+          "f2": {
+            "title": "Referee recruitment",
+            "text": "Open positions and requirements; respond in one click."
+          },
+          "f3": {
+            "title": "Crews and mats",
+            "text": "Mat assignments and schedule."
+          },
+          "f4": {
+            "title": "Mat tablet",
+            "text": "Points, penalties and the bout result; it goes straight to the bracket and the rating."
+          }
+        }
+      },
+      "athletes": {
+        "ORGANIZATION_HEAD": {
+          "title": "My athletes",
+          "lead": "The organization's athlete register.",
+          "f1": {
+            "title": "Register",
+            "text": "All athletes of the organization's clubs with grades, coaches and rating."
+          },
+          "f2": {
+            "title": "Import",
+            "text": "Upload a list from CSV or XLSX with duplicate detection."
+          },
+          "f3": {
+            "title": "Documents and consents",
+            "text": "Documents and guardians' consents under Russian personal data law, with expiry tracking."
+          },
+          "f4": {
+            "title": "Rating and grades",
+            "text": "Rating, level and results history of every athlete."
+          }
+        },
+        "COACH": {
+          "title": "My athletes",
+          "lead": "Cards of the athletes you coach.",
+          "f1": {
+            "title": "Athlete cards",
+            "text": "Details, grade, weight and documents of each athlete."
+          },
+          "f2": {
+            "title": "Add and import",
+            "text": "Add athletes one by one or as a spreadsheet list."
+          },
+          "f3": {
+            "title": "Guardians",
+            "text": "Invitations to legal guardians and their consents."
+          },
+          "f4": {
+            "title": "Progress",
+            "text": "Rating, level and tournament results."
+          }
+        }
+      },
+      "coaches": {
+        "title": "My coaches",
+        "lead": "The organization's coaching staff.",
+        "f1": {
+          "title": "Coach list",
+          "text": "Coaches of the organization's clubs and their athletes."
+        },
+        "f2": {
+          "title": "Invitations",
+          "text": "Invite a coach by email; after signing up they appear in the organization."
+        },
+        "f3": {
+          "title": "Qualification review",
+          "text": "Confirm coaches' profiles and documents."
+        }
+      },
+      "pathToSuccess": {
+        "title": "Path to success",
+        "lead": "Your sports journey from the first tournament to the top of the rating.",
+        "f1": {
+          "title": "Results history",
+          "text": "All tournaments, bouts and medals in one feed."
+        },
+        "f2": {
+          "title": "Rating growth",
+          "text": "How your rating and level changed after each bout."
+        },
+        "f3": {
+          "title": "Next goals",
+          "text": "Upcoming tournaments and how many points you need for the next level."
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "lead": "Notifications and platform documents.",
+        "f1": {
+          "title": "Notification feed",
+          "text": "All platform messages in one place."
+        },
+        "f2": {
+          "title": "Phone push",
+          "text": "Notifications on this device even when the site is closed."
+        },
+        "f3": {
+          "title": "Notification types",
+          "text": "Choose what to be told about: applications, admission, bouts."
+        },
+        "f4": {
+          "title": "Consent texts",
+          "text": "Terms of use, privacy policy and personal data consent."
+        }
+      },
+      "refereeing": {
+        "title": "Refereeing",
+        "lead": "A referee's tools at the tournament.",
+        "f1": {
+          "title": "Open recruitment",
+          "text": "Tournaments that need referees and responding to positions."
+        },
+        "f2": {
+          "title": "Mat tablet",
+          "text": "Enter points, penalties and the bout result right on the mat."
+        },
+        "f3": {
+          "title": "Protocols",
+          "text": "Bout protocols are generated automatically and ready to print."
+        }
+      },
+      "applications": {
+        "title": "Tournament applications",
+        "lead": "Your team's applications and decisions on them.",
+        "f1": {
+          "title": "Application roster",
+          "text": "Athletes by category, checked against the regulations."
+        },
+        "f2": {
+          "title": "Organizer decisions",
+          "text": "Who is accepted and what needs fixing."
+        },
+        "f3": {
+          "title": "Changes",
+          "text": "Replacements and withdrawals until applications close."
+        }
+      },
+      "competitionRequests": {
+        "title": "Hosting requests",
+        "lead": "How to host your own tournament on the platform.",
+        "f1": {
+          "title": "Request",
+          "text": "Dates, venue, tournament level and referee requirements."
+        },
+        "f2": {
+          "title": "Review",
+          "text": "The platform reviews the request and reports its decision."
+        },
+        "f3": {
+          "title": "Creating the tournament",
+          "text": "Once approved, the tournament is created from the request in a minute."
+        }
+      },
+      "documents": {
+        "title": "Documents",
+        "lead": "Athletes' documents and their review.",
+        "f1": {
+          "title": "Upload",
+          "text": "A photo or scan of the document from a phone or computer."
+        },
+        "f2": {
+          "title": "Review",
+          "text": "A responsible person reviews the document and records the decision."
+        },
+        "f3": {
+          "title": "Expiry",
+          "text": "A reminder before the document expires."
+        }
+      },
+      "generic": {
+        "title": "Platform section",
+        "lead": "After you sign up, this section opens with your own data.",
+        "f1": {
+          "title": "Your data",
+          "text": "The section shows data for your role and organization."
+        },
+        "f2": {
+          "title": "Actions",
+          "text": "Applications, documents and decisions are handled right here."
+        },
+        "f3": {
+          "title": "Notifications",
+          "text": "The platform lets you know when something new appears here."
+        }
+      }
+    }
+  },
+  "about": {
+    "eyebrow": "About the platform",
+    "title": "Цифровое самбо: the whole tournament in one system",
+    "lead": "A platform for youth sambo tournaments. Regulations, applications, credentials, draw, refereeing, results and rating all run in one system, with no paper or spreadsheets.",
+    "stats": {
+      "roles": "roles: head, coach, athlete, referee",
+      "outcomes": "bout outcomes counted by the rating",
+      "levels": "skill levels in the rating",
+      "start": "points of starting rating"
+    },
+    "essence": {
+      "p1": {
+        "title": "One source of data",
+        "text": "Athletes, documents and results live in one place and are not lost between tournaments."
+      },
+      "p2": {
+        "title": "Transparent for everyone",
+        "text": "Brackets, schedules and results are visible to participants at once; public pages need no login."
+      },
+      "p3": {
+        "title": "Data kept safe",
+        "text": "Children's personal data is processed under Russian law 152-FZ, with guardians' consent."
+      }
+    },
+    "audience": {
+      "eyebrow": "Who it is for",
+      "title": "Four roles, each with its own dashboard",
+      "lead": "Pick a role to see what it gets.",
+      "ORGANIZATION_HEAD": {
+        "text": "The head of a club or federation runs the organization and hosts tournaments.",
+        "b1": "Create tournaments and accept club applications",
+        "b2": "The organization's coaches and athletes in one register",
+        "b3": "Referee recruitment with position requirements"
+      },
+      "COACH": {
+        "text": "A coach manages athletes and enters them in tournaments.",
+        "b1": "Team applications with automatic requirement checks",
+        "b2": "Documents and guardians' consents under control",
+        "b3": "“Bout coming up” alerts for coach and athlete"
+      },
+      "ATHLETE": {
+        "text": "An athlete follows their bouts and growth.",
+        "b1": "Personal rating and level from 1 to 10",
+        "b2": "Bout schedule, brackets and results",
+        "b3": "Results history in “Path to success”"
+      },
+      "REFEREE": {
+        "text": "A referee responds to recruitment and judges bouts on a tablet.",
+        "b1": "Open referee recruitment for tournaments",
+        "b2": "Mat tablet: points, penalties, result",
+        "b3": "Working as tournament head or secretary"
+      }
+    },
+    "problems": {
+      "eyebrow": "What it solves",
+      "title": "Before and after",
+      "lead": "Click a card to see the solution.",
+      "before": "Problem",
+      "after": "Solution",
+      "showSolution": "Show the solution →",
+      "showProblem": "← Back to the problem",
+      "paper": {
+        "problemTitle": "Paper applications and spreadsheets",
+        "problem": "Applications arrive by messenger and email, and data is retyped by hand with mistakes.",
+        "solutionTitle": "Online applications",
+        "solution": "The coach builds the application in the dashboard, and the system checks age, weight and documents."
+      },
+      "draw": {
+        "problemTitle": "Manual draws and disputes",
+        "problem": "Brackets are made by hand, clubs are not separated and results get disputed.",
+        "solutionTitle": "A fair draw",
+        "solution": "A reproducible draw with seeding and club and region separation; every version is kept."
+      },
+      "results": {
+        "problemTitle": "Results get lost",
+        "problem": "Tournament results are scattered across files and there is no athlete history.",
+        "solutionTitle": "History and rating",
+        "solution": "Every bout goes into the results and the rating, and an athlete's history is kept for years."
+      },
+      "data": {
+        "problemTitle": "Children's data in chats",
+        "problem": "Document scans are forwarded in messengers without consent or protection.",
+        "solutionTitle": "Secure storage",
+        "solution": "Documents are stored on the platform with role-based access and guardians' consent under 152-FZ."
+      }
+    },
+    "rating": {
+      "eyebrow": "A unique rating system",
+      "title": "A rating that counts the quality of a win",
+      "lead": "The rating is built on the Elo formula: it matters not only who won, but against whom and how. Beating a strong opponent gives more points, and a clean win is worth more than a win on points.",
+      "steps": {
+        "start": {
+          "title": "1. Start at 200 points",
+          "text": "Every athlete starts with a rating of 200 and level 1."
+        },
+        "match": {
+          "title": "2. Opponent strength",
+          "text": "Before a bout the system computes the expected result: the stronger the opponent, the more you can win and the less you lose."
+        },
+        "quality": {
+          "title": "3. Quality of the win",
+          "text": "8 outcomes are counted, from a clean win to a win by minimal advantage. A newcomer (K = 60) grows faster, an experienced athlete (K = 10) more steadily."
+        },
+        "level": {
+          "title": "4. Levels 1–10",
+          "text": "Every 200 points is a new level: level 2 from 400 points, level 10 from 2000 points."
+        }
+      },
+      "levelsTitle": "Skill levels",
+      "levelLow": "Level 1",
+      "levelHigh": "Level 10",
+      "calc": {
+        "title": "Try it yourself",
+        "hint": "Set two athletes' ratings and the bout outcome.",
+        "athleteA": "Athlete A",
+        "athleteB": "Athlete B",
+        "kAndLevel": "Coefficient K = {k} · level {level}",
+        "after": "After the bout",
+        "chance": "Athlete A's expected result: {chance}%",
+        "outcome": "Outcome for athlete A",
+        "outcomes": {
+          "CLEAN_WIN": "Clean win",
+          "WIN_ON_POINTS": "Win on points",
+          "WIN_SMALL_ADVANTAGE": "Win by small advantage",
+          "WIN_MINIMAL_ADVANTAGE": "Win by minimal advantage",
+          "LOSS_MINIMAL_ADVANTAGE": "Loss by opponent's minimal advantage",
+          "LOSS_SMALL_ADVANTAGE": "Loss by opponent's small advantage",
+          "LOSS_ON_POINTS": "Loss on points",
+          "CLEAN_LOSS": "Clean loss"
+        },
+        "note": "An example calculation using the platform's rating formula. The real rating changes after bouts of rated tournaments."
+      }
+    },
+    "cta": {
+      "title": "Join Цифровое самбо",
+      "text": "Sign up in your role and run your next tournament in the system.",
+      "register": "Sign up",
+      "rating": "Open the rating"
+    }
   }
 }

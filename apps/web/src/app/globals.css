@@ -139,6 +139,36 @@ body {
   outline-offset: 2px;
 }
 
+/* Анимации главной и справок демо-режима (правки 28.10.2026). При «уменьшить движение» — правило ниже. */
+@keyframes sde-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sde-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(0.35rem);
+  }
+}
+
+.animate-fade-up {
+  animation: sde-fade-up 0.45s ease-out both;
+}
+
+.animate-float {
+  animation: sde-float 2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
