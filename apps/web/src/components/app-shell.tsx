@@ -18,6 +18,7 @@ import { ConsoleRoleBar, RoleChangedElsewhere, RoleSwitcher } from '@/features/c
 import { Avatar } from '@/features/avatar';
 import { NotificationBell } from '@/features/notifications/bell';
 import { Brand } from './brand';
+import { DemoGuide } from './demo-guide';
 import { LocaleSwitcher } from './locale-switcher';
 import { ThemeSwitcher } from './theme-switcher';
 
@@ -155,12 +156,14 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
   const user = me.data;
   // Демо-вход: действия перехватываются до запроса (lib/demo.ts).
   setDemoMode(user.demo);
+  // Демо-вход (правки 28.10.2026): вкладка показывает справку о разделе и призыв зарегистрироваться, а не содержимое.
+  const content = user.demo ? <DemoGuide pathname={pathname} role={user.activeRole} /> : children;
   if (bare) {
     return (
       <main id="main" className="min-h-screen bg-slate-100">
         <RoleChangedElsewhere userId={user.id} />
         <ConsoleRoleBar me={user} />
-        {children}
+        {user.demo ? <div className="px-4 py-6">{content}</div> : content}
       </main>
     );
   }
@@ -253,7 +256,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
         />
       ) : null}
       <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 print:p-0">
-        {children}
+        {content}
       </main>
     </div>
   );

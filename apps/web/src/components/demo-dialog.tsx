@@ -9,21 +9,11 @@ import { api } from '@/lib/api';
 import { DEMO_BLOCKED_EVENT, setDemoMode } from '@/lib/demo';
 import { closeLive } from '@/lib/live';
 
-export function DemoBlockedDialog() {
-  const t = useTranslations('demo');
-  const ref = useRef<HTMLDialogElement>(null);
+/** Выход из демо и переход к регистрации — тот же сценарий, что кнопка «Зарегистрироваться» на главной. */
+export function useRegisterFromDemo(): () => Promise<void> {
   const router = useRouter();
   const queryClient = useQueryClient();
-  useEffect(() => {
-    const open = (): void => {
-      const d = ref.current;
-      if (d && !d.open) d.showModal();
-    };
-    window.addEventListener(DEMO_BLOCKED_EVENT, open);
-    return () => window.removeEventListener(DEMO_BLOCKED_EVENT, open);
-  }, []);
-  const register = async (): Promise<void> => {
-    ref.current?.close();
+  return async () => {
     try {
       await api('/auth/logout', { method: 'POST', noRefresh: true });
     } catch {
@@ -34,6 +24,24 @@ export function DemoBlockedDialog() {
       queryClient.clear();
       router.push('/register');
     }
+  };
+}
+
+export function DemoBlockedDialog() {
+  const t = useTranslations('demo');
+  const ref = useRef<HTMLDialogElement>(null);
+  const registerFromDemo = useRegisterFromDemo();
+  useEffect(() => {
+    const open = (): void => {
+      const d = ref.current;
+      if (d && !d.open) d.showModal();
+    };
+    window.addEventListener(DEMO_BLOCKED_EVENT, open);
+    return () => window.removeEventListener(DEMO_BLOCKED_EVENT, open);
+  }, []);
+  const register = async (): Promise<void> => {
+    ref.current?.close();
+    await registerFromDemo();
   };
   return (
     <dialog

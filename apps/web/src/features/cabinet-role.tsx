@@ -2,7 +2,7 @@
 // Роль в кабинете (0.13.0): человек с несколькими ролями работает в одной выбранной — права на сервере, меню и обзор
 // действуют только для неё. Переключатель — в боковой панели; выбор хранится на сервере на сессию входа, поэтому
 // после переключения страница загружается заново (кэш запросов, соединение живых данных, другие вкладки).
-import { type CabinetRole, type DataEnvelope, type Me } from '@sde/contracts';
+import { type CabinetRole, type DataEnvelope, type Me, ONBOARDING_ROLES } from '@sde/contracts';
 import { Alert, Button, cn } from '@sde/ui';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
@@ -218,12 +218,15 @@ export function RoleSwitcher({ me }: { me: Me }) {
           {error}
         </p>
       ) : null}
-      <Link
-        href="/onboarding"
-        className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-blue-700 hover:underline"
-      >
-        {roles.length === 0 ? t('chooseRole') : t('addRole')}
-      </Link>
+      {/* Правки 28.10.2026: когда у человека уже все четыре роли платформы, добавлять нечего — ссылки нет. */}
+      {ONBOARDING_ROLES.every((r) => roles.includes(r)) ? null : (
+        <Link
+          href="/onboarding"
+          className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-blue-700 hover:underline"
+        >
+          {roles.length === 0 ? t('chooseRole') : t('addRole')}
+        </Link>
+      )}
     </div>
   );
 }
