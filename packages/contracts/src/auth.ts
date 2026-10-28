@@ -94,6 +94,8 @@ export interface Me {
   status: UserStatus;
   personId: string | null;
   totpEnabled: boolean;
+  /** Email подтверждён по ссылке из письма (правки 28.10.2026: без него заявку на роль не отправить). */
+  emailVerified: boolean;
   /** Фото профиля (запись «человек» пользователя); null — фото нет. */
   avatarUrl: string | null;
   /**

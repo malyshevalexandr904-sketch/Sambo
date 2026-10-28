@@ -1,17 +1,7 @@
-import type { Metadata } from 'next';
-import { getTranslations } from 'next-intl/server';
-import { Suspense } from 'react';
-import { NotificationsPage } from '@/features/notifications/list';
+import { redirect } from '@/i18n/navigation';
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations('notifications');
-  return { title: t('title') };
-}
-
-export default function Page() {
-  return (
-    <Suspense>
-      <NotificationsPage />
-    </Suspense>
-  );
+/** Уведомления перенесены в «Настройки» (правки 28.10.2026): старые ссылки (письма, push) ведут туда. */
+export default async function Page({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  redirect({ href: '/settings', locale });
 }

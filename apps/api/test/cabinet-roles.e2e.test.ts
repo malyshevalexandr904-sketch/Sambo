@@ -313,8 +313,9 @@ describe('куда уходят письма', () => {
 });
 
 describe('регистрация с ролью и повторное письмо', () => {
-  const register = async (s: Session, email: string, role?: string) =>
-    s.agent.post('/api/v1/auth/register').set('x-csrf-token', s.csrf).send({
+  // Регистрация открывает сессию сразу (правки 28.10.2026): CSRF-токен новой сессии — из ответа.
+  const register = async (s: Session, email: string, role?: string) => {
+    const res = await s.agent.post('/api/v1/auth/register').set('x-csrf-token', s.csrf).send({
       email,
       password: 'Lemon-Tatami-Throw-42',
       displayName: 'Новичок',
@@ -323,11 +324,17 @@ describe('регистрация с ролью и повторное письм�
       acceptPersonalData: true,
       role,
     });
+    const cookie = ((res.headers['set-cookie'] as unknown as string[] | undefined) ?? []).find((c) =>
+      c.startsWith('sde_csrf='),
+    );
+    if (cookie) s.csrf = decodeURIComponent(cookie.split(';')[0]!.slice(9));
+    return res;
+  };
 
   it('роль, выбранная до формы, запоминается; роль администратора выбрать нельзя', async () => {
     const s = await csrfAgent(t);
     expect((await register(s, 'admin-wannabe@test.local', 'ADMIN')).status).toBe(400);
-    expect((await register(s, 'coach-new@test.local', 'COACH')).status).toBe(202);
+    expect((await register(s, 'coach-new@test.local', 'COACH')).status).toBe(201);
     const [mail] = await sentEmails(t, 'auth.verify_email');
     const verified = await s.agent
       .post('/api/v1/auth/verify-email')
@@ -344,7 +351,7 @@ describe('регистрация с ролью и повторное письм�
 
   it('повторное письмо: прежняя ссылка действует до подтверждения, после — гаснут все; адрес не раскрывается', async () => {
     const s = await csrfAgent(t);
-    expect((await register(s, 'slow@test.local', 'ATHLETE')).status).toBe(202);
+    expect((await register(s, 'slow@test.local', 'ATHLETE')).status).toBe(201);
     const resend = (email: string) =>
       s.agent
         .post('/api/v1/auth/verify-email/resend')

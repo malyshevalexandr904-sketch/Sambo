@@ -26,7 +26,7 @@ export function NotificationBell() {
   const unread = useUnreadCount().data ?? 0;
   return (
     <Link
-      href="/notifications"
+      href="/settings"
       className="relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-slate-700 hover:bg-slate-100"
       aria-label={t('bell', { count: unread })}
     >

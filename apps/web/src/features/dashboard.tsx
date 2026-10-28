@@ -30,6 +30,10 @@ function OrganizationRow({ id, roles }: { id: string; roles: string[] }) {
   );
 }
 
+/**
+ * «Работа» (правки 28.10.2026): в меню у ролей только фиксированные вкладки — остальные разделы роли открываются
+ * отсюда, по правам.
+ */
 function WorkCard() {
   const t = useTranslations();
   const { data: me } = useMe();
@@ -52,9 +56,22 @@ function WorkCard() {
       visible: me?.activeRole !== 'ATHLETE' && (mine.data?.length ?? 0) > 0,
     },
     {
+      href: '/competition-requests',
+      label: t('dashboard.links.competitionRequests'),
+      visible: hasAnywhere(me, 'competition.request'),
+    },
+    {
       href: '/referee',
       label: t('dashboard.links.referee'),
-      visible: (me?.grants.competitions.length ?? 0) > 0,
+      visible:
+        me?.activeRole === 'REFEREE' ||
+        (me?.grants.competitions.length ?? 0) > 0 ||
+        hasAnywhere(me, 'result.confirm'),
+    },
+    {
+      href: '/referee/recruitment',
+      label: t('dashboard.links.recruitment'),
+      visible: me?.activeRole === 'REFEREE',
     },
     {
       href: '/applications',
@@ -64,12 +81,29 @@ function WorkCard() {
     {
       href: '/onboarding/review',
       label: t('dashboard.links.review'),
-      visible: hasAnywhere(me, 'onboarding.review'),
+      visible:
+        hasAnywhere(me, 'onboarding.review') ||
+        (me?.grants.organizations.some((g) => g.roles.includes('COACH')) ?? false),
     },
     {
       href: '/documents',
       label: t('dashboard.links.documents'),
       visible: me?.activeRole !== 'REFEREE' && hasAnywhere(me, 'document.verify'),
+    },
+    {
+      href: '/admin/referees',
+      label: t('dashboard.links.referees'),
+      visible: hasAnywhere(me, 'referee.manage'),
+    },
+    {
+      href: '/admin/categories',
+      label: t('dashboard.links.categories'),
+      visible: hasAnywhere(me, 'category.manage'),
+    },
+    {
+      href: '/admin/rulesets',
+      label: t('dashboard.links.rulesets'),
+      visible: hasAnywhere(me, 'ruleset.manage'),
     },
   ].filter((l) => l.visible);
   if (links.length === 0) return null;

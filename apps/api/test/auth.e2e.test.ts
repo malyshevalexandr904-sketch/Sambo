@@ -33,9 +33,10 @@ const cookieValue = (res: { headers: Record<string, unknown> }, name: string): s
 };
 
 describe('registration and email verification', () => {
-  it('register → verify email → session → me → logout', async () => {
+  it('register → session at once → verify email → me → logout', async () => {
     const s = await csrfAgent(t);
-    await s.agent
+    // Регистрация — первый шаг анкеты (правки 28.10.2026): сессия открывается сразу, без подтверждения email.
+    const registered = await s.agent
       .post('/api/v1/auth/register')
       .set('x-csrf-token', s.csrf)
       .send({
@@ -46,7 +47,13 @@ describe('registration and email verification', () => {
         acceptTerms: true,
         acceptPersonalData: true,
       })
-      .expect(202, { data: { status: 'VERIFICATION_SENT' } });
+      .expect(201);
+    expect(registered.body.data).toMatchObject({
+      email: 'coach@test.local',
+      status: 'ACTIVE',
+      emailVerified: false,
+    });
+    const csrf = decodeURIComponent(cookieValue(registered, 'sde_csrf') ?? '');
 
     // Согласие на обработку ПДн сохранено отдельно от условий, с редакцией текста (152-ФЗ, ст. 9).
     const consent = await t.admin.user.findUniqueOrThrow({
@@ -57,58 +64,80 @@ describe('registration and email verification', () => {
     expect(consent.pdConsentAt).toBeInstanceOf(Date);
     expect(consent.pdConsentVersion).toBe(PD_CONSENT_VERSION);
 
-    // До подтверждения войти нельзя.
-    const early = await s.agent
-      .post('/api/v1/auth/login')
-      .set('x-csrf-token', s.csrf)
-      .send({ email: 'coach@test.local', password: PASSWORD });
-    expect(early.status).toBe(403);
-    expect(early.body.error.code).toBe('EMAIL_NOT_VERIFIED');
+    const before = await s.agent.get('/api/v1/me').expect(200);
+    expect(before.body.data.emailVerified).toBe(false);
 
     const [mail] = await sentEmails(t, 'auth.verify_email');
     expect(mail?.to).toBe('coach@test.local');
     const verified = await s.agent
       .post('/api/v1/auth/verify-email')
-      .set('x-csrf-token', s.csrf)
+      .set('x-csrf-token', csrf)
       .send({ token: tokenFromUrl(mail?.params.verifyUrl) })
       .expect(200);
-    expect(verified.body.data.status).toBe('ACTIVE');
-    const csrf = decodeURIComponent(cookieValue(verified, 'sde_csrf') ?? '');
+    expect(verified.body.data).toMatchObject({ status: 'ACTIVE', emailVerified: true });
+    const csrf2 = decodeURIComponent(cookieValue(verified, 'sde_csrf') ?? '');
 
     const me = await s.agent.get('/api/v1/me').expect(200);
     expect(me.body.data.email).toBe('coach@test.local');
     expect(me.body.data.grants).toEqual({ platform: [], organizations: [], competitions: [] });
 
-    await s.agent.post('/api/v1/auth/logout').set('x-csrf-token', csrf).expect(204);
+    await s.agent.post('/api/v1/auth/logout').set('x-csrf-token', csrf2).expect(204);
     const after = await s.agent.get('/api/v1/me');
     expect(after.status).toBe(401);
 
     // Токен подтверждения одноразовый.
     const again = await s.agent
       .post('/api/v1/auth/verify-email')
-      .set('x-csrf-token', csrf)
+      .set('x-csrf-token', csrf2)
       .send({ token: tokenFromUrl(mail?.params.verifyUrl) });
     expect(again.body.error.code).toBe('TOKEN_EXPIRED');
   });
 
-  it('does not reveal that an email is taken', async () => {
+  it('reports a taken email as a field error and sends no mail', async () => {
     await createUser(t, { email: 'taken@test.local' });
     const s = await csrfAgent(t);
-    await s.agent
+    const res = await s.agent.post('/api/v1/auth/register').set('x-csrf-token', s.csrf).send({
+      email: 'taken@test.local',
+      password: PASSWORD,
+      displayName: 'X',
+      locale: 'ru',
+      acceptTerms: true,
+      acceptPersonalData: true,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error.details.fields).toEqual([{ path: 'email', code: 'email_taken' }]);
+    expect(await sentEmails(t)).toHaveLength(0);
+  });
+
+  it('the role application is filled right after sign-up; submitting needs a confirmed email', async () => {
+    const s = await csrfAgent(t);
+    const registered = await s.agent
       .post('/api/v1/auth/register')
       .set('x-csrf-token', s.csrf)
       .send({
-        email: 'taken@test.local',
+        email: 'athlete-new@test.local',
         password: PASSWORD,
-        displayName: 'X',
+        displayName: 'Спортсмен',
         locale: 'ru',
         acceptTerms: true,
         acceptPersonalData: true,
+        role: 'ATHLETE',
       })
-      .expect(202, { data: { status: 'VERIFICATION_SENT' } });
-    const mails = await sentEmails(t);
-    expect(mails.map((m) => m.to)).toEqual(['taken@test.local']);
-    expect(await sentEmails(t, 'auth.account_exists')).toHaveLength(1);
+      .expect(201);
+    expect(registered.body.data).toMatchObject({ preferredRole: 'ATHLETE', availableRoles: [] });
+    const csrf = decodeURIComponent(cookieValue(registered, 'sde_csrf') ?? '');
+    const created = await s.agent
+      .post('/api/v1/onboarding/requests')
+      .set('x-csrf-token', csrf)
+      .send({ role: 'ATHLETE', kind: 'REGISTRATION' })
+      .expect(201);
+    const submit = await s.agent
+      .post(`/api/v1/onboarding/requests/${created.body.data.id}/submit`)
+      .set('x-csrf-token', csrf)
+      .set('if-match', `"v${created.body.data.version}"`)
+      .send({ consentPersonalData: true });
+    expect(submit.status).toBe(403);
+    expect(submit.body.error.code).toBe('EMAIL_NOT_VERIFIED');
   });
 
   it('rejects leaked passwords and invalid bodies with field errors', async () => {

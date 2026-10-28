@@ -1,18 +1,34 @@
 'use client';
-// Регистрация (API.md, 3.1; 0.13.0): сначала роль, затем учётная запись; письмо подтверждения и его повторная
-// отправка (она же — на экране входа, если почта не подтверждена).
+// Регистрация (API.md, 3.1): первые шаги пошаговой анкеты — роль и учётная запись (правки 28.10.2026: отдельной
+// упрощённой регистрации нет). После учётной записи вход открыт сразу и продолжается анкета роли; письмо подтверждения
+// и его повторная отправка — для отправки заявки (и на экране входа у старых неподтверждённых учётных записей).
 import { zodResolver } from '@hookform/resolvers/zod';
-import { isOnboardingRole, ONBOARDING_ROLES, type OnboardingRole, RegisterRequest } from '@sde/contracts';
+import {
+  type DataEnvelope,
+  isOnboardingRole,
+  type Me,
+  ONBOARDING_ROLES,
+  type OnboardingRequestDto,
+  type OnboardingRole,
+  RegisterRequest,
+} from '@sde/contracts';
 import { Alert, Button, Card, Field, Input } from '@sde/ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { z } from 'zod';
 import { PasswordRequirements } from '@/components/password-requirements';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { applyFieldErrors, useErrorMessage, useFieldMessage } from '@/lib/errors';
+import { qk } from '@/lib/queries';
+
+/** Переход после входа — только на внутренний путь (защита от открытого редиректа). */
+export function safeNext(value: string | null): string {
+  return value && value.startsWith('/') && !value.startsWith('//') ? value : '/admin';
+}
 
 /** Как на сервере (лимит `verifyResend`): не больше 3 писем за 15 минут на адрес. */
 const RESEND_LIMIT = 3;
@@ -74,9 +90,9 @@ export function ResendVerification({ email, className }: { email: string; classN
 }
 
 /**
- * Регистрация (0.13.0): сначала роль, затем учётная запись. Роль запоминается и после подтверждения email сразу
- * открывается её анкета; права роль даёт только после одобрения заявки. Без роли — по приглашению (`next`) или для
- * представителя спортсмена (`role=none`): его связь с ребёнком оформляет тренер.
+ * Регистрация: шаг 1 — роль, шаг 2 — учётная запись, дальше без перерыва — анкета роли (правки 28.10.2026); права роль
+ * даёт только после одобрения заявки. Без роли — по приглашению (`next`) или для представителя спортсмена
+ * (`role=none`): его связь с ребёнком оформляет тренер, а приглашению нужен подтверждённый email.
  */
 export function RegisterForm() {
   const search = useSearchParams();
@@ -92,6 +108,7 @@ function RegisterRoleStep() {
   return (
     <Card>
       <h1 className="text-2xl font-semibold">{t('title')}</h1>
+      <RegisterProgress current={0} />
       <p className="mt-1 text-sm text-slate-600">{t('roleStep')}</p>
       <h2 className="mb-3 mt-5 text-base font-semibold text-slate-900">{t('whoAreYou')}</h2>
       <ul className="space-y-3">
@@ -126,6 +143,37 @@ function RegisterRoleStep() {
   );
 }
 
+/**
+ * Этапы регистрации (правки 28.10.2026): роль и учётная запись — первые шаги анкеты, остальные шаги зависят от роли
+ * и открываются сразу после учётной записи.
+ */
+function RegisterProgress({ current }: { current: 0 | 1 }) {
+  const t = useTranslations('onboarding');
+  const all = [t('steps.role'), t('steps.account'), t('steps.form')];
+  return (
+    <nav aria-label={t('wizard.progress')} className="mb-4 mt-3">
+      <ol className="flex flex-wrap gap-2">
+        {all.map((label, i) => (
+          <li
+            key={label}
+            aria-current={i === current ? 'step' : undefined}
+            className={
+              i === current
+                ? 'rounded-full bg-blue-700 px-3 py-1 text-xs font-medium text-white'
+                : i < current
+                  ? 'rounded-full bg-green-50 px-3 py-1 text-xs font-medium text-green-800 ring-1 ring-green-300'
+                  : 'rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600'
+            }
+          >
+            {i < current ? '✓ ' : `${i + 1}. `}
+            {label}
+          </li>
+        ))}
+      </ol>
+    </nav>
+  );
+}
+
 function LegalLink({ href, children }: { href: string; children: ReactNode }) {
   return (
     <Link href={href} target="_blank" className="text-blue-700 underline">
@@ -140,6 +188,9 @@ function RegisterAccountStep({ role }: { role: OnboardingRole | null }) {
   const locale = useLocale();
   const errorMessage = useErrorMessage();
   const fieldMessage = useFieldMessage();
+  const queryClient = useQueryClient();
+  const router = useRouter();
+  const next = useSearchParams().get('next');
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const form = useForm<z.input<typeof RegisterRequest>>({
@@ -156,7 +207,21 @@ function RegisterAccountStep({ role }: { role: OnboardingRole | null }) {
   const onSubmit = form.handleSubmit(async (values) => {
     setError(null);
     try {
-      await api('/auth/register', { method: 'POST', body: values, noRefresh: true });
+      const res = await api<DataEnvelope<Me>>('/auth/register', {
+        method: 'POST',
+        body: values,
+        noRefresh: true,
+      });
+      queryClient.setQueryData(qk.me, res.data);
+      if (role) {
+        // Сразу — следующий шаг анкеты выбранной роли.
+        const created = await api<DataEnvelope<OnboardingRequestDto>>('/onboarding/requests', {
+          method: 'POST',
+          body: { role, kind: 'REGISTRATION' },
+        });
+        router.replace(`/onboarding/${created.data.id}`);
+        return;
+      }
       setSentTo(values.email);
     } catch (e) {
       if (
@@ -180,6 +245,12 @@ function RegisterAccountStep({ role }: { role: OnboardingRole | null }) {
         </Alert>
         <p className="mt-4 text-sm text-slate-600">{t('register.notReceived')}</p>
         <ResendVerification email={sentTo} className="mt-3" />
+        <Link
+          href={safeNext(next)}
+          className="mt-4 inline-flex min-h-11 items-center rounded-md bg-blue-700 px-5 font-medium text-white hover:bg-blue-800"
+        >
+          {t('register.continue')}
+        </Link>
       </Card>
     );
   }
@@ -187,9 +258,10 @@ function RegisterAccountStep({ role }: { role: OnboardingRole | null }) {
   return (
     <Card>
       <h1 className="text-2xl font-semibold">{t('register.title')}</h1>
+      {role ? <RegisterProgress current={1} /> : null}
       {role ? (
         <p className="mb-6 mt-1 text-sm text-slate-600">
-          {t('register.accountStep')} · {t('register.role')}: <strong>{tRoles(role)}</strong>{' '}
+          {t('register.role')}: <strong>{tRoles(role)}</strong>{' '}
           <Link href="/register" className="text-blue-700 hover:underline">
             {t('register.changeRole')}
           </Link>

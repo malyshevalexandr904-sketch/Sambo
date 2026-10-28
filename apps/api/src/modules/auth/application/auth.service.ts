@@ -67,41 +67,36 @@ export class AuthService {
     }
   }
 
-  /** Ответ всегда одинаковый: занятость email не раскрывается (API.md, 3.1). */
-  async register(input: RegisterRequest): Promise<void> {
+  /**
+   * Регистрация — первый шаг пошаговой анкеты (правки 28.10.2026): учётная запись создаётся и сразу открывается сессия,
+   * чтобы человек без перерыва продолжил анкету роли. Письмо для подтверждения email уходит сразу; подтверждённый
+   * адрес нужен для отправки заявки на проверку (и для приглашений), а не для заполнения. Занятый адрес — ошибка поля
+   * `email_taken`: продолжить анкету под чужим адресом нельзя, поэтому скрывать занятость больше нечем.
+   */
+  async register(input: RegisterRequest): Promise<LoginResult> {
     await this.limiter.hit('authEmail', `register:${input.email}`);
     if (!(await this.settings.get('registration.selfSignupEnabled')))
       throw new DomainError('FORBIDDEN', { reason: 'signup_disabled' });
     await this.assertPasswordAcceptable(input.password, 'password');
     const secretHash = await hashPassword(input.password);
+    const emailTaken = (): DomainError =>
+      new DomainError('VALIDATION_FAILED', { fields: [{ path: 'email', code: 'email_taken' }] });
+    let created: { userId: string; session: IssuedSession };
     try {
-      await this.db.tx(async (tx) => {
-        const existing = await tx.user.findUnique({
-          where: { email: input.email },
-          select: { id: true, locale: true },
-        });
-        if (existing) {
-          await this.emails.request(tx, {
-            template: 'auth.account_exists',
-            to: input.email,
-            userId: existing.id,
-            locale: existing.locale === 'en' ? 'en' : 'ru',
-            params: {
-              loginUrl: `${this.env.APP_URL}/${input.locale}/login`,
-              resetUrl: `${this.env.APP_URL}/${input.locale}/forgot-password`,
-            },
-          });
-          return;
-        }
+      created = await this.db.tx(async (tx) => {
+        const existing = await tx.user.findUnique({ where: { email: input.email }, select: { id: true } });
+        if (existing) throw emailTaken();
         const userId = uuidv7();
-        await tx.user.create({
+        const user = await tx.user.create({
           data: {
             id: userId,
             email: input.email,
             displayName: input.displayName,
             locale: input.locale,
-            status: 'PENDING_VERIFICATION',
-            // Роль, выбранная до формы (0.13.0): после подтверждения сразу открывается её анкета.
+            // Вход открыт сразу; адрес не подтверждён, пока emailVerifiedAt пуст.
+            status: 'ACTIVE',
+            lastLoginAt: new Date(),
+            // Роль, выбранная до формы (0.13.0): анкета этой роли открывается сразу.
             preferredRole: input.role ?? null,
             // Отметки формы обязательны (схема запроса): время и редакция текста согласия (152-ФЗ, ст. 9).
             termsAcceptedAt: new Date(),
@@ -143,12 +138,17 @@ export class AuthService {
           aggregate: { type: 'User', id: userId },
           payload: { userId },
         });
+        return { userId, session: await this.sessions.create(tx, user) };
       });
     } catch (e) {
-      // Гонка двух регистраций одного email: для клиента ответ тот же.
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return;
+      // Гонка двух регистраций одного email.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') throw emailTaken();
       throw e;
     }
+    return {
+      me: await this.me.get({ userId: created.userId, sessionId: created.session.sessionId }),
+      session: created.session,
+    };
   }
 
   async verifyEmail(token: string): Promise<LoginResult> {
@@ -245,7 +245,7 @@ export class AuthService {
 
   /**
    * Повторное письмо для подтверждения email (0.13.0). Всегда 202: существование адреса не раскрывается. Письмо
-   * уходит, только если учётная запись ждёт подтверждения. Прежние ссылки действуют до своего срока (0.13.1): иначе
+   * уходит, только если адрес ещё не подтверждён. Прежние ссылки действуют до своего срока (0.13.1): иначе
    * посторонний, знающий адрес, гасил бы ссылку, по которой человек вот-вот перейдёт; после подтверждения гаснут все.
    */
   async resendVerification(email: string, locale: Locale): Promise<void> {
@@ -253,9 +253,10 @@ export class AuthService {
     await this.db.tx(async (tx) => {
       const user = await tx.user.findUnique({
         where: { email },
-        select: { id: true, status: true, locale: true, displayName: true },
+        select: { id: true, status: true, emailVerifiedAt: true, locale: true, displayName: true },
       });
-      if (!user || user.status !== 'PENDING_VERIFICATION') return;
+      // Ждёт подтверждения: адрес не подтверждён (с 28.10.2026 вход открыт сразу, статус уже ACTIVE).
+      if (!user || user.status === 'BLOCKED' || user.emailVerifiedAt !== null) return;
       const userLocale: Locale = user.locale === 'en' ? 'en' : user.locale === 'ru' ? 'ru' : locale;
       const token = await this.tokens.issue(tx, 'EMAIL_VERIFY', {
         userId: user.id,

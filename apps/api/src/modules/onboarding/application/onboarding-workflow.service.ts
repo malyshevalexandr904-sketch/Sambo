@@ -65,6 +65,8 @@ export class OnboardingWorkflowService {
     version: number,
     _body: OnboardingSubmit,
   ): Promise<OnboardingRequestDto> {
+    // Анкету можно заполнить сразу после регистрации, отправить на проверку — только с подтверждённым email.
+    if (!user.emailVerified) throw new DomainError('EMAIL_NOT_VERIFIED');
     const rules = await this.requests.rules();
     await this.db.tx(async (tx) => {
       const row = await tx.onboardingRequest.findUnique({
