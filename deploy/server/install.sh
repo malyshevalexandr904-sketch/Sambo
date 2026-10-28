@@ -198,7 +198,7 @@ SEED_ADMIN_TOTP_SECRET=$(head -c 20 /dev/urandom | base32 | tr -d '=')
 # SMTP_SECURE=true
 # SMTP_USER=no-reply@$DOMAIN
 # SMTP_PASSWORD='пароль-приложения'
-# EMAIL_FROM=Digital Sambo <no-reply@$DOMAIN>
+# EMAIL_FROM=Цифровое самбо <no-reply@$DOMAIN>
 EOF
 else
   if [ "$(env_get DOMAIN)" != "$DOMAIN" ]; then

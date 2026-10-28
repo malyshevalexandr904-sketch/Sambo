@@ -52,7 +52,7 @@ export const EnvSchema = z
     STORAGE_FORCE_PATH_STYLE: bool.default(false),
 
     EMAIL_PROVIDER: z.enum(['smtp', 'log']).default('smtp'),
-    EMAIL_FROM: z.string().min(3).default('Digital Sambo <no-reply@sambo.local>'),
+    EMAIL_FROM: z.string().min(3).default('Цифровое самбо <no-reply@sambo.local>'),
     SMTP_HOST: z.string().optional(),
     SMTP_PORT: z.coerce.number().int().default(587),
     SMTP_SECURE: bool.default(false),

@@ -72,7 +72,7 @@ const TEXTS: Record<Locale, Record<NotificationType, Texts>> = {
       title: 'Заявка передана на проверку организации',
       body: (s) => join(s.organizationName),
     },
-    'onboarding.awaiting_review': { title: 'Новая заявка ждёт проверки', body: () => 'Digital Sambo' },
+    'onboarding.awaiting_review': { title: 'Новая заявка ждёт проверки', body: () => 'Цифровое самбо' },
     'onboarding.changes_requested': {
       title: 'Нужно исправить заявку',
       body: () => 'Подробности — в приложении',
@@ -107,7 +107,7 @@ const TEXTS: Record<Locale, Record<NotificationType, Texts>> = {
       title: 'Request forwarded to the organization',
       body: (s) => join(s.organizationName),
     },
-    'onboarding.awaiting_review': { title: 'A new request awaits review', body: () => 'Digital Sambo' },
+    'onboarding.awaiting_review': { title: 'A new request awaits review', body: () => 'Цифровое самбо' },
     'onboarding.changes_requested': {
       title: 'Please correct your request',
       body: () => 'Details are in the app',

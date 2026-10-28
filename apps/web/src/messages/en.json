@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "Digital Sambo",
+    "appName": "Цифровое самбо",
     "tagline": "Digital ecosystem for sambo tournaments",
     "loading": "Loading…",
     "save": "Save",
@@ -37,7 +37,7 @@
     }
   },
   "home": {
-    "title": "Digital Sambo",
+    "title": "Цифровое самбо",
     "lead": "A single digital ecosystem for sambo",
     "login": "Sign in",
     "register": "Sign up",
@@ -45,19 +45,19 @@
     "loginHint": "Applications, athletes, refereeing and notifications — in your account.",
     "registerTitle": "New user",
     "registerHint": "Choose a role: head of organization, coach, athlete or referee. Access opens after review.",
-    "guestTitle": "Without signing in",
-    "guestHint": "Tournaments, schedules, brackets and results — open to everyone.",
+    "guestTitle": "Demo access",
+    "guestHint": "Look around the platform: every role and section is open for viewing without signing up.",
     "continue": "Continue",
     "openCabinet": "Open my account"
   },
   "nav": {
-    "dashboard": "Overview",
+    "dashboard": "My account",
     "users": "Users",
     "organizations": "Organizations",
     "rating": "Rating",
     "audit": "Audit log",
     "settings": "System settings",
-    "account": "My profile",
+    "account": "My account",
     "athletes": "Athletes",
     "children": "My athletes",
     "coaches": "Coaches",
@@ -70,7 +70,6 @@
     "applications": "My applications",
     "notifications": "Notifications",
     "referee": "Refereeing",
-    "onboarding": "Registration",
     "onboardingReview": "Review requests",
     "competitionRequests": "Hosting requests",
     "divisions": "Divisions"
@@ -154,7 +153,7 @@
     }
   },
   "dashboard": {
-    "title": "Overview",
+    "title": "My account",
     "welcome": "Hello, {name}!",
     "myOrganizations": "My organizations",
     "noOrganizations": "You are not a member of any organization yet.",
@@ -168,7 +167,6 @@
       "import": "Import from file",
       "children": "My athletes and consents",
       "documents": "Documents to review",
-      "person": "Fill in your details",
       "referee": "Refereeing",
       "applications": "Tournament applications",
       "review": "Registration requests to review"
@@ -522,7 +520,8 @@
     "RATING_SEASON_OVERLAP": "Rating seasons cannot overlap: change the dates.",
     "NON_RATED_COMPETITION_FORBIDDEN": "All competitions are rated: a competition cannot be made non-rated.",
     "COMPETITION_REQUEST_NOT_PENDING": "The request has already been reviewed or withdrawn.",
-    "DIVISION_OVERLAP": "The age range overlaps another division."
+    "DIVISION_OVERLAP": "The age range overlaps another division.",
+    "DEMO_READ_ONLY": "Sign up to unlock all features"
   },
   "people": {
     "lastName": "Last name",
@@ -956,7 +955,8 @@
       "draws": "Draw",
       "schedule": "Schedule",
       "crews": "Crews",
-      "results": "Results"
+      "results": "Results",
+      "recruitment": "Referee recruitment"
     },
     "statuses": {
       "DRAFT": "Draft",
@@ -2459,7 +2459,7 @@
     "noChanges": "No amendments.",
     "referee": "Referee",
     "matChief": "Mat chief",
-    "footMatch": "Digital Sambo · match {publicId} · generated {at}",
+    "footMatch": "Цифровое самбо · match {publicId} · generated {at}",
     "notHeld": "Not held",
     "notFinished": "Not finished",
     "categoryTitle": "Category results protocol",
@@ -2484,7 +2484,7 @@
     "amendedRow": "No. {number}: the result was amended by the chief referee {at}, previous version — {previous}; reason: {reason}.",
     "chiefReferee": "Chief referee",
     "chiefSecretary": "Chief secretary",
-    "footCategory": "Digital Sambo · category {code}",
+    "footCategory": "Цифровое самбо · category {code}",
     "footPublished": "results published {at}",
     "footGenerated": "generated {at}",
     "forbidden": "Protocols are printed by the secretary, the chief referee and the tournament manager.",
@@ -2702,7 +2702,7 @@
       "fixStep": "Fix: {step}"
     },
     "consent": {
-      "text": "Personal data from the request (name, date of birth, contacts, documents) is needed to review the request and register you on Digital Sambo. Only reviewers can see it: the platform team or the head of the chosen organization. You can withdraw consent by contacting support.",
+      "text": "Personal data from the request (name, date of birth, contacts, documents) is needed to review the request and register you on Цифровое самбо. Only reviewers can see it: the platform team or the head of the chosen organization. You can withdraw consent by contacting support.",
       "checkbox": "I consent to the processing of my personal data for these purposes (Federal Law 152-FZ) and confirm the data is correct."
     },
     "review": {
@@ -3113,5 +3113,49 @@
     "legendWin": "win",
     "legendLoss": "loss",
     "legendAxis": "horizontal axis: bout number"
+  },
+  "demo": {
+    "blocked": "Sign up to unlock all features",
+    "close": "Close",
+    "register": "Sign up"
+  },
+  "recruitment": {
+    "title": "Open referee recruitment",
+    "announce": "Announce open referee recruitment",
+    "announceHint": "List the positions you need referees for and the requirements for candidates for each one. Referees will see the recruitment under “Refereeing” and apply; you approve or reject each application.",
+    "position": "Position {n}",
+    "role": "Position",
+    "requirements": "Requirements",
+    "requirementsHint": "For example: referee category, experience, availability for all tournament days.",
+    "addPosition": "Add position",
+    "removePosition": "Remove position",
+    "addTitle": "New recruitment position",
+    "empty": "No open referee recruitment has been announced.",
+    "status": {
+      "OPEN": "Recruitment open",
+      "CLOSED": "Recruitment closed"
+    },
+    "close": "Close recruitment",
+    "reopen": "Reopen recruitment",
+    "applications": "Referee applications",
+    "noApplications": "No applications yet.",
+    "approve": "Approve",
+    "reject": "Reject",
+    "applicationStatus": {
+      "PENDING": "Under review",
+      "APPROVED": "Approved",
+      "REJECTED": "Rejected"
+    },
+    "myStatus": {
+      "PENDING": "Application under review",
+      "APPROVED": "Application approved",
+      "REJECTED": "Application rejected"
+    },
+    "myCompetitions": "My tournaments",
+    "openTitle": "Open recruitment",
+    "sectionsLabel": "Refereeing sections",
+    "openHint": "Tournaments where organizers are recruiting referees: positions and requirements. Apply for a position and the organizer will review it.",
+    "noOpen": "There is no open recruitment right now.",
+    "apply": "Apply"
   }
 }

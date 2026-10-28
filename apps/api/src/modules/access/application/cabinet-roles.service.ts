@@ -21,6 +21,8 @@ export interface CabinetUser {
   id: string;
   personId: string | null;
   permissionsVersion: number;
+  /** Демо-вход (правки 27.10.2026): для просмотра доступны все роли кабинета — прав они не дают. */
+  isDemo?: boolean;
 }
 
 /** Есть ли у пользователя роль кабинета по связи или профилю (спортсмен, представитель, тренер, судья). */
@@ -55,6 +57,7 @@ export class CabinetRolesService {
    * включённого TOTP (права она даст только с ним — в кабинете будет подсказка включить).
    */
   async available(user: CabinetUser): Promise<CabinetRole[]> {
+    if (user.isDemo) return [...CABINET_ROLES];
     const [grants, platformAssigned] = await Promise.all([
       this.grants.forUser(user.id, user.permissionsVersion),
       this.db.platformRoleAssignment.count({ where: { userId: user.id, revokedAt: null } }),
@@ -128,7 +131,7 @@ export class CabinetRolesService {
   async select(userId: string, sessionId: string, role: CabinetRole): Promise<void> {
     const user = await this.db.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { id: true, personId: true, permissionsVersion: true, preferredRole: true },
+      select: { id: true, personId: true, permissionsVersion: true, preferredRole: true, isDemo: true },
     });
     if (!(await this.available(user)).includes(role))
       throw new DomainError('FORBIDDEN', { reason: 'cabinet_role_not_held', role });

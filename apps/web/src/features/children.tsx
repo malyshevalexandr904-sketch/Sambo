@@ -17,7 +17,7 @@ export function MyAthletes() {
       {!me?.personId ? (
         <Alert tone="info" className="mb-4">
           {t('children.noPerson')}{' '}
-          <Link href="/account" className="font-medium underline">
+          <Link href="/admin" className="font-medium underline">
             {t('nav.account')}
           </Link>
         </Alert>

@@ -1,24 +1,6 @@
-// Логотип платформы рядом с названием: шапка, боковая панель и экран входа.
+// Название платформы: шапка, боковая панель и экран входа. Логотипа пока нет — новый будет добавлен позже.
 import { cn } from '@sde/ui';
-import Image from 'next/image';
-import logo from '@/assets/logo.png';
 
-/**
- * Картинка с белым фоном (белые пояс и воротник сливаются с ним, поэтому фон не вырезан): `mix-blend-multiply`
- * делает белое невидимым на любом светлом фоне, цвета формы остаются прежними. Название платформы рядом читается
- * скринридером, сама картинка декоративна (alt=""). В тёмной теме — на белой подложке (globals.css).
- */
-export function Brand({ className, logoClassName }: { className?: string; logoClassName?: string }) {
-  return (
-    <span className={cn('inline-flex items-center gap-2', className)}>
-      <Image
-        src={logo}
-        alt=""
-        unoptimized
-        priority
-        className={cn('brand-logo h-8 w-auto mix-blend-multiply', logoClassName)}
-      />
-      <span>Digital Sambo</span>
-    </span>
-  );
+export function Brand({ className }: { className?: string }) {
+  return <span className={cn('inline-flex items-center gap-2', className)}>Цифровое самбо</span>;
 }

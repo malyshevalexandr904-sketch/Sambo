@@ -17,6 +17,8 @@ export interface AuthUser {
    * доступно только то, что не требует роли (свой профиль, уведомления, заявка на роль, публичные турниры).
    */
   activeRole: CabinetRole | null;
+  /** Демо-вход (правки 27.10.2026): только просмотр — изменения отклоняет DemoReadOnlyGuard. */
+  demo?: boolean;
 }
 
 export interface RequestContext {

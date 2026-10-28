@@ -32,7 +32,7 @@ describe('email templates', () => {
       organizationName: 'Спортивный клуб «Буревестник»',
       roleCode: 'CLUB_MANAGER',
     });
-    expect(r.subject).toBe('Приглашение в «Спортивный клуб „Буревестник“» — Digital Sambo');
+    expect(r.subject).toBe('Приглашение в «Спортивный клуб „Буревестник“» — Цифровое самбо');
     expect(r.text).toContain('в организацию «Спортивный клуб „Буревестник“» с ролью');
     expect(r.html).toContain('«Спортивный клуб „Буревестник“»');
     expect(nestQuotes('«a «b «c»» d»')).toBe('«a „b „c““ d»');
@@ -69,7 +69,7 @@ describe('email templates', () => {
       competitionName: 'Первенство клуба «Витязь»',
       roleCode: 'SECRETARY',
     });
-    expect(r.subject).toBe('Приглашение в персонал турнира «Первенство клуба „Витязь“» — Digital Sambo');
+    expect(r.subject).toBe('Приглашение в персонал турнира «Первенство клуба „Витязь“» — Цифровое самбо');
     expect(r.text).toContain('с ролью «секретарь»');
     const en = renderEmail('competition.invite', 'en', {
       acceptUrl: 'https://sambo.local/en/invites/competition?token=t',

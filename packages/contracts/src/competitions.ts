@@ -5,6 +5,7 @@ import { CONSENT_KINDS, type ConsentKind } from './athletes.js';
 import { CATEGORY_RULE_KINDS, CATEGORY_RULE_PARAMS, type CategoryRuleKind } from './categories.js';
 import { E164, Email, Instant, LocalDate, PageQuery, Reason, Slug, Timezone, Uuid } from './common.js';
 import type { OrganizationRef } from './organizations.js';
+import { RefereeRecruitmentInput } from './referee-recruitment-input.js';
 import { COMPETITION_ROLE_CODES, type RoleCode } from './roles.js';
 import { localDateIn } from './time.js';
 
@@ -144,6 +145,8 @@ export const CompetitionCreate = z
     ...CompetitionFields,
     organizerOrganizationId: Uuid,
     competitionType: z.literal('RATED').default('RATED'),
+    /** Открытый набор судей (правки 27.10.2026): должности и требования к кандидатам. */
+    refereeRecruitment: RefereeRecruitmentInput.optional(),
   })
   .superRefine((v, ctx) => {
     for (const i of scheduleIssues(v)) ctx.addIssue({ code: 'custom', path: [i.path], message: i.code });

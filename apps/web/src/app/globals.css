@@ -52,14 +52,6 @@
     --color-orange-300: oklch(46% 0.11 42);
   }
 
-  /* Логотип нарисован на белом фоне: в тёмной теме — на белой подложке вместо смешивания с фоном. */
-  :root[data-theme='dark'] .brand-logo {
-    mix-blend-mode: normal;
-    background-color: #fff;
-    border-radius: 0.375rem;
-    padding: 0.125rem;
-  }
-
   /* Табло ковра для зала и трансляции — всегда в своих цветах: возвращаем исходную палитру. */
   :root[data-theme='dark'] .theme-light {
     color-scheme: light;

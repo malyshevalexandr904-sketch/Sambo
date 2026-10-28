@@ -1,7 +1,8 @@
 'use client';
-// Профиль: имя и язык, смена пароля, сеансы, двухфакторная аутентификация (API.md, 3.1–3.2).
+// Профиль: имя и язык, смена пароля, сеансы, двухфакторная аутентификация (API.md, 3.1–3.2). Показывается в личном
+// кабинете (правки 27.10.2026: «Мой профиль» перенесён в «Личный кабинет»).
 import type { DataEnvelope, Me, SessionDto } from '@sde/contracts';
-import { Alert, Badge, Button, Card, CardTitle, Field, Input, PageHeader, Select } from '@sde/ui';
+import { Alert, Badge, Button, Card, CardTitle, Field, Input, Select } from '@sde/ui';
 import { AvatarCard } from './avatar';
 import { MyPersonCard } from './my-person';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,7 +13,7 @@ import { PasswordRequirements } from '@/components/password-requirements';
 import { api } from '@/lib/api';
 import { useErrorMessage } from '@/lib/errors';
 import { describeUserAgent, formatDateTime } from '@/lib/format';
-import { qk, useMe } from '@/lib/queries';
+import { qk } from '@/lib/queries';
 
 type Notice = { tone: 'success' | 'danger'; text: string } | null;
 
@@ -275,21 +276,22 @@ function TotpCard({ me }: { me: Me }) {
   );
 }
 
-export function Account() {
+/** Разделы профиля в личном кабинете. */
+export function AccountSections({ me }: { me: Me }) {
   const t = useTranslations('account');
-  const me = useMe();
-  if (!me.data) return null;
   return (
-    <>
-      <PageHeader title={t('title')} description={me.data.email ?? undefined} />
+    <section aria-labelledby="account-title" className="mt-8">
+      <h2 id="account-title" className="mb-4 text-xl font-semibold text-slate-900">
+        {t('title')}
+      </h2>
       <div className="grid gap-6 xl:grid-cols-2">
-        <ProfileCard me={me.data} />
-        <AvatarCard me={me.data} />
-        <TotpCard me={me.data} />
+        <ProfileCard me={me} />
+        <AvatarCard me={me} />
+        <TotpCard me={me} />
         <MyPersonCard />
         <PasswordCard />
         <SessionsCard />
       </div>
-    </>
+    </section>
   );
 }

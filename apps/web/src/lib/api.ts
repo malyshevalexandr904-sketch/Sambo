@@ -12,6 +12,7 @@ import {
   type UploadPurpose,
   type UploadTicket,
 } from '@sde/contracts';
+import { announceDemoBlocked, demoBlocks } from './demo';
 import { browserLock, coordinatedRefresh, lockedRequestSignal } from './session-refresh';
 
 export class ApiError extends Error {
@@ -124,6 +125,10 @@ async function toError(res: Response): Promise<ApiError> {
 
 export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const method = opts.method ?? 'GET';
+  if (demoBlocks(method, path)) {
+    announceDemoBlocked();
+    throw new ApiError(403, 'DEMO_READ_ONLY', undefined, null);
+  }
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   if (!SAFE.has(method)) headers[CSRF_HEADER] = await ensureCsrf();
@@ -152,6 +157,7 @@ export async function api<T>(path: string, opts: RequestOptions = {}): Promise<T
     // CSRF-cookie могла смениться после входа в другой вкладке: берём новую и повторяем один раз.
     if (err.code === 'CSRF_TOKEN_INVALID' && !opts.noRefresh)
       return api<T>(path, { ...opts, noRefresh: true });
+    if (err.code === 'DEMO_READ_ONLY') announceDemoBlocked();
     throw err;
   }
   if (!res.ok) throw await toError(res);

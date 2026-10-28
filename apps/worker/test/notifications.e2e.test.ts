@@ -179,7 +179,7 @@ describe('notifications', () => {
     expect(mailer.sent).toHaveLength(1);
     const mail = mailer.sent[0];
     expect(mail?.to).toBe('coach@club.test');
-    expect(mail?.email.subject).toBe('Заявка возвращена на исправление — Digital Sambo');
+    expect(mail?.email.subject).toBe('Заявка возвращена на исправление — Цифровое самбо');
     expect(mail?.email.text).toContain('Заявка СК «Буревестник» на турнир «Первенство города»');
     expect(mail?.email.text).toContain('Комментарий секретариата: Нет свидетельства о рождении');
     expect(mail?.email.text).toContain(`https://sambo.test/ru/applications/${applicationId}`);

@@ -52,7 +52,7 @@ const ROLE_NAMES: Record<Locale, Record<string, string>> = {
 const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
   ru: {
     'auth.verify_email': {
-      subject: 'Подтвердите email — Digital Sambo',
+      subject: 'Подтвердите email — Цифровое самбо',
       lines: [
         'Здравствуйте, {displayName}!',
         'Чтобы завершить регистрацию, подтвердите адрес электронной почты. Ссылка действует 24 часа.',
@@ -61,7 +61,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['verifyUrl', 'displayName'],
     },
     'auth.account_exists': {
-      subject: 'У вас уже есть аккаунт — Digital Sambo',
+      subject: 'У вас уже есть аккаунт — Цифровое самбо',
       lines: [
         'Кто-то попытался зарегистрироваться с этим адресом, но аккаунт уже существует.',
         'Если это были вы — войдите или восстановите пароль. Если нет — просто проигнорируйте письмо.',
@@ -70,7 +70,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['resetUrl', 'loginUrl'],
     },
     'auth.password_reset': {
-      subject: 'Восстановление пароля — Digital Sambo',
+      subject: 'Восстановление пароля — Цифровое самбо',
       lines: [
         'Мы получили запрос на смену пароля. Ссылка действует 1 час.',
         'Если вы не запрашивали смену пароля, проигнорируйте письмо.',
@@ -79,7 +79,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['resetUrl'],
     },
     'auth.password_changed': {
-      subject: 'Пароль изменён — Digital Sambo',
+      subject: 'Пароль изменён — Цифровое самбо',
       lines: [
         'Пароль вашего аккаунта был изменён, другие сеансы завершены.',
         'Если это были не вы, немедленно восстановите пароль и сообщите администратору.',
@@ -88,7 +88,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['resetUrl'],
     },
     'organization.invite': {
-      subject: 'Приглашение в «{organizationName}» — Digital Sambo',
+      subject: 'Приглашение в «{organizationName}» — Цифровое самбо',
       lines: [
         'Вас пригласили в организацию «{organizationName}» с ролью «{roleName}».',
         'Ссылка действует 7 дней. Войдите или зарегистрируйтесь с этим адресом email, чтобы принять приглашение.',
@@ -97,7 +97,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['acceptUrl', 'organizationName', 'roleCode'],
     },
     'guardian.invite': {
-      subject: 'Приглашение законного представителя — Digital Sambo',
+      subject: 'Приглашение законного представителя — Цифровое самбо',
       lines: [
         '«{organizationName}» указал(а) вас законным представителем спортсмена.',
         'Войдите или зарегистрируйтесь с этим адресом email и примите приглашение: в личном кабинете вы увидите данные ребёнка, дадите согласия и загрузите документы. Ссылка действует 7 дней.',
@@ -107,7 +107,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['acceptUrl', 'organizationName'],
     },
     'document.rejected': {
-      subject: 'Документ отклонён — Digital Sambo',
+      subject: 'Документ отклонён — Цифровое самбо',
       lines: [
         'Документ «{documentType}», который вы загрузили, отклонён при проверке.',
         'Причина: {reason}',
@@ -117,7 +117,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['documentType', 'reason', 'documentsUrl'],
     },
     'competition.invite': {
-      subject: 'Приглашение в персонал турнира «{competitionName}» — Digital Sambo',
+      subject: 'Приглашение в персонал турнира «{competitionName}» — Цифровое самбо',
       lines: [
         'Вас пригласили в персонал турнира «{competitionName}» с ролью «{roleName}».',
         'Ссылка действует 7 дней. Войдите или зарегистрируйтесь с этим адресом email, чтобы принять приглашение.',
@@ -128,7 +128,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
   },
   en: {
     'auth.verify_email': {
-      subject: 'Confirm your email — Digital Sambo',
+      subject: 'Confirm your email — Цифровое самбо',
       lines: [
         'Hello, {displayName}!',
         'Please confirm your email address to finish signing up. The link is valid for 24 hours.',
@@ -137,7 +137,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['verifyUrl', 'displayName'],
     },
     'auth.account_exists': {
-      subject: 'You already have an account — Digital Sambo',
+      subject: 'You already have an account — Цифровое самбо',
       lines: [
         'Someone tried to sign up with this address, but an account already exists.',
         'If it was you, sign in or reset your password. Otherwise, ignore this email.',
@@ -146,7 +146,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['resetUrl', 'loginUrl'],
     },
     'auth.password_reset': {
-      subject: 'Password reset — Digital Sambo',
+      subject: 'Password reset — Цифровое самбо',
       lines: [
         'We received a request to reset your password. The link is valid for 1 hour.',
         'If you did not request it, ignore this email.',
@@ -155,7 +155,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['resetUrl'],
     },
     'auth.password_changed': {
-      subject: 'Password changed — Digital Sambo',
+      subject: 'Password changed — Цифровое самбо',
       lines: [
         'Your password was changed and other sessions were signed out.',
         'If this was not you, reset your password immediately and contact the administrator.',
@@ -164,7 +164,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['resetUrl'],
     },
     'organization.invite': {
-      subject: 'Invitation to “{organizationName}” — Digital Sambo',
+      subject: 'Invitation to “{organizationName}” — Цифровое самбо',
       lines: [
         'You have been invited to “{organizationName}” as {roleName}.',
         'The link is valid for 7 days. Sign in or sign up with this email address to accept.',
@@ -173,7 +173,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['acceptUrl', 'organizationName', 'roleCode'],
     },
     'guardian.invite': {
-      subject: 'Guardian invitation — Digital Sambo',
+      subject: 'Guardian invitation — Цифровое самбо',
       lines: [
         '“{organizationName}” listed you as a legal guardian of an athlete.',
         'Sign in or sign up with this email address and accept the invitation to see the athlete, give consents and upload documents. The link is valid for 7 days.',
@@ -183,7 +183,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['acceptUrl', 'organizationName'],
     },
     'document.rejected': {
-      subject: 'Document rejected — Digital Sambo',
+      subject: 'Document rejected — Цифровое самбо',
       lines: [
         'The document “{documentType}” you uploaded was rejected during review.',
         'Reason: {reason}',
@@ -193,7 +193,7 @@ const TEMPLATES: Record<Locale, Record<EmailTemplate, TemplateDef>> = {
       required: ['documentType', 'reason', 'documentsUrl'],
     },
     'competition.invite': {
-      subject: 'Invitation to the staff of “{competitionName}” — Digital Sambo',
+      subject: 'Invitation to the staff of “{competitionName}” — Цифровое самбо',
       lines: [
         'You have been invited to the staff of the competition “{competitionName}” as {roleName}.',
         'The link is valid for 7 days. Sign in or sign up with this email address to accept.',

@@ -25,6 +25,7 @@ import { type AuthUser, RequestContextStore } from '../../../common/context/requ
 import { DomainError } from '../../../common/errors/domain-error';
 import { ok } from '../../../common/http/http';
 import { CsrfService } from '../../../common/security/csrf';
+import { DemoAllowed } from '../../../common/security/demo';
 import { RateLimit } from '../../../common/security/rate-limit';
 import { UuidParam, ValidBody, ZodValidationPipe } from '../../../common/validation/zod.pipe';
 import { ENV } from '../../../config/config.module';
@@ -110,6 +111,18 @@ export class AuthController {
     return this.respond(req, res, await this.auth.login(body));
   }
 
+  /** Демо-вход (правки 27.10.2026): сессия общей демо-учётной записи — все роли для просмотра, без действий. */
+  @Post('demo')
+  @Public()
+  @RateLimit('auth')
+  @HttpCode(200)
+  async demo(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<DataEnvelope<Me | BearerLoginResponse>> {
+    return this.respond(req, res, await this.auth.demoLogin());
+  }
+
   @Post('refresh')
   @Public()
   @RateLimit('auth')
@@ -135,6 +148,7 @@ export class AuthController {
 
   @Post('logout')
   @Authenticated()
+  @DemoAllowed()
   @HttpCode(204)
   async logout(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response): Promise<void> {
     await this.auth.logout(user.sessionId);
@@ -171,7 +185,9 @@ export class AuthController {
   @Get('sessions')
   @Authenticated()
   async listSessions(@CurrentUser() user: AuthUser): Promise<DataEnvelope<SessionDto[]>> {
-    return ok(await this.sessions.list(user.id, user.sessionId));
+    const list = await this.sessions.list(user.id, user.sessionId);
+    // Демо-учётная запись общая: сеансы других посетителей не показываются.
+    return ok(user.demo ? list.filter((s) => s.current) : list);
   }
 
   @Delete('sessions/:id')

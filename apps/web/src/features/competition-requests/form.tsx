@@ -15,6 +15,13 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { OrganizationPicker } from '@/components/organization-picker';
 import { ScheduleCard, type ScheduleValues, today } from '@/features/competitions/create';
+import {
+  emptyRecruitment,
+  type RecruitmentDraft,
+  RecruitmentDraftCard,
+  recruitmentBody,
+  recruitmentIssues,
+} from '@/features/competitions/recruitment';
 import { VenueSelect } from '@/features/competitions/venue-select';
 import { useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
@@ -59,6 +66,7 @@ export function CompetitionRequestForm() {
     comment: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [recruitment, setRecruitment] = useState<RecruitmentDraft>(emptyRecruitment);
   const setOrganization = useCallback((id: string) => setV((x) => ({ ...x, organizationId: id })), []);
   const set = (k: keyof FormValues) => (e: { target: { value: string } }) =>
     setV((x) => ({ ...x, [k]: e.target.value }));
@@ -88,8 +96,9 @@ export function CompetitionRequestForm() {
         v.expectedParticipants && Number.isInteger(participants) ? participants : undefined,
       descriptionMd: v.descriptionMd.trim() || undefined,
       comment: v.comment.trim() || undefined,
+      refereeRecruitment: recruitmentBody(recruitment),
     };
-    const local: Record<string, string> = {};
+    const local: Record<string, string> = recruitmentIssues(recruitment);
     if (!body.name || body.name.length < 3) local.name = 'too_short';
     if (!body.startDate) local.startDate = 'required';
     if (!body.registrationStartsAt) local.registrationStartsAt = 'required';
@@ -197,6 +206,7 @@ export function CompetitionRequestForm() {
             />
           ) : null}
         </Card>
+        <RecruitmentDraftCard value={recruitment} onChange={setRecruitment} errors={errors} />
         <Card>
           <CardTitle>{t('competitionRequests.details')}</CardTitle>
           <div className="grid gap-4">

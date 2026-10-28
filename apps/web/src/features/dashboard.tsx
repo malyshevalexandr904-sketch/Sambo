@@ -4,6 +4,7 @@ import { Alert, Card, CardTitle, PageHeader } from '@sde/ui';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { StatusBadge } from '@/components/common';
+import { AccountSections } from '@/features/account';
 import { AthleteProgressCard } from '@/features/athletes/rating-progress';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
@@ -45,7 +46,11 @@ function WorkCard() {
       label: t('dashboard.links.import'),
       visible: hasAnywhere(me, 'athlete.import'),
     },
-    { href: '/children', label: t('dashboard.links.children'), visible: (mine.data?.length ?? 0) > 0 },
+    {
+      href: '/children',
+      label: t('dashboard.links.children'),
+      visible: me?.activeRole !== 'ATHLETE' && (mine.data?.length ?? 0) > 0,
+    },
     {
       href: '/referee',
       label: t('dashboard.links.referee'),
@@ -64,9 +69,8 @@ function WorkCard() {
     {
       href: '/documents',
       label: t('dashboard.links.documents'),
-      visible: hasAnywhere(me, 'document.verify'),
+      visible: me?.activeRole !== 'REFEREE' && hasAnywhere(me, 'document.verify'),
     },
-    { href: '/account', label: t('dashboard.links.person'), visible: !me?.personId },
   ].filter((l) => l.visible);
   if (links.length === 0) return null;
   return (
@@ -111,6 +115,7 @@ function MyProgress() {
   );
 }
 
+/** Личный кабинет (правки 27.10.2026): вместо «Обзора»; внизу — разделы бывшего «Моего профиля». */
 export function Dashboard() {
   const t = useTranslations();
   const { data: me } = useMe();
@@ -140,9 +145,9 @@ export function Dashboard() {
       {me.grants.platform.length > 0 && !me.totpEnabled ? (
         <Alert tone="warning" className="mb-6">
           {t('dashboard.totpWarning')}{' '}
-          <Link href="/account" className="font-medium underline">
-            {t('nav.account')}
-          </Link>
+          <a href="#account-title" className="font-medium underline">
+            {t('account.title')}
+          </a>
         </Alert>
       ) : null}
       {role === 'ATHLETE' || role === 'GUARDIAN' ? <MyProgress /> : null}
@@ -175,6 +180,7 @@ export function Dashboard() {
           </Card>
         ) : null}
       </div>
+      <AccountSections me={me} />
     </>
   );
 }

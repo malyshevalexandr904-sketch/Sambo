@@ -2,7 +2,7 @@
 // Кнопка карточки входа на первом экране (0.13.0): вошедшему пользователю — сразу кабинет (отдельной ссылки
 // «Перейти в кабинет» больше нет). Сессию проверяем, только если браузер уже работал с сайтом (есть CSRF-cookie):
 // у нового гостя лишних запросов нет.
-import { COOKIE_CSRF } from '@sde/contracts';
+import { COOKIE_CSRF, type DataEnvelope, type Me } from '@sde/contracts';
 import { useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { Link } from '@/i18n/navigation';
@@ -14,8 +14,9 @@ export function HomeLoginAction() {
   useEffect(() => {
     if (!document.cookie.split('; ').some((c) => c.startsWith(`${COOKIE_CSRF}=`))) return;
     let alive = true;
-    api('/me')
-      .then(() => alive && setSignedIn(true))
+    // Демо-вход — не вход: из демо можно войти своей учётной записью.
+    api<DataEnvelope<Me>>('/me')
+      .then((res) => alive && setSignedIn(!res.data.demo))
       .catch(() => undefined);
     return () => {
       alive = false;

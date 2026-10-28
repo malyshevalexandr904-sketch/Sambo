@@ -1,12 +1,7 @@
-import type { Metadata } from 'next';
-import { getTranslations } from 'next-intl/server';
-import { Account } from '@/features/account';
+import { redirect } from '@/i18n/navigation';
 
-export async function generateMetadata(): Promise<Metadata> {
-  const t = await getTranslations('account');
-  return { title: t('title') };
-}
-
-export default function Page() {
-  return <Account />;
+/** «Мой профиль» перенесён в личный кабинет (правки 27.10.2026): старые ссылки ведут туда. */
+export default async function Page({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  redirect({ href: '/admin', locale });
 }

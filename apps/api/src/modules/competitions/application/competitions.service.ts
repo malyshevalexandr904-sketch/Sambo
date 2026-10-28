@@ -47,6 +47,7 @@ import { listWhere, staffFilter } from './competition-queries';
 import { CompetitionReferences } from './competition-references';
 import { type CompetitionBasics, CompetitionScopeService } from './competition-scope.service';
 import { CompetitionStatusWriter } from './competition-status.writer';
+import { RefereeRecruitmentService } from './referee-recruitment.service';
 import {
   ACTION_CANDIDATES,
   COMPETITION_INCLUDE,
@@ -73,6 +74,7 @@ export class CompetitionsService {
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
     private readonly rating: CompetitionRatingService,
+    private readonly recruitment: RefereeRecruitmentService,
   ) {}
 
   // ---------- Чтение ----------
@@ -190,6 +192,13 @@ export class CompetitionsService {
       data: createData({ ...input, competitionType: 'RATED' }, competitionId, slug, user.id),
     });
     const ruleSet = await this.rating.pin(tx, competitionId, { publicDeltas: true, reason: null }, user.id);
+    if (input.refereeRecruitment?.length)
+      await this.recruitment.insertPositions(
+        tx,
+        { id: competitionId, organizerOrganizationId: input.organizerOrganizationId },
+        input.refereeRecruitment,
+        user.id,
+      );
     await this.leases.createCloudLease(tx, competitionId, user.id);
     await this.audit.record(tx, {
       action: 'competition.created',
