@@ -122,6 +122,7 @@ describe('create and isolation', () => {
           candidateIds: [athlete.id],
           reason: 'Другой спортсмен, проверено по документам',
         },
+        thirdPartyConsentConfirmed: true,
       }),
     );
     expect(confirmed.status).toBe(201);
@@ -129,6 +130,7 @@ describe('create and isolation', () => {
       where: { action: 'athlete.created', entityId: confirmed.body.data.id },
     });
     expect(audit?.reason).toContain('Другой спортсмен');
+    expect((audit?.after as { thirdPartyConsentConfirmed?: boolean }).thirdPartyConsentConfirmed).toBe(true);
     expect(JSON.stringify(audit?.after)).not.toContain('Самбистоф');
 
     // Тренер другого клуба не видит спортсмена: 404 и нет в списке.

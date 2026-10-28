@@ -625,6 +625,20 @@
     "follow": {
       "follow": "Notify me about bouts",
       "hint": "On competition day: coming up, started, time changed. Sent to coaches and managers of the club that entered the athlete in the tournament."
+    },
+    "coachNoClubTitle": "Join a club to add athletes",
+    "coachNoClub": "Athletes on the platform belong to clubs, which enter them into tournaments. Once the club head accepts your request, the “Add athlete” button will appear here.",
+    "coachJoinClub": "Join a club",
+    "wizard": {
+      "step1": "Step 1 of 2: athlete details",
+      "step2": "Step 2 of 2: consents and documents",
+      "step2Title": "Consents and documents",
+      "next": "Add and continue to documents",
+      "consentConfirm": "I confirm that the athlete (or their legal guardian if under 18) agrees to the processing of their personal data on the platform, and I will upload the <consent>consent</consent> in the next step.",
+      "created": "{name} has been added with you as coach. Upload the scan of the signed personal data consent and the athlete’s documents.",
+      "done": "Done — open the profile",
+      "another": "Add another athlete",
+      "later": "You can also add consents and documents later on the athlete’s profile."
     }
   },
   "guardians": {
@@ -3397,8 +3411,8 @@
             "text": "Details, grade, weight and documents of each athlete."
           },
           "f2": {
-            "title": "Add and import",
-            "text": "Add athletes one by one or as a spreadsheet list."
+            "title": "Adding athletes",
+            "text": "Enter an athlete’s details yourself, then upload the consent and documents in one wizard. Or import a list from a spreadsheet."
           },
           "f3": {
             "title": "Guardians",
