@@ -1,12 +1,14 @@
 // Тестовые спортсмены для пробного турнира на рабочем сайте: 40 вымышленных юношей и девушек 2012 г. р. (в 2026 году
-// им 14 по году рождения — подходят и в группу «12–14 лет», и в «14–16 лет»), привязанных к организации пользователя и к нему как к тренеру, если он тренер. У каждого —
+// им 14 по году рождения — подходят и в группу «12–14 лет», и в «14–16 лет»), привязанных к организации пользователя и
+// к нему как к тренеру, если он тренер. Нет у пользователя клуба — создаётся «Тестовый клуб» (slug test-athletes-club),
+// пользователь в нём руководитель и тренер: без клуба спортсменов не заявить на турнир. У каждого спортсмена —
 // разряд и три согласия (без согласия на обработку ПДн заявка не принимается). Вес хранится не у спортсмена,
 // а в заявке: плановый вес и категория печатаются списком, их вводят при заявке или на взвешивании.
 //
 // Запуск — deploy/server/test-athletes.sh. Режимы:
 //   add <email> [--org <часть названия>] [--apply] — без --apply только показывает, что будет сделано;
-//   remove [--apply]                                 — удаляет всех тестовых спортсменов.
-// Тестовые спортсмены помечены публичным номером «TESTATHL…» — по нему их находит удаление.
+//   remove [--apply]                                 — удаляет всех тестовых спортсменов и тестовый клуб.
+// Тестовые спортсмены помечены публичным номером «TESTATHL…», клуб — slug — по ним их находит удаление.
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { type Prisma, PrismaClient } from '../generated/client';
@@ -21,6 +23,7 @@ const testPublicId = (n: number): string => `${MARK}${BASE58[Math.floor(n / 58)]
 
 /** Роли в организации, от которых добавляются спортсмены: руководитель клуба — первым. */
 const ORG_ROLES = ['CLUB_MANAGER', 'ORGANIZER', 'FEDERATION_ADMIN', 'COACH'];
+const TEST_CLUB = { slug: 'test-athletes-club', name: 'Тестовый клуб', shortName: 'Тестовый клуб' };
 const RANKS = ['YOUTH_1', 'SPORT_3', 'YOUTH_2', 'SPORT_2', 'YOUTH_1', 'SPORT_3', 'YOUTH_3'];
 
 interface TestAthlete {
@@ -112,6 +115,8 @@ interface Target {
   userId: string;
   coachId: string | null;
   org: { id: string; name: string };
+  /** Клуба у пользователя нет — тестовый клуб создаётся вместе со спортсменами. */
+  createClub: boolean;
 }
 
 /** Организация пользователя, куда добавить спортсменов, и его профиль тренера. */
@@ -144,8 +149,13 @@ async function resolveTarget(db: PrismaClient, email: string, orgFilter: string 
   const candidates = [...orgs.values()].filter((o) => o.name.toLowerCase().includes(needle));
   out(`Пользователь: ${user.displayName} (${email})`);
   out(`Профиль тренера: ${coach ? 'есть — спортсмены будут и в «Мои спортсмены» тренера' : 'нет'}`);
-  if (orgs.size === 0)
-    throw new Error('У пользователя нет организации (клуба), в которую можно добавить спортсменов.');
+  const base = { userId: user.id, coachId: coach?.id ?? null };
+  if (orgs.size === 0 && !orgFilter) {
+    out(
+      `Организация: у пользователя нет клуба — будет создан «${TEST_CLUB.name}», он в нём руководитель и тренер`,
+    );
+    return { ...base, org: { id: uuidv7(), name: TEST_CLUB.name }, createClub: true };
+  }
   if (candidates.length !== 1) {
     out('Организации пользователя:');
     for (const o of orgs.values()) out(`  ${o.name}`);
@@ -157,7 +167,7 @@ async function resolveTarget(db: PrismaClient, email: string, orgFilter: string 
   }
   const org = candidates[0] as { id: string; name: string };
   out(`Организация: ${org.name}`);
-  return { userId: user.id, coachId: coach?.id ?? null, org };
+  return { ...base, org, createClub: false };
 }
 
 /** Действующие тексты согласий (по одному на вид): общие согласия нужны для заявки и допуска. */
@@ -172,6 +182,34 @@ async function consentTemplates(db: PrismaClient): Promise<string[]> {
   if (!byKind.has('PD_PROCESSING'))
     throw new Error('Нет опубликованного текста согласия на обработку ПДн — без него заявку не подать.');
   return [...byKind.values()];
+}
+
+/** Тестовый клуб: активный, корень иерархии; пользователь — руководитель и тренер (как после одобрения заявок). */
+async function createTestClub(tx: Tx, t: Target): Promise<void> {
+  const { id } = t.org;
+  await tx.organization.create({
+    data: { id, type: 'CLUB', ...TEST_CLUB, countryCode: 'RU', status: 'ACTIVE', createdById: t.userId },
+  });
+  await tx.$executeRaw`INSERT INTO organization_closure (ancestor_id, descendant_id, depth) VALUES (${id}::uuid, ${id}::uuid, 0)`;
+  const roles = await tx.role.findMany({
+    where: { code: { in: ['CLUB_MANAGER', 'COACH'] } },
+    select: { id: true },
+  });
+  await tx.organizationMembership.createMany({
+    data: roles.map((r) => ({
+      id: uuidv7(),
+      organizationId: id,
+      userId: t.userId,
+      roleId: r.id,
+      status: 'ACTIVE' as const,
+      validFrom: today,
+    })),
+  });
+  if (t.coachId)
+    await tx.coachMembership.create({
+      data: { id: uuidv7(), coachId: t.coachId, organizationId: id, validFrom: today, createdById: t.userId },
+    });
+  await tx.user.update({ where: { id: t.userId }, data: { permissionsVersion: { increment: 1 } } });
 }
 
 async function insertAthlete(
@@ -256,6 +294,7 @@ async function add(db: PrismaClient, email: string, orgFilter: string | null, ap
   }
   await db.$transaction(
     async (tx) => {
+      if (target.createClub) await createTestClub(tx, target);
       for (const [i, a] of ATHLETES.entries()) await insertAthlete(tx, i + 1, a, target, templateIds);
     },
     { timeout: 60_000 },
@@ -268,8 +307,13 @@ async function remove(db: PrismaClient, apply: boolean): Promise<void> {
     where: { publicId: { startsWith: MARK } },
     select: { id: true, personId: true },
   });
+  const club = await db.organization.findUnique({
+    where: { slug: TEST_CLUB.slug },
+    select: { id: true, memberships: { select: { userId: true } } },
+  });
   out(`Тестовых спортсменов: ${athletes.length}`);
-  if (athletes.length === 0) return;
+  out(`Тестовый клуб: ${club ? 'есть, будет удалён' : 'нет'}`);
+  if (athletes.length === 0 && !club) return;
   const athleteIds = athletes.map((a) => a.id);
   const personIds = athletes.map((a) => a.personId);
 
@@ -277,8 +321,14 @@ async function remove(db: PrismaClient, apply: boolean): Promise<void> {
     where: { athleteId: { in: athleteIds } },
     select: { competition: { select: { name: true } } },
   });
-  if (entries.length > 0) {
-    const names = [...new Set(entries.map((e) => e.competition.name))];
+  const applications = club
+    ? await db.application.findMany({
+        where: { organizationId: club.id },
+        select: { competition: { select: { name: true } } },
+      })
+    : [];
+  if (entries.length > 0 || applications.length > 0) {
+    const names = [...new Set([...entries, ...applications].map((e) => e.competition.name))];
     out('Они заявлены на турниры:');
     for (const name of names) out(`  ${name}`);
     throw new Error(
@@ -297,10 +347,26 @@ async function remove(db: PrismaClient, apply: boolean): Promise<void> {
       await tx.athleteMembership.deleteMany({ where: { athleteId: { in: athleteIds } } });
       await tx.athleteProfile.deleteMany({ where: { id: { in: athleteIds } } });
       await tx.person.deleteMany({ where: { id: { in: personIds } } });
+      if (club) await removeTestClub(tx, club);
     },
     { timeout: 60_000 },
   );
-  out(`Готово: удалено ${athletes.length} тестовых спортсменов.`);
+  out(`Готово: удалено ${athletes.length} тестовых спортсменов${club ? ' и тестовый клуб' : ''}.`);
+}
+
+async function removeTestClub(
+  tx: Tx,
+  club: { id: string; memberships: { userId: string | null }[] },
+): Promise<void> {
+  const userIds = [...new Set(club.memberships.flatMap((m) => (m.userId ? [m.userId] : [])))];
+  await tx.organizationMembership.deleteMany({ where: { organizationId: club.id } });
+  await tx.coachMembership.deleteMany({ where: { organizationId: club.id } });
+  await tx.organizationClosure.deleteMany({ where: { descendantId: club.id } });
+  await tx.organization.delete({ where: { id: club.id } });
+  await tx.user.updateMany({
+    where: { id: { in: userIds } },
+    data: { permissionsVersion: { increment: 1 } },
+  });
 }
 
 async function main(): Promise<void> {

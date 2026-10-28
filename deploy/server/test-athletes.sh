@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Тестовые спортсмены для пробного турнира (packages/db/scripts/test-athletes.ts): 40 вымышленных юношей и девушек
-# 2012 г. р. в организации пользователя, с разрядами и согласиями.
+# 2012 г. р. в организации пользователя, с разрядами и согласиями. Нет у пользователя клуба — создаётся «Тестовый клуб»,
+# пользователь в нём руководитель и тренер; удаление убирает и его.
 #   bash /opt/sambo/deploy/server/test-athletes.sh add <email>           — предпросмотр, база не меняется;
 #   bash /opt/sambo/deploy/server/test-athletes.sh add <email> --apply   — резервная копия и добавление;
-#   bash /opt/sambo/deploy/server/test-athletes.sh remove [--apply]      — удаление всех тестовых спортсменов.
+#   bash /opt/sambo/deploy/server/test-athletes.sh remove [--apply]      — удаление всех тестовых спортсменов и тестового клуба.
 # Если организаций у пользователя несколько — добавьте --org <часть названия>. Скрипт берётся из образа migrate:
 # после обновления кода сначала update.sh.
 set -Eeuo pipefail
