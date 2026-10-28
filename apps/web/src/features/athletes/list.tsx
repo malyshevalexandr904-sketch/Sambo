@@ -1,7 +1,7 @@
 'use client';
 // Спортсмены (API.md, 4.1): список по видимости — сервер отдаёт только спортсменов клубов пользователя.
 import { type AthleteSummary, GENDERS, type Page, PROFILE_STATUSES } from '@sde/contracts';
-import { Button, EmptyState, Input, PageHeader, Select, Table, Td, Th } from '@sde/ui';
+import { Alert, Button, EmptyState, Input, PageHeader, Select, Table, Td, Th } from '@sde/ui';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -22,6 +22,8 @@ export function AthletesList() {
   const { data: me } = useMe();
   const rankName = useRankName();
   const isCoach = !!me?.grants.organizations.some((g) => g.roles.includes('COACH'));
+  // Тренер без клуба: спортсменов добавляют через клуб, поэтому сначала нужно вступить в него.
+  const coachWithoutClub = me?.activeRole === 'COACH' && !hasAnywhere(me, 'athlete.create');
   const [draft, setDraft] = useState({
     q: '',
     gender: '',
@@ -61,6 +63,14 @@ export function AthletesList() {
           </>
         }
       />
+      {coachWithoutClub ? (
+        <Alert tone="info" title={t('athletes.coachNoClubTitle')} className="mb-4">
+          {t('athletes.coachNoClub')}{' '}
+          <Link href="/onboarding" className="font-medium underline">
+            {t('athletes.coachJoinClub')}
+          </Link>
+        </Alert>
+      ) : null}
       <form
         className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6"
         onSubmit={(e) => {

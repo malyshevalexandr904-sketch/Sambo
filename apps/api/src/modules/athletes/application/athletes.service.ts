@@ -215,6 +215,7 @@ export class AthletesService {
         coachId,
         sportRankCode: input.rank?.sportRankCode ?? null,
         confirmedNotDuplicateOf: candidates.map((c) => c.athleteId),
+        thirdPartyConsentConfirmed: input.thirdPartyConsentConfirmed ?? false,
       },
       reason: candidates.length > 0 ? opts.confirmReason : null,
     });

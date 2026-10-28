@@ -1,6 +1,8 @@
 'use client';
 // Новый спортсмен (API.md, 4.1): сначала проверка дублей (G-08) — похожие спортсмены показываются
 // в публичном виде; создать всё равно можно только с причиной (попадёт в аудит).
+// Мастер в два шага: данные спортсмена, затем согласия и документы — тренер вносит всё сам.
+// Данные вносит не субъект ПДн, поэтому автор подтверждает согласие спортсмена или представителя (152-ФЗ).
 import {
   type Athlete,
   type CoachSummary,
@@ -9,7 +11,7 @@ import {
   type Page,
 } from '@sde/contracts';
 import { Alert, Button, Card, CardTitle, Field, Input, PageHeader, Select, Textarea } from '@sde/ui';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import {
@@ -20,12 +22,15 @@ import {
   type PersonValues,
   withPrefix,
 } from '@/components/person-fields';
-import { Link, useRouter } from '@/i18n/navigation';
+import { QueryState } from '@/components/common';
+import { AthleteDocuments } from '@/features/documents/athlete-documents';
+import { Link } from '@/i18n/navigation';
 import { hasOrgRole } from '@/lib/access';
 import { api, ApiError } from '@/lib/api';
 import { useFieldMessage } from '@/lib/errors';
 import { pickName, qk, useMe, useSportRanks } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
+import { ConsentsPanel } from './consents';
 import { useClubsWith } from './shared';
 
 export function DuplicateList({ candidates }: { candidates: DuplicateCandidate[] }) {
@@ -48,7 +53,7 @@ export function AthleteCreate() {
   const t = useTranslations();
   const tf = useFieldMessage();
   const locale = useLocale();
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: me } = useMe();
   const clubs = useClubsWith('athlete.create');
   const ranks = useSportRanks();
@@ -58,6 +63,8 @@ export function AthleteCreate() {
   const [rank, setRank] = useState({ code: '', assignedAt: '', orderRef: '' });
   const [candidates, setCandidates] = useState<DuplicateCandidate[] | null>(null);
   const [reason, setReason] = useState('');
+  const [consentConfirmed, setConsentConfirmed] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const action = useAction();
 
@@ -76,7 +83,11 @@ export function AthleteCreate() {
   const submit = async (confirm: boolean): Promise<void> => {
     setErrors({});
     await action.run(async () => {
-      const body: Record<string, unknown> = { person: personPayload(person), organizationId };
+      const body: Record<string, unknown> = {
+        person: personPayload(person),
+        organizationId,
+        thirdPartyConsentConfirmed: consentConfirmed,
+      };
       if (coachId) body.coachId = coachId;
       if (rank.code)
         body.rank = {
@@ -88,7 +99,10 @@ export function AthleteCreate() {
         body.confirmNotDuplicate = { candidateIds: candidates.map((c) => c.athleteId), reason };
       try {
         const res = await api<DataEnvelope<Athlete>>('/athletes', { method: 'POST', body });
-        router.push(`/athletes/${res.data.id}`);
+        queryClient.setQueryData(qk.athlete(res.data.id), res.data);
+        void queryClient.invalidateQueries({ queryKey: ['athletes'] });
+        setCreatedId(res.data.id);
+        window.scrollTo({ top: 0 });
       } catch (e) {
         if (e instanceof ApiError && e.code === 'POSSIBLE_DUPLICATE') {
           setCandidates((e.details?.candidates as DuplicateCandidate[] | undefined) ?? []);
@@ -100,9 +114,30 @@ export function AthleteCreate() {
     });
   };
 
+  const reset = (): void => {
+    setCreatedId(null);
+    setPerson(emptyPerson());
+    setRank({ code: '', assignedAt: '', orderRef: '' });
+    setCandidates(null);
+    setReason('');
+    setConsentConfirmed(false);
+    setErrors({});
+    window.scrollTo({ top: 0 });
+  };
+
+  if (createdId) return <AthleteDocumentsStep id={createdId} onAnother={reset} />;
+
   return (
     <>
-      <PageHeader title={t('athletes.createTitle')} description={t('athletes.createHint')} />
+      <PageHeader
+        title={t('athletes.createTitle')}
+        description={
+          <>
+            <span className="block font-medium">{t('athletes.wizard.step1')}</span>
+            {t('athletes.createHint')}
+          </>
+        }
+      />
       {clubs.data.length === 0 && !clubs.isPending ? (
         <Alert tone="warning">{t('athletes.noClubs')}</Alert>
       ) : null}
@@ -235,10 +270,79 @@ export function AthleteCreate() {
             </Button>
           </Alert>
         ) : null}
-        <Button type="submit" size="lg" loading={action.busy} disabled={!organizationId}>
-          {t('athletes.create')}
+        <div>
+          <label className="flex min-h-11 items-start gap-3 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5 shrink-0"
+              checked={consentConfirmed}
+              onChange={(e) => setConsentConfirmed(e.target.checked)}
+            />
+            <span>
+              {t.rich('athletes.wizard.consentConfirm', {
+                consent: (chunks) => (
+                  <Link
+                    href="/personal-data-consent"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-700 underline"
+                  >
+                    {chunks}
+                  </Link>
+                ),
+              })}
+            </span>
+          </label>
+        </div>
+        <Button type="submit" size="lg" loading={action.busy} disabled={!organizationId || !consentConfirmed}>
+          {t('athletes.wizard.next')}
         </Button>
       </form>
+    </>
+  );
+}
+
+/** Шаг 2: согласия (скан бумажного согласия) и документы только что добавленного спортсмена. */
+function AthleteDocumentsStep({ id, onAnother }: { id: string; onAnother: () => void }) {
+  const t = useTranslations();
+  const query = useQuery({
+    queryKey: qk.athlete(id),
+    queryFn: async () => (await api<DataEnvelope<Athlete>>(`/athletes/${id}`)).data,
+  });
+  return (
+    <>
+      <PageHeader
+        title={t('athletes.wizard.step2Title')}
+        description={<span className="block font-medium">{t('athletes.wizard.step2')}</span>}
+      />
+      <QueryState isPending={query.isPending} error={query.error}>
+        {() => {
+          const a = query.data as Athlete;
+          return (
+            <div className="space-y-6">
+              <Alert tone="success">
+                {t('athletes.wizard.created', { name: `${a.person.lastName} ${a.person.firstName}` })}
+              </Alert>
+              <div className="grid gap-6 xl:grid-cols-2">
+                <ConsentsPanel athlete={a} />
+                {a.allowedActions.includes('document.view') ? <AthleteDocuments athlete={a} /> : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/athletes/${a.id}`}
+                  className="inline-flex min-h-11 items-center rounded-md bg-blue-700 px-4 text-sm font-medium text-white hover:bg-blue-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                >
+                  {t('athletes.wizard.done')}
+                </Link>
+                <Button variant="secondary" onClick={onAnother}>
+                  {t('athletes.wizard.another')}
+                </Button>
+              </div>
+              <p className="text-sm text-slate-600">{t('athletes.wizard.later')}</p>
+            </div>
+          );
+        }}
+      </QueryState>
     </>
   );
 }

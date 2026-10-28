@@ -44,6 +44,11 @@ export const AthleteCreate = z.object({
   rank: RankInput.omit({ documentId: true }).optional(),
   /** Похожие спортсмены найдены, но это другой человек: перечисляются все кандидаты и причина. */
   confirmNotDuplicate: z.object({ candidateIds: z.array(Uuid).min(1).max(20), reason: Reason }).optional(),
+  /**
+   * Данные вносит не сам спортсмен (тренер, клуб): автор подтверждает, что спортсмен или его законный представитель
+   * согласен на передачу данных платформе (152-ФЗ). Отметка попадает в аудит создания.
+   */
+  thirdPartyConsentConfirmed: z.boolean().optional(),
 });
 export type AthleteCreate = z.infer<typeof AthleteCreate>;
 
