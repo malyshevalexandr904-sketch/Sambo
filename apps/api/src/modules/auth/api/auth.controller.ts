@@ -65,15 +65,17 @@ export class AuthController {
     return ok({ csrfToken: token });
   }
 
+  /** Регистрация с входом (правки 28.10.2026): ответ — как у входа, анкета роли продолжается сразу. */
   @Post('register')
   @Public()
   @RateLimit('auth')
-  @HttpCode(202)
+  @HttpCode(201)
   async register(
     @ValidBody(RegisterRequest) body: RegisterRequest,
-  ): Promise<DataEnvelope<{ status: 'VERIFICATION_SENT' }>> {
-    await this.auth.register(body);
-    return ok({ status: 'VERIFICATION_SENT' });
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<DataEnvelope<Me | BearerLoginResponse>> {
+    return this.respond(req, res, await this.auth.register(body));
   }
 
   @Post('verify-email')

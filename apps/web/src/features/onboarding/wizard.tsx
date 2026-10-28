@@ -2,15 +2,17 @@
 // Мастер заявки на регистрацию (Phase 9a): индикатор этапа, «Назад» и «Продолжить», сохранение черновика на сервере на
 // каждом шаге (введённое не теряется при возврате и после перезагрузки), ошибки рядом с полями, предпросмотр, согласие
 // на обработку ПДн, отправка и статус. Проверка полноты — та же функция, что на сервере (contracts: onboardingProblems).
-import { type DataEnvelope, onboardingProblems, type OnboardingRequestDto } from '@sde/contracts';
+import { type DataEnvelope, type Me, onboardingProblems, type OnboardingRequestDto } from '@sde/contracts';
 import { Alert, Button, Card, CardTitle, PageHeader } from '@sde/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { QueryState } from '@/components/common';
+import { ResendVerification } from '@/components/register-form';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { useErrorMessage } from '@/lib/errors';
+import { qk, useMe } from '@/lib/queries';
 import { DocumentsStep } from './documents';
 import {
   completenessOf,
@@ -87,7 +89,8 @@ function useStepLabels(): (s: StepId) => string {
 function StepIndicator({ steps, current, kind }: { steps: StepId[]; current: number; kind: string }) {
   const t = useTranslations('onboarding');
   const label = useStepLabels();
-  const all = kind === 'REGISTRATION' ? ['role' as const, ...steps] : steps;
+  // Регистрация: роль и учётная запись — первые шаги анкеты (правки 28.10.2026), к этому моменту пройдены.
+  const all = kind === 'REGISTRATION' ? (['role', 'account', ...steps] as const) : steps;
   const offset = all.length - steps.length;
   return (
     <nav aria-label={t('wizard.progress')} className="mb-6">
@@ -110,7 +113,7 @@ function StepIndicator({ steps, current, kind }: { steps: StepId[]; current: num
               }
             >
               {state === 'done' ? '✓ ' : `${i + 1}. `}
-              {s === 'role' ? t('steps.role') : label(s)}
+              {s === 'role' || s === 'account' ? t(`steps.${s}`) : label(s)}
             </li>
           );
         })}
@@ -144,6 +147,8 @@ function Wizard({ initial }: { initial: OnboardingRequestDto }) {
   const [consent, setConsent] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const current = steps[step] ?? 'review';
+  const me = useMe();
+  const emailVerified = me.data?.emailVerified ?? true;
 
   useEffect(() => headingRef.current?.focus(), [step]);
 
@@ -237,6 +242,7 @@ function Wizard({ initial }: { initial: OnboardingRequestDto }) {
           <DocumentsStep request={request} errors={errors} onChanged={accept} />
         ) : null}
         {current === 'contacts' ? <ContactsStep {...stepProps} /> : null}
+        {current === 'review' && !emailVerified && me.data ? <ConfirmEmail me={me.data} /> : null}
         {current === 'review' ? (
           <ReviewStep
             request={request}
@@ -251,7 +257,11 @@ function Wizard({ initial }: { initial: OnboardingRequestDto }) {
             {t('wizard.back')}
           </Button>
           {current === 'review' ? (
-            <Button loading={busy} disabled={!consent || problems.length > 0} onClick={() => void submit()}>
+            <Button
+              loading={busy}
+              disabled={!consent || problems.length > 0 || !emailVerified}
+              onClick={() => void submit()}
+            >
               {t('wizard.submit')}
             </Button>
           ) : (
@@ -263,6 +273,26 @@ function Wizard({ initial }: { initial: OnboardingRequestDto }) {
       </Card>
       <p className="mt-4 text-sm text-slate-500">{t('wizard.autosave')}</p>
     </>
+  );
+}
+
+/**
+ * Email ещё не подтверждён (правки 28.10.2026: анкета открывается сразу после учётной записи): письмо можно отправить
+ * ещё раз, а после перехода по ссылке — проверить снова, не уходя с анкеты.
+ */
+function ConfirmEmail({ me }: { me: Me }) {
+  const t = useTranslations('onboarding.wizard');
+  const queryClient = useQueryClient();
+  return (
+    <Alert tone="warning" className="mb-4" title={t('emailTitle')}>
+      <p>{t('emailBody', { email: me.email ?? '' })}</p>
+      <div className="mt-3 flex flex-wrap items-start gap-3">
+        {me.email ? <ResendVerification email={me.email} /> : null}
+        <Button variant="secondary" onClick={() => void queryClient.invalidateQueries({ queryKey: qk.me })}>
+          {t('emailRecheck')}
+        </Button>
+      </div>
+    </Alert>
   );
 }
 

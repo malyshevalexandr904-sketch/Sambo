@@ -6,6 +6,7 @@ import {
   isOnboardingRole,
   type Me,
   type Membership,
+  type OnboardingOverviewDto,
   type OnboardingRequestDto,
 } from '@sde/contracts';
 import { Alert, Card, Spinner } from '@sde/ui';
@@ -45,7 +46,17 @@ export function VerifyEmail() {
             router.replace(`/onboarding/${created.data.id}`);
             return;
           } catch {
-            // Заявка на эту роль уже есть (ссылку открыли повторно) — её видно в кабинете регистрации.
+            // Заявка на эту роль уже есть: с 28.10.2026 анкета заполняется до подтверждения — вернуться к ней.
+            const overview = await api<DataEnvelope<OnboardingOverviewDto>>('/onboarding/me').catch(
+              () => null,
+            );
+            const draft = overview?.data.requests.find(
+              (r) => r.role === role && r.allowedActions.includes('update'),
+            );
+            if (draft) {
+              router.replace(`/onboarding/${draft.id}`);
+              return;
+            }
           }
         }
         router.replace('/onboarding');

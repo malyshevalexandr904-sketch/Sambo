@@ -93,6 +93,7 @@ export class MeService {
       status: user.status,
       personId: user.personId,
       totpEnabled: user.totpEnabledAt !== null,
+      emailVerified: user.emailVerifiedAt !== null,
       avatarUrl:
         photo && photo.status === 'AVAILABLE' && photo.bucket === 'PUBLIC_MEDIA'
           ? this.files.publicUrl(photo.storageKey)

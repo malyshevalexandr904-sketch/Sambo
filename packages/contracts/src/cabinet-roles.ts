@@ -17,6 +17,17 @@ export const CABINET_ROLES = [
 ] as const;
 export type CabinetRole = (typeof CABINET_ROLES)[number];
 
+/**
+ * Роли демо-входа (правки 28.10.2026): только четыре роли платформы — руководитель организации, тренер, спортсмен
+ * и судья; администратор, врач и представитель в демо не показываются. Порядок — как в CABINET_ROLES.
+ */
+export const DEMO_CABINET_ROLES = [
+  'ORGANIZATION_HEAD',
+  'REFEREE',
+  'COACH',
+  'ATHLETE',
+] as const satisfies readonly CabinetRole[];
+
 export const isCabinetRole = (v: unknown): v is CabinetRole =>
   typeof v === 'string' && (CABINET_ROLES as readonly string[]).includes(v);
 

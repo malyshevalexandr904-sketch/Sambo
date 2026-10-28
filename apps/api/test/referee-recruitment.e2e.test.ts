@@ -204,20 +204,22 @@ describe('open referee recruitment', () => {
 });
 
 describe('demo access', () => {
-  it('opens every cabinet role for viewing and refuses any action with DEMO_READ_ONLY', async () => {
+  it('opens the four platform roles for viewing and refuses any action with DEMO_READ_ONLY', async () => {
     const s = await csrfAgent(t);
     const res = await s.agent.post('/api/v1/auth/demo').set('x-csrf-token', s.csrf).send({});
     expect(res.status, JSON.stringify(res.body)).toBe(200);
     expect(res.body.data).toMatchObject({
       demo: true,
       email: null,
-      availableRoles: ['ADMIN', 'ORGANIZATION_HEAD', 'REFEREE', 'MEDICAL', 'COACH', 'ATHLETE', 'GUARDIAN'],
+      // Правки 28.10.2026: только руководитель, судья, тренер и спортсмен.
+      availableRoles: ['ORGANIZATION_HEAD', 'REFEREE', 'COACH', 'ATHLETE'],
       grants: { platform: [], organizations: [], competitions: [] },
     });
     const cookie = (res.headers['set-cookie'] as unknown as string[]).find((c) => c.startsWith('sde_csrf='));
     const demo: Session = { agent: s.agent, csrf: decodeURIComponent(cookie!.split(';')[0]!.slice(9)) };
 
     // Переключение роли — просмотр; чтение доступно.
+    expect((await send(demo, 'put', '/api/v1/me/role', { role: 'ADMIN' })).status).toBe(403);
     const role = await send(demo, 'put', '/api/v1/me/role', { role: 'REFEREE' });
     expect(role.status, JSON.stringify(role.body)).toBe(200);
     expect(role.body.data.activeRole).toBe('REFEREE');

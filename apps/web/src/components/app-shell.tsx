@@ -13,7 +13,7 @@ import { hasAnywhere, platformHas } from '@/lib/access';
 import { setDemoMode } from '@/lib/demo';
 import { closeLive } from '@/lib/live';
 import { disablePushForLogout, syncPush } from '@/lib/push';
-import { useMe, useMyAthletes } from '@/lib/queries';
+import { useMe } from '@/lib/queries';
 import { ConsoleRoleBar, RoleChangedElsewhere, RoleSwitcher } from '@/features/cabinet-role';
 import { Avatar } from '@/features/avatar';
 import { NotificationBell } from '@/features/notifications/bell';
@@ -28,70 +28,60 @@ export function hasPlatformPermission(me: Me | undefined, permission: Permission
 interface NavItem {
   href: string;
   label: string;
-  visible: boolean;
-  /** Виден ли пункт в демо-входе (по умолчанию — да: в демо открыты все разделы). */
-  inDemo?: boolean;
 }
 
 type Translate = ReturnType<typeof useTranslations>;
 
-/** Пункты меню по правам выбранной роли; `inDemo` — видимость в демо-входе. */
-function navItems(t: Translate, user: Me, myAthleteCount: number): NavItem[] {
-  const role = user.activeRole;
-  // Правки 27.10.2026: «Организации» — только у супер-администратора; у судьи нет «Проверки документов»,
-  // у спортсмена — «Моих спортсменов»; «Регистрация в системе» убрана — роль добавляется кнопкой «Добавить роль».
-  // В демо-входе видны все разделы (с теми же исключениями по ролям); роль «Администратор» — как супер-администратор.
-  const isSuperAdmin = role === 'ADMIN' && (user.demo || user.grants.platform.includes('SUPER_ADMIN'));
-  return [
-    { href: '/admin', label: t('nav.dashboard'), visible: true },
-    {
-      href: '/onboarding/review',
-      label: t('nav.onboardingReview'),
-      visible:
-        hasAnywhere(user, 'onboarding.review') ||
-        user.grants.organizations.some((g) => g.roles.includes('COACH')),
-    },
-    { href: '/competitions', label: t('nav.competitions'), visible: true },
-    {
-      href: '/competition-requests',
-      label: t('nav.competitionRequests'),
-      visible:
-        hasAnywhere(user, 'competition.request') || hasPlatformPermission(user, 'competition.create_rated'),
-    },
-    {
-      href: '/referee',
-      label: t('nav.referee'),
-      visible:
-        role === 'REFEREE' || user.grants.competitions.length > 0 || hasAnywhere(user, 'result.confirm'),
-    },
-    {
-      href: '/applications',
-      label: t('nav.applications'),
-      visible: hasAnywhere(user, 'registration.create'),
-    },
-    { href: '/athletes', label: t('nav.athletes'), visible: hasAnywhere(user, 'athlete.view') },
-    {
-      href: '/children',
-      label: t('nav.children'),
-      visible: role !== 'ATHLETE' && myAthleteCount > 0,
-      inDemo: role !== 'ATHLETE',
-    },
-    { href: '/coaches', label: t('nav.coaches'), visible: hasAnywhere(user, 'coach.manage') },
-    {
-      href: '/documents',
-      label: t('nav.documents'),
-      visible: role !== 'REFEREE' && hasAnywhere(user, 'document.verify'),
-      inDemo: role !== 'REFEREE',
-    },
+/**
+ * Вкладки меню по выбранной роли (правки 28.10.2026): у каждой из четырёх ролей платформы — свой фиксированный набор,
+ * одинаковый в обычном и демо-входе; уведомления и тексты согласий — в «Настройках». Прочие разделы роли (заявки,
+ * судейство, проверка заявок и документов) открываются из личного кабинета. Администратор платформы сохраняет свои
+ * разделы по правам.
+ */
+function navItems(t: Translate, user: Me): NavItem[] {
+  const home = { href: '/admin', label: t('nav.dashboard') };
+  const competitions = { href: '/competitions', label: t('nav.competitions') };
+  const settings = { href: '/settings', label: t('nav.mySettings') };
+  switch (user.activeRole) {
+    case 'ORGANIZATION_HEAD':
+      return [
+        home,
+        competitions,
+        { href: '/coaches', label: t('nav.myCoaches') },
+        { href: '/athletes', label: t('nav.myAthletes') },
+        settings,
+      ];
+    case 'COACH':
+      return [home, competitions, { href: '/athletes', label: t('nav.myAthletes') }, settings];
+    case 'ATHLETE':
+      return [home, competitions, { href: '/path-to-success', label: t('nav.pathToSuccess') }, settings];
+    case 'GUARDIAN':
+      return [home, competitions, { href: '/children', label: t('nav.children') }, settings];
+    case 'ADMIN':
+      return [home, competitions, ...adminItems(t, user), settings];
+    default:
+      return [home, competitions, settings];
+  }
+}
+
+/** Разделы администратора платформы — по правам; в демо роли администратора нет. */
+function adminItems(t: Translate, user: Me): NavItem[] {
+  const items: (NavItem & { visible: boolean })[] = [
     {
       href: '/admin/organizations',
       label: t('nav.organizations'),
-      visible: isSuperAdmin,
-      inDemo: isSuperAdmin,
+      visible: user.grants.platform.includes('SUPER_ADMIN'),
     },
-    { href: '/admin/referees', label: t('nav.referees'), visible: hasAnywhere(user, 'referee.manage') },
-    { href: '/admin/categories', label: t('nav.categories'), visible: hasAnywhere(user, 'category.manage') },
-    { href: '/admin/rulesets', label: t('nav.rulesets'), visible: hasAnywhere(user, 'ruleset.manage') },
+    {
+      href: '/competition-requests',
+      label: t('nav.competitionRequests'),
+      visible: hasPlatformPermission(user, 'competition.create_rated'),
+    },
+    {
+      href: '/onboarding/review',
+      label: t('nav.onboardingReview'),
+      visible: hasAnywhere(user, 'onboarding.review'),
+    },
     {
       href: '/admin/consent-templates',
       label: t('nav.consentTemplates'),
@@ -114,8 +104,8 @@ function navItems(t: Translate, user: Me, myAthleteCount: number): NavItem[] {
       label: t('nav.settings'),
       visible: hasPlatformPermission(user, 'platform.settings.manage'),
     },
-    { href: '/notifications', label: t('nav.notifications'), visible: true },
   ];
+  return items.filter((i) => i.visible).map(({ href, label }) => ({ href, label }));
 }
 
 /**
@@ -124,7 +114,6 @@ function navItems(t: Translate, user: Me, myAthleteCount: number): NavItem[] {
 export function AppShell({ children, bare = false }: { children: ReactNode; bare?: boolean }) {
   const t = useTranslations();
   const me = useMe();
-  const myAthletes = useMyAthletes(!!me.data?.personId);
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -175,10 +164,9 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
       </main>
     );
   }
-  const demo = user.demo;
-  const nav = navItems(t, user, myAthletes.data?.length ?? 0);
+  const nav = navItems(t, user);
   const isActive = (href: string): boolean =>
-    href === '/admin' ? pathname === '/admin' : pathname.startsWith(href);
+    href === '/admin' ? pathname === '/admin' : pathname === href || pathname.startsWith(`${href}/`);
 
   const logout = async (): Promise<void> => {
     try {
@@ -239,22 +227,20 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
         <RoleSwitcher me={user} />
         <nav aria-label={t('common.menu')}>
           <ul className="space-y-1">
-            {nav
-              .filter((i) => (demo ? (i.inDemo ?? true) : i.visible))
-              .map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={isActive(item.href) ? 'page' : undefined}
-                    className={cn(
-                      'flex min-h-11 items-center rounded-md px-3 text-sm font-medium',
-                      isActive(item.href) ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-100',
-                    )}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
+            {nav.map((item) => (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  aria-current={isActive(item.href) ? 'page' : undefined}
+                  className={cn(
+                    'flex min-h-11 items-center rounded-md px-3 text-sm font-medium',
+                    isActive(item.href) ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-100',
+                  )}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </nav>
         <SidebarFooter me={user} onLogout={() => void logout()} />

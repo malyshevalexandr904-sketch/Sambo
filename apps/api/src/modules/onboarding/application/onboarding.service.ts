@@ -59,7 +59,8 @@ export class OnboardingService implements OnModuleInit {
 
   onModuleInit(): void {
     // Документ заявки загружает любой вошедший с подтверждённым email; привязка к заявке — отдельной командой.
-    this.files.registerUploadPolicy('ONBOARDING_DOCUMENT', (user) => Promise.resolve(user.emailVerified));
+    // Документы анкеты загружаются до подтверждения email (правки 28.10.2026): адрес проверяется при отправке заявки.
+    this.files.registerUploadPolicy('ONBOARDING_DOCUMENT', () => Promise.resolve(true));
     // Скачивание по fileId: только заявитель и проверяющий заявки (не автор файла сам по себе после привязки).
     this.files.registerAccessPolicy('ONBOARDING_DOCUMENT', async (user, file) => {
       const doc = await this.db.onboardingDocument.findUnique({
@@ -214,7 +215,6 @@ export class OnboardingService implements OnModuleInit {
   }
 
   async create(user: AuthUser, input: OnboardingCreate): Promise<OnboardingRequestDto> {
-    if (!user.emailVerified) throw new DomainError('EMAIL_NOT_VERIFIED');
     const id = uuidv7();
     try {
       await this.db.tx(async (tx) => {

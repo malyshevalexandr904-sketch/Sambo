@@ -15,12 +15,7 @@ import { applyFieldErrors, useErrorMessage, useFieldMessage } from '@/lib/errors
 import { closeLive } from '@/lib/live';
 import { qk } from '@/lib/queries';
 import { PasswordRequirements } from './password-requirements';
-import { ResendVerification } from './register-form';
-
-/** Переход после входа — только на внутренний путь (защита от открытого редиректа). */
-function safeNext(value: string | null): string {
-  return value && value.startsWith('/') && !value.startsWith('//') ? value : '/admin';
-}
+import { ResendVerification, safeNext } from './register-form';
 
 export function LoginForm() {
   const t = useTranslations('auth');

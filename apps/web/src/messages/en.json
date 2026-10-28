@@ -38,7 +38,7 @@
   },
   "home": {
     "title": "Цифровое самбо",
-    "lead": "A single digital ecosystem for sambo",
+    "lead": "Dive into the world of sambo",
     "login": "Sign in",
     "register": "Sign up",
     "loginTitle": "Already registered",
@@ -46,7 +46,7 @@
     "registerTitle": "New user",
     "registerHint": "Choose a role: head of organization, coach, athlete or referee. Access opens after review.",
     "guestTitle": "Demo access",
-    "guestHint": "Look around the platform: every role and section is open for viewing without signing up.",
+    "guestHint": "Look around the platform: the head, coach, athlete and referee roles are open for viewing without signing up.",
     "continue": "Continue",
     "openCabinet": "Open my account"
   },
@@ -72,7 +72,11 @@
     "referee": "Refereeing",
     "onboardingReview": "Review requests",
     "competitionRequests": "Hosting requests",
-    "divisions": "Divisions"
+    "divisions": "Divisions",
+    "mySettings": "Settings",
+    "myCoaches": "My coaches",
+    "myAthletes": "My athletes",
+    "pathToSuccess": "Path to success"
   },
   "auth": {
     "email": "Email",
@@ -96,8 +100,7 @@
       "sentTitle": "Check your inbox",
       "sentBody": "We have sent a confirmation link to {email}. It is valid for 24 hours.",
       "notReceived": "No email? Check your spam folder or send it again.",
-      "roleStep": "Step 1 of 2: role",
-      "accountStep": "Step 2 of 2: account",
+      "roleStep": "Choose a role — right after the account step the role application opens.",
       "whoAreYou": "What will you be in the system?",
       "roleHints": {
         "ORGANIZATION_HEAD": "Club, sports school, federation or tournament organizer: athletes, coaches, entries.",
@@ -108,8 +111,9 @@
       "guardianHint": "A parent of an athlete? The coach or club links you to your child by invitation.",
       "withoutRole": "Sign up without a role",
       "login": "Sign in",
-      "role": "role",
-      "changeRole": "Change"
+      "role": "Role",
+      "changeRole": "Change",
+      "continue": "Continue"
     },
     "verify": {
       "title": "Email confirmation",
@@ -169,7 +173,12 @@
       "documents": "Documents to review",
       "referee": "Refereeing",
       "applications": "Tournament applications",
-      "review": "Registration requests to review"
+      "review": "Registration requests to review",
+      "competitionRequests": "Tournament hosting requests",
+      "recruitment": "Open referee recruitment",
+      "referees": "Referees",
+      "categories": "Categories",
+      "rulesets": "Rules"
     },
     "welcomeRole": "Hello, {name}! You are working as “{role}”.",
     "noRoleTitle": "No role yet",
@@ -281,6 +290,16 @@
       "internal": "The server sends emails to the internal mailbox (Mailpit) or to the log: users will not receive email confirmation, password reset or email notifications. Connect domain mail — docs/DEPLOYMENT.md, “Server”.",
       "ok": "Emails are sent from “{from}” via {host}."
     }
+  },
+  "mySettings": {
+    "title": "Settings",
+    "lead": "Notifications and consent texts.",
+    "consentsTitle": "Consent texts",
+    "consentsHint": "Documents you accepted when signing up. They open in a new tab."
+  },
+  "pathToSuccess": {
+    "title": "Path to success",
+    "empty": "This section is coming soon."
   },
   "account": {
     "title": "My profile",
@@ -425,7 +444,8 @@
     "not_enough_participants": "At least two participants are needed",
     "rated_seeding_by_rating": "In the rated format seeding comes from ratings and cannot be set manually",
     "invalid_season_code": "The season code takes Latin letters, digits, dots, hyphens or underscores, up to 20 characters",
-    "season_dates_invalid": "The season ends before it starts"
+    "season_dates_invalid": "The season ends before it starts",
+    "email_taken": "This email is already registered — sign in or reset your password"
   },
   "errors": {
     "VALIDATION_FAILED": "Please check the form fields.",
@@ -2682,7 +2702,9 @@
       "personal": "Personal data",
       "documents": "Documents",
       "contacts": "Contact methods",
-      "review": "Review and submit"
+      "review": "Review and submit",
+      "account": "Account",
+      "form": "Role application"
     },
     "wizard": {
       "progress": "Request steps",
@@ -2699,7 +2721,10 @@
       "submit": "Submit request",
       "autosave": "The draft is saved when you move between steps.",
       "incomplete": "The request is incomplete",
-      "fixStep": "Fix: {step}"
+      "fixStep": "Fix: {step}",
+      "emailTitle": "Confirm your email to submit the application",
+      "emailBody": "We sent a link to {email}. You can fill in the application before confirming, but it can be submitted only after.",
+      "emailRecheck": "I have confirmed my email"
     },
     "consent": {
       "text": "Personal data from the request (name, date of birth, contacts, documents) is needed to review the request and register you on Цифровое самбо. Only reviewers can see it: the platform team or the head of the chosen organization. You can withdraw consent by contacting support.",

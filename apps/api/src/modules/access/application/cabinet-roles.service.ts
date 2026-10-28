@@ -6,6 +6,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   CABINET_ROLES,
   type CabinetRole,
+  DEMO_CABINET_ROLES,
   cabinetRoleOf,
   defaultCabinetRole,
   isCabinetRole,
@@ -21,7 +22,7 @@ export interface CabinetUser {
   id: string;
   personId: string | null;
   permissionsVersion: number;
-  /** Демо-вход (правки 27.10.2026): для просмотра доступны все роли кабинета — прав они не дают. */
+  /** Демо-вход (правки 27.10.2026, 28.10.2026): для просмотра — четыре роли платформы; прав они не дают. */
   isDemo?: boolean;
 }
 
@@ -57,7 +58,7 @@ export class CabinetRolesService {
    * включённого TOTP (права она даст только с ним — в кабинете будет подсказка включить).
    */
   async available(user: CabinetUser): Promise<CabinetRole[]> {
-    if (user.isDemo) return [...CABINET_ROLES];
+    if (user.isDemo) return [...DEMO_CABINET_ROLES];
     const [grants, platformAssigned] = await Promise.all([
       this.grants.forUser(user.id, user.permissionsVersion),
       this.db.platformRoleAssignment.count({ where: { userId: user.id, revokedAt: null } }),

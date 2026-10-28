@@ -9,7 +9,7 @@ import {
   type NotificationPreferenceDto,
   type Page,
 } from '@sde/contracts';
-import { Alert, Button, Card, CardTitle, EmptyState, PageHeader, cn } from '@sde/ui';
+import { Alert, Button, Card, CardTitle, EmptyState, cn } from '@sde/ui';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -166,7 +166,8 @@ function Preferences() {
   );
 }
 
-export function NotificationsPage() {
+/** Уведомления — раздел «Настроек» (правки 28.10.2026): лента, push на этом устройстве, виды уведомлений. */
+export function NotificationsSection() {
   const t = useTranslations('notifications');
   const locale = useLocale();
   const router = useRouter();
@@ -192,24 +193,24 @@ export function NotificationsPage() {
       if (n.link) router.push(n.link);
     });
   return (
-    <>
-      <PageHeader
-        title={t('title')}
-        actions={
-          <Button
-            variant="secondary"
-            loading={action.busy}
-            onClick={() =>
-              void action.run(async () => {
-                await api('/me/notifications/read-all', { method: 'POST' });
-                await refresh();
-              })
-            }
-          >
-            {t('markAll')}
-          </Button>
-        }
-      />
+    <section aria-labelledby="notifications-title" id="notifications" className="scroll-mt-20">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 id="notifications-title" className="text-xl font-semibold text-slate-900">
+          {t('title')}
+        </h2>
+        <Button
+          variant="secondary"
+          loading={action.busy}
+          onClick={() =>
+            void action.run(async () => {
+              await api('/me/notifications/read-all', { method: 'POST' });
+              await refresh();
+            })
+          }
+        >
+          {t('markAll')}
+        </Button>
+      </div>
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-4">
           <label className="flex min-h-11 items-center gap-2 text-sm">
@@ -264,6 +265,6 @@ export function NotificationsPage() {
           <Preferences />
         </div>
       </div>
-    </>
+    </section>
   );
 }
