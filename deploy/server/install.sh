@@ -6,6 +6,7 @@
 #   bash /opt/sambo/deploy/server/install.sh <домен> [дополнительные домены…]
 #
 # Дополнительные домены (и их www) перенаправляют на основной: install.sh digitalsambo.ru digitalsambo.online
+# Домен, отданный под страницу соцсетей (links-site.sh, LINKS_SITES в .env), в перенаправление не попадает.
 #
 # Что делает: защита входа (только по ключу, если он добавлен; fail2ban), файл подкачки (для сборки), Docker, секреты этого сервера (.env), сборка образов, миграции,
 # учебные данные (один раз, со своим паролем), запуск, ночные резервные копии. В конце печатает адреса и
@@ -53,10 +54,17 @@ fi
 check_domain "$DOMAIN"
 
 # Дополнительные домены: из аргументов, иначе — как при прошлой установке.
+LINKS_SITES=""
+if [ -f "$ENV_FILE" ]; then LINKS_SITES="$(env_get LINKS_SITES)"; fi
 extra=()
 for arg in "${@:2}"; do
   d="$(normalize "$arg")"
   check_domain "$d"
+  # Домен страницы соцсетей — отдельный сайт: Caddy не примет один адрес в двух блоках.
+  if [[ ", $LINKS_SITES," == *", $d,"* ]]; then
+    note "$d — страница соцсетей (LINKS_SITES), не перенаправляется"
+    continue
+  fi
   [ "$d" = "$DOMAIN" ] || extra+=("$d")
 done
 if ((${#extra[@]} > 0)); then
@@ -153,6 +161,7 @@ note "IP этого сервера: $public_ip"
 dns_ok=1
 hosts=("$DOMAIN" "www.$DOMAIN" "s3.$DOMAIN")
 if [ -n "$REDIRECT_SITES" ]; then IFS=', ' read -ra more <<<"$REDIRECT_SITES" && hosts+=("${more[@]}"); fi
+if [ -n "$LINKS_SITES" ]; then IFS=', ' read -ra more <<<"$LINKS_SITES" && hosts+=("${more[@]}"); fi
 for host in "${hosts[@]}"; do
   got=$(getent ahostsv4 "$host" | awk 'NR==1 {print $1}' || true)
   if [ "$got" = "$public_ip" ]; then
@@ -272,6 +281,7 @@ totp="$(env_get SEED_ADMIN_TOTP_SECRET)"
   echo
   echo "Сайт:      https://$DOMAIN/ru/login"
   [ -z "$REDIRECT_SITES" ] || echo "           ($REDIRECT_SITES → https://$DOMAIN)"
+  [ -z "$LINKS_SITES" ] || echo "Соцсети:   $LINKS_SITES (страница из deploy/links)"
   echo "Пароль всех учебных учётных записей: $password"
   echo "  organizer@sambo.local   руководитель турниров"
   echo "  secretary@sambo.local   секретарь"

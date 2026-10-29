@@ -110,6 +110,7 @@ MinIO используется только для разработки; product
 | Что | Где |
 |---|---|
 | Сайт | `https://<домен>`; `www.<домен>` и дополнительные домены (`REDIRECT_SITES`) перенаправляют на него |
+| Страница соцсетей | домены из `LINKS_SITES` (digitalsambo.online и www) — отдельный статичный сайт из `deploy/links`, без сервисов платформы |
 | API | `https://<домен>/api/*` — Caddy отправляет напрямую в `api` (один прокси: `TRUST_PROXY=true` доверяет одному хопу) |
 | Живые данные | `https://<домен>/ws` — WebSocket (Socket.IO), тоже напрямую в `api` |
 | Хранилище | `https://s3.<домен>` → MinIO; Host не меняется — подпись presigned URL включает хост |
@@ -152,6 +153,14 @@ docker compose start api worker web
 
 - **Журналы:** `docker compose -f /opt/sambo/deploy/server/compose.yml logs --tail 100 api` (ротация — 5 файлов по 10 МБ на сервис).
 - **Push-уведомления (с 0.11.0)** работают без настройки: ключи VAPID выводятся из `AUTH_SECRET`, контакт для push-служб — адрес из `EMAIL_FROM`. Нужен HTTPS (на сервере он есть). worker отправляет push на адреса Google (FCM), Mozilla, Apple, Microsoft — исходящий HTTPS с сервера должен быть открыт. На iPhone и iPad push работает только у сайта, добавленного на экран «Домой» (iOS 16.4+). Нагрузка и запас по зрителям табло — [LOAD_TEST.md](LOAD_TEST.md).
+
+### Страница соцсетей на отдельном домене
+
+`deploy/links/` — одна статичная страница (ссылки на Telegram, ВКонтакте, MAX, TikTok, Instagram и кнопка на основной сайт) с картинками. Caddy отдаёт её как файлы на доменах из `LINKS_SITES` (`.env`) и сам выпускает для них HTTPS.
+
+- **Включить** (домен перестаёт перенаправлять на основной сайт): `git -C /opt/sambo pull`, затем `bash /opt/sambo/deploy/server/links-site.sh digitalsambo.online`. Скрипт переносит домен и его www из `REDIRECT_SITES` в `LINKS_SITES`, перезапускает только Caddy и проверяет, что страница открывается.
+- **Вернуть перенаправление:** `bash /opt/sambo/deploy/server/links-site.sh --off digitalsambo.online`.
+- **Правка страницы** — файлы в `deploy/links/`, на сервер попадают через `update.sh` (папка подключена в Caddy целиком, перезапуск не нужен). Повторный `install.sh` с этим доменом в аргументах его в перенаправление не возвращает.
 
 ### Персональные данные (152-ФЗ)
 

@@ -6,6 +6,7 @@
 #   https://s3.<домен>     — хранилище файлов: браузер загружает по presigned POST и скачивает по presigned URL
 #   https://<домен>/mail/  — почтовый ящик Mailpit (пока письма не уходят наружу; вход по паролю из .env)
 #   www.<домен> и дополнительные домены (REDIRECT_SITES) — перенаправление на https://<домен>
+#   домены страницы соцсетей (LINKS_SITES) — отдельный сайт из deploy/links (links-site.sh)
 
 name: sambo
 
@@ -66,9 +67,11 @@ services:
       DOMAIN: ${DOMAIN}
       # Без дополнительных доменов — заглушка только по http (сертификат для неё не запрашивается).
       REDIRECT_SITES: ${REDIRECT_SITES:-http://redirect.invalid}
+      LINKS_SITES: ${LINKS_SITES:-http://links.invalid}
     ports: ['80:80', '443:443', '443:443/udp']
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ../links:/srv/links:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [web, api, minio, mailpit]
