@@ -1,9 +1,10 @@
-// Тестовые спортсмены для пробного турнира на рабочем сайте: 40 вымышленных юношей и девушек 2012 г. р. (в 2026 году
-// им 14 по году рождения — подходят и в группу «12–14 лет», и в «14–16 лет»), привязанных к организации пользователя и
+// Тестовые спортсмены для пробного турнира на рабочем сайте (список — test-athletes-data.ts): 87 вымышленных юношей
+// 2012 г. р. (в 2026 году им 14 по году рождения — подходят и в группу «12–14 лет», и в «14–16 лет»), привязанных к организации пользователя и
 // к нему как к тренеру, если он тренер. Нет у пользователя клуба — создаётся «Тестовый клуб» (slug test-athletes-club),
 // пользователь в нём руководитель и тренер: без клуба спортсменов не заявить на турнир. У каждого спортсмена —
 // разряд и три согласия (без согласия на обработку ПДн заявка не принимается). Вес хранится не у спортсмена,
-// а в заявке: плановый вес и категория печатаются списком, их вводят при заявке или на взвешивании.
+// а в заявке: плановый вес и категория печатаются списком; заявить всех на турнир с этим весом —
+// apps/api/scripts/test-athletes-enter.ts.
 //
 // Запуск — deploy/server/test-athletes.sh. Режимы:
 //   add <email> [--org <часть названия>] [--apply] — без --apply только показывает, что будет сделано;
@@ -13,80 +14,22 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { type Prisma, PrismaClient } from '../generated/client';
 import { uuidv7 } from '../src/uuid';
+import {
+  MARK,
+  type TestAthlete,
+  TEST_ATHLETES as ATHLETES,
+  testBirthDate as birthDate,
+  testPublicId,
+} from './test-athletes-data';
 
 const envFile = path.resolve(__dirname, '..', '..', '..', '.env');
 if (existsSync(envFile)) process.loadEnvFile(envFile);
-
-const BASE58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-const MARK = 'TESTATHL';
-const testPublicId = (n: number): string => `${MARK}${BASE58[Math.floor(n / 58)]}${BASE58[n % 58]}ZZ`;
 
 /** Роли в организации, от которых добавляются спортсмены: руководитель клуба — первым. */
 const ORG_ROLES = ['CLUB_MANAGER', 'ORGANIZER', 'FEDERATION_ADMIN', 'COACH'];
 const TEST_CLUB = { slug: 'test-athletes-club', name: 'Тестовый клуб', shortName: 'Тестовый клуб' };
 const RANKS = ['YOUTH_1', 'SPORT_3', 'YOUTH_2', 'SPORT_2', 'YOUTH_1', 'SPORT_3', 'YOUTH_3'];
 
-interface TestAthlete {
-  lastName: string;
-  firstName: string;
-  middleName: string;
-  gender: 'MALE' | 'FEMALE';
-  /** Весовая категория (до, кг) — есть в обеих группах — и плановый вес. */
-  category: number;
-  weight: number;
-}
-
-// Юноши: 50 кг — 8, 55 кг — 7, 60 кг — 6, 66 кг — 4, 72 кг — 3. Девушки: 47 кг — 5, 51 кг — 4, 55 кг — 3.
-// Разное число в категориях — чтобы увидеть и полную сетку, и маленькую.
-const M = (lastName: string, firstName: string, middleName: string, category: number, weight: number) =>
-  ({ lastName, firstName, middleName, gender: 'MALE', category, weight }) as const;
-const F = (lastName: string, firstName: string, middleName: string, category: number, weight: number) =>
-  ({ lastName, firstName, middleName, gender: 'FEMALE', category, weight }) as const;
-
-const ATHLETES: TestAthlete[] = [
-  M('Абрамов', 'Никита', 'Сергеевич', 50, 49.2),
-  M('Белов', 'Артём', 'Игоревич', 50, 48.6),
-  M('Васильев', 'Егор', 'Дмитриевич', 50, 49.8),
-  M('Гаврилов', 'Матвей', 'Андреевич', 50, 47.3),
-  M('Данилов', 'Иван', 'Олегович', 50, 48.9),
-  M('Ершов', 'Тимофей', 'Павлович', 50, 46.8),
-  M('Жуков', 'Максим', 'Алексеевич', 50, 49.5),
-  M('Зайцев', 'Глеб', 'Викторович', 50, 47.9),
-  M('Ильин', 'Даниил', 'Романович', 55, 54.1),
-  M('Карпов', 'Кирилл', 'Евгеньевич', 55, 53.6),
-  M('Лебедев', 'Арсений', 'Николаевич', 55, 54.8),
-  M('Макаров', 'Лев', 'Константинович', 55, 52.4),
-  M('Назаров', 'Марк', 'Владимирович', 55, 54.3),
-  M('Осипов', 'Фёдор', 'Михайлович', 55, 51.7),
-  M('Павлов', 'Ярослав', 'Юрьевич', 55, 53.2),
-  M('Рябов', 'Михаил', 'Артёмович', 60, 59.4),
-  M('Семёнов', 'Александр', 'Ильич', 60, 58.7),
-  M('Тихонов', 'Роман', 'Сергеевич', 60, 59.9),
-  M('Уваров', 'Степан', 'Денисович', 60, 57.5),
-  M('Фролов', 'Савелий', 'Андреевич', 60, 58.2),
-  M('Харитонов', 'Захар', 'Петрович', 60, 56.9),
-  M('Царёв', 'Богдан', 'Олегович', 66, 65.3),
-  M('Чернов', 'Илья', 'Витальевич', 66, 64.6),
-  M('Шестаков', 'Георгий', 'Борисович', 66, 63.8),
-  M('Щербаков', 'Платон', 'Аркадьевич', 66, 65.9),
-  M('Юдин', 'Святослав', 'Григорьевич', 72, 71.2),
-  M('Яковлев', 'Демид', 'Станиславович', 72, 70.4),
-  M('Афанасьев', 'Всеволод', 'Валерьевич', 72, 69.1),
-  F('Борисова', 'Анна', 'Сергеевна', 47, 46.5),
-  F('Голубева', 'Мария', 'Андреевна', 47, 45.8),
-  F('Дмитриева', 'София', 'Игоревна', 47, 46.9),
-  F('Егорова', 'Алиса', 'Павловна', 47, 44.7),
-  F('Зуева', 'Виктория', 'Олеговна', 47, 46.2),
-  F('Киселёва', 'Полина', 'Дмитриевна', 51, 50.4),
-  F('Лапина', 'Варвара', 'Николаевна', 51, 49.6),
-  F('Морозова', 'Ева', 'Алексеевна', 51, 50.8),
-  F('Никитина', 'Дарья', 'Евгеньевна', 51, 48.3),
-  F('Орлова', 'Ксения', 'Романовна', 55, 54.2),
-  F('Попова', 'Вероника', 'Михайловна', 55, 53.5),
-  F('Романова', 'Елизавета', 'Викторовна', 55, 54.9),
-];
-
-const birthDate = (n: number): Date => new Date(Date.UTC(2012, (n * 5) % 12, ((n * 7) % 27) + 1));
 const today = new Date(new Date().toISOString().slice(0, 10));
 type Tx = Prisma.TransactionClient;
 const out = (line: string): boolean => process.stdout.write(`${line}\n`);
@@ -95,18 +38,21 @@ const fmtKg = (kg: number): string => kg.toFixed(1).replace('.', ',');
 
 function usage(): never {
   process.stderr.write(
-    'Использование: test-athletes.ts add <email> [--org <часть названия>] [--apply] | remove [--apply]\n',
+    'Использование: test-athletes.ts add <email> [--org <часть названия>] [--apply] | remove [--apply] | plan\n',
   );
   process.exit(2);
 }
 
 function printList(): void {
   out('\nСписок (вес вводится при заявке на турнир — у спортсмена его нет):');
-  ATHLETES.forEach((a, i) => {
+  const counts = new Map<number, number>();
+  for (const a of ATHLETES) counts.set(a.category, (counts.get(a.category) ?? 0) + 1);
+  out(`Весовые категории: ${[...counts].map(([c, k]) => `до ${c} кг — ${k}`).join(', ')}`);
+  ATHLETES.forEach((a) => {
     const name = `${a.lastName} ${a.firstName} ${a.middleName}`;
     const g = a.gender === 'MALE' ? 'юн.' : 'дев.';
     out(
-      `  ${String(i + 1).padStart(2)}. ${name.padEnd(38)} ${fmtDate(birthDate(i + 1))}  ${g.padEnd(4)}  до ${a.category} кг, вес ${fmtKg(a.weight)}`,
+      `  ${String(a.n).padStart(2)}. ${name.padEnd(38)} ${fmtDate(birthDate(a.n))}  ${g.padEnd(4)}  до ${a.category} кг, вес ${fmtKg(a.weight)}`,
     );
   });
 }
@@ -295,7 +241,7 @@ async function add(db: PrismaClient, email: string, orgFilter: string | null, ap
   await db.$transaction(
     async (tx) => {
       if (target.createClub) await createTestClub(tx, target);
-      for (const [i, a] of ATHLETES.entries()) await insertAthlete(tx, i + 1, a, target, templateIds);
+      for (const a of ATHLETES) await insertAthlete(tx, a.n, a, target, templateIds);
     },
     { timeout: 60_000 },
   );
@@ -369,6 +315,16 @@ async function removeTestClub(
   });
 }
 
+/** Плановый вес каждого тестового спортсмена (JSON) — вход команды enter (apps/api/scripts/test-athletes-enter.ts). */
+function printPlan(): void {
+  const plan = ATHLETES.map((a) => ({
+    publicId: testPublicId(a.n),
+    category: a.category,
+    weightGrams: Math.round(a.weight * 1000),
+  }));
+  out(JSON.stringify(plan));
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const apply = args.includes('--apply');
@@ -380,6 +336,7 @@ async function main(): Promise<void> {
   try {
     if (args[0] === 'add' && args[1] && !args[1].startsWith('--')) await add(db, args[1], orgFilter, apply);
     else if (args[0] === 'remove') await remove(db, apply);
+    else if (args[0] === 'plan') printPlan();
     else usage();
   } finally {
     await db.$disconnect();
