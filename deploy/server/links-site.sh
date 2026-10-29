@@ -73,7 +73,8 @@ fi
 step "Проверка https://$d"
 # Сертификат Let's Encrypt для нового сайта Caddy получает сам, обычно за несколько секунд.
 for _ in $(seq 1 12); do
-  if curl -fsS --max-time 10 -o /dev/null "https://$d/"; then
+  # Первые секунды Caddy ещё запускается — ошибки соединения не печатаются, проверка повторяется.
+  if curl -fs --max-time 10 -o /dev/null "https://$d/"; then
     step "Готово: https://$d — страница соцсетей"
     exit 0
   fi
