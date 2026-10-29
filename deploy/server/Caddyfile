@@ -36,6 +36,15 @@ www.{$DOMAIN}, {$REDIRECT_SITES} {
 	redir https://{$DOMAIN}{uri} permanent
 }
 
+# Страница соцсетей — отдельный сайт (LINKS_SITES из .env, например «digitalsambo.online, www.digitalsambo.online»;
+# включает links-site.sh). Статичные файлы из deploy/links, без сервисов платформы.
+{$LINKS_SITES} {
+	encode zstd gzip
+	root * /srv/links
+	file_server
+	header Cache-Control "public, max-age=300"
+}
+
 # Хранилище файлов: подпись presigned-ссылок включает хост, поэтому Host передаётся как есть (по умолчанию).
 s3.{$DOMAIN} {
 	request_body {
