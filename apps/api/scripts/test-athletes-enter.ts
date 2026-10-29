@@ -36,10 +36,11 @@ async function readPlan(): Promise<Map<string, PlanItem>> {
   return new Map(plan.map((p) => [p.publicId, p]));
 }
 
-const errorText = (e: unknown): string =>
-  e instanceof Error
-    ? `${e.message} ${JSON.stringify((e as { details?: unknown }).details ?? '')}`
-    : String(e);
+const errorText = (e: unknown): string => {
+  if (!(e instanceof Error)) return String(e);
+  const details = (e as { details?: unknown }).details;
+  return details === undefined ? e.message : `${e.message} ${JSON.stringify(details)}`;
+};
 
 async function main(): Promise<void> {
   const [email, competitionPart] = process.argv.slice(2).filter((a) => !a.startsWith('--'));
@@ -66,20 +67,24 @@ interface Choice {
   weightGrams: number;
 }
 
+/** Турнир по части названия: заявлять можно только в турнир с открытой регистрацией — отменённые и прошедшие не в счёт. */
 async function findCompetition(db: PrismaService, part: string): Promise<{ id: string; name: string }> {
-  const competitions = await db.competition.findMany({
+  const found = await db.competition.findMany({
     where: { name: { contains: part, mode: 'insensitive' } },
     select: { id: true, name: true, status: true },
   });
-  if (competitions.length !== 1) {
-    for (const c of competitions) out(`  ${c.name} (${c.status})`);
+  const open = found.filter((c) => c.status === 'REGISTRATION_OPEN');
+  if (open.length !== 1) {
+    for (const c of found) out(`  ${c.name} (${c.status})`);
     throw new Error(
-      competitions.length === 0
+      found.length === 0
         ? `Нет турнира, в названии которого есть «${part}».`
-        : 'Подходит несколько турниров — уточните название.',
+        : open.length === 0
+          ? 'Ни в одном из этих турниров регистрация не открыта.'
+          : 'Открытая регистрация у нескольких турниров — уточните название.',
     );
   }
-  const competition = competitions[0] as { id: string; name: string; status: string };
+  const competition = open[0] as { id: string; name: string; status: string };
   out(`Турнир: ${competition.name} (статус ${competition.status})`);
   return competition;
 }
