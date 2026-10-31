@@ -169,6 +169,36 @@ body {
   animation: sde-float 2s ease-in-out infinite;
 }
 
+/* Первый экран главной (правки 31.10.2026): медленное «дыхание» неподвижного кадра (на телефоне он и есть фон)
+   и полоса цветов самбо, которая вырастает под заголовком. */
+@keyframes sde-hero-drift {
+  from {
+    transform: scale(1.04);
+  }
+  to {
+    transform: scale(1.12) translateX(-1.5%);
+  }
+}
+
+@keyframes sde-hero-bar {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+.hero-still {
+  animation: sde-hero-drift 24s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.hero-bar {
+  transform-origin: left;
+  animation: sde-hero-bar 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
