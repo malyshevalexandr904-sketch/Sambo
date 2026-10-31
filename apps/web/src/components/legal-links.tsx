@@ -3,23 +3,22 @@
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 
-export function LegalLinks({ className }: { className?: string }) {
+export function LegalLinks({ className, tone }: { className?: string; tone?: 'onDark' }) {
   const t = useTranslations('legal');
+  // На тёмном фоне первого экрана главной — светлые ссылки.
+  const link = `inline-flex min-h-11 items-center underline ${tone === 'onDark' ? 'hover:text-white' : 'hover:text-slate-900'}`;
   return (
     <nav
       aria-label={t('nav')}
-      className={`flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600 ${className ?? ''}`}
+      className={`flex flex-wrap gap-x-4 gap-y-1 text-sm ${tone === 'onDark' ? 'text-white/70' : 'text-slate-600'} ${className ?? ''}`}
     >
-      <Link href="/terms" className="inline-flex min-h-11 items-center underline hover:text-slate-900">
+      <Link href="/terms" className={link}>
         {t('terms.title')}
       </Link>
-      <Link href="/privacy" className="inline-flex min-h-11 items-center underline hover:text-slate-900">
+      <Link href="/privacy" className={link}>
         {t('privacy.title')}
       </Link>
-      <Link
-        href="/personal-data-consent"
-        className="inline-flex min-h-11 items-center underline hover:text-slate-900"
-      >
+      <Link href="/personal-data-consent" className={link}>
         {t('consent.title')}
       </Link>
     </nav>
