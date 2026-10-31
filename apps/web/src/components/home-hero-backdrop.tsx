@@ -61,11 +61,11 @@ export function HomeHeroBackdrop() {
         <img
           src={POSTER}
           srcSet={`${POSTER_SMALL} 960w, ${POSTER} 1920w`}
-          sizes="100vw"
+          sizes="(max-aspect-ratio: 16/9) 178vh, 100vw"
           alt=""
           fetchPriority="high"
           decoding="async"
-          className={`absolute inset-0 h-full w-full object-cover object-[72%_center] ${playing ? '' : 'hero-still'}`}
+          className={`absolute inset-0 h-full w-full object-cover object-[86%_center] md:object-[72%_center] ${playing ? '' : 'hero-still'}`}
         />
         {src ? (
           <video
