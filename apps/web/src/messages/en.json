@@ -49,7 +49,10 @@
     "guestHint": "Look around the platform: the head, coach, athlete and referee roles are open for viewing without signing up.",
     "continue": "Continue",
     "openCabinet": "Open my account",
-    "aboutLink": "About the platform"
+    "aboutLink": "About the platform",
+    "eyebrow": "Tournaments · rating · refereeing",
+    "videoPause": "Pause background video",
+    "videoPlay": "Play background video"
   },
   "nav": {
     "dashboard": "My account",
