@@ -128,13 +128,17 @@ function CompetitionCard({ competition: c }: { competition: CompetitionSummary }
   );
 }
 
-/** Заметный призыв организации провести рейтинговый турнир у себя: кнопка заявки и «?» с описанием процесса. */
+/**
+ * Заметный призыв организации провести рейтинговый турнир у себя: кнопка заявки и «?» с описанием процесса.
+ * Фон — только оттенки 50, которые тёмная тема переворачивает в тёмные подложки: белый (`via-white`) в градиенте
+ * тема не меняет, и светлый текст на нём не читается.
+ */
 function HostingCta() {
   const t = useTranslations('competitions');
   return (
     <section
       aria-labelledby="hosting-cta-title"
-      className="mb-6 overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-amber-50 p-5 shadow-sm sm:p-6"
+      className="mb-6 overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-amber-50 p-5 shadow-sm sm:p-6"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">

@@ -100,9 +100,32 @@ describe('competition hosting requests', () => {
       manager,
       'post',
       '/api/v1/competition-requests',
-      request({ responsible: { kind: 'USER', email: 'nobody@example.com' } }),
+      request({ responsible: { kind: 'USER', userId: '0192f0c4-0000-7000-8000-00000000abcd' } }),
     );
-    expect(nobody.body.error.details.fields).toEqual([{ path: 'responsible.email', code: 'user_not_found' }]);
+    expect(nobody.body.error.details.fields).toEqual([
+      { path: 'responsible.userId', code: 'user_not_found' },
+    ]);
+
+    // Ответственного ищут по ФИО или почте: только активные, почта скрыта наполовину; тренер клуба искать не может.
+    const judge = await createUser(t, { email: 'glavsudya.petrov@example.com' });
+    await createUser(t, { email: 'glavsudya.blocked@example.com', status: 'BLOCKED' });
+    const search = await manager.agent
+      .get('/api/v1/competition-requests/responsible-candidates?q=glavsudya')
+      .expect(200);
+    expect(search.body.data).toEqual([
+      { id: judge.id, displayName: expect.any(String), maskedEmail: 'gl**************@example.com' },
+    ]);
+    await manager.agent.get('/api/v1/competition-requests/responsible-candidates?q=gl').expect(400);
+    const chosen = await submit({
+      name: 'Турнир с главным судьёй',
+      responsible: { kind: 'USER', userId: judge.id },
+    });
+    const chosenView = await admin.agent.get(`/api/v1/competition-requests/${chosen.id}`).expect(200);
+    expect(chosenView.body.data.proposal.responsible).toMatchObject({
+      kind: 'USER',
+      userId: judge.id,
+      email: 'glavsudya.petrov@example.com',
+    });
 
     // Тренер клуба заявку не подаёт; чужая организация её не видит.
     const coach = await login(
@@ -110,6 +133,7 @@ describe('competition hosting requests', () => {
       (await createUser(t, { orgs: [{ organizationId: clubId, role: 'COACH' }] })).email,
     );
     expect((await send(coach, 'post', '/api/v1/competition-requests', request())).status).toBe(403);
+    await coach.agent.get('/api/v1/competition-requests/responsible-candidates?q=test').expect(403);
     const otherClub = await createOrg(t);
     const other = await login(
       t,

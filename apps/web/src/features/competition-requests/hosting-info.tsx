@@ -24,7 +24,7 @@ function InfoDialog({
       <dialog
         ref={ref}
         aria-labelledby={`${id}-title`}
-        className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-lg border border-slate-200 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-slate-900/50"
+        className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-lg border border-slate-200 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-black/60"
         onClick={(e) => {
           // Щелчок по затемнению закрывает окно.
           if (e.target === ref.current) ref.current.close();
