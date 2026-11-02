@@ -13,6 +13,7 @@ import {
   HOSTING_MAX_MATS,
   type HostingAvailability,
   type HostingGender,
+  type ResponsibleCandidateDto,
   hostingRequirements,
 } from '@sde/contracts';
 import { Alert, Button, Card, CardTitle, cn, Field, Input, PageHeader, Textarea } from '@sde/ui';
@@ -29,6 +30,7 @@ import { pickName, qk } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 import { Choice, EquipmentList, RADIO, RefereeList, radioTone } from './form-parts';
 import { HostingProcessButton, HostingRulesLink } from './hosting-info';
+import { ResponsibleUserSearch } from './user-search';
 
 type ResponsibleKind = 'SELF' | 'USER' | 'CONTACT';
 
@@ -43,7 +45,7 @@ interface FormValues {
   refereeTeam: HostingAvailability | '';
   gender: HostingGender | '';
   responsible: ResponsibleKind;
-  responsibleEmail: string;
+  responsibleUser: ResponsibleCandidateDto | null;
   contactName: string;
   contactPhone: string;
   contactEmail: string;
@@ -87,7 +89,7 @@ export function CompetitionRequestForm() {
     refereeTeam: '',
     gender: '',
     responsible: 'SELF',
-    responsibleEmail: '',
+    responsibleUser: null,
     contactName: '',
     contactPhone: '',
     contactEmail: '',
@@ -99,11 +101,11 @@ export function CompetitionRequestForm() {
   /** Исправленное поле больше не подсвечивается ошибкой. */
   const ERROR_KEYS: Partial<Record<keyof FormValues, string[]>> = {
     date: ['startDate'],
-    responsibleEmail: ['responsible.email'],
+    responsibleUser: ['responsible.userId'],
     contactName: ['responsible.fullName'],
     contactPhone: ['responsible.phone'],
     contactEmail: ['responsible.phone', 'responsible.email'],
-    responsible: ['responsible.email', 'responsible.fullName', 'responsible.phone'],
+    responsible: ['responsible.userId', 'responsible.email', 'responsible.fullName', 'responsible.phone'],
   };
   const clearErrors = (keys: (keyof FormValues)[]): void =>
     setErrors((e) => {
@@ -139,7 +141,7 @@ export function CompetitionRequestForm() {
   };
 
   const responsibleBody = (): CompetitionRequestCreate['responsible'] => {
-    if (v.responsible === 'USER') return { kind: 'USER', email: v.responsibleEmail.trim() };
+    if (v.responsible === 'USER' && v.responsibleUser) return { kind: 'USER', userId: v.responsibleUser.id };
     if (v.responsible === 'CONTACT')
       return {
         kind: 'CONTACT',
@@ -160,7 +162,8 @@ export function CompetitionRequestForm() {
     if (!v.equipment) local.equipment = 'required';
     if (!v.refereeTeam) local.refereeTeam = 'required';
     if (!v.gender) local.gender = 'required';
-    if (v.responsible === 'USER' && !v.responsibleEmail.trim()) local['responsible.email'] = 'required';
+    if (v.responsible === 'USER' && !v.responsibleUser)
+      local['responsible.userId'] = 'responsible_not_chosen';
     if (v.responsible === 'CONTACT') {
       if (v.contactName.trim().length < 3) local['responsible.fullName'] = 'required';
       if (!v.contactPhone.trim() && !v.contactEmail.trim()) local['responsible.phone'] = 'contact_required';
@@ -375,21 +378,11 @@ export function CompetitionRequestForm() {
             label={(k) => tr(`responsibleKinds.${k}`)}
           />
           {v.responsible === 'USER' ? (
-            <Field
-              id="r-resp-email"
-              label={tr('responsibleEmail')}
-              hint={tr('responsibleEmailHint')}
-              error={tf(errors['responsible.email'])}
-              className="mt-4"
-            >
-              <Input
-                id="r-resp-email"
-                type="email"
-                autoComplete="off"
-                value={v.responsibleEmail}
-                onChange={set('responsibleEmail')}
-              />
-            </Field>
+            <ResponsibleUserSearch
+              value={v.responsibleUser}
+              onChange={(responsibleUser) => patch({ responsibleUser })}
+              error={tf(errors['responsible.userId'])}
+            />
           ) : null}
           {v.responsible === 'CONTACT' ? (
             <div className="mt-4 grid gap-4 sm:grid-cols-2">

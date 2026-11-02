@@ -454,7 +454,8 @@
     "too_many": "Too many",
     "contact_required": "Enter a phone or an email",
     "consent_required": "You need to accept the rules",
-    "user_not_found": "No user with this email"
+    "user_not_found": "No user with this email",
+    "responsible_not_chosen": "Choose a person from the list"
   },
   "errors": {
     "VALIDATION_FAILED": "Please check the form fields.",
@@ -3142,14 +3143,12 @@
     "equipment": "Equipment",
     "equipmentQuestion": "Equipment available",
     "equipmentListTitle": "Minimum for {mats, plural, one {# mat} other {# mats}}:",
-    "equipmentListNote": "Per mat: 1 laptop and 1 TV, plus stable Wi-Fi at the venue.",
     "laptops": "{n, plural, one {# laptop} other {# laptops}}",
     "tvs": "{n, plural, one {# TV} other {# TVs}}",
     "wifi": "stable Wi-Fi connection",
     "refereeTeam": "Referee team",
     "refereeTeamQuestion": "Referee team available",
     "refereeListTitle": "Minimum for {mats, plural, one {# mat} other {# mats}} and {groups, plural, one {# age category} other {# age categories}}:",
-    "refereeListNote": "Per age category per mat: a mat chief, an arbiter, a side judge and a timekeeper.",
     "matHeads": "{n, plural, one {# mat chief} other {# mat chiefs}}",
     "arbiters": "{n, plural, one {# arbiter} other {# arbiters}}",
     "sideJudges": "{n, plural, one {# side judge} other {# side judges}}",
@@ -3164,8 +3163,6 @@
       "USER": "A registered user",
       "CONTACT": "Enter contact details"
     },
-    "responsibleEmail": "User email",
-    "responsibleEmailHint": "The address the person registered with",
     "contactName": "Full name",
     "contactPhone": "Mobile phone",
     "contactPhoneHint": "Phone or email — at least one",
@@ -3174,7 +3171,13 @@
       "SELF": "Author of the request",
       "USER": "Registered user",
       "CONTACT": "Contact person"
-    }
+    },
+    "responsibleSearch": "Search by name or email",
+    "responsibleSearchHint": "Type at least three letters of the surname, name or email",
+    "responsibleSearching": "Searching…",
+    "responsibleSearchFailed": "Search failed, please try again",
+    "responsibleNotFound": "Nobody found. Check the spelling or enter contact details.",
+    "responsibleChange": "Change"
   },
   "divisions": {
     "title": "Divisions",

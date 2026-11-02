@@ -6,6 +6,8 @@ import {
   CompetitionRequestsQuery,
   type DataEnvelope,
   type Page,
+  type ResponsibleCandidateDto,
+  ResponsibleCandidatesQuery,
 } from '@sde/contracts';
 import { CurrentUser } from '../../../common/context/current-user';
 import type { AuthUser } from '../../../common/context/request-context';
@@ -29,6 +31,16 @@ export class CompetitionRequestsController {
     @ValidQuery(CompetitionRequestsQuery) q: CompetitionRequestsQuery,
   ): Promise<Page<CompetitionRequestDto>> {
     return this.requests.list(user, q);
+  }
+
+  /** Поиск ответственного за проведение среди зарегистрированных пользователей (по ФИО или почте). */
+  @Get('responsible-candidates')
+  @Authenticated()
+  async responsibleCandidates(
+    @CurrentUser() user: AuthUser,
+    @ValidQuery(ResponsibleCandidatesQuery) q: ResponsibleCandidatesQuery,
+  ): Promise<DataEnvelope<ResponsibleCandidateDto[]>> {
+    return ok(await this.requests.responsibleCandidates(user, q));
   }
 
   @Post()

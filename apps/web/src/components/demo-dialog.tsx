@@ -47,7 +47,7 @@ export function DemoBlockedDialog() {
     <dialog
       ref={ref}
       aria-labelledby="demo-dialog-text"
-      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-slate-200 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-slate-900/50"
+      className="m-auto w-[calc(100%-2rem)] max-w-md rounded-lg border border-slate-200 bg-white p-6 text-slate-900 shadow-xl backdrop:bg-black/60"
     >
       <p id="demo-dialog-text" className="text-lg font-semibold">
         {t('blocked')}

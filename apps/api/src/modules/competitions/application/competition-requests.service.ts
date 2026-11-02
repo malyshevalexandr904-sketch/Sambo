@@ -8,6 +8,9 @@ import {
   CompetitionRequestProposal,
   type HostingResponsible,
   hostingRequirements,
+  maskEmail,
+  type ResponsibleCandidateDto,
+  type ResponsibleCandidatesQuery,
   zonedToInstant,
   type CompetitionRequestAction,
   type CompetitionRequestCreate,
@@ -147,6 +150,46 @@ export class CompetitionRequestsService {
       (await this.policy.can(user, 'competition.request', await this.orgScopes.scopeOf(row.organizationId)));
     if (!platform && !own) throw new DomainError('NOT_FOUND', { resource: 'competition_request' });
     return this.toDto(row, await this.references([row]), this.actions(row, platform, own));
+  }
+
+  /**
+   * Поиск ответственного для формы заявки: активные пользователи, у которых имя в профиле, ФИО или почта содержат
+   * каждое слово запроса. Доступен тем, кто может подавать заявки; не больше 10 результатов, почта скрыта наполовину.
+   */
+  async responsibleCandidates(
+    user: AuthUser,
+    q: ResponsibleCandidatesQuery,
+  ): Promise<ResponsibleCandidateDto[]> {
+    const grants = await this.policy.grants(user);
+    const canRequest = grants.organizations.some((g) =>
+      g.roles.some((r) => ROLE_PERMISSIONS[r]['competition.request'] !== undefined),
+    );
+    if (!canRequest && !(await this.isPlatform(user))) throw new DomainError('FORBIDDEN');
+    const words = q.q.split(/\s+/).filter(Boolean).slice(0, 4);
+    const rows = await this.db.user.findMany({
+      where: {
+        deletedAt: null,
+        isDemo: false,
+        status: 'ACTIVE',
+        AND: words.map((w) => ({
+          OR: [
+            { displayName: { contains: w, mode: 'insensitive' as const } },
+            { email: { contains: w } },
+            { person: { lastName: { contains: w, mode: 'insensitive' as const } } },
+            { person: { firstName: { contains: w, mode: 'insensitive' as const } } },
+            { person: { middleName: { contains: w, mode: 'insensitive' as const } } },
+          ],
+        })),
+      },
+      orderBy: [{ displayName: 'asc' }, { id: 'asc' }],
+      take: 10,
+      select: { id: true, displayName: true, email: true },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      displayName: r.displayName,
+      maskedEmail: r.email ? maskEmail(r.email) : null,
+    }));
   }
 
   // ---------- Команды ----------
@@ -301,7 +344,7 @@ export class CompetitionRequestsService {
       throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'ageGroupIds', code: 'not_found' }] });
   }
 
-  /** Ответственный за проведение: сам автор, зарегистрированный пользователь по email или контактные данные. */
+  /** Ответственный за проведение: сам автор, найденный зарегистрированный пользователь или контактные данные. */
   private async responsible(
     tx: Tx,
     user: AuthUser,
@@ -309,12 +352,15 @@ export class CompetitionRequestsService {
   ): Promise<HostingResponsible> {
     if (input.kind === 'CONTACT') return input;
     const found = await tx.user.findFirst({
-      where: input.kind === 'SELF' ? { id: user.id } : { email: input.email, deletedAt: null },
+      where:
+        input.kind === 'SELF'
+          ? { id: user.id }
+          : { id: input.userId, deletedAt: null, isDemo: false, status: 'ACTIVE' },
       select: { id: true, displayName: true, email: true },
     });
     if (!found)
       throw new DomainError('VALIDATION_FAILED', {
-        fields: [{ path: 'responsible.email', code: 'user_not_found' }],
+        fields: [{ path: 'responsible.userId', code: 'user_not_found' }],
       });
     return {
       kind: input.kind,

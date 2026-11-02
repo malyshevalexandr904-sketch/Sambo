@@ -80,7 +80,6 @@ export function EquipmentList({ req, mats }: { req: HostingRequirements; mats: n
     <RequirementList
       title={t('equipmentListTitle', { mats })}
       items={[t('laptops', { n: req.laptops }), t('tvs', { n: req.tvs }), t('wifi')]}
-      note={t('equipmentListNote')}
     />
   );
 }
@@ -104,7 +103,6 @@ export function RefereeList({
         t('sideJudges', { n: req.sideJudges }),
         t('timekeepers', { n: req.timekeepers }),
       ]}
-      note={t('refereeListNote')}
     />
   );
 }

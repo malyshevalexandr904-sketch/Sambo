@@ -23,7 +23,8 @@ export const HOSTING_MAX_MATS = 20;
 
 /**
  * Минимальные требования к организатору: на один ковёр — ноутбук и телевизор (плюс устойчивый Wi-Fi на площадке);
- * на одну возрастную категорию на одном ковре — руководитель ковра, арбитр, боковой судья и секундометрист.
+ * на одну возрастную категорию на одном ковре — арбитр и боковой судья; руководитель ковра и секундометрист — по одному
+ * на ковёр, сколько бы ни было возрастных категорий (правка заказчика 02.11.2026).
  */
 export interface HostingRequirements {
   laptops: number;
@@ -42,10 +43,10 @@ export function hostingRequirements(mats: number, ageGroups: number): HostingReq
     laptops: m,
     tvs: m,
     wifi: true,
-    matHeads: crews,
+    matHeads: m,
     arbiters: crews,
     sideJudges: crews,
-    timekeepers: crews,
+    timekeepers: m,
   };
 }
 
@@ -53,11 +54,11 @@ const FullName = z.string().trim().min(3, { error: 'too_short' }).max(200, { err
 
 /**
  * Ответственный за проведение (для связи с администратором платформы): сам автор заявки, другой
- * зарегистрированный пользователь (по email) или контактные данные — ФИО и телефон или почта.
+ * зарегистрированный пользователь (найден поиском по ФИО или почте) или контактные данные — ФИО и телефон или почта.
  */
 export const HostingResponsibleInput = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('SELF') }),
-  z.object({ kind: z.literal('USER'), email: Email }),
+  z.object({ kind: z.literal('USER'), userId: Uuid }),
   z
     .object({
       kind: z.literal('CONTACT'),
@@ -158,6 +159,28 @@ export const CompetitionRequestCreate = z
       ctx.addIssue({ code: 'custom', path: [i.path], message: i.code });
   });
 export type CompetitionRequestCreate = z.infer<typeof CompetitionRequestCreate>;
+
+/** Поиск ответственного среди зарегистрированных пользователей: по ФИО или почте, от 3 символов. */
+export const ResponsibleCandidatesQuery = z.object({
+  q: z.string().trim().min(3, { error: 'too_short' }).max(100, { error: 'too_long' }),
+});
+export type ResponsibleCandidatesQuery = z.infer<typeof ResponsibleCandidatesQuery>;
+
+/** Найденный пользователь: имя и почта, скрытая наполовину (полностью её видит только платформа в заявке). */
+export interface ResponsibleCandidateDto {
+  id: string;
+  displayName: string;
+  maskedEmail: string | null;
+}
+
+/** «ivanov@mail.ru» → «iv****@mail.ru». */
+export function maskEmail(email: string): string {
+  const at = email.lastIndexOf('@');
+  if (at <= 0) return '***';
+  const local = email.slice(0, at);
+  const shown = local.slice(0, Math.min(2, Math.max(1, local.length - 1)));
+  return `${shown}${'*'.repeat(Math.max(3, local.length - shown.length))}${email.slice(at)}`;
+}
 
 export const CompetitionRequestReject = z.object({ reason: Reason });
 export type CompetitionRequestReject = z.infer<typeof CompetitionRequestReject>;

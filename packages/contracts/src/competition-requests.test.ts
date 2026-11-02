@@ -4,6 +4,7 @@ import {
   CompetitionRequestCreate,
   CompetitionRequestProposal,
   hostingRequirements,
+  maskEmail,
 } from './competition-requests.js';
 
 const ORG = '0192f0c4-0000-7000-8000-000000000001';
@@ -31,15 +32,15 @@ const fields = (body: unknown): string[] => {
 };
 
 describe('hostingRequirements', () => {
-  it('per mat: laptop and TV; per age group per mat: a full referee crew', () => {
+  it('per mat: laptop, TV, mat chief and timekeeper; per age group per mat: arbiter and side judge', () => {
     expect(hostingRequirements(3, 2)).toEqual({
       laptops: 3,
       tvs: 3,
       wifi: true,
-      matHeads: 6,
+      matHeads: 3,
       arbiters: 6,
       sideJudges: 6,
-      timekeepers: 6,
+      timekeepers: 3,
     });
   });
   it('no age group chosen yet counts as one', () => {
@@ -65,7 +66,7 @@ describe('CompetitionRequestCreate', () => {
     expect(fields({ ...valid, gender: 'ALL' })).toHaveLength(1);
   });
   it('the person in charge: a registered user by email or contacts with a phone or an email', () => {
-    expect(fields({ ...valid, responsible: { kind: 'USER', email: 'coach@example.com' } })).toEqual([]);
+    expect(fields({ ...valid, responsible: { kind: 'USER', userId: AG3 } })).toEqual([]);
     expect(
       fields({ ...valid, responsible: { kind: 'CONTACT', fullName: 'Иванов Иван', phone: '+79991234567' } }),
     ).toEqual([]);
@@ -88,5 +89,12 @@ describe('CompetitionRequestProposal', () => {
       disciplineCode: 'SPORT_SAMBO',
     });
     expect(old.success).toBe(true);
+  });
+});
+
+describe('maskEmail', () => {
+  it('hides most of the local part', () => {
+    expect(maskEmail('ivanov@mail.ru')).toBe('iv****@mail.ru');
+    expect(maskEmail('ab@x.ru')).toBe('a***@x.ru');
   });
 });
