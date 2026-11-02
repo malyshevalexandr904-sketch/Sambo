@@ -9,9 +9,7 @@ import {
   type CompetitionStatus,
   type CompetitionSummary,
   type CompetitionTransitionRequest,
-  isRoleCode,
   type Page,
-  ROLE_PERMISSIONS,
 } from '@sde/contracts';
 import { type Tx, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
@@ -373,39 +371,6 @@ export class CompetitionsService {
         confirmable: true,
       });
     return checks.warnings;
-  }
-
-  /**
-   * Руководитель турнира (TOURNAMENT_MANAGER) — автору одобренной заявки, если своей ролью в организации-организаторе
-   * он турниром не управляет (организатор управляет по наследованию, федерация и клуб — нет). Роль действует в
-   * кабинете «Судья»; права пересчитываются по новой версии пользователя.
-   */
-  async grantManagerIfNeeded(
-    tx: Tx,
-    competitionId: string,
-    organizationId: string,
-    userId: string,
-    grantedById: string,
-  ): Promise<boolean> {
-    const own = await tx.organizationMembership.findMany({
-      where: { organizationId, userId, status: 'ACTIVE' },
-      select: { role: { select: { code: true } } },
-    });
-    if (own.some((m) => isRoleCode(m.role.code) && ROLE_PERMISSIONS[m.role.code]['competition.update']))
-      return false;
-    const role = await tx.role.findUniqueOrThrow({ where: { code: 'TOURNAMENT_MANAGER' } });
-    await tx.competitionMembership.create({
-      data: {
-        id: uuidv7(),
-        competitionId,
-        userId,
-        roleId: role.id,
-        status: 'ACTIVE',
-        invitedById: grantedById,
-      },
-    });
-    await tx.user.update({ where: { id: userId }, data: { permissionsVersion: { increment: 1 } } });
-    return true;
   }
 
   /** Условия самого турнира: правила и сроки при публикации, новый срок при продлении регистрации. */

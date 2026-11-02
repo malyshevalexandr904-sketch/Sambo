@@ -12,13 +12,14 @@ import {
   type TestApp,
 } from './helpers/app';
 import { send } from './helpers/phase3';
-import { clubAthlete, isoDate } from './helpers/phase4';
+import { categoryTemplate, clubAthlete, isoDate } from './helpers/phase4';
 
 let t: TestApp;
 let admin: Session;
 let clubId: string;
 let manager: Session;
 let managerId: string;
+let ageGroupId: string;
 
 const day = 24 * 60 * 60 * 1000;
 
@@ -30,6 +31,7 @@ beforeAll(async () => {
   const m = await createUser(t, { orgs: [{ organizationId: clubId, role: 'CLUB_MANAGER' }] });
   managerId = m.id;
   manager = await login(t, m.email);
+  ({ ageGroupId } = await categoryTemplate(t));
 });
 afterAll(async () => {
   await t.close();
@@ -40,14 +42,15 @@ const request = (over: Record<string, unknown> = {}) => {
   return {
     organizationId: clubId,
     name: 'Кубок клуба по самбо',
-    level: 'CLUB',
-    disciplineCode: 'SPORT_SAMBO',
-    timezone: 'Europe/Moscow',
     startDate: isoDate(start),
-    endDate: isoDate(start),
-    registrationStartsAt: new Date(Date.now() - day).toISOString(),
-    registrationEndsAt: new Date(Date.now() + 20 * day).toISOString(),
-    expectedParticipants: 60,
+    address: 'г. Казань, ул. Спортивная, 1, СК «Олимп»',
+    ageGroupIds: [ageGroupId],
+    matCount: 2,
+    equipment: 'PARTIAL',
+    refereeTeam: 'NONE',
+    gender: 'SEPARATE',
+    responsible: { kind: 'SELF' },
+    rulesAccepted: true,
     comment: 'Просим двух судей категории ВК',
     ...over,
   };
@@ -76,12 +79,30 @@ describe('competition hosting requests', () => {
       manager,
       'post',
       '/api/v1/competition-requests',
-      request({ endDate: isoDate(new Date(Date.now() + 29 * day)) }),
+      request({ rulesAccepted: false, matCount: 0 }),
     );
     expect(bad.status).toBe(400);
     expect(bad.body.error.details.fields).toEqual(
-      expect.arrayContaining([{ path: 'endDate', code: 'end_before_start' }]),
+      expect.arrayContaining([
+        { path: 'rulesAccepted', code: 'consent_required' },
+        { path: 'matCount', code: 'required' },
+      ]),
     );
+    // Возрастная группа — только шаблон платформы; ответственный — зарегистрированный пользователь.
+    const foreign = await send(
+      manager,
+      'post',
+      '/api/v1/competition-requests',
+      request({ ageGroupIds: ['0192f0c4-0000-7000-8000-00000000abcd'] }),
+    );
+    expect(foreign.body.error.details.fields).toEqual([{ path: 'ageGroupIds', code: 'not_found' }]);
+    const nobody = await send(
+      manager,
+      'post',
+      '/api/v1/competition-requests',
+      request({ responsible: { kind: 'USER', email: 'nobody@example.com' } }),
+    );
+    expect(nobody.body.error.details.fields).toEqual([{ path: 'responsible.email', code: 'user_not_found' }]);
 
     // Тренер клуба заявку не подаёт; чужая организация её не видит.
     const coach = await login(
@@ -102,7 +123,18 @@ describe('competition hosting requests', () => {
     expect(adminView.body.data).toMatchObject({
       organization: { id: clubId },
       submittedBy: { id: managerId },
-      expectedParticipants: 60,
+      startDate: request().startDate,
+      endDate: request().startDate,
+      ageGroups: [{ id: ageGroupId, ageFrom: 12, ageTo: 13 }],
+      requirements: { laptops: 2, tvs: 2, matHeads: 2, arbiters: 2, sideJudges: 2, timekeepers: 2 },
+      proposal: {
+        address: 'г. Казань, ул. Спортивная, 1, СК «Олимп»',
+        matCount: 2,
+        equipment: 'PARTIAL',
+        refereeTeam: 'NONE',
+        gender: 'SEPARATE',
+        responsible: { kind: 'SELF', userId: managerId },
+      },
       comment: 'Просим двух судей категории ВК',
       allowedActions: ['approve', 'reject'],
     });
@@ -110,8 +142,9 @@ describe('competition hosting requests', () => {
     expect(pending.body.data.map((x: { id: string }) => x.id)).toContain(r.id);
   });
 
-  it('the platform approves: a rated draft for the organization, its author manages it; decided once', async () => {
-    const r = await submit({ name: 'Первенство клуба' });
+  it('the platform approves: a rated draft for the organization, managed by the platform; decided once', async () => {
+    const contact = { kind: 'CONTACT', fullName: 'Петров Пётр', phone: '+79991234567' };
+    const r = await submit({ name: 'Первенство клуба', responsible: contact });
     // Организация сама не одобряет.
     expect(
       (await send(manager, 'post', `/api/v1/competition-requests/${r.id}/approve`, {}, r.version)).status,
@@ -131,14 +164,18 @@ describe('competition hosting requests', () => {
       organizerOrganizationId: clubId,
     });
     expect(competition.ratingConfig).not.toBeNull();
-    // Руководитель клуба турниром по своей роли не управляет — он руководитель турнира.
-    const staff = await t.admin.competitionMembership.findMany({
-      where: { competitionId: competition.id },
-      include: { role: true },
-    });
-    expect(staff.map((s) => [s.userId, s.role.code, s.status])).toEqual([
-      [managerId, 'TOURNAMENT_MANAGER', 'ACTIVE'],
-    ]);
+    // Адрес и ответственный переходят в черновик; сроки регистрации — до начала дня турнира, их уточнит платформа.
+    expect(competition.descriptionMd).toContain('г. Казань, ул. Спортивная, 1');
+    expect(competition.contactInfo).toEqual({ name: 'Петров Пётр', phone: '+79991234567' });
+    expect(competition.registrationEndsAt.getTime()).toBeGreaterThan(
+      competition.registrationStartsAt.getTime(),
+    );
+    // Дальше турниром управляет платформа: автору заявки роль руководителя турнира не выдаётся.
+    const staff = await t.admin.competitionMembership.findMany({ where: { competitionId: competition.id } });
+    expect(staff).toEqual([]);
+    expect(
+      (await manager.agent.get(`/api/v1/competitions/${competition.id}`)).body.data?.allowedActions ?? [],
+    ).not.toContain('competition.update');
     const audit = await t.admin.auditLog.findFirstOrThrow({
       where: { action: 'competition_request.approved', entityId: r.id },
     });

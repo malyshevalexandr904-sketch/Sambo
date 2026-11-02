@@ -1,7 +1,7 @@
 'use client';
 // Заявка на проведение турнира: предложение организации и решение платформы. Одобрение создаёт черновик
 // рейтингового турнира — администратор продолжает подготовку на его странице (правила, категории, публикация).
-import type { CompetitionRequestDto, DataEnvelope } from '@sde/contracts';
+import type { CompetitionRequestDto, DataEnvelope, HostingResponsible } from '@sde/contracts';
 import { Alert, Button, Card, CardTitle, PageHeader } from '@sde/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
@@ -10,8 +10,10 @@ import { MarkdownLite } from '@/components/markdown-lite';
 import { formatDates, formatInZone } from '@/features/competitions/shared';
 import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
+import { pickName } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 import { RecruitmentSummary } from '@/features/competitions/recruitment';
+import { EquipmentList, RefereeList } from './form-parts';
 import { RequestStatusBadge } from './shared';
 
 export function CompetitionRequestDetail({ id }: { id: string }) {
@@ -75,18 +77,61 @@ function RequestView({ request: r }: { request: CompetitionRequestDto }) {
             <dd>{r.organization.name}</dd>
             <dt className="text-slate-600">{t('competitions.dates')}</dt>
             <dd>{formatDates(r.startDate, r.endDate, locale)}</dd>
-            <dt className="text-slate-600">{t('competitions.registrationStartsAt')}</dt>
-            <dd>{formatInZone(p.registrationStartsAt, p.timezone, locale)}</dd>
-            <dt className="text-slate-600">{t('competitions.registrationEndsAt')}</dt>
-            <dd>{formatInZone(p.registrationEndsAt, p.timezone, locale)}</dd>
-            <dt className="text-slate-600">{t('competitions.level')}</dt>
-            <dd>{t(`competitions.levels.${r.level}`)}</dd>
-            <dt className="text-slate-600">{t('competitions.venue')}</dt>
-            <dd>
-              {r.venue
-                ? [r.venue.name, r.venue.city, r.venue.address].filter(Boolean).join(', ')
-                : t('competitionRequests.noVenue')}
-            </dd>
+            {p.address ? (
+              <>
+                <dt className="text-slate-600">{t('competitionRequests.address')}</dt>
+                <dd className="whitespace-pre-line">{p.address}</dd>
+              </>
+            ) : (
+              <>
+                <dt className="text-slate-600">{t('competitions.venue')}</dt>
+                <dd>
+                  {r.venue
+                    ? [r.venue.name, r.venue.city, r.venue.address].filter(Boolean).join(', ')
+                    : t('competitionRequests.noVenue')}
+                </dd>
+              </>
+            )}
+            {r.ageGroups.length > 0 ? (
+              <>
+                <dt className="text-slate-600">{t('competitionRequests.ageGroups')}</dt>
+                <dd>{r.ageGroups.map((g) => pickName(g.name, locale)).join(', ')}</dd>
+              </>
+            ) : null}
+            {p.gender ? (
+              <>
+                <dt className="text-slate-600">{t('competitionRequests.gender')}</dt>
+                <dd>{t(`competitionRequests.genders.${p.gender}`)}</dd>
+              </>
+            ) : null}
+            {p.matCount ? (
+              <>
+                <dt className="text-slate-600">{t('competitionRequests.matCount')}</dt>
+                <dd>{p.matCount}</dd>
+              </>
+            ) : null}
+            {p.equipment ? (
+              <>
+                <dt className="text-slate-600">{t('competitionRequests.equipment')}</dt>
+                <dd>{t(`competitionRequests.availability.${p.equipment}`)}</dd>
+              </>
+            ) : null}
+            {p.refereeTeam ? (
+              <>
+                <dt className="text-slate-600">{t('competitionRequests.refereeTeam')}</dt>
+                <dd>{t(`competitionRequests.availability.${p.refereeTeam}`)}</dd>
+              </>
+            ) : null}
+            {p.registrationStartsAt && p.registrationEndsAt ? (
+              <>
+                <dt className="text-slate-600">{t('competitions.registrationStartsAt')}</dt>
+                <dd>{formatInZone(p.registrationStartsAt, p.timezone, locale)}</dd>
+                <dt className="text-slate-600">{t('competitions.registrationEndsAt')}</dt>
+                <dd>{formatInZone(p.registrationEndsAt, p.timezone, locale)}</dd>
+                <dt className="text-slate-600">{t('competitions.level')}</dt>
+                <dd>{t(`competitions.levels.${r.level}`)}</dd>
+              </>
+            ) : null}
             {r.expectedParticipants ? (
               <>
                 <dt className="text-slate-600">{t('competitionRequests.expectedParticipants')}</dt>
@@ -112,6 +157,14 @@ function RequestView({ request: r }: { request: CompetitionRequestDto }) {
             </p>
           ) : null}
         </Card>
+        {p.responsible ? <ResponsibleCard responsible={p.responsible} /> : null}
+        {r.requirements && p.matCount ? (
+          <Card>
+            <CardTitle>{t('competitionRequests.requirements')}</CardTitle>
+            <EquipmentList req={r.requirements} mats={p.matCount} />
+            <RefereeList req={r.requirements} mats={p.matCount} groups={r.ageGroups.length} />
+          </Card>
+        ) : null}
         <RecruitmentSummary positions={p.refereeRecruitment ?? []} />
         {r.allowedActions.length > 0 ? (
           <div className="flex flex-wrap items-start gap-3">
@@ -151,5 +204,34 @@ function RequestView({ request: r }: { request: CompetitionRequestDto }) {
         ) : null}
       </div>
     </>
+  );
+}
+
+/** Ответственный за проведение — с кем связывается администратор платформы. */
+function ResponsibleCard({ responsible: r }: { responsible: HostingResponsible }) {
+  const t = useTranslations('competitionRequests');
+  const name = r.kind === 'CONTACT' ? r.fullName : r.displayName;
+  return (
+    <Card>
+      <CardTitle>{t('responsible')}</CardTitle>
+      <p className="text-sm text-slate-600">{t(`responsibleShown.${r.kind}`)}</p>
+      <p className="mt-2 font-medium">{name}</p>
+      <ul className="mt-1 text-sm">
+        {r.phone ? (
+          <li>
+            <a className="text-blue-700 underline" href={`tel:${r.phone}`}>
+              {r.phone}
+            </a>
+          </li>
+        ) : null}
+        {r.email ? (
+          <li>
+            <a className="text-blue-700 underline" href={`mailto:${r.email}`}>
+              {r.email}
+            </a>
+          </li>
+        ) : null}
+      </ul>
+    </Card>
   );
 }

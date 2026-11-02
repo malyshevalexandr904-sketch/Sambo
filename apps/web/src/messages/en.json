@@ -449,7 +449,12 @@
     "rated_seeding_by_rating": "In the rated format seeding comes from ratings and cannot be set manually",
     "invalid_season_code": "The season code takes Latin letters, digits, dots, hyphens or underscores, up to 20 characters",
     "season_dates_invalid": "The season ends before it starts",
-    "email_taken": "This email is already registered — sign in or reset your password"
+    "email_taken": "This email is already registered — sign in or reset your password",
+    "too_short": "Too short",
+    "too_many": "Too many",
+    "contact_required": "Enter a phone or an email",
+    "consent_required": "You need to accept the rules",
+    "user_not_found": "No user with this email"
   },
   "errors": {
     "VALIDATION_FAILED": "Please check the form fields.",
@@ -1287,7 +1292,9 @@
       "formatHint": "The rated tournament group scheme will be added at the next stage.",
       "allRated": "All competitions on the platform are rated: confirmed bouts change the Elo rating. There is one format: rating-based groups with snake seeding and a playoff."
     },
-    "requestCreate": "Request to host"
+    "requestCreate": "Apply to host a tournament",
+    "hostingCtaTitle": "Want to host a rated tournament at your venue?",
+    "hostingCtaText": "Bring the region’s young sambo athletes to your mats: apply now — we help with refereeing, electronic draws and live results, and every bout counts towards the official rating."
   },
   "applications": {
     "cardTitle": "Competition application",
@@ -3070,7 +3077,7 @@
     "hintReviewer": "Organizations’ requests to host competitions. Approval creates a draft rated competition.",
     "new": "Submit a request",
     "newTitle": "Request to host a competition",
-    "newHint": "Give the name, dates and venue. The platform administrator reviews the request and creates the competition.",
+    "newHint": "Fill in the form: the platform administrator reviews the request and contacts the person in charge to clarify the details.",
     "formatNote": "All competitions are rated and use one format: rating-based groups with snake seeding and a playoff.",
     "organization": "Organizing organization",
     "expectedParticipants": "Expected number of participants",
@@ -3092,7 +3099,7 @@
     "loadMore": "Show more",
     "fromOrganization": "Request from “{name}”",
     "approvedTitle": "Request approved",
-    "approvedText": "The competition was created as a draft: the administrator prepares rules, categories and publication.",
+    "approvedText": "The tournament is created as a draft and is now managed by the platform administrator, who clarifies details with the person in charge and prepares registration, categories and publication.",
     "openCompetition": "Open competition",
     "rejectedTitle": "Request rejected",
     "proposal": "Organization’s proposal",
@@ -3101,7 +3108,73 @@
     "approve": "Approve and create competition",
     "reject": "Reject",
     "rejectTitle": "Reject request",
-    "withdraw": "Withdraw request"
+    "withdraw": "Withdraw request",
+    "processTitle": "How a tournament with a third-party host works",
+    "processText": "1. You submit a request: name, date, address, age categories, mats, equipment, referees and the person in charge.\n\n2. The platform administrator reviews and approves the request.\n\n3. After approval the platform administrator runs the preparation: contacts the person in charge, sets registration and weigh-in dates, categories and rules, and publishes the tournament.\n\n4. On the day each mat has a laptop and a TV scoreboard, referees score bouts in the system and results go straight into the athletes’ rating.\n\nA detailed description will appear here soon.",
+    "rulesTitle": "Rules for tournament hosting requests",
+    "rulesText": "1. The request is submitted by the head of the organization or an authorized employee; the information must be accurate.\n\n2. Submitting a request does not guarantee the tournament: the Digital Sambo platform administrator decides.\n\n3. After approval the platform administrator prepares and publishes the tournament; the host provides the venue, equipment and referee team as agreed.\n\n4. The person in charge must be reachable to clarify details.\n\nThe full rules will appear here soon.",
+    "rulesConsent": "I have read and accept the <rules>rules for tournament hosting requests</rules> of Digital Sambo",
+    "fullName": "Full tournament name",
+    "fullNameHint": "For example: “Sambo-70 open youth sambo championship”",
+    "date": "Tournament date",
+    "dateHint": "The tournament day. Registration and weigh-in dates are set later.",
+    "address": "Venue",
+    "addressHint": "Full address: city, street, building, venue name",
+    "matCount": "Number of mats",
+    "matCountHint": "Mats available for the tournament (up to 20)",
+    "participants": "Participants",
+    "ageGroups": "Age categories",
+    "ageGroupsHint": "Choose one or two template categories (at most {max}).",
+    "ageGroupsEmpty": "No template age categories yet — describe the ages in the comment.",
+    "ages": "{from}–{to} y.o.",
+    "gender": "Participants",
+    "genders": {
+      "BOYS": "Boys only",
+      "GIRLS": "Girls only",
+      "MIXED": "Boys and girls together",
+      "SEPARATE": "Boys and girls separately"
+    },
+    "availability": {
+      "FULL": "Full",
+      "PARTIAL": "Partial",
+      "NONE": "None"
+    },
+    "equipment": "Equipment",
+    "equipmentQuestion": "Equipment available",
+    "equipmentListTitle": "Minimum for {mats, plural, one {# mat} other {# mats}}:",
+    "equipmentListNote": "Per mat: 1 laptop and 1 TV, plus stable Wi-Fi at the venue.",
+    "laptops": "{n, plural, one {# laptop} other {# laptops}}",
+    "tvs": "{n, plural, one {# TV} other {# TVs}}",
+    "wifi": "stable Wi-Fi connection",
+    "refereeTeam": "Referee team",
+    "refereeTeamQuestion": "Referee team available",
+    "refereeListTitle": "Minimum for {mats, plural, one {# mat} other {# mats}} and {groups, plural, one {# age category} other {# age categories}}:",
+    "refereeListNote": "Per age category per mat: a mat chief, an arbiter, a side judge and a timekeeper.",
+    "matHeads": "{n, plural, one {# mat chief} other {# mat chiefs}}",
+    "arbiters": "{n, plural, one {# arbiter} other {# arbiters}}",
+    "sideJudges": "{n, plural, one {# side judge} other {# side judges}}",
+    "timekeepers": "{n, plural, one {# timekeeper} other {# timekeepers}}",
+    "needMats": "Enter the number of mats — the list is calculated automatically.",
+    "requirements": "Minimum requirements for the host",
+    "responsible": "Person in charge",
+    "responsibleHint": "The platform administrator will contact this person to clarify the tournament details.",
+    "responsibleQuestion": "Who is in charge",
+    "responsibleKinds": {
+      "SELF": "Me",
+      "USER": "A registered user",
+      "CONTACT": "Enter contact details"
+    },
+    "responsibleEmail": "User email",
+    "responsibleEmailHint": "The address the person registered with",
+    "contactName": "Full name",
+    "contactPhone": "Mobile phone",
+    "contactPhoneHint": "Phone or email — at least one",
+    "fixErrors": "Check the highlighted fields.",
+    "responsibleShown": {
+      "SELF": "Author of the request",
+      "USER": "Registered user",
+      "CONTACT": "Contact person"
+    }
   },
   "divisions": {
     "title": "Divisions",
@@ -3235,7 +3308,7 @@
           },
           "f3": {
             "title": "Request to host a tournament",
-            "text": "Submit a request and, once approved, create the tournament: regulations, categories, rules and referee requirements."
+            "text": "Submit a request: date, address, mats, equipment and referees. Once approved, the platform administrator contacts you and prepares the tournament."
           },
           "f4": {
             "title": "Notifications",

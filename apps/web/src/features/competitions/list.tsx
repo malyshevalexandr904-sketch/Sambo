@@ -11,6 +11,7 @@ import { Link } from '@/i18n/navigation';
 import { hasAnywhere, platformHas } from '@/lib/access';
 import { api } from '@/lib/api';
 import { qk, useMe } from '@/lib/queries';
+import { HostingProcessButton } from '@/features/competition-requests/hosting-info';
 import { CompetitionTypeBadge } from './rating-card';
 import { CompetitionStatusBadge, formatDates, formatInZone } from './shared';
 
@@ -21,6 +22,8 @@ export function CompetitionsList() {
   const { data: me } = useMe();
   const canCreate = platformHas(me, 'competition.create_rated');
   const canRequest = hasAnywhere(me, 'competition.request');
+  // Призыв подать заявку — только в роли «Руководитель организации» (описание процесса, 02.11.2026, п. 1).
+  const showHostingCta = canRequest && me?.activeRole === 'ORGANIZATION_HEAD';
   const staff = hasAnywhere(me, 'competition.view') || canCreate || canRequest;
   const [scope, setScope] = useState<Scope>(staff ? 'mine' : 'open');
   const params = {
@@ -50,16 +53,10 @@ export function CompetitionsList() {
             >
               {t('create')}
             </Link>
-          ) : canRequest ? (
-            <Link
-              href="/competition-requests/new"
-              className="inline-flex min-h-11 items-center rounded-md bg-blue-700 px-4 font-medium text-white hover:bg-blue-800"
-            >
-              {t('requestCreate')}
-            </Link>
           ) : null
         }
       />
+      {showHostingCta ? <HostingCta /> : null}
       <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label={t('title')}>
         {scopes.map((s) => (
           <Button
@@ -128,5 +125,34 @@ function CompetitionCard({ competition: c }: { competition: CompetitionSummary }
         </p>
       ) : null}
     </Card>
+  );
+}
+
+/** Заметный призыв организации провести рейтинговый турнир у себя: кнопка заявки и «?» с описанием процесса. */
+function HostingCta() {
+  const t = useTranslations('competitions');
+  return (
+    <section
+      aria-labelledby="hosting-cta-title"
+      className="mb-6 overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-amber-50 p-5 shadow-sm sm:p-6"
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <h2 id="hosting-cta-title" className="text-lg font-semibold text-slate-900 sm:text-xl">
+            {t('hostingCtaTitle')}
+          </h2>
+          <p className="mt-1 text-sm text-slate-700">{t('hostingCtaText')}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          <Link
+            href="/competition-requests/new"
+            className="inline-flex min-h-12 flex-1 items-center justify-center rounded-lg bg-blue-700 px-5 py-2 text-center text-base font-semibold text-white shadow-md ring-2 ring-blue-700/20 transition hover:bg-blue-800 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-700"
+          >
+            {t('requestCreate')}
+          </Link>
+          <HostingProcessButton />
+        </div>
+      </div>
+    </section>
   );
 }
