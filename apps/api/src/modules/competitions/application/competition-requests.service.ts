@@ -4,7 +4,11 @@
 // заявку, пока её не рассмотрели. Каждая команда — одна транзакция с записью аудита.
 import { Injectable } from '@nestjs/common';
 import {
+  type CompetitionCreate,
   CompetitionRequestProposal,
+  type HostingResponsible,
+  hostingRequirements,
+  zonedToInstant,
   type CompetitionRequestAction,
   type CompetitionRequestCreate,
   type CompetitionRequestDto,
@@ -33,6 +37,59 @@ const INCLUDE = {
 type Row = Prisma.CompetitionRequestGetPayload<{ include: typeof INCLUDE }>;
 
 const dateOnly = (d: Date): string => d.toISOString().slice(0, 10);
+
+const DEFAULT_TIMEZONE = 'Europe/Moscow';
+const DEFAULT_DISCIPLINE = 'SPORT_SAMBO';
+
+interface References {
+  venues: Map<string, CompetitionRequestDto['venue']>;
+  ageGroups: Map<string, CompetitionRequestDto['ageGroups'][number]>;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Черновик турнира по заявке. У новых заявок нет окна регистрации — его уточняет платформа после одобрения; до этого
+ * в черновике окно от «сейчас» до начала дня турнира (проверка сроков — при публикации). Адрес и ответственный
+ * переносятся в описание и контакты турнира.
+ */
+export function draftFromProposal(
+  p: CompetitionRequestProposal,
+  organizerOrganizationId: string,
+  now: Date,
+): Omit<CompetitionCreate, 'competitionType'> {
+  const endsAt = p.registrationEndsAt ?? zonedToInstant(`${p.startDate}T00:00`, p.timezone);
+  const startsAt =
+    p.registrationStartsAt ?? new Date(Math.min(now.getTime(), Date.parse(endsAt) - DAY_MS)).toISOString();
+  const r = p.responsible;
+  const contact =
+    p.contactInfo ??
+    (r
+      ? {
+          name: r.kind === 'CONTACT' ? r.fullName : r.displayName,
+          ...(r.email ? { email: r.email } : {}),
+          ...(r.phone ? { phone: r.phone } : {}),
+        }
+      : undefined);
+  const description =
+    p.descriptionMd ?? (p.address ? `**Место проведения:** ${p.address.replace(/[*_`#]/g, '')}` : undefined);
+  return {
+    name: p.name,
+    shortName: p.shortName,
+    venueId: p.venueId,
+    timezone: p.timezone,
+    startDate: p.startDate,
+    endDate: p.endDate,
+    registrationStartsAt: startsAt,
+    registrationEndsAt: endsAt,
+    level: p.level,
+    disciplineCode: p.disciplineCode,
+    descriptionMd: description,
+    contactInfo: contact,
+    refereeRecruitment: p.refereeRecruitment,
+    organizerOrganizationId,
+  };
+}
 
 @Injectable()
 export class CompetitionRequestsService {
@@ -72,12 +129,12 @@ export class CompetitionRequestsService {
       take: q.limit + 1,
       include: INCLUDE,
     });
-    const venues = await this.venues(rows);
+    const refs = await this.references(rows);
     return toPage(
       rows,
       q.limit,
       (r) => ({ k: r.id, id: r.id }),
-      (r) => this.toDto(r, venues, this.actions(r, platform, !platform)),
+      (r) => this.toDto(r, refs, this.actions(r, platform, !platform)),
     );
   }
 
@@ -89,7 +146,7 @@ export class CompetitionRequestsService {
       !platform &&
       (await this.policy.can(user, 'competition.request', await this.orgScopes.scopeOf(row.organizationId)));
     if (!platform && !own) throw new DomainError('NOT_FOUND', { resource: 'competition_request' });
-    return this.toDto(row, await this.venues([row]), this.actions(row, platform, own));
+    return this.toDto(row, await this.references([row]), this.actions(row, platform, own));
   }
 
   // ---------- Команды ----------
@@ -99,11 +156,27 @@ export class CompetitionRequestsService {
     await this.policy.assert(user, 'competition.request', scope);
     if (!scope.visibleToAll)
       throw new DomainError('ORGANIZATION_NOT_ACTIVE', { organizationId: input.organizationId });
-    const { organizationId, expectedParticipants, comment, ...rest } = input;
-    const proposal = CompetitionRequestProposal.parse(rest);
+    const { organizationId, comment } = input;
     const id = await this.db.tx(async (tx) => {
-      await this.refs.assertDiscipline(tx, proposal.disciplineCode);
-      if (proposal.venueId) await this.refs.assertVenue(tx, proposal.venueId, organizationId);
+      await this.assertTemplateAgeGroups(tx, input.ageGroupIds);
+      const responsible = await this.responsible(tx, user, input.responsible);
+      const proposal: CompetitionRequestProposal = CompetitionRequestProposal.parse({
+        name: input.name,
+        startDate: input.startDate,
+        endDate: input.endDate ?? input.startDate,
+        // Часовой пояс, уровень и дисциплину, сроки регистрации и взвешивания уточняет платформа после одобрения.
+        timezone: DEFAULT_TIMEZONE,
+        level: 'CLUB',
+        disciplineCode: DEFAULT_DISCIPLINE,
+        address: input.address,
+        ageGroupIds: input.ageGroupIds,
+        matCount: input.matCount,
+        equipment: input.equipment,
+        refereeTeam: input.refereeTeam,
+        gender: input.gender,
+        responsible,
+        rulesAcceptedAt: new Date().toISOString(),
+      });
       const created = await tx.competitionRequest.create({
         data: {
           id: uuidv7(),
@@ -113,7 +186,7 @@ export class CompetitionRequestsService {
           startDate: toDate(proposal.startDate),
           endDate: toDate(proposal.endDate),
           proposal,
-          expectedParticipants: expectedParticipants ?? null,
+          expectedParticipants: null,
           comment: comment || null,
         },
       });
@@ -122,7 +195,13 @@ export class CompetitionRequestsService {
         entityType: 'CompetitionRequest',
         entityId: created.id,
         organizationId,
-        after: { name: proposal.name, startDate: proposal.startDate, endDate: proposal.endDate },
+        after: {
+          name: proposal.name,
+          startDate: proposal.startDate,
+          matCount: input.matCount,
+          ageGroupIds: input.ageGroupIds,
+          rulesAccepted: true,
+        },
       });
       return created.id;
     });
@@ -171,9 +250,9 @@ export class CompetitionRequestsService {
   }
 
   /**
-   * Одобрение: черновик рейтингового турнира по предложению организации, организатор — она же; автор заявки ведёт
-   * турнир (при необходимости — руководителем турнира). Сроки, место и правила соревнований правятся уже в турнире;
-   * проверка сроков — при публикации.
+   * Одобрение (описание процесса, 02.11.2026, п. 5–6): черновик рейтингового турнира по заявке, организатор —
+   * организация заявки; дальше турниром управляет администратор платформы — он связывается с ответственным и уточняет
+   * сроки регистрации, взвешивания, категории и правила. Отдельная роль руководителя турнира автору не выдаётся.
    */
   async approve(user: AuthUser, id: string, version: number): Promise<CompetitionRequestDto> {
     await this.policy.assert(user, 'competition.create_rated', { kind: 'PLATFORM' });
@@ -186,23 +265,9 @@ export class CompetitionRequestsService {
       const competitionId = await this.competitions.insert(
         tx,
         user,
-        { ...proposal, organizerOrganizationId: row.organizationId },
+        draftFromProposal(proposal, row.organizationId, new Date()),
         { requestId: id },
       );
-      const submitter = await tx.competitionRequest.findUniqueOrThrow({
-        where: { id },
-        select: { submittedById: true },
-      });
-      // Автор заявки ведёт свой турнир: руководитель турнира, если ролью в организации он им не управляет.
-      const manager = submitter.submittedById
-        ? await this.competitions.grantManagerIfNeeded(
-            tx,
-            competitionId,
-            row.organizationId,
-            submitter.submittedById,
-            user.id,
-          )
-        : false;
       await this.decide(tx, id, 'APPROVED', user.id, null, competitionId);
       await this.audit.record(tx, {
         action: 'competition_request.approved',
@@ -211,7 +276,7 @@ export class CompetitionRequestsService {
         organizationId: row.organizationId,
         competitionId,
         before: { status: 'SUBMITTED' },
-        after: { status: 'APPROVED', competitionId, managerGranted: manager },
+        after: { status: 'APPROVED', competitionId },
         platformIntervention: true,
       });
     });
@@ -219,6 +284,45 @@ export class CompetitionRequestsService {
   }
 
   // ---------- Внутреннее ----------
+
+  /**
+   * Возрастные группы заявки — только шаблоны платформы (без организации-владельца). Без групп заявку можно подать,
+   * только пока у платформы нет ни одного шаблона.
+   */
+  private async assertTemplateAgeGroups(tx: Tx, ids: string[]): Promise<void> {
+    const where = { deletedAt: null, ownerOrganizationId: null, disciplineCode: DEFAULT_DISCIPLINE };
+    if (ids.length === 0) {
+      if ((await tx.ageGroup.count({ where })) > 0)
+        throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'ageGroupIds', code: 'required' }] });
+      return;
+    }
+    const found = await tx.ageGroup.count({ where: { ...where, id: { in: ids } } });
+    if (found !== ids.length)
+      throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'ageGroupIds', code: 'not_found' }] });
+  }
+
+  /** Ответственный за проведение: сам автор, зарегистрированный пользователь по email или контактные данные. */
+  private async responsible(
+    tx: Tx,
+    user: AuthUser,
+    input: CompetitionRequestCreate['responsible'],
+  ): Promise<HostingResponsible> {
+    if (input.kind === 'CONTACT') return input;
+    const found = await tx.user.findFirst({
+      where: input.kind === 'SELF' ? { id: user.id } : { email: input.email, deletedAt: null },
+      select: { id: true, displayName: true, email: true },
+    });
+    if (!found)
+      throw new DomainError('VALIDATION_FAILED', {
+        fields: [{ path: 'responsible.email', code: 'user_not_found' }],
+      });
+    return {
+      kind: input.kind,
+      userId: found.id,
+      displayName: found.displayName,
+      ...(found.email ? { email: found.email } : {}),
+    };
+  }
 
   private async require(id: string): Promise<{ organizationId: string }> {
     const row = await this.db.competitionRequest.findUnique({
@@ -274,28 +378,45 @@ export class CompetitionRequestsService {
     return actions;
   }
 
-  private async venues(rows: Row[]): Promise<Map<string, CompetitionRequestDto['venue']>> {
-    const ids = [
-      ...new Set(
-        rows
-          .map((r) => CompetitionRequestProposal.safeParse(r.proposal))
-          .flatMap((p) => (p.success && p.data.venueId ? [p.data.venueId] : [])),
+  /** Площадки старых заявок и возрастные группы новых — одним запросом на страницу. */
+  private async references(rows: Row[]): Promise<References> {
+    const proposals = rows
+      .map((r) => CompetitionRequestProposal.safeParse(r.proposal))
+      .flatMap((p) => (p.success ? [p.data] : []));
+    const venueIds = [...new Set(proposals.flatMap((p) => (p.venueId ? [p.venueId] : [])))];
+    const groupIds = [...new Set(proposals.flatMap((p) => p.ageGroupIds ?? []))];
+    const [venues, groups] = await Promise.all([
+      venueIds.length
+        ? this.db.venue.findMany({
+            where: { id: { in: venueIds } },
+            select: { id: true, name: true, address: true, city: true },
+          })
+        : [],
+      groupIds.length
+        ? this.db.ageGroup.findMany({
+            where: { id: { in: groupIds } },
+            select: { id: true, nameRu: true, nameEn: true, ageFrom: true, ageTo: true },
+          })
+        : [],
+    ]);
+    return {
+      venues: new Map(venues.map((v) => [v.id, v])),
+      ageGroups: new Map(
+        groups.map((g) => [
+          g.id,
+          { id: g.id, name: { ru: g.nameRu, en: g.nameEn }, ageFrom: g.ageFrom, ageTo: g.ageTo },
+        ]),
       ),
-    ];
-    if (ids.length === 0) return new Map();
-    const venues = await this.db.venue.findMany({
-      where: { id: { in: ids } },
-      select: { id: true, name: true, address: true, city: true },
-    });
-    return new Map(venues.map((v) => [v.id, v]));
+    };
   }
 
   private toDto(
     row: Row,
-    venues: Map<string, CompetitionRequestDto['venue']>,
+    refs: References,
     allowedActions: CompetitionRequestAction[],
   ): CompetitionRequestDto {
     const proposal = CompetitionRequestProposal.parse(row.proposal);
+    const ageGroupIds = proposal.ageGroupIds ?? [];
     return {
       id: row.id,
       status: row.status,
@@ -305,7 +426,13 @@ export class CompetitionRequestsService {
       startDate: dateOnly(row.startDate),
       endDate: dateOnly(row.endDate),
       level: proposal.level,
-      venue: proposal.venueId ? (venues.get(proposal.venueId) ?? null) : null,
+      venue: proposal.venueId ? (refs.venues.get(proposal.venueId) ?? null) : null,
+      ageGroups: ageGroupIds.flatMap((g) => {
+        const group = refs.ageGroups.get(g);
+        return group ? [group] : [];
+      }),
+      requirements:
+        proposal.matCount !== undefined ? hostingRequirements(proposal.matCount, ageGroupIds.length) : null,
       proposal,
       expectedParticipants: row.expectedParticipants,
       comment: row.comment,

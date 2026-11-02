@@ -89,7 +89,11 @@ export function CompetitionRequestsList() {
                     </div>
                     <p className="mt-1 text-sm text-slate-600">
                       {formatDates(r.startDate, r.endDate, locale)} · {r.organization.shortName}
-                      {r.venue ? ` · ${r.venue.city ?? r.venue.name}` : ''}
+                      {r.venue
+                        ? ` · ${r.venue.city ?? r.venue.name}`
+                        : r.proposal.address
+                          ? ` · ${r.proposal.address}`
+                          : ''}
                     </p>
                   </Card>
                 </li>
