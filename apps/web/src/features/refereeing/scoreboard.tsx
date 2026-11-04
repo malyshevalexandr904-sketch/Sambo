@@ -12,6 +12,7 @@ import {
   type Side,
 } from '@sde/contracts';
 import { Badge, cn } from '@sde/ui';
+import { EloBadge } from '@/components/elo-badge';
 import { useTranslations } from 'next-intl';
 import { formatClock, useRefereeLabels } from './labels';
 import type { EventInput } from './use-scoring';
@@ -99,9 +100,11 @@ function SidePanel({
             {info.publicName ?? '—'}
           </span>
           {info.rating !== null ? (
-            <span className="shrink-0 rounded bg-white px-2 py-0.5 text-sm font-semibold tabular-nums text-slate-700">
-              {t('elo', { rating: info.rating })}
-            </span>
+            <EloBadge
+              rating={info.rating}
+              label={t('eloLabel')}
+              className="rounded bg-white px-2 py-0.5 text-sm font-semibold tabular-nums text-slate-700"
+            />
           ) : null}
         </p>
         <p className="truncate text-sm text-slate-600">

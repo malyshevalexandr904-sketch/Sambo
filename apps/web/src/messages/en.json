@@ -2405,7 +2405,7 @@
     "submissionStart": "Submission",
     "submissionStop": "End of submission",
     "submissionRunning": "Submission {seconds} s",
-    "elo": "Elo {rating}"
+    "eloLabel": "Elo rating"
   },
   "results": {
     "medals": {
@@ -2581,7 +2581,7 @@
     "activity": "Activity",
     "activityShort": "A",
     "submissionLabel": "Submission",
-    "elo": "Elo {rating}"
+    "eloLabel": "Elo rating"
   },
   "onboarding": {
     "cabinet": {

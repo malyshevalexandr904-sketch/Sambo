@@ -2405,7 +2405,7 @@
     "submissionStart": "Болевой",
     "submissionStop": "Конец болевого",
     "submissionRunning": "Болевой {seconds} с",
-    "elo": "Эло {rating}"
+    "eloLabel": "Рейтинг Эло"
   },
   "results": {
     "medals": {
@@ -2581,7 +2581,7 @@
     "activity": "Активность",
     "activityShort": "А",
     "submissionLabel": "Болевой",
-    "elo": "Эло {rating}"
+    "eloLabel": "Рейтинг Эло"
   },
   "onboarding": {
     "cabinet": {

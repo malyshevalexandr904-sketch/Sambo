@@ -17,6 +17,7 @@ import {
   type Side,
 } from '@sde/contracts';
 import { cn } from '@sde/ui';
+import { EloBadge } from '@/components/elo-badge';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatClock, useRefereeLabels } from '@/features/refereeing/labels';
@@ -116,17 +117,19 @@ function SideName({ side, info }: { side: Side; info: LiveSideDto }) {
     <div className={cn('flex min-w-0 flex-col', inner)}>
       <p
         className={cn(
-          'flex max-w-full items-baseline gap-[1vw]',
+          'flex max-w-full items-center gap-[1vw]',
           side === 'RED' ? 'flex-row-reverse' : 'flex-row',
         )}
       >
-        <span className="line-clamp-2 min-w-0 break-words text-[min(6.5vh,3.6vw)] font-extrabold leading-[1.05]">
+        <span className="min-w-0 truncate whitespace-nowrap text-[min(6.5vh,3.6vw)] font-extrabold leading-[1.15]">
           {name}
         </span>
         {info.rating !== null ? (
-          <span className="shrink-0 rounded-[0.6vh] bg-black/25 px-[0.8vw] py-[0.3vh] text-[min(2.6vh,1.6vw)] font-bold tabular-nums">
-            {t('elo', { rating: info.rating })}
-          </span>
+          <EloBadge
+            rating={info.rating}
+            label={t('eloLabel')}
+            className="rounded-[0.6vh] bg-black/25 px-[0.8vw] py-[0.3vh] text-[min(2.6vh,1.6vw)] font-bold tabular-nums"
+          />
         ) : null}
       </p>
       <p className="max-w-full truncate text-[min(4vh,2.6vw)] font-medium text-white/85">
@@ -141,21 +144,24 @@ function PenaltySteps({ side, penalties }: { side: Side; penalties: string[] }) 
   const label = useRefereeLabels();
   if (penalties.length === 0) return null;
   return (
-    <ol
-      className={cn(
-        'flex max-w-[18vw] shrink-0 flex-col gap-[0.8vh]',
-        side === 'RED' ? 'items-start' : 'items-end',
-      )}
-    >
-      {penalties.map((p, i) => (
-        <li
-          key={`${p}-${i}`}
-          className="w-max max-w-[15vw] rounded-[0.6vh] bg-amber-300 px-[0.8vw] py-[0.4vh] text-[min(2.4vh,1.4vw)] font-bold leading-tight text-slate-950 shadow-md"
-          style={side === 'RED' ? { marginLeft: `${i * 1.5}vw` } : { marginRight: `${i * 1.5}vw` }}
-        >
-          {label.code(p)}
-        </li>
-      ))}
+    <ol className={cn('flex shrink-0 flex-col gap-[0.6vh]', side === 'RED' ? 'items-start' : 'items-end')}>
+      {penalties.map((p, i) => {
+        // Предупреждения — жёлтые карточки, как в футболе; снятие со схватки — красная.
+        const red = /REMOVAL|DISQUAL/.test(p);
+        return (
+          <li
+            key={`${p}-${i}`}
+            title={label.code(p)}
+            className={cn(
+              'h-[min(5.4vh,3.4vw)] w-[min(4vh,2.5vw)] rotate-[-6deg] rounded-[0.5vh] border border-black/20 shadow-[0_0.4vh_1vh_rgb(0_0_0/0.35)]',
+              red ? 'bg-red-500' : 'bg-yellow-300',
+            )}
+            style={side === 'RED' ? { marginLeft: `${i * 1.6}vw` } : { marginRight: `${i * 1.6}vw` }}
+          >
+            <span className="sr-only">{label.code(p)}</span>
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -202,7 +208,7 @@ function SidePanel({
         className={cn('absolute inset-0 -z-10 transition-[filter] duration-700', style.panel)}
         style={{ filter: advantage ? 'saturate(1)' : 'saturate(0.5)' }}
       />
-      {/* Сверху: предупреждения — в крайнем углу, имя — у центра табло. */}
+      {/* Сверху: предупреждения-карточки — в крайнем углу, имя в одну строку и Эло на его уровне — у центра. */}
       <div className={cn('flex min-w-0 items-start gap-[1.5vw]', side === 'BLUE' && 'flex-row-reverse')}>
         <PenaltySteps side={side} penalties={score?.penalties ?? []} />
         <div className="min-w-0 flex-1">
