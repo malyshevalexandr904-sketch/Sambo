@@ -9,16 +9,14 @@
 import {
   type DataEnvelope,
   liveClockMs,
-  liveHoldMs,
   type LiveMatchDto,
-  liveSubmissionMs,
   type LiveSideDto,
   type PublicMatStateDto,
   type Side,
 } from '@sde/contracts';
 import { cn } from '@sde/ui';
 import { EloBadge } from '@/components/elo-badge';
-import { RefereeGesture } from '@/components/referee-gesture';
+import { GestureLights } from './gesture-lights';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatClock, useRefereeLabels } from '@/features/refereeing/labels';
@@ -106,8 +104,6 @@ function useWakeLock(): void {
   }, []);
 }
 
-const CHIP = 'rounded-[0.6vh] px-[1vw] py-[0.4vh] text-[min(3.2vh,2vw)] font-bold';
-
 function SideName({ side, info }: { side: Side; info: LiveSideDto }) {
   const t = useTranslations('scoreboard');
   const corner = t(side === 'RED' ? 'red' : 'blue');
@@ -173,6 +169,7 @@ function SidePanel({
   showScore,
   winner,
   advantage,
+  live,
   serverNow,
 }: {
   side: Side;
@@ -180,6 +177,8 @@ function SidePanel({
   showScore: boolean;
   winner: boolean;
   advantage: boolean;
+  /** Схватка идёт (или пауза): показываются жесты судьи. */
+  live: boolean;
   serverNow: number;
 }) {
   const t = useTranslations('scoreboard');
@@ -188,17 +187,14 @@ function SidePanel({
   const result = match.result;
   const finalPoints = result ? (side === 'RED' ? result.redScore : result.blueScore) : null;
   const points = finalPoints ?? score?.points ?? 0;
-  const subAt = side === 'RED' ? match.submissions.red : match.submissions.blue;
-  const activity = match.activity === side;
   const style = SIDE_STYLE[side];
-  const outer = side === 'RED' ? 'left-[2vw]' : 'right-[2vw]';
-  // Болевой и «Победа» — у центра, над вырезом под время (вырез растёт, когда рядом со временем удержание).
+  // «Победа» — у центра, над вырезом под время.
   const inner = side === 'RED' ? 'right-[2vw]' : 'left-[2vw]';
   return (
     <section
       aria-label={t(side === 'RED' ? 'red' : 'blue')}
       className={cn(
-        // Имя — сверху у центра, баллы — всё оставшееся место, снизу — место под время, активность и болевой.
+        // Имя — сверху у центра, баллы — всё оставшееся место, снизу — место под время и жесты судьи.
         'relative isolate grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_min(18vh,12vw)] gap-[1vh] overflow-hidden p-[2.5vh_2vw]',
         winner && `ring-[1.2vh] ring-inset ${style.win}`,
       )}
@@ -228,40 +224,14 @@ function SidePanel({
         <div />
       )}
       <div />
-      {activity ? (
-        // Оценка активности «А» — в нижнем крайнем углу.
-        <p
-          className={cn(
-            'absolute bottom-[2.5vh] flex items-center gap-[0.8vw] rounded-[1vh] bg-emerald-400 px-[1.2vw] py-[0.6vh] text-slate-950 shadow-md',
-            outer,
-          )}
-        >
-          <RefereeGesture kind="activity" className="text-[min(7vh,4.5vw)]" />
-          <span className="text-[min(7vh,4.5vw)] font-black leading-none">{t('activityShort')}</span>
-          <span className="text-[min(2.6vh,1.7vw)] font-semibold uppercase tracking-wide">
-            {t('activity')}
-          </span>
-        </p>
-      ) : null}
+      {live ? <GestureLights side={side} match={match} serverNow={serverNow} /> : null}
       <div
         className={cn(
-          'absolute bottom-[calc(min(18vh,12vw)+8vh)] flex flex-col gap-[0.8vh]',
+          'absolute bottom-[calc(min(18vh,12vw)+4vh)] flex flex-col gap-[0.8vh]',
           inner,
           side === 'RED' ? 'items-end' : 'items-start',
         )}
       >
-        {subAt ? (
-          <p
-            role="timer"
-            className={cn(CHIP, 'flex items-baseline gap-[0.8vw] bg-white text-slate-950 shadow-md')}
-          >
-            <RefereeGesture kind="submission" className="self-center text-[min(5vh,3.2vw)]" />
-            <span className="uppercase tracking-wide">{t('submissionLabel')}</span>
-            <span className="text-[min(6vh,4vw)] font-black leading-none tabular-nums">
-              {Math.floor(liveSubmissionMs(subAt, serverNow) / 1000)}
-            </span>
-          </p>
-        ) : null}
         {winner ? (
           <span className="rounded-[0.6vh] bg-white px-[1vw] py-[0.4vh] text-[min(4vh,2.6vw)] font-black text-slate-950">
             {t('winner')}
@@ -289,14 +259,13 @@ function MatchHeader({ match, status }: { match: LiveMatchDto; status: string | 
   );
 }
 
-/** Время — в вырезе у нижнего края обеих цветных половин, по центру; рядом — удержание цветом угла. */
+/** Время — в вырезе у нижнего края обеих цветных половин, по центру (удержание — жестом на половине спортсмена). */
 function Clock({ match, serverNow }: { match: LiveMatchDto; serverNow: number }) {
   const t = useTranslations('scoreboard');
   if (!match.clock) return null;
   const elapsed = liveClockMs(match.clock, serverNow);
   const remaining = match.clock.durationMs - elapsed;
   const timeUp = remaining <= 0;
-  const hold = match.hold;
   return (
     <div className="absolute bottom-0 left-1/2 z-10 flex -translate-x-1/2 items-center justify-center gap-[2vw] rounded-t-[3vh] bg-slate-950 px-[3vw] pb-[1.2vh] pt-[1.6vh] shadow-[0_-0.6vh_2vh_rgb(0_0_0/0.35)]">
       <div className="flex flex-col items-center">
@@ -314,23 +283,6 @@ function Clock({ match, serverNow }: { match: LiveMatchDto; serverNow: number })
           <p className="text-[min(3vh,2vw)] font-semibold text-amber-300">{t('timeUp')}</p>
         ) : null}
       </div>
-      {hold ? (
-        // Удержание — рядом с основным временем, цветом угла: его видно с любого места трибуны.
-        <div
-          className={cn(
-            'flex flex-col items-center rounded-[1vh] px-[2vw] py-[0.8vh]',
-            hold.side === 'RED' ? 'bg-red-700' : 'bg-blue-700',
-          )}
-        >
-          <p className="flex items-center gap-[0.6vw] text-[min(2.6vh,1.8vw)] font-semibold uppercase tracking-widest text-white/80">
-            <RefereeGesture kind="hold" className="text-[min(6vh,4vw)]" />
-            {t('holdLabel')}
-          </p>
-          <p className="text-[min(10vh,6.5vw)] font-black leading-none tabular-nums">
-            {Math.floor(liveHoldMs(hold, serverNow) / 1000)}
-          </p>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -513,6 +465,7 @@ export function MatScoreboard({ matId }: { matId: string }) {
                 showScore={view.kind !== 'next' && view.kind !== 'called'}
                 winner={winnerSide === side}
                 advantage={advantage === side}
+                live={view.kind === 'live'}
                 serverNow={serverNow}
               />
             ))}

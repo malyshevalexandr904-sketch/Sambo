@@ -1,0 +1,77 @@
+'use client';
+import { liveHoldMs, type LiveMatchDto, liveSubmissionMs, type Side } from '@sde/contracts';
+import { cn } from '@sde/ui';
+import { useTranslations } from 'next-intl';
+import { RefereeGesture } from '@/components/referee-gesture';
+
+/**
+ * Жесты судьи на половине спортсмена (правки 04.11.2026): в нижнем крайнем углу, в один ряд — удержание 🫳,
+ * болевой 🤜, активность ✊. Загорается жест того, кто проводит приём или получил оценку активности; у удержания и
+ * болевого под жестом — секунды. Подписей нет: их заменяют жесты (для чтеца — скрытый текст).
+ */
+export function GestureLights({
+  side,
+  match,
+  serverNow,
+}: {
+  side: Side;
+  match: LiveMatchDto;
+  serverNow: number;
+}) {
+  const t = useTranslations('scoreboard');
+  const hold = match.hold?.side === side ? match.hold : null;
+  const subAt = side === 'RED' ? match.submissions.red : match.submissions.blue;
+  const lights: {
+    kind: 'hold' | 'submission' | 'activity';
+    label: string;
+    on: boolean;
+    seconds: number | null;
+  }[] = [
+    {
+      kind: 'hold',
+      label: t('holdLabel'),
+      on: hold !== null,
+      seconds: hold ? Math.floor(liveHoldMs(hold, serverNow) / 1000) : null,
+    },
+    {
+      kind: 'submission',
+      label: t('submissionLabel'),
+      on: subAt !== null,
+      seconds: subAt ? Math.floor(liveSubmissionMs(subAt, serverNow) / 1000) : null,
+    },
+    { kind: 'activity', label: t('activity'), on: match.activity === side, seconds: null },
+  ];
+  return (
+    <ul
+      className={cn(
+        'absolute bottom-[2.5vh] flex gap-[1vw]',
+        side === 'RED' ? 'left-[2vw]' : 'right-[2vw] flex-row-reverse',
+      )}
+    >
+      {lights.map((l) => (
+        <li
+          key={l.kind}
+          role={l.seconds !== null ? 'timer' : undefined}
+          className={cn(
+            'flex h-[min(15vh,9.5vw)] w-[min(13vh,8vw)] flex-col items-center justify-center gap-[0.4vh] rounded-[1.4vh] transition duration-300',
+            l.on ? 'bg-white shadow-[0_0_3vh_rgb(255_255_255/0.55)]' : 'bg-black/15',
+          )}
+        >
+          <RefereeGesture
+            kind={l.kind}
+            className={cn(
+              'text-[min(8vh,5vw)] transition duration-300',
+              l.on ? 'scale-100' : 'scale-90 opacity-20 grayscale',
+            )}
+          />
+          {l.on && l.seconds !== null ? (
+            <span className="text-[min(5vh,3.2vw)] font-black leading-none tabular-nums text-slate-950">
+              {l.seconds}
+            </span>
+          ) : null}
+          {l.on ? <span className="sr-only">{l.label}</span> : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
