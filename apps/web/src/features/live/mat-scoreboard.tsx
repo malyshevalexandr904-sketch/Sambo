@@ -407,8 +407,6 @@ export function MatScoreboard({ matId }: { matId: string }) {
   }, []);
 
   const serverNow = useServerNow(restOffset, online);
-  // «В эфире» — канал табло работает, а не просто есть соединение.
-  const onAir = health === 'live';
 
   if (notFound)
     return (
@@ -434,22 +432,10 @@ export function MatScoreboard({ matId }: { matId: string }) {
         <p className="min-w-0 truncate text-[min(3.6vh,2.4vw)] font-bold">
           {t('mat', { number: state.mat.number })}
           {state.mat.name ? ` ${state.mat.name}` : ''}
-          <span className="font-normal text-white/70"> · {state.competition.name}</span>
+          {' · '}
+          {state.competition.name}
         </p>
         <div className="flex shrink-0 items-center gap-[1vw]">
-          <span
-            className={cn(
-              'inline-flex items-center gap-[0.5vw] text-[min(2.4vh,1.6vw)]',
-              onAir ? 'text-emerald-300' : 'text-amber-300',
-            )}
-            role="status"
-          >
-            <span
-              aria-hidden="true"
-              className={cn('h-[1.4vh] w-[1.4vh] rounded-full', onAir ? 'bg-emerald-400' : 'bg-amber-400')}
-            />
-            {onAir ? t('online') : t('offline')}
-          </span>
           {!fullscreen ? (
             <button
               type="button"
