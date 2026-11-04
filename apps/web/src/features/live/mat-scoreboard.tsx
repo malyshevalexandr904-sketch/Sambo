@@ -280,7 +280,7 @@ function MatchHeader({ match, status }: { match: LiveMatchDto; status: string | 
   );
 }
 
-/** Время — в вырезе у нижнего края обеих цветных половин, по центру, на нейтральном сером фоне (удержание — жестом на половине спортсмена). */
+/** Время — в вырезе у нижнего края обеих цветных половин, по центру, на тёмно-синем фоне шапки (удержание — жестом на половине спортсмена). */
 function Clock({ match, serverNow }: { match: LiveMatchDto; serverNow: number }) {
   const t = useTranslations('scoreboard');
   if (!match.clock) return null;
@@ -288,7 +288,7 @@ function Clock({ match, serverNow }: { match: LiveMatchDto; serverNow: number })
   const remaining = match.clock.durationMs - elapsed;
   const timeUp = remaining <= 0;
   return (
-    <div className="absolute bottom-0 left-1/2 z-10 flex -translate-x-1/2 items-center justify-center gap-[2vw] rounded-t-[3vh] bg-zinc-600 px-[3vw] pb-[1.2vh] pt-[1.6vh] shadow-[0_-0.6vh_2vh_rgb(0_0_0/0.35)]">
+    <div className="absolute bottom-0 left-1/2 z-10 flex -translate-x-1/2 items-center justify-center gap-[2vw] rounded-t-[3vh] bg-slate-900 px-[3vw] pb-[1.2vh] pt-[1.6vh] shadow-[0_-0.6vh_2vh_rgb(0_0_0/0.35)]">
       <div className="flex flex-col items-center">
         <p
           role="timer"
