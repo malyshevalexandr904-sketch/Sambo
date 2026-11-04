@@ -35,9 +35,17 @@ const POLL_MS = 5_000;
 const RESYNC_MS = 60_000;
 const TICK_MS = 200;
 
-const SIDE_STYLE: Record<Side, { panel: string; accent: string; win: string }> = {
-  RED: { panel: 'bg-red-700', accent: 'bg-red-950/40', win: 'ring-red-300' },
-  BLUE: { panel: 'bg-blue-700', accent: 'bg-blue-950/40', win: 'ring-blue-300' },
+const SIDE_STYLE: Record<Side, { panel: string; win: string }> = {
+  RED: { panel: 'bg-red-600', win: 'ring-red-200' },
+  BLUE: { panel: 'bg-blue-600', win: 'ring-blue-200' },
+};
+
+/** Кто ведёт: ведущий — ярко-ярко, отстающий — тускло, при равенстве обе половины приглушены наполовину. */
+type Tone = 'lead' | 'trail' | 'even';
+const TONE_FILTER: Record<Tone, string> = {
+  lead: 'saturate(1.3) brightness(1.12)',
+  even: 'saturate(0.5) brightness(0.85)',
+  trail: 'saturate(0.4) brightness(0.6)',
 };
 
 /** Снимок ковра по REST; `offsetMs` — смещение часов сервера по времени ответа (пока нет живого соединения). */
@@ -168,7 +176,7 @@ function SidePanel({
   match,
   showScore,
   winner,
-  advantage,
+  tone,
   live,
   serverNow,
 }: {
@@ -176,7 +184,7 @@ function SidePanel({
   match: LiveMatchDto;
   showScore: boolean;
   winner: boolean;
-  advantage: boolean;
+  tone: Tone;
   /** Схватка идёт (или пауза): показываются жесты судьи. */
   live: boolean;
   serverNow: number;
@@ -199,11 +207,18 @@ function SidePanel({
         winner && `ring-[1.2vh] ring-inset ${style.win}`,
       )}
     >
-      {/* Цвет угла: приглушён наполовину, в полную силу — у стороны в преимуществе. */}
+      {/* Цвет угла: у ведущего горит ярко (со светом из центра), у отстающего — тусклый, при равенстве — наполовину. */}
       <div
         aria-hidden="true"
         className={cn('absolute inset-0 -z-10 transition-[filter] duration-700', style.panel)}
-        style={{ filter: advantage ? 'saturate(1)' : 'saturate(0.5)' }}
+        style={{ filter: TONE_FILTER[tone] }}
+      />
+      <div
+        aria-hidden="true"
+        className={cn(
+          'absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgb(255_255_255/0.22),transparent_70%)] transition-opacity duration-700',
+          tone === 'lead' ? 'opacity-100' : 'opacity-0',
+        )}
       />
       {/* Сверху: предупреждения-карточки — в крайнем углу, имя в одну строку и Эло на его уровне — у центра. */}
       <div className={cn('flex min-w-0 items-start gap-[1.5vw]', side === 'BLUE' && 'flex-row-reverse')}>
@@ -464,7 +479,7 @@ export function MatScoreboard({ matId }: { matId: string }) {
                 match={match}
                 showScore={view.kind !== 'next' && view.kind !== 'called'}
                 winner={winnerSide === side}
-                advantage={advantage === side}
+                tone={advantage === null ? 'even' : advantage === side ? 'lead' : 'trail'}
                 live={view.kind === 'live'}
                 serverNow={serverNow}
               />

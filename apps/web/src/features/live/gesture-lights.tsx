@@ -44,7 +44,7 @@ export function GestureLights({
   return (
     <ul
       className={cn(
-        'absolute bottom-[2.5vh] flex gap-[1vw]',
+        'absolute bottom-[4.5vh] flex gap-[1vw]',
         side === 'RED' ? 'left-[2vw]' : 'right-[2vw] flex-row-reverse',
       )}
     >
@@ -53,19 +53,21 @@ export function GestureLights({
           key={l.kind}
           role={l.seconds !== null ? 'timer' : undefined}
           className={cn(
-            'flex h-[min(15vh,9.5vw)] w-[min(13vh,8vw)] flex-col items-center justify-center gap-[0.4vh] rounded-[1.4vh] transition duration-300',
+            'flex h-[min(15vh,9.5vw)] w-[min(13vh,8vw)] flex-col items-center justify-center gap-[0.8vh] overflow-hidden rounded-[1.4vh] py-[1vh] transition duration-300',
             l.on ? 'bg-white shadow-[0_0_3vh_rgb(255_255_255/0.55)]' : 'bg-black/15',
           )}
         >
           <RefereeGesture
             kind={l.kind}
             className={cn(
-              'text-[min(8vh,5vw)] transition duration-300',
+              'transition duration-300',
+              // С секундами жест чуть меньше: жест и число помещаются в плашку.
+              l.on && l.seconds !== null ? 'text-[min(6vh,3.8vw)]' : 'text-[min(8vh,5vw)]',
               l.on ? 'scale-100' : 'scale-90 opacity-20 grayscale',
             )}
           />
           {l.on && l.seconds !== null ? (
-            <span className="text-[min(5vh,3.2vw)] font-black leading-none tabular-nums text-slate-950">
+            <span className="text-[min(4.6vh,3vw)] font-black leading-none tabular-nums text-slate-950">
               {l.seconds}
             </span>
           ) : null}
