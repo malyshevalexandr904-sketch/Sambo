@@ -149,7 +149,13 @@ function PenaltySteps({ side, penalties }: { side: Side; penalties: string[] }) 
   const label = useRefereeLabels();
   if (penalties.length === 0) return null;
   return (
-    <ol className={cn('flex shrink-0 flex-col gap-[0.6vh]', side === 'RED' ? 'items-start' : 'items-end')}>
+    // Карточки — поверх половины в верхнем крайнем углу: стопка не сдвигает ни имя, ни баллы.
+    <ol
+      className={cn(
+        'absolute top-[2.5vh] flex flex-col gap-[0.6vh]',
+        side === 'RED' ? 'left-[2vw] items-start' : 'right-[2vw] items-end',
+      )}
+    >
       {penalties.map((p, i) => {
         // Предупреждения — жёлтые карточки, как в футболе; снятие со схватки — красная.
         const red = /REMOVAL|DISQUAL/.test(p);
@@ -158,7 +164,8 @@ function PenaltySteps({ side, penalties }: { side: Side; penalties: string[] }) 
             key={`${p}-${i}`}
             title={label.code(p)}
             className={cn(
-              'h-[min(8vh,5vw)] w-[min(6vh,3.75vw)] rotate-[-6deg] rounded-[0.5vh] border border-black/20 shadow-[0_0.4vh_1vh_rgb(0_0_0/0.35)]',
+              // Новая карточка «влетает» и ложится на место (sb-card-in, globals.css).
+              'sb-card-in h-[min(8vh,5vw)] w-[min(6vh,3.75vw)] rotate-[-6deg] rounded-[0.5vh] border border-black/20 shadow-[0_0.4vh_1vh_rgb(0_0_0/0.35)]',
               red ? 'bg-red-500' : 'bg-yellow-300',
             )}
             style={side === 'RED' ? { marginLeft: `${i * 2.4}vw` } : { marginRight: `${i * 2.4}vw` }}
@@ -221,24 +228,22 @@ function SidePanel({
         )}
       />
       {/* Сверху: предупреждения-карточки — в крайнем углу, имя в одну строку и Эло на его уровне — у центра. */}
-      <div className={cn('flex min-w-0 items-start gap-[1.5vw]', side === 'BLUE' && 'flex-row-reverse')}>
-        <PenaltySteps side={side} penalties={score?.penalties ?? []} />
-        <div className="min-w-0 flex-1">
-          <SideName side={side} info={info} />
-        </div>
+      <PenaltySteps side={side} penalties={score?.penalties ?? []} />
+      <div className={cn('min-w-0', side === 'RED' ? 'pl-[13vw]' : 'pr-[13vw]')}>
+        <SideName side={side} info={info} />
       </div>
+      <div />
+      <div />
       {showScore ? (
+        // Баллы — ровно по центру половины, у обоих спортсменов на одном уровне.
         <p
-          className="flex min-h-0 items-center justify-center text-[min(30vh,18vw)] font-black leading-none tabular-nums"
+          className="pointer-events-none absolute inset-0 flex items-center justify-center text-[min(30vh,18vw)] font-black leading-none tabular-nums"
           aria-live="polite"
         >
           <span className="sr-only">{t('points')}: </span>
           {points}
         </p>
-      ) : (
-        <div />
-      )}
-      <div />
+      ) : null}
       {live ? <GestureLights side={side} match={match} serverNow={serverNow} /> : null}
       <div
         className={cn(
@@ -262,7 +267,10 @@ function MatchHeader({ match, status }: { match: LiveMatchDto; status: string | 
   const locale = useLocale();
   return (
     <p className="truncate text-center text-[min(3.4vh,2.2vw)] font-semibold">
-      {pickName(match.category, locale)}
+      {/* Части категории (возраст, вес) — через ту же точку, что «Ковёр N · турнир». */}
+      {pickName(match.category, locale)
+        .split(/\s*,\s*/)
+        .join(' · ')}
       {status ? (
         <span className="ml-[1.5vw] rounded-[0.6vh] bg-white px-[1vw] py-[0.3vh] text-slate-950">
           {status}

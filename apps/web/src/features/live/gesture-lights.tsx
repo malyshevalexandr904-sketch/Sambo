@@ -54,7 +54,8 @@ export function GestureLights({
           role={l.seconds !== null ? 'timer' : undefined}
           className={cn(
             'flex h-[min(15vh,9.5vw)] w-[min(13vh,8vw)] flex-col items-center justify-center gap-[0.8vh] overflow-hidden rounded-[1.4vh] py-[1vh] transition duration-300',
-            l.on ? 'bg-white shadow-[0_0_3vh_rgb(255_255_255/0.55)]' : 'bg-black/15',
+            // Загорание — вспышка и мягкое свечение, пока приём идёт (sb-light-on, globals.css).
+            l.on ? 'sb-light-on bg-white' : 'bg-black/15',
           )}
         >
           <RefereeGesture
@@ -63,7 +64,8 @@ export function GestureLights({
               'transition duration-300',
               // С секундами жест чуть меньше: жест и число помещаются в плашку.
               l.on && l.seconds !== null ? 'text-[min(6vh,3.8vw)]' : 'text-[min(8vh,5vw)]',
-              l.on ? 'scale-100' : 'scale-90 opacity-20 grayscale',
+              // Жест делает своё движение: удержание прижимает, болевой — толчок, активность — поднятый кулак.
+              l.on ? `scale-100 sb-gesture-${l.kind}` : 'scale-90 opacity-20 grayscale',
             )}
           />
           {l.on && l.seconds !== null ? (
