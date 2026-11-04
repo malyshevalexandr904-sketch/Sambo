@@ -40,12 +40,15 @@ const SIDE_STYLE: Record<Side, { panel: string; win: string }> = {
   BLUE: { panel: 'bg-blue-600', win: 'ring-blue-200' },
 };
 
-/** Кто ведёт: ведущий — ярко-ярко, отстающий — тускло, при равенстве обе половины приглушены наполовину. */
+/**
+ * Кто ведёт: ведущий — ярко-ярко, отстающий — блёклый (выцветший, сероватый, но не темнее), при равенстве обе
+ * половины приглушены наполовину.
+ */
 type Tone = 'lead' | 'trail' | 'even';
 const TONE_FILTER: Record<Tone, string> = {
   lead: 'saturate(1.3) brightness(1.12)',
-  even: 'saturate(0.5) brightness(0.85)',
-  trail: 'saturate(0.4) brightness(0.6)',
+  even: 'saturate(0.5) brightness(0.9)',
+  trail: 'saturate(0.22) brightness(0.95)',
 };
 
 /** Снимок ковра по REST; `offsetMs` — смещение часов сервера по времени ответа (пока нет живого соединения). */
@@ -225,6 +228,14 @@ function SidePanel({
         className={cn(
           'absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgb(255_255_255/0.22),transparent_70%)] transition-opacity duration-700',
           tone === 'lead' ? 'opacity-100' : 'opacity-0',
+        )}
+      />
+      {/* Отстающий — как выцветший: лёгкая серая дымка поверх цвета. */}
+      <div
+        aria-hidden="true"
+        className={cn(
+          'absolute inset-0 -z-10 bg-slate-300/15 transition-opacity duration-700',
+          tone === 'trail' ? 'opacity-100' : 'opacity-0',
         )}
       />
       {/* Сверху: предупреждения-карточки — в крайнем углу, имя в одну строку и Эло на его уровне — у центра. */}
