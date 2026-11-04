@@ -13,6 +13,7 @@ import { Link } from '@/i18n/navigation';
  * выбором роли и демо-вход: все роли и разделы для просмотра, без действий (правки 27.10.2026). Правки 28.10.2026:
  * переключатели языка и темы вверху, ниже первого экрана — секции «О платформе» с рейтинговой системой. Правки 31.10.2026:
  * фон первого экрана — видео зала с самбистами (на телефоне — неподвижный кадр), карточки входа — стеклянные.
+ * Правки 04.11.2026: под названием — цитата Василия Шестакова с автором.
  */
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -45,12 +46,15 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
               <span className="hero-bar flex-1 bg-red-600" />
               <span className="hero-bar flex-1 bg-blue-600" style={{ animationDelay: '250ms' }} />
             </div>
-            <p
-              className="mt-5 max-w-xl animate-fade-up text-xl text-white/85 [text-shadow:0_1px_12px_rgb(0_0_0/0.5)] sm:text-2xl"
-              style={{ animationDelay: '160ms' }}
-            >
-              {t('lead')}
-            </p>
+            {/* Цитата Василия Шестакова (правки 04.11.2026) — вместо прежней подписи «Окунись в мир самбо». */}
+            <figure className="mt-5 max-w-2xl animate-fade-up" style={{ animationDelay: '160ms' }}>
+              <blockquote className="text-xl italic text-white/90 [text-shadow:0_1px_12px_rgb(0_0_0/0.5)] sm:text-2xl">
+                {t('lead')}
+              </blockquote>
+              <figcaption className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-white/70 [text-shadow:0_1px_12px_rgb(0_0_0/0.5)] sm:text-base">
+                — {t('leadAuthor')}
+              </figcaption>
+            </figure>
             <div className="mt-10 grid gap-4 md:grid-cols-3">
               <section className={card} style={{ animationDelay: '260ms' }} aria-labelledby="home-login">
                 <h2 id="home-login" className="text-lg font-semibold text-white">

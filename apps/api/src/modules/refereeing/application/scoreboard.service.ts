@@ -53,6 +53,7 @@ interface SideView {
   club: string | null;
   region: string | null;
   athletePersonId: string;
+  rating: number | null;
 }
 
 interface LiveContext {
@@ -165,7 +166,7 @@ export class ScoreboardService {
               publicName: true,
               snapClubName: true,
               snapRegionName: true,
-              athlete: { select: { personId: true } },
+              athlete: { select: { personId: true, rating: { select: { rating: true } } } },
             },
           })
         : Promise.resolve([]),
@@ -188,6 +189,7 @@ export class ScoreboardService {
             club: e.snapClubName,
             region: e.snapRegionName,
             athletePersonId: e.athlete.personId,
+            rating: e.athlete.rating?.rating ?? null,
           },
         ]),
       ),
@@ -199,9 +201,16 @@ export class ScoreboardService {
   private side(m: MatchRecord, side: Side, ctx: LiveContext): LiveSideDto {
     const entryId = sideOf(m, side)?.entryId ?? null;
     const e = entryId ? ctx.entries.get(entryId) : undefined;
-    if (!e) return { name: null, hidden: false, club: null, region: null };
+    if (!e) return { name: null, hidden: false, club: null, region: null, rating: null };
     const visible = ctx.distribution.has(e.athletePersonId);
-    return { name: visible ? e.publicName : null, hidden: !visible, club: e.club, region: e.region };
+    return {
+      name: visible ? e.publicName : null,
+      hidden: !visible,
+      club: e.club,
+      region: e.region,
+      // Рейтинг — рядом с именем: без согласия на распространение ПДн не публикуется вместе с ним.
+      rating: visible ? e.rating : null,
+    };
   }
 
   private async liveMatch(m: MatchRecord, ctx: LiveContext): Promise<LiveMatchDto> {
@@ -247,6 +256,14 @@ export class ScoreboardService {
         state?.hold && LIVE.includes(m.status)
           ? { side: state.hold.side, startedAt: state.hold.startedAt, maxMs: maxHoldMs }
           : null,
+      activity: state?.activity?.side ?? null,
+      submissions:
+        state && LIVE.includes(m.status)
+          ? {
+              red: state.submissions?.red?.startedAt ?? null,
+              blue: state.submissions?.blue?.startedAt ?? null,
+            }
+          : { red: null, blue: null },
       result: r
         ? {
             status: r.status,

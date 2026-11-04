@@ -38,7 +38,8 @@
   },
   "home": {
     "title": "Цифровое самбо",
-    "lead": "Dive into the world of sambo",
+    "lead": "“Sambo is our country's calling card, alongside space and ballet”",
+    "leadAuthor": "Vasily Shestakov",
     "login": "Sign in",
     "register": "Sign up",
     "loginTitle": "Already registered",
@@ -2231,7 +2232,8 @@
       "MORE_HIGH_SCORES": "more high scores",
       "REFEREE_DECISION": "referees’ decision",
       "TECHNICAL_POINTS": "more technical points",
-      "LAST_PENALTY": "by the last warning"
+      "LAST_PENALTY": "by the last warning",
+      "ACTIVITY": "by activity mark"
     },
     "codes": {
       "THROW_TOTAL": "Throw",
@@ -2254,6 +2256,9 @@
       "HOLD_STARTED": "hold started",
       "HOLD_ENDED": "hold",
       "PENALTY": "penalty",
+      "ACTIVITY": "activity mark",
+      "SUBMISSION_STARTED": "submission start",
+      "SUBMISSION_ENDED": "submission",
       "EVENT_VOIDED": "undo"
     },
     "rejections": {
@@ -2273,7 +2278,11 @@
       "match_decided": "the outcome is already decided",
       "not_voidable": "time readings cannot be undone",
       "already_voided": "the event is already undone",
-      "event_not_found": "event not found"
+      "event_not_found": "event not found",
+      "activity_used": "the activity mark was already given in this bout",
+      "activity_not_allowed": "the activity mark is allowed only with no technical scores and equal penalties",
+      "submission_active": "a submission is already running",
+      "submission_not_active": "no submission is running"
     },
     "preconditions": {
       "competition_status": "matches are held once the schedule is ready",
@@ -2390,7 +2399,13 @@
     "liveOff": "Refresh every 5 s",
     "rolePausedTitle": "Scores not sent",
     "rolePaused": "Another role is selected in this browser — the server does not accept scores. Unsent actions: {count}; they are kept and will be sent after you return to the “{role}” role.",
-    "backToRole": "Return to the “{role}” role"
+    "backToRole": "Return to the “{role}” role",
+    "activity": "Activity “A”",
+    "activityGiven": "Activity “A”",
+    "submissionStart": "Submission",
+    "submissionStop": "End of submission",
+    "submissionRunning": "Submission {seconds} s",
+    "eloLabel": "Elo rating"
   },
   "results": {
     "medals": {
@@ -2562,7 +2577,11 @@
       "FINISHED": "Result",
       "NEXT": "Next bout"
     },
-    "holdLabel": "Hold"
+    "holdLabel": "Hold",
+    "activity": "Activity",
+    "activityShort": "A",
+    "submissionLabel": "Submission",
+    "eloLabel": "Elo rating"
   },
   "onboarding": {
     "cabinet": {

@@ -56,6 +56,9 @@ export const MATCH_EVENT_INPUT_TYPES = [
   'HOLD_STARTED',
   'HOLD_ENDED',
   'PENALTY',
+  'ACTIVITY',
+  'SUBMISSION_STARTED',
+  'SUBMISSION_ENDED',
 ] as const satisfies readonly MatchEventType[];
 
 const Code = z.string().regex(/^[A-Z][A-Z0-9_]{1,39}$/, { error: 'invalid_code' });
@@ -92,7 +95,15 @@ export const MatchEventCreate = z
     deviceId: z.string().trim().min(1).max(64).optional(),
   })
   .superRefine((v, ctx) => {
-    const needsSide = ['SCORE', 'PENALTY', 'HOLD_STARTED', 'HOLD_ENDED'].includes(v.type);
+    const needsSide = [
+      'SCORE',
+      'PENALTY',
+      'HOLD_STARTED',
+      'HOLD_ENDED',
+      'ACTIVITY',
+      'SUBMISSION_STARTED',
+      'SUBMISSION_ENDED',
+    ].includes(v.type);
     if (needsSide && !v.side) ctx.addIssue({ code: 'custom', path: ['side'], message: 'required' });
     if (v.type === 'SCORE' && !v.actionCode)
       ctx.addIssue({ code: 'custom', path: ['actionCode'], message: 'required' });
@@ -145,6 +156,8 @@ export interface MatchSideDto {
   region: string | null;
   /** Участник снят после жеребьёвки: проигрывает оставшиеся схватки неявкой автоматически. */
   withdrawn: boolean;
+  /** Текущий рейтинг Эло спортсмена; null — рейтинга ещё нет. */
+  rating: number | null;
 }
 
 /** Правила турнира для кнопок планшета (часть закреплённой версии правил). */
