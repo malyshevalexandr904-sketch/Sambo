@@ -13,6 +13,7 @@ import {
 } from '@sde/contracts';
 import { Badge, cn } from '@sde/ui';
 import { EloBadge } from '@/components/elo-badge';
+import { RefereeGesture } from '@/components/referee-gesture';
 import { useTranslations } from 'next-intl';
 import { formatClock, useRefereeLabels } from './labels';
 import type { EventInput } from './use-scoring';
@@ -128,12 +129,14 @@ function SidePanel({
         {s.holds > 0 ? ` · ${t('holdUsed')}` : ''}
         {activityMine ? (
           <Badge tone="success" className="ml-2">
+            <RefereeGesture kind="activity" className="mr-2 text-xl" />
             {t('activityGiven')}
           </Badge>
         ) : null}
       </p>
       {subMs !== null ? (
         <p role="status" className="rounded-lg bg-white p-2 text-lg font-semibold">
+          <RefereeGesture kind="submission" className="mr-2" />
           {t('submissionRunning', { seconds: Math.floor(subMs / 1000) })}
         </p>
       ) : null}
@@ -182,6 +185,7 @@ function SidePanel({
                 event({ type: 'HOLD_ENDED', actionCode: null, value: Math.min(holdMs, holdTop) })
               }
             >
+              <RefereeGesture kind="hold" className="mr-2 text-xl" />
               {t('holdStop')}
             </button>
           ) : (
@@ -193,6 +197,7 @@ function SidePanel({
               className={cn(BTN, 'col-span-2', style.button)}
               onClick={() => event({ type: 'HOLD_STARTED', actionCode: null, value: null })}
             >
+              <RefereeGesture kind="hold" className="mr-2 text-xl" />
               {t('holdStart')}
             </button>
           )}
@@ -202,6 +207,7 @@ function SidePanel({
               className={cn(BTN, style.strong)}
               onClick={() => event({ type: 'SUBMISSION_ENDED', actionCode: null, value: null })}
             >
+              <RefereeGesture kind="submission" className="mr-2 text-xl" />
               {t('submissionStop')}
             </button>
           ) : (
@@ -211,6 +217,7 @@ function SidePanel({
               className={cn(BTN, style.button)}
               onClick={() => event({ type: 'SUBMISSION_STARTED', actionCode: null, value: null })}
             >
+              <RefereeGesture kind="submission" className="mr-2 text-xl" />
               {t('submissionStart')}
             </button>
           )}
@@ -220,6 +227,7 @@ function SidePanel({
             className={cn(BTN, 'border-emerald-400 bg-emerald-50 text-emerald-900 hover:bg-emerald-100')}
             onClick={() => event({ type: 'ACTIVITY', actionCode: null, value: null })}
           >
+            <RefereeGesture kind="activity" className="mr-2 text-xl" />
             {t('activity')}
           </button>
           <button

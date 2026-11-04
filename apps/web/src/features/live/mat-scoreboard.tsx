@@ -18,6 +18,7 @@ import {
 } from '@sde/contracts';
 import { cn } from '@sde/ui';
 import { EloBadge } from '@/components/elo-badge';
+import { RefereeGesture } from '@/components/referee-gesture';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatClock, useRefereeLabels } from '@/features/refereeing/labels';
@@ -153,10 +154,10 @@ function PenaltySteps({ side, penalties }: { side: Side; penalties: string[] }) 
             key={`${p}-${i}`}
             title={label.code(p)}
             className={cn(
-              'h-[min(5.4vh,3.4vw)] w-[min(4vh,2.5vw)] rotate-[-6deg] rounded-[0.5vh] border border-black/20 shadow-[0_0.4vh_1vh_rgb(0_0_0/0.35)]',
+              'h-[min(8vh,5vw)] w-[min(6vh,3.75vw)] rotate-[-6deg] rounded-[0.5vh] border border-black/20 shadow-[0_0.4vh_1vh_rgb(0_0_0/0.35)]',
               red ? 'bg-red-500' : 'bg-yellow-300',
             )}
-            style={side === 'RED' ? { marginLeft: `${i * 1.6}vw` } : { marginRight: `${i * 1.6}vw` }}
+            style={side === 'RED' ? { marginLeft: `${i * 2.4}vw` } : { marginRight: `${i * 2.4}vw` }}
           >
             <span className="sr-only">{label.code(p)}</span>
           </li>
@@ -235,6 +236,7 @@ function SidePanel({
             outer,
           )}
         >
+          <RefereeGesture kind="activity" className="text-[min(7vh,4.5vw)]" />
           <span className="text-[min(7vh,4.5vw)] font-black leading-none">{t('activityShort')}</span>
           <span className="text-[min(2.6vh,1.7vw)] font-semibold uppercase tracking-wide">
             {t('activity')}
@@ -243,7 +245,7 @@ function SidePanel({
       ) : null}
       <div
         className={cn(
-          'absolute bottom-[calc(min(18vh,12vw)+4vh)] flex flex-col gap-[0.8vh]',
+          'absolute bottom-[calc(min(18vh,12vw)+8vh)] flex flex-col gap-[0.8vh]',
           inner,
           side === 'RED' ? 'items-end' : 'items-start',
         )}
@@ -253,6 +255,7 @@ function SidePanel({
             role="timer"
             className={cn(CHIP, 'flex items-baseline gap-[0.8vw] bg-white text-slate-950 shadow-md')}
           >
+            <RefereeGesture kind="submission" className="self-center text-[min(5vh,3.2vw)]" />
             <span className="uppercase tracking-wide">{t('submissionLabel')}</span>
             <span className="text-[min(6vh,4vw)] font-black leading-none tabular-nums">
               {Math.floor(liveSubmissionMs(subAt, serverNow) / 1000)}
@@ -319,7 +322,8 @@ function Clock({ match, serverNow }: { match: LiveMatchDto; serverNow: number })
             hold.side === 'RED' ? 'bg-red-700' : 'bg-blue-700',
           )}
         >
-          <p className="text-[min(2.6vh,1.8vw)] font-semibold uppercase tracking-widest text-white/80">
+          <p className="flex items-center gap-[0.6vw] text-[min(2.6vh,1.8vw)] font-semibold uppercase tracking-widest text-white/80">
+            <RefereeGesture kind="hold" className="text-[min(6vh,4vw)]" />
             {t('holdLabel')}
           </p>
           <p className="text-[min(10vh,6.5vw)] font-black leading-none tabular-nums">
