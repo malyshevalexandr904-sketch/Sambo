@@ -1,7 +1,8 @@
 'use client';
 // Счёт и время на планшете ковра (план Phase 7a, §5): красный слева, синий справа — «Фамилия И.», клуб, баллы
 // крупно, наказания; основной таймер и таймер удержания; крупные кнопки оценок из правил турнира, удержание
-// старт/стоп, наказание (следующее по порядку). Цели касания ≥ 48 px; статус — цветом и текстом.
+// старт/стоп, наказание (следующее по порядку). Цели касания ≥ 48 px; статус — цветом и текстом. Правки 04.11.2026:
+// Эло рядом с фамилией, оценка активности «А» (правила FIAS, ст. 29.9) и секундомер болевого приёма каждому.
 import {
   clockNowMs,
   type MatchDetailDto,
@@ -37,6 +38,12 @@ export function holdElapsedMs(state: MatchState, now: number): number {
   return state.hold ? Math.max(0, now - Date.parse(state.hold.startedAt)) : 0;
 }
 
+/** Длительность идущего болевого приёма стороны (по часам планшета). */
+export function submissionElapsedMs(state: MatchState, side: Side, now: number): number | null {
+  const sub = side === 'RED' ? state.submissions?.red : state.submissions?.blue;
+  return sub ? Math.max(0, now - Date.parse(sub.startedAt)) : null;
+}
+
 export function maxHoldMs(rules: MatchRulesDto): number {
   return Math.max(0, ...rules.hold.thresholds.map((t) => t.seconds)) * 1000;
 }
@@ -69,6 +76,14 @@ function SidePanel({
   const holdMs = myHold ? holdElapsedMs(state, now) : 0;
   const holdTop = maxHoldMs(rules);
   const nextPenalty = rules.penalties[s.penalties.length];
+  const subMs = submissionElapsedMs(state, side, now);
+  const activityMine = state.activity?.side === side;
+  // Оценка активности — один раз за схватку, пока нет технических оценок и наказаний поровну (как в счёте).
+  const activityOpen =
+    !state.activity &&
+    state.red.points === state.blue.points &&
+    state.red.penalties.length === state.blue.penalties.length &&
+    [state.red, state.blue].every((x) => Object.values(x.technical).every((n) => n === 0));
   const event = (e: Omit<EventInput, 'side' | 'matchClockMs'> & { matchClockMs?: number }): void =>
     onEvent({ side, matchClockMs: clockMs, ...e });
   return (
@@ -77,8 +92,18 @@ function SidePanel({
       className={cn('flex min-w-0 flex-col gap-3 rounded-xl border-l-8 p-4', style.box)}
     >
       <header className="min-w-0">
-        <p className="text-sm font-semibold uppercase tracking-wide text-slate-600">{label.side(side)}</p>
-        <p className="truncate text-2xl font-bold text-slate-900 md:text-3xl">{info.publicName ?? '—'}</p>
+        {/* Угол — цветом панели; подпись «Красный/Синий угол» убрана (правки 04.11.2026), остаётся для чтеца. */}
+        <p className="sr-only">{label.side(side)}</p>
+        <p className="flex min-w-0 items-baseline gap-2">
+          <span className="truncate text-2xl font-bold text-slate-900 md:text-3xl">
+            {info.publicName ?? '—'}
+          </span>
+          {info.rating !== null ? (
+            <span className="shrink-0 rounded bg-white px-2 py-0.5 text-sm font-semibold tabular-nums text-slate-700">
+              {t('elo', { rating: info.rating })}
+            </span>
+          ) : null}
+        </p>
         <p className="truncate text-sm text-slate-600">
           {info.club ?? ''}
           {info.withdrawn ? (
@@ -98,7 +123,17 @@ function SidePanel({
       <p className="min-h-6 text-sm text-slate-700">
         {s.penalties.length > 0 ? s.penalties.map((p) => label.code(p)).join(' · ') : t('penaltiesNone')}
         {s.holds > 0 ? ` · ${t('holdUsed')}` : ''}
+        {activityMine ? (
+          <Badge tone="success" className="ml-2">
+            {t('activityGiven')}
+          </Badge>
+        ) : null}
       </p>
+      {subMs !== null ? (
+        <p role="status" className="rounded-lg bg-white p-2 text-lg font-semibold">
+          {t('submissionRunning', { seconds: Math.floor(subMs / 1000) })}
+        </p>
+      ) : null}
       {myHold ? (
         <div role="status" className="rounded-lg bg-white p-2">
           <p className="text-lg font-semibold">{t('holdRunning', { seconds: Math.floor(holdMs / 1000) })}</p>
@@ -158,6 +193,32 @@ function SidePanel({
               {t('holdStart')}
             </button>
           )}
+          {subMs !== null ? (
+            <button
+              type="button"
+              className={cn(BTN, style.strong)}
+              onClick={() => event({ type: 'SUBMISSION_ENDED', actionCode: null, value: null })}
+            >
+              {t('submissionStop')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled={decided}
+              className={cn(BTN, style.button)}
+              onClick={() => event({ type: 'SUBMISSION_STARTED', actionCode: null, value: null })}
+            >
+              {t('submissionStart')}
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={decided || !activityOpen}
+            className={cn(BTN, 'border-emerald-400 bg-emerald-50 text-emerald-900 hover:bg-emerald-100')}
+            onClick={() => event({ type: 'ACTIVITY', actionCode: null, value: null })}
+          >
+            {t('activity')}
+          </button>
           <button
             type="button"
             disabled={decided || !nextPenalty}

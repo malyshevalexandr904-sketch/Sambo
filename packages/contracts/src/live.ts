@@ -201,6 +201,8 @@ export interface LiveSideDto {
   hidden: boolean;
   club: string | null;
   region: string | null;
+  /** Текущий рейтинг Эло; null — рейтинга нет или имя скрыто. */
+  rating: number | null;
 }
 
 export interface LiveSideScoreDto {
@@ -225,6 +227,10 @@ export interface LiveMatchDto {
   score: { red: LiveSideScoreDto; blue: LiveSideScoreDto } | null;
   clock: { running: boolean; elapsedMs: number; durationMs: number; at: string | null } | null;
   hold: { side: Side; startedAt: string; maxMs: number } | null;
+  /** Оценка активности («А»): чья действует; null — нет (не ставилась или потеряла силу). */
+  activity: Side | null;
+  /** Идущие болевые приёмы: момент начала по сторонам (секундомер на табло). */
+  submissions: { red: string | null; blue: string | null };
   /** Результат (предварительный или подтверждённый). */
   result: {
     status: MatchResultStatus;
@@ -266,6 +272,11 @@ export function isNewerMatchState(next: LiveMatchDto, shown: LiveMatchDto | null
 export function liveClockMs(clock: NonNullable<LiveMatchDto['clock']>, serverNowMs: number): number {
   if (!clock.running || !clock.at) return clock.elapsedMs;
   return Math.min(clock.durationMs, clock.elapsedMs + Math.max(0, serverNowMs - Date.parse(clock.at)));
+}
+
+/** Длительность идущего болевого приёма по часам сервера. */
+export function liveSubmissionMs(startedAt: string, serverNowMs: number): number {
+  return Math.max(0, serverNowMs - Date.parse(startedAt));
 }
 
 /** Длительность идущего удержания по часам сервера (не дольше максимального порога). */

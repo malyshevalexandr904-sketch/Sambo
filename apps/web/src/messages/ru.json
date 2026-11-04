@@ -38,7 +38,8 @@
   },
   "home": {
     "title": "Цифровое самбо",
-    "lead": "Окунись в мир самбо",
+    "lead": "«Самбо — визитная карточка нашей страны наравне с космосом и балетом»",
+    "leadAuthor": "Василий Шестаков",
     "login": "Войти",
     "register": "Зарегистрироваться",
     "loginTitle": "Уже зарегистрированы",
@@ -2231,7 +2232,8 @@
       "MORE_HIGH_SCORES": "больше высших оценок",
       "REFEREE_DECISION": "решение судей",
       "TECHNICAL_POINTS": "больше баллов за технику",
-      "LAST_PENALTY": "по последнему предупреждению"
+      "LAST_PENALTY": "по последнему предупреждению",
+      "ACTIVITY": "по оценке активности"
     },
     "codes": {
       "THROW_TOTAL": "Бросок",
@@ -2254,6 +2256,9 @@
       "HOLD_STARTED": "начало удержания",
       "HOLD_ENDED": "удержание",
       "PENALTY": "наказание",
+      "ACTIVITY": "оценка активности",
+      "SUBMISSION_STARTED": "начало болевого",
+      "SUBMISSION_ENDED": "болевой",
       "EVENT_VOIDED": "отмена"
     },
     "rejections": {
@@ -2273,7 +2278,11 @@
       "match_decided": "исход уже определён досрочно",
       "not_voidable": "показания времени не отменяются",
       "already_voided": "событие уже отменено",
-      "event_not_found": "событие не найдено"
+      "event_not_found": "событие не найдено",
+      "activity_used": "оценку активности уже ставили в этой схватке",
+      "activity_not_allowed": "оценка активности — только пока нет технических оценок и наказаний поровну",
+      "submission_active": "болевой приём уже идёт",
+      "submission_not_active": "болевой приём не идёт"
     },
     "preconditions": {
       "competition_status": "схватки проводятся, когда расписание готово",
@@ -2390,7 +2399,13 @@
     "liveOff": "Обновление раз в 5 с",
     "rolePausedTitle": "Оценки не отправлены",
     "rolePaused": "В этом браузере выбрана другая роль — сервер не принимает оценки. Неотправленных действий: {count}; они сохранены и уйдут после возврата в роль «{role}».",
-    "backToRole": "Вернуться в роль «{role}»"
+    "backToRole": "Вернуться в роль «{role}»",
+    "activity": "Активность «А»",
+    "activityGiven": "Активность «А»",
+    "submissionStart": "Болевой",
+    "submissionStop": "Конец болевого",
+    "submissionRunning": "Болевой {seconds} с",
+    "elo": "Эло {rating}"
   },
   "results": {
     "medals": {
@@ -2562,7 +2577,11 @@
       "FINISHED": "Результат",
       "NEXT": "Следующая схватка"
     },
-    "holdLabel": "Удержание"
+    "holdLabel": "Удержание",
+    "activity": "Активность",
+    "activityShort": "А",
+    "submissionLabel": "Болевой",
+    "elo": "Эло {rating}"
   },
   "onboarding": {
     "cabinet": {

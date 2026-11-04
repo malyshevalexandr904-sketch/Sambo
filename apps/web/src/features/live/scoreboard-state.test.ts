@@ -1,6 +1,6 @@
 import type { LiveMatchDto, PublicMatStateDto } from '@sde/contracts';
 import { describe, expect, it } from 'vitest';
-import { mergeMatState, scoreboardView, upNext } from './scoreboard-state';
+import { advantageSide, mergeMatState, scoreboardView, upNext } from './scoreboard-state';
 
 const NOW = Date.parse('2026-10-10T12:00:00.000Z');
 
@@ -10,11 +10,13 @@ const match = (p: Partial<LiveMatchDto>): LiveMatchDto => ({
   roundLabel: 'FINAL',
   category: { ru: 'Юноши', en: 'Boys' },
   status: 'IN_PROGRESS',
-  red: { name: 'Иванов И.', hidden: false, club: 'СК', region: null },
-  blue: { name: null, hidden: true, club: 'СШ', region: null },
+  red: { name: 'Иванов И.', hidden: false, club: 'СК', region: null, rating: 1512 },
+  blue: { name: null, hidden: true, club: 'СШ', region: null, rating: null },
   score: null,
   clock: null,
   hold: null,
+  activity: null,
+  submissions: { red: null, blue: null },
   result: null,
   finishedAt: null,
   version: 3,
@@ -76,5 +78,33 @@ describe('scoreboardView', () => {
     expect(upNext(s, scoreboardView(s, NOW))?.publicId).toBe('m2');
     const onlyNext = state({ next });
     expect(upNext(onlyNext, scoreboardView(onlyNext, NOW))).toBeNull();
+  });
+});
+
+describe('advantageSide', () => {
+  const score = (red: number, blue: number) => ({
+    red: { points: red, penalties: [] },
+    blue: { points: blue, penalties: [] },
+  });
+  it('до старта и при равном счёте без «А» — никто', () => {
+    expect(advantageSide(match({}))).toBeNull();
+    expect(advantageSide(match({ score: score(0, 0) }))).toBeNull();
+  });
+  it('больше баллов — преимущество', () => {
+    expect(advantageSide(match({ score: score(1, 4) }))).toBe('BLUE');
+  });
+  it('равный счёт — по оценке активности', () => {
+    expect(advantageSide(match({ score: score(0, 0), activity: 'RED' }))).toBe('RED');
+  });
+  it('после схватки — победитель', () => {
+    const result = {
+      status: 'CONFIRMED' as const,
+      winnerSide: 'BLUE' as const,
+      method: 'POINTS' as const,
+      methodDetail: null,
+      redScore: 2,
+      blueScore: 2,
+    };
+    expect(advantageSide(match({ score: score(2, 2), result }))).toBe('BLUE');
   });
 });

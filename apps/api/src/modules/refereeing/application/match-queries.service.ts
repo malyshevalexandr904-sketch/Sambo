@@ -120,7 +120,14 @@ export class MatchQueriesService {
       entryIds.length
         ? db.entry.findMany({
             where: { id: { in: entryIds } },
-            select: { id: true, publicName: true, snapClubName: true, snapRegionName: true, status: true },
+            select: {
+              id: true,
+              publicName: true,
+              snapClubName: true,
+              snapRegionName: true,
+              status: true,
+              athlete: { select: { rating: { select: { rating: true } } } },
+            },
           })
         : Promise.resolve([]),
       db.user.findMany({
@@ -144,6 +151,7 @@ export class MatchQueriesService {
             club: e.snapClubName,
             region: e.snapRegionName,
             withdrawn: e.status === 'WITHDRAWN',
+            rating: e.athlete.rating?.rating ?? null,
           },
         ]),
       ),

@@ -5,6 +5,7 @@ import {
   LIVE_LAST_RESULT_MS,
   type LiveMatchDto,
   type PublicMatStateDto,
+  type Side,
 } from '@sde/contracts';
 
 /**
@@ -48,4 +49,16 @@ export function scoreboardView(s: PublicMatStateDto, serverNowMs: number): Score
 export function upNext(s: PublicMatStateDto, view: ScoreboardView): LiveMatchDto | null {
   if (view.kind === 'next' || !s.next) return null;
   return 'match' in view && view.match.publicId === s.next.publicId ? null : s.next;
+}
+
+/**
+ * Чья сторона в преимуществе: больше баллов, при равенстве — оценка активности «А»; после схватки — победитель.
+ * Цвет угла в преимуществе — в полную силу, остальные — приглушены наполовину (правки 04.11.2026).
+ */
+export function advantageSide(match: LiveMatchDto): Side | null {
+  if (match.result) return match.result.winnerSide;
+  const s = match.score;
+  if (!s) return null;
+  if (s.red.points !== s.blue.points) return s.red.points > s.blue.points ? 'RED' : 'BLUE';
+  return match.activity;
 }

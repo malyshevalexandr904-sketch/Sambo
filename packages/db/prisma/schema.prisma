@@ -2123,6 +2123,11 @@ enum MatchEventType {
   HOLD_STARTED
   HOLD_ENDED
   PENALTY
+  /// Оценка активности «А» (Международные правила самбо FIAS, ст. 29.9).
+  ACTIVITY
+  /// Секундомер болевого приёма: на счёт не влияет.
+  SUBMISSION_STARTED
+  SUBMISSION_ENDED
   EVENT_VOIDED
 }
 

@@ -3,11 +3,15 @@
 // «Фамилия И.» и клуб (без согласия на распространение ПДн — только угол и клуб), баллы, наказания, удержание,
 // время схватки; между схватками — вызов и следующая пара, после — результат. Данные — публичный снимок ковра и
 // живой канал `public:mat`; без живого соединения — опрос снимка. Время досчитывается здесь по часам сервера.
+// Правки 04.11.2026: без подписей угла и «круг · идёт схватка»; имена и Эло — у центра, время — в вырезе у нижнего
+// края половин, предупреждения — ступеньками из верхнего крайнего угла, активность «А» — в нижнем крайнем углу,
+// секундомер болевого — каждому; цвет угла приглушён наполовину, у стороны в преимуществе — в полную силу.
 import {
   type DataEnvelope,
   liveClockMs,
   liveHoldMs,
   type LiveMatchDto,
+  liveSubmissionMs,
   type LiveSideDto,
   type PublicMatStateDto,
   type Side,
@@ -16,10 +20,15 @@ import { cn } from '@sde/ui';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatClock, useRefereeLabels } from '@/features/refereeing/labels';
-import { useRoundLabel } from '@/features/scheduling/shared';
 import { liveClient, useChannelHealth, useLiveChannel, useLiveStatus } from '@/lib/live';
 import { pickName } from '@/lib/queries';
-import { mergeMatState, type ScoreboardView, scoreboardView, upNext } from './scoreboard-state';
+import {
+  advantageSide,
+  mergeMatState,
+  type ScoreboardView,
+  scoreboardView,
+  upNext,
+} from './scoreboard-state';
 
 const POLL_MS = 5_000;
 /** При живом соединении — сверка со снимком раз в минуту (тихий обрыв ленты на сервере, смена номера ковра). */
@@ -95,18 +104,59 @@ function useWakeLock(): void {
   }, []);
 }
 
+const CHIP = 'rounded-[0.6vh] px-[1vw] py-[0.4vh] text-[min(3.2vh,2vw)] font-bold';
+
 function SideName({ side, info }: { side: Side; info: LiveSideDto }) {
   const t = useTranslations('scoreboard');
   const corner = t(side === 'RED' ? 'red' : 'blue');
   const name = info.name ?? (info.hidden ? corner : t('waiting'));
+  // Имена — у центра табло: красный — в правом углу своей половины, синий — в левом.
+  const inner = side === 'RED' ? 'items-end text-right' : 'items-start text-left';
   return (
-    <div className="min-w-0">
-      <p className="truncate text-[min(3vh,2vw)] font-semibold uppercase tracking-widest text-white/70">
-        {info.name ? corner : ' '}
+    <div className={cn('flex min-w-0 flex-col', inner)}>
+      <p
+        className={cn(
+          'flex max-w-full items-baseline gap-[1vw]',
+          side === 'RED' ? 'flex-row-reverse' : 'flex-row',
+        )}
+      >
+        <span className="line-clamp-2 min-w-0 break-words text-[min(6.5vh,3.6vw)] font-extrabold leading-[1.05]">
+          {name}
+        </span>
+        {info.rating !== null ? (
+          <span className="shrink-0 rounded-[0.6vh] bg-black/25 px-[0.8vw] py-[0.3vh] text-[min(2.6vh,1.6vw)] font-bold tabular-nums">
+            {t('elo', { rating: info.rating })}
+          </span>
+        ) : null}
       </p>
-      <p className="truncate text-[min(8vh,4.6vw)] font-extrabold leading-tight">{name}</p>
-      <p className="truncate text-[min(4vh,2.6vw)] font-medium text-white/85">{info.club ?? ' '}</p>
+      <p className="max-w-full truncate text-[min(4vh,2.6vw)] font-medium text-white/85">
+        {info.club ?? ' '}
+      </p>
     </div>
+  );
+}
+
+/** Предупреждения — в верхнем крайнем углу, каждое следующее — ступенькой ниже и ближе к центру. */
+function PenaltySteps({ side, penalties }: { side: Side; penalties: string[] }) {
+  const label = useRefereeLabels();
+  if (penalties.length === 0) return null;
+  return (
+    <ol
+      className={cn(
+        'flex max-w-[18vw] shrink-0 flex-col gap-[0.8vh]',
+        side === 'RED' ? 'items-start' : 'items-end',
+      )}
+    >
+      {penalties.map((p, i) => (
+        <li
+          key={`${p}-${i}`}
+          className="w-max max-w-[15vw] rounded-[0.6vh] bg-amber-300 px-[0.8vw] py-[0.4vh] text-[min(2.4vh,1.4vw)] font-bold leading-tight text-slate-950 shadow-md"
+          style={side === 'RED' ? { marginLeft: `${i * 1.5}vw` } : { marginRight: `${i * 1.5}vw` }}
+        >
+          {label.code(p)}
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -115,32 +165,50 @@ function SidePanel({
   match,
   showScore,
   winner,
+  advantage,
+  serverNow,
 }: {
   side: Side;
   match: LiveMatchDto;
   showScore: boolean;
   winner: boolean;
+  advantage: boolean;
+  serverNow: number;
 }) {
   const t = useTranslations('scoreboard');
-  const label = useRefereeLabels();
   const info = side === 'RED' ? match.red : match.blue;
   const score = match.score ? (side === 'RED' ? match.score.red : match.score.blue) : null;
   const result = match.result;
   const finalPoints = result ? (side === 'RED' ? result.redScore : result.blueScore) : null;
   const points = finalPoints ?? score?.points ?? 0;
-  const hold = match.hold?.side === side ? match.hold : null;
+  const subAt = side === 'RED' ? match.submissions.red : match.submissions.blue;
+  const activity = match.activity === side;
   const style = SIDE_STYLE[side];
+  const outer = side === 'RED' ? 'left-[2vw]' : 'right-[2vw]';
+  // Болевой и «Победа» — у центра, над вырезом под время (вырез растёт, когда рядом со временем удержание).
+  const inner = side === 'RED' ? 'right-[2vw]' : 'left-[2vw]';
   return (
     <section
       aria-label={t(side === 'RED' ? 'red' : 'blue')}
       className={cn(
-        // Три строки: имя — сверху, баллы — всё оставшееся место, наказания и удержание — всегда видны снизу.
-        'grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] gap-[1.5vh] overflow-hidden p-[2.5vh_3vw]',
-        style.panel,
+        // Имя — сверху у центра, баллы — всё оставшееся место, снизу — место под время, активность и болевой.
+        'relative isolate grid min-h-0 min-w-0 grid-rows-[auto_minmax(0,1fr)_min(18vh,12vw)] gap-[1vh] overflow-hidden p-[2.5vh_2vw]',
         winner && `ring-[1.2vh] ring-inset ${style.win}`,
       )}
     >
-      <SideName side={side} info={info} />
+      {/* Цвет угла: приглушён наполовину, в полную силу — у стороны в преимуществе. */}
+      <div
+        aria-hidden="true"
+        className={cn('absolute inset-0 -z-10 transition-[filter] duration-700', style.panel)}
+        style={{ filter: advantage ? 'saturate(1)' : 'saturate(0.5)' }}
+      />
+      {/* Сверху: предупреждения — в крайнем углу, имя — у центра табло. */}
+      <div className={cn('flex min-w-0 items-start gap-[1.5vw]', side === 'BLUE' && 'flex-row-reverse')}>
+        <PenaltySteps side={side} penalties={score?.penalties ?? []} />
+        <div className="min-w-0 flex-1">
+          <SideName side={side} info={info} />
+        </div>
+      </div>
       {showScore ? (
         <p
           className="flex min-h-0 items-center justify-center text-[min(30vh,18vw)] font-black leading-none tabular-nums"
@@ -152,25 +220,38 @@ function SidePanel({
       ) : (
         <div />
       )}
-      <div className="flex min-h-[6vh] flex-wrap items-center gap-[1vw]">
-        {(score?.penalties ?? []).map((p, i) => (
-          <span
-            key={`${p}-${i}`}
-            className="rounded-[0.6vh] bg-amber-300 px-[1vw] py-[0.4vh] text-[min(3.2vh,2vw)] font-bold text-slate-950"
-          >
-            {label.code(p)}
+      <div />
+      {activity ? (
+        // Оценка активности «А» — в нижнем крайнем углу.
+        <p
+          className={cn(
+            'absolute bottom-[2.5vh] flex items-center gap-[0.8vw] rounded-[1vh] bg-emerald-400 px-[1.2vw] py-[0.6vh] text-slate-950 shadow-md',
+            outer,
+          )}
+        >
+          <span className="text-[min(7vh,4.5vw)] font-black leading-none">{t('activityShort')}</span>
+          <span className="text-[min(2.6vh,1.7vw)] font-semibold uppercase tracking-wide">
+            {t('activity')}
           </span>
-        ))}
-        {hold ? (
-          // Подробно удержание — рядом с основным временем; здесь — только чей угол держит.
-          <span
-            className={cn(
-              'rounded-[0.6vh] px-[1vw] py-[0.4vh] text-[min(3.2vh,2vw)] font-bold',
-              style.accent,
-            )}
+        </p>
+      ) : null}
+      <div
+        className={cn(
+          'absolute bottom-[calc(min(18vh,12vw)+4vh)] flex flex-col gap-[0.8vh]',
+          inner,
+          side === 'RED' ? 'items-end' : 'items-start',
+        )}
+      >
+        {subAt ? (
+          <p
+            role="timer"
+            className={cn(CHIP, 'flex items-baseline gap-[0.8vw] bg-white text-slate-950 shadow-md')}
           >
-            {t('holdLabel')}
-          </span>
+            <span className="uppercase tracking-wide">{t('submissionLabel')}</span>
+            <span className="text-[min(6vh,4vw)] font-black leading-none tabular-nums">
+              {Math.floor(liveSubmissionMs(subAt, serverNow) / 1000)}
+            </span>
+          </p>
         ) : null}
         {winner ? (
           <span className="rounded-[0.6vh] bg-white px-[1vw] py-[0.4vh] text-[min(4vh,2.6vw)] font-black text-slate-950">
@@ -182,19 +263,24 @@ function SidePanel({
   );
 }
 
-function MatchHeader({ match, status }: { match: LiveMatchDto; status: string }) {
+/** Строка над табло: категория и номер схватки; подпись состояния — только когда схватка не идёт. */
+function MatchHeader({ match, status }: { match: LiveMatchDto; status: string | null }) {
   const t = useTranslations('scoreboard');
   const locale = useLocale();
-  const round = useRoundLabel();
   return (
     <p className="truncate text-center text-[min(3.4vh,2.2vw)] font-semibold">
-      {pickName(match.category, locale)} · {round(match.roundLabel)}
+      {pickName(match.category, locale)}
       {match.number !== null ? ` · ${t('match', { number: match.number })}` : ''}
-      <span className="ml-[1.5vw] rounded-[0.6vh] bg-white px-[1vw] py-[0.3vh] text-slate-950">{status}</span>
+      {status ? (
+        <span className="ml-[1.5vw] rounded-[0.6vh] bg-white px-[1vw] py-[0.3vh] text-slate-950">
+          {status}
+        </span>
+      ) : null}
     </p>
   );
 }
 
+/** Время — в вырезе у нижнего края обеих цветных половин, по центру; рядом — удержание цветом угла. */
 function Clock({ match, serverNow }: { match: LiveMatchDto; serverNow: number }) {
   const t = useTranslations('scoreboard');
   if (!match.clock) return null;
@@ -203,7 +289,7 @@ function Clock({ match, serverNow }: { match: LiveMatchDto; serverNow: number })
   const timeUp = remaining <= 0;
   const hold = match.hold;
   return (
-    <div className="flex items-center justify-center gap-[4vw] bg-slate-950 py-[1.2vh]">
+    <div className="absolute bottom-0 left-1/2 z-10 flex -translate-x-1/2 items-center justify-center gap-[2vw] rounded-t-[3vh] bg-slate-950 px-[3vw] pb-[1.2vh] pt-[1.6vh] shadow-[0_-0.6vh_2vh_rgb(0_0_0/0.35)]">
       <div className="flex flex-col items-center">
         <p
           role="timer"
@@ -366,6 +452,7 @@ export function MatScoreboard({ matId }: { matId: string }) {
   const next = upNext(state, view);
   const match = 'match' in view ? view.match : null;
   const winnerSide = view.kind === 'result' ? (view.match.result?.winnerSide ?? null) : null;
+  const advantage = match && view.kind !== 'next' && view.kind !== 'called' ? advantageSide(match) : null;
   return (
     <main className="theme-light flex h-screen min-h-[320px] select-none flex-col overflow-hidden bg-slate-950 text-white">
       <header className="flex items-center justify-between gap-[2vw] bg-slate-900 px-[3vw] py-[1.2vh]">
@@ -402,27 +489,26 @@ export function MatScoreboard({ matId }: { matId: string }) {
       {match ? (
         <>
           <div className="bg-slate-900 px-[3vw] pb-[1.2vh]">
-            <MatchHeader match={match} status={t(`status.${statusKey(view)}`)} />
-          </div>
-          <div className="grid min-h-0 flex-1 grid-cols-2">
-            <SidePanel
-              side="RED"
+            <MatchHeader
               match={match}
-              showScore={view.kind !== 'next' && view.kind !== 'called'}
-              winner={winnerSide === 'RED'}
-            />
-            <SidePanel
-              side="BLUE"
-              match={match}
-              showScore={view.kind !== 'next' && view.kind !== 'called'}
-              winner={winnerSide === 'BLUE'}
+              status={statusKey(view) === 'IN_PROGRESS' ? null : t(`status.${statusKey(view)}`)}
             />
           </div>
-          {view.kind === 'result' ? (
-            <ResultLine match={match} />
-          ) : (
-            <Clock match={match} serverNow={serverNow} />
-          )}
+          <div className="relative grid min-h-0 flex-1 grid-cols-2">
+            {(['RED', 'BLUE'] as const).map((side) => (
+              <SidePanel
+                key={side}
+                side={side}
+                match={match}
+                showScore={view.kind !== 'next' && view.kind !== 'called'}
+                winner={winnerSide === side}
+                advantage={advantage === side}
+                serverNow={serverNow}
+              />
+            ))}
+            {view.kind === 'result' ? null : <Clock match={match} serverNow={serverNow} />}
+          </div>
+          {view.kind === 'result' ? <ResultLine match={match} /> : null}
         </>
       ) : (
         <div className="flex flex-1 items-center justify-center p-6 text-center">

@@ -12,16 +12,23 @@ export const MATCH_EVENT_TYPES = [
   'HOLD_STARTED',
   'HOLD_ENDED',
   'PENALTY',
+  'ACTIVITY',
+  'SUBMISSION_STARTED',
+  'SUBMISSION_ENDED',
   'EVENT_VOIDED',
 ] as const;
 export type MatchEventType = (typeof MATCH_EVENT_TYPES)[number];
 
-/** События, которые можно отменить компенсирующим событием: оценки, наказания и удержания (показания времени — нет). */
+/**
+ * События, которые можно отменить компенсирующим событием: оценки, наказания, удержания и оценка активности
+ * (показания времени и секундомер болевого приёма — нет: секундомер болевого счёт не меняет).
+ */
 export const VOIDABLE_EVENT_TYPES: readonly MatchEventType[] = [
   'SCORE',
   'PENALTY',
   'HOLD_STARTED',
   'HOLD_ENDED',
+  'ACTIVITY',
 ];
 
 /** Правила, от которых зависит счёт (часть версии правил турнира). */
@@ -80,6 +87,26 @@ export interface HoldState {
   eventId: string;
 }
 
+/** Идущий болевой приём: секундомер для судей и табло, на счёт не влияет. */
+export interface SubmissionState {
+  /** Время устройства начала болевого приёма (ISO). */
+  startedAt: string;
+  /** Показание основного секундомера при начале. */
+  clockMs: number;
+  eventId: string;
+}
+
+/**
+ * Оценка активности (Международные правила самбо FIAS, ст. 14.11–14.12, 16.2, 29.9; в протоколе — «А»): судьи
+ * отмечают более активного спортсмена, пока нет ни оценок, ни наказаний. Ставится один раз за схватку и теряет
+ * силу, когда появляется разница в баллах или наказаниях. Если до конца схватки ни оценок, ни наказаний не
+ * было — побеждает спортсмен с оценкой активности.
+ */
+export interface ActivityState {
+  /** Чья оценка активности действует; null — оценку уже ставили, но она потеряла силу. */
+  side: Side | null;
+}
+
 export type DecisiveKind = 'TOTAL_VICTORY' | 'SUPERIORITY' | 'DISQUALIFICATION';
 
 export interface MatchState {
@@ -90,6 +117,10 @@ export interface MatchState {
   blue: SideScore;
   clock: ClockState;
   hold: HoldState | null;
+  /** Оценка активности; null или нет поля — не ставилась (состояния, записанные до неё, поля не имеют). */
+  activity?: ActivityState | null;
+  /** Идущие болевые приёмы по сторонам; нет поля — болевых нет. */
+  submissions?: { red: SubmissionState | null; blue: SubmissionState | null };
   /** Сторона последнего технического действия (оценка, удержание с баллами) — тай-брейк. */
   lastTechnical: Side | null;
   /** Досрочный исход: чистая победа, преимущество, дисквалификация. */
@@ -115,6 +146,10 @@ export const SCORING_REJECTIONS = [
   'not_voidable',
   'already_voided',
   'event_not_found',
+  'activity_used',
+  'activity_not_allowed',
+  'submission_active',
+  'submission_not_active',
 ] as const;
 export type ScoringRejection = (typeof SCORING_REJECTIONS)[number];
 
@@ -161,6 +196,8 @@ export function initialMatchState(durationMs: number): MatchState {
     blue: emptySide(),
     clock: { running: false, elapsedMs: 0, at: null },
     hold: null,
+    activity: null,
+    submissions: { red: null, blue: null },
     lastTechnical: null,
     decision: null,
   };
@@ -180,6 +217,11 @@ function cloneState(s: MatchState): MatchState {
     blue: side(s.blue),
     clock: { ...s.clock },
     hold: s.hold ? { ...s.hold } : null,
+    activity: s.activity ? { ...s.activity } : null,
+    submissions: {
+      red: s.submissions?.red ? { ...s.submissions.red } : null,
+      blue: s.submissions?.blue ? { ...s.submissions.blue } : null,
+    },
     decision: s.decision ? { ...s.decision } : null,
   };
 }
@@ -281,6 +323,57 @@ const applyHoldEnd: Apply = (s, e, rules) => {
   return done(s);
 };
 
+/**
+ * Условие оценки активности и победы по ней: технических оценок нет ни у кого, наказаний поровну (нет совсем или
+ * получены одновременно) — счёт равный.
+ */
+function blankScore(s: MatchState): boolean {
+  const noTechnical = (x: SideScore): boolean => Object.values(x.technical).every((n) => n === 0);
+  return (
+    noTechnical(s.red) &&
+    noTechnical(s.blue) &&
+    s.red.points === s.blue.points &&
+    s.red.penalties.length === s.blue.penalties.length
+  );
+}
+
+/** Оценка активности теряет силу, когда появилась разница в баллах или в наказаниях. */
+function lapseActivity(s: MatchState): void {
+  if (!s.activity?.side) return;
+  if (s.red.points !== s.blue.points || s.red.penalties.length !== s.blue.penalties.length)
+    s.activity = { side: null };
+}
+
+const applyActivity: Apply = (s, e) => {
+  if (!e.side) return fail('side_required');
+  if (s.decision) return fail('match_decided');
+  if (s.activity) return fail('activity_used');
+  if (!blankScore(s)) return fail('activity_not_allowed');
+  s.activity = { side: e.side };
+  return done(s);
+};
+
+const submissionsOf = (s: MatchState) => (s.submissions ??= { red: null, blue: null });
+
+const applySubmissionStart: Apply = (s, e) => {
+  if (!e.side) return fail('side_required');
+  if (s.decision) return fail('match_decided');
+  const subs = submissionsOf(s);
+  const key = e.side === 'RED' ? 'red' : 'blue';
+  if (subs[key]) return fail('submission_active');
+  subs[key] = { startedAt: e.deviceTime, clockMs: e.matchClockMs, eventId: e.id };
+  return done(s);
+};
+
+const applySubmissionEnd: Apply = (s, e) => {
+  if (!e.side) return fail('side_required');
+  const subs = submissionsOf(s);
+  const key = e.side === 'RED' ? 'red' : 'blue';
+  if (!subs[key]) return fail('submission_not_active');
+  subs[key] = null;
+  return done(s);
+};
+
 const APPLY: Record<MatchEventType, Apply> = {
   CLOCK_STARTED: (s, e) => applyClock(s, e, true),
   CLOCK_STOPPED: (s, e) => applyClock(s, e, false),
@@ -288,6 +381,9 @@ const APPLY: Record<MatchEventType, Apply> = {
   PENALTY: applyPenalty,
   HOLD_STARTED: applyHoldStart,
   HOLD_ENDED: applyHoldEnd,
+  ACTIVITY: applyActivity,
+  SUBMISSION_STARTED: applySubmissionStart,
+  SUBMISSION_ENDED: applySubmissionEnd,
   // Отмена учитывается повтором журнала (replayEvents): само событие счёт не меняет.
   EVENT_VOIDED: (s) => done(s),
 };
@@ -305,7 +401,13 @@ export function applyEvent(
 ): ApplyResult {
   const s = cloneState(state);
   s.seq = Math.max(s.seq, e.seq);
-  return APPLY[e.type](s, e, rules, strict);
+  const r = APPLY[e.type](s, e, rules, strict);
+  if (r.ok) {
+    lapseActivity(r.state);
+    // Досрочный исход — болевые приёмы закончены.
+    if (r.state.decision) r.state.submissions = { red: null, blue: null };
+  }
+  return r;
 }
 
 /**
@@ -458,6 +560,8 @@ export function determineOutcome(
     };
   }
   if (s.hold || !timeExpired(s)) return null;
+  if (s.activity?.side && blankScore(s))
+    return { winnerSide: s.activity.side, method: 'POINTS', methodDetail: 'ACTIVITY', basis: 'TIE_BREAKER' };
   if (s.red.points !== s.blue.points)
     return {
       winnerSide: s.red.points > s.blue.points ? 'RED' : 'BLUE',

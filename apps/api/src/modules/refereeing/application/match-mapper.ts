@@ -23,6 +23,8 @@ export interface EntryView {
   club: string | null;
   region: string | null;
   withdrawn: boolean;
+  /** Текущий рейтинг Эло спортсмена. */
+  rating?: number | null;
 }
 
 export type UserNames = ReadonlyMap<string, string>;
@@ -57,6 +59,7 @@ export function sideDto(m: MatchRecord, side: Side, entries: ReadonlyMap<string,
     club: e?.club ?? null,
     region: e?.region ?? null,
     withdrawn: e?.withdrawn ?? false,
+    rating: e?.rating ?? null,
   };
 }
 
