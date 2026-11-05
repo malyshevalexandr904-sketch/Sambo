@@ -25,6 +25,7 @@ import { CompetitionCategoriesService } from './competition-categories.service';
 
 const REGISTRATION_PHASE: readonly CompetitionStatus[] = [
   'DRAFT',
+  'PUBLISHED',
   'REGISTRATION_OPEN',
   'REGISTRATION_CLOSED',
 ];

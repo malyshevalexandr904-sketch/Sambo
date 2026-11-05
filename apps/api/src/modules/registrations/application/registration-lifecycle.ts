@@ -6,10 +6,13 @@ import { DomainError } from '../../../common/errors/domain-error';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { AthleteExtensions } from '../../athletes';
 import { CategoryExtensions, type EntryStats } from '../../categories';
-import { CompetitionExtensions } from '../../competitions';
+import { AuditService } from '../../audit';
+import { CompetitionExtensions, type TransitionContext } from '../../competitions';
+import { OutboxService } from '../../outbox';
 import { ACTIVE_ENTRY_STATUSES } from '../domain/entry-rules';
 
 const ACTIVE = [...ACTIVE_ENTRY_STATUSES];
+const AUTO_REJECT_REASON = 'Заявка не исправлена до окончания мандатной комиссии';
 
 @Injectable()
 export class RegistrationLifecycle implements OnModuleInit {
@@ -18,6 +21,8 @@ export class RegistrationLifecycle implements OnModuleInit {
     private readonly competitions: CompetitionExtensions,
     private readonly categories: CategoryExtensions,
     private readonly athletes: AthleteExtensions,
+    private readonly audit: AuditService,
+    private readonly outbox: OutboxService,
   ) {}
 
   onModuleInit(): void {
@@ -33,13 +38,26 @@ export class RegistrationLifecycle implements OnModuleInit {
       return { applications, entriesApproved: approved, entriesPending: pending };
     });
 
-    // Мандатная комиссия (REGISTRATION_CLOSED → CHECK_IN): нерассмотренные заявки — предупреждение с подтверждением.
+    // Мандатная комиссия (REGISTRATION_CLOSED → CHECK_IN): нерассмотренные заявки и заявки, не исправленные после
+    // возврата, — предупреждения с подтверждением.
     this.competitions.registerCheck(async ({ tx, competition, from, to }) => {
       if (from !== 'REGISTRATION_CLOSED' || to !== 'CHECK_IN') return { blocking: [] };
-      const open = await tx.application.count({
-        where: { competitionId: competition.id, status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
-      });
-      return { blocking: [], warnings: open > 0 ? ['applications_pending_review'] : [] };
+      const [open, waiting] = await Promise.all([
+        tx.application.count({
+          where: { competitionId: competition.id, status: { in: ['SUBMITTED', 'UNDER_REVIEW'] } },
+        }),
+        tx.application.count({ where: { competitionId: competition.id, status: 'WAITING_DOCUMENTS' } }),
+      ]);
+      const warnings: string[] = [];
+      if (open > 0) warnings.push('applications_pending_review');
+      if (waiting > 0) warnings.push('applications_will_be_rejected');
+      return { blocking: [], warnings };
+    });
+
+    // Окончание мандатной комиссии (правки 05.11.2026): заявка, которую вернули на исправление и не исправили до
+    // окончания комиссии, отклоняется автоматически вместе с её нерассмотренными участиями.
+    this.competitions.registerEffect(async (ctx) => {
+      if (ctx.from === 'REGISTRATION_CLOSED' && ctx.to === 'CHECK_IN') await this.rejectUnfixed(ctx);
     });
 
     this.categories.registerEntryStats((tx, ids) => this.stats(tx, ids));
@@ -78,6 +96,63 @@ export class RegistrationLifecycle implements OnModuleInit {
         data: { athleteId: target.athleteId },
       });
     });
+  }
+
+  private async rejectUnfixed(ctx: TransitionContext): Promise<void> {
+    const { tx, competition, userId, now } = ctx;
+    const apps = await tx.application.findMany({
+      where: { competitionId: competition.id, status: 'WAITING_DOCUMENTS' },
+      select: { id: true, organizationId: true },
+    });
+    for (const app of apps) {
+      await tx.application.update({
+        where: { id: app.id },
+        data: {
+          status: 'REJECTED',
+          reviewedAt: now,
+          reviewedById: userId,
+          reviewComment: AUTO_REJECT_REASON,
+          version: { increment: 1 },
+        },
+      });
+      const entries = await tx.entry.findMany({
+        where: { applicationId: app.id, status: 'PENDING' },
+        select: { id: true },
+      });
+      await tx.entry.updateMany({
+        where: { id: { in: entries.map((e) => e.id) } },
+        data: {
+          status: 'REJECTED',
+          decidedAt: now,
+          decidedById: userId,
+          decisionReason: AUTO_REJECT_REASON,
+          version: { increment: 1 },
+        },
+      });
+      await this.audit.record(tx, {
+        action: 'application.status_changed',
+        entityType: 'Application',
+        entityId: app.id,
+        competitionId: competition.id,
+        organizationId: app.organizationId,
+        before: { status: 'WAITING_DOCUMENTS' },
+        after: { status: 'REJECTED', entries: entries.length, trigger: 'mandate_commission_ended' },
+        reason: AUTO_REJECT_REASON,
+      });
+      for (const e of entries)
+        await this.outbox.enqueue(tx, {
+          type: 'registration.entry_decided',
+          aggregate: { type: 'Entry', id: e.id },
+          competitionId: competition.id,
+          payload: { entryId: e.id, decision: 'REJECTED' },
+        });
+      await this.outbox.enqueue(tx, {
+        type: 'registration.application_decided',
+        aggregate: { type: 'Application', id: app.id },
+        competitionId: competition.id,
+        payload: { applicationId: app.id, status: 'REJECTED' },
+      });
+    }
   }
 
   private async stats(tx: Tx | null, categoryIds: string[]): Promise<Map<string, EntryStats>> {

@@ -172,7 +172,7 @@ export async function notificationSource(
     };
   }
   if (type === 'application.decided') return { ...app, status: params.status ?? app.status };
-  if (type === 'schedule.changed') {
+  if (type === 'schedule.changed' || type === 'competition.registration_opened') {
     const competition = params.competitionId
       ? await db.competition.findUnique({ where: { id: params.competitionId }, select: { name: true } })
       : null;

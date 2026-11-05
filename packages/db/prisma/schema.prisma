@@ -135,6 +135,7 @@ model User {
   importJobs                 ImportJob[]                     @relation("ImportCreator")
   createdVenues              Venue[]                         @relation("VenueCreator")
   createdCompetitions        Competition[]                   @relation("CompetitionCreator")
+  createdCompetitionMedia    CompetitionMedia[]              @relation("CompetitionMediaCreator")
   updatedCompetitions        Competition[]                   @relation("CompetitionUpdater")
   createdApplications        Application[]                   @relation("ApplicationCreator")
   submittedApplications      Application[]                   @relation("ApplicationSubmitter")
@@ -659,6 +660,7 @@ model StoredFile {
   importJobs         ImportJob[]         @relation("ImportFile")
   competitionLogos   Competition[]       @relation("CompetitionLogo")
   regulations        Competition[]       @relation("CompetitionRegulation")
+  competitionMedia   CompetitionMedia[]  @relation("CompetitionMediaFile")
   onboardingDocument OnboardingDocument? @relation("OnboardingDocumentFile")
 
   @@index([status, createdAt])
@@ -1250,6 +1252,8 @@ model ImportJob {
 
 enum CompetitionStatus {
   DRAFT
+  /// «Опубликован» (правки 05.11.2026): турнир виден всем, регистрация ещё не началась.
+  PUBLISHED
   REGISTRATION_OPEN
   REGISTRATION_CLOSED
   CHECK_IN
@@ -1370,6 +1374,10 @@ model Competition {
   notifyMatchesAhead      Int                   @default(3) @map("notify_matches_ahead")
   /// Рейтинговый турнир (docs/RATING_ARCHITECTURE.md, 3.1): RATED — подтверждённые схватки меняют Elo.
   competitionType         CompetitionType       @default(NON_RATED) @map("competition_type")
+  /// Шаблон афиши на публичной странице (правки 05.11.2026): код из contracts `POSTER_TEMPLATES`.
+  posterTemplate          String                @default("classic") @map("poster_template")
+  /// Ссылка на прямую трансляцию (VK Видео, YouTube, Rutube) для раздела «Прямая трансляция».
+  liveStreamUrl           String?               @map("live_stream_url")
   createdAt               DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt               DateTime?             @map("deleted_at") @db.Timestamptz(3)
@@ -1421,6 +1429,7 @@ model Competition {
   ratingConfig        CompetitionRatingConfig?
   request             CompetitionRequest?
   refereeRecruitments RefereeRecruitmentPosition[]
+  media               CompetitionMedia[]
 
   @@index([status, startDate])
   @@index([organizerOrganizationId, startDate])
@@ -2053,6 +2062,8 @@ model PushSubscription {
 
 enum FollowTarget {
   ATHLETE
+  /// Подписка на начало регистрации турнира (правки 05.11.2026).
+  COMPETITION
 }
 
 /// Подписка пользователя на спортсмена (Phase 8b; DATABASE.md, 3.8): уведомления дня соревнований о его схватках
@@ -3103,6 +3114,8 @@ model RatingSeason {
 // ============================================================
 
 enum CompetitionRequestStatus {
+  /// Черновик организатора (правки 05.11.2026): виден только организации, `draft` — введённые данные формы.
+  DRAFT
   SUBMITTED
   APPROVED
   REJECTED
@@ -3126,6 +3139,8 @@ model CompetitionRequest {
   decidedById          String?                  @map("decided_by_id") @db.Uuid
   decidedAt            DateTime?                @map("decided_at") @db.Timestamptz(3)
   competitionId        String?                  @unique @map("competition_id") @db.Uuid
+  /// Введённые данные формы черновика (DRAFT): частичный CompetitionRequestCreate; после подачи — null.
+  draft                Json?
   version              Int                      @default(1)
   createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt            DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -3214,4 +3229,31 @@ model RefereeRecruitmentApplication {
   @@unique([positionId, userId])
   @@index([userId, createdAt])
   @@map("referee_recruitment_application")
+}
+
+// ============================================================
+// Медиа завершённого турнира (правки 05.11.2026): фото (файл в публичном хранилище) и видео (ссылка на ролик).
+// ============================================================
+
+enum CompetitionMediaKind {
+  PHOTO
+  VIDEO
+}
+
+model CompetitionMedia {
+  id            String               @id @default(uuid(7)) @db.Uuid
+  competitionId String               @map("competition_id") @db.Uuid
+  kind          CompetitionMediaKind
+  fileId        String?              @map("file_id") @db.Uuid
+  url           String?
+  caption       String?
+  createdById   String?              @map("created_by_id") @db.Uuid
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  file        StoredFile? @relation("CompetitionMediaFile", fields: [fileId], references: [id], onDelete: Restrict)
+  createdBy   User?       @relation("CompetitionMediaCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([competitionId, createdAt])
+  @@map("competition_media")
 }

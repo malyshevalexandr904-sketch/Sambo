@@ -20,3 +20,4 @@ export {
   resubmissionAllowed,
   type RegistrationWindow,
 } from './domain/competition-machine';
+export { CompetitionStagesService } from './application/competition-stages.service';

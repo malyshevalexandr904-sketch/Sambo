@@ -87,12 +87,20 @@ async function publish(w: World): Promise<{ id: string; slug: string; version: n
     templateId: w.templateId,
   }).expect(201);
   const current = await w.organizer.agent.get(`/api/v1/competitions/${c.id}`).expect(200);
+  const pub = await send(
+    w.organizer,
+    'post',
+    `/api/v1/competitions/${c.id}/transitions`,
+    { to: 'PUBLISHED' },
+    current.body.data.version,
+  );
+  expect(pub.status, JSON.stringify(pub.body)).toBe(200);
   const res = await send(
     w.organizer,
     'post',
     `/api/v1/competitions/${c.id}/transitions`,
     { to: 'REGISTRATION_OPEN' },
-    current.body.data.version,
+    pub.body.data.version,
   );
   expect(res.status, JSON.stringify(res.body)).toBe(200);
   return res.body.data;
@@ -105,9 +113,7 @@ describe('competition lifecycle', () => {
     expect(c.status).toBe('DRAFT');
     expect(c.slug).toMatch(/^otkrytoe-pervenstvo-kluba-\d{4}$/);
     expect(c).toMatchObject({ competitionType: 'RATED' });
-    expect(c.allowedActions).toEqual(
-      expect.arrayContaining(['competition.update', 'transition:REGISTRATION_OPEN']),
-    );
+    expect(c.allowedActions).toEqual(expect.arrayContaining(['competition.update', 'transition:PUBLISHED']));
     // Создатель — платформа: руководитель турнира не назначается, организатор управляет по наследованию.
     const staff = await w.organizer.agent.get(`/api/v1/competitions/${c.id}/members`).expect(200);
     expect(staff.body.data).toEqual([]);
@@ -168,7 +174,7 @@ describe('competition lifecycle', () => {
       w.organizer,
       'post',
       `/api/v1/competitions/${c.id}/transitions`,
-      { to: 'REGISTRATION_OPEN' },
+      { to: 'PUBLISHED' },
       c.version,
     );
     expect(noRules.body.error.code).toBe('RULESET_REQUIRED');
@@ -185,7 +191,7 @@ describe('competition lifecycle', () => {
       w.organizer,
       'post',
       `/api/v1/competitions/${c.id}/transitions`,
-      { to: 'REGISTRATION_OPEN' },
+      { to: 'PUBLISHED' },
       withRules.body.data.version,
     );
     expect(noCategories.body.error).toMatchObject({
@@ -235,13 +241,13 @@ describe('competition lifecycle', () => {
       w.organizer,
       'post',
       `/api/v1/competitions/${c.id}/transitions`,
-      { to: 'REGISTRATION_OPEN' },
+      { to: 'PUBLISHED' },
       reg.body.data.version,
     );
     expect(published.status, JSON.stringify(published.body)).toBe(200);
     expect(published.body.data).toMatchObject({
-      status: 'REGISTRATION_OPEN',
-      registrationOpenNow: true,
+      status: 'PUBLISHED',
+      registrationOpenNow: false,
       ruleSetVersion: { id: w.ruleSetVersionId, status: 'PUBLISHED' },
       counters: { categories: 4 },
     });
@@ -301,7 +307,8 @@ describe('competition lifecycle', () => {
     expect(pub.headers['cache-control']).toContain('max-age=60');
     expect(pub.body.data).toMatchObject({
       slug: c.slug,
-      status: 'REGISTRATION_OPEN',
+      status: 'PUBLISHED',
+      posterTemplate: 'classic',
       requirementsMd: 'Медицинский допуск обязателен.',
       regulationUrl: expect.stringContaining('http://storage.test/test-public/'),
     });

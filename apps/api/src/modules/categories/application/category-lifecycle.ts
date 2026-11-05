@@ -34,7 +34,7 @@ export class CategoryLifecycle implements OnModuleInit {
     const { tx, competition, from, to } = ctx;
     const id = competition.id;
     const blocking: string[] = [];
-    if (from === 'DRAFT' && to === 'REGISTRATION_OPEN') {
+    if (from === 'DRAFT' && to === 'PUBLISHED') {
       if ((await this.count(tx, id, { status: { notIn: ['MERGED', 'CANCELLED'] } })) === 0)
         blocking.push('no_categories');
     }

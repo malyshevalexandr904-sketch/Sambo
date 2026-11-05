@@ -105,12 +105,20 @@ async function world(opts: { maxCategories?: number } = {}): Promise<World> {
       rules: [{ kind: 'MAX_CATEGORIES_PER_ATHLETE', params: { max: opts.maxCategories } }],
     }).expect(200);
   const current = await organizer.agent.get(`/api/v1/competitions/${competitionId}`).expect(200);
+  const announced = await send(
+    organizer,
+    'post',
+    `/api/v1/competitions/${competitionId}/transitions`,
+    { to: 'PUBLISHED' },
+    current.body.data.version,
+  );
+  expect(announced.status, JSON.stringify(announced.body)).toBe(200);
   const published = await send(
     organizer,
     'post',
     `/api/v1/competitions/${competitionId}/transitions`,
     { to: 'REGISTRATION_OPEN' },
-    current.body.data.version,
+    announced.body.data.version,
   );
   expect(published.status, JSON.stringify(published.body)).toBe(200);
 

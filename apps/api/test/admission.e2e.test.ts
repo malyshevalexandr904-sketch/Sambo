@@ -135,6 +135,7 @@ async function world(opts: { outcome?: 'WITHDRAW' | 'RECHECK' | 'TRANSFER' } = {
       { requirementsMd: 'Положение', weighInFailureOutcome: opts.outcome },
       await competitionVersion(organizer, competitionId),
     ).expect(200);
+  await transition(organizer, competitionId, 'PUBLISHED');
   await transition(organizer, competitionId, 'REGISTRATION_OPEN');
 
   const secretaryUser = await createUser(t);

@@ -58,6 +58,10 @@ const TEXTS: Record<Locale, Record<NotificationType, Texts>> = {
       title: 'Опубликованы результаты',
       body: (s) => join(s.categoryName, s.competitionName),
     },
+    'competition.registration_opened': {
+      title: 'Открыта регистрация на турнир',
+      body: (s) => join(s.competitionName),
+    },
     'match.soon': {
       title: 'Скоро схватка',
       body: (s) => join(mat(s), aheadText(s), bout(s), s.competitionName),
@@ -93,6 +97,10 @@ const TEXTS: Record<Locale, Record<NotificationType, Texts>> = {
     'document.rejected': { title: 'Document rejected', body: (s) => join(s.documentType) },
     'schedule.changed': { title: 'Tournament schedule changed', body: (s) => join(s.competitionName) },
     'results.published': { title: 'Results published', body: (s) => join(s.categoryName, s.competitionName) },
+    'competition.registration_opened': {
+      title: 'Tournament registration is open',
+      body: (s) => join(s.competitionName),
+    },
     'match.soon': {
       title: 'Bout coming up',
       body: (s) => join(mat(s), aheadText(s), bout(s), s.competitionName),

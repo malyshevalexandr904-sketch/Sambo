@@ -204,6 +204,15 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       action: { label: 'Посмотреть результаты', param: 'url' },
       required: ['competitionName', 'categoryName', 'url'],
     },
+    'competition.registration_opened': {
+      subject: 'Открыта регистрация на турнир — Цифровое самбо',
+      lines: [
+        'Открыта регистрация на турнир «{competitionName}».',
+        'Тренеры и руководители спортивных организаций могут подавать заявки на своих спортсменов.',
+      ],
+      action: { label: 'Открыть турнир', param: 'url' },
+      required: ['competitionName', 'url'],
+    },
     'match.soon': matchDay('Скоро схватка', 'Подробности — в приложении.', 'Открыть'),
     'match.started': matchDay('Схватка началась', 'Подробности — в приложении.', 'Открыть'),
     'match.time_changed': matchDay('Изменилось время схватки', 'Подробности — в приложении.', 'Открыть'),
@@ -265,6 +274,15 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       ],
       action: { label: 'View results', param: 'url' },
       required: ['competitionName', 'categoryName', 'url'],
+    },
+    'competition.registration_opened': {
+      subject: 'Tournament registration is open — Цифровое самбо',
+      lines: [
+        'Registration for “{competitionName}” is open.',
+        'Coaches and heads of sports organizations can now enter their athletes.',
+      ],
+      action: { label: 'Open tournament', param: 'url' },
+      required: ['competitionName', 'url'],
     },
     'match.soon': matchDay('Bout coming up', 'Details are in the app.', 'Open'),
     'match.started': matchDay('Bout started', 'Details are in the app.', 'Open'),

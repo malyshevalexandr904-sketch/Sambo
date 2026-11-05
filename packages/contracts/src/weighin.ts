@@ -106,6 +106,8 @@ export const WeighInQuery = PageQuery.extend({
   categoryId: Uuid.optional(),
   status: z.enum(WEIGH_IN_STATUSES).optional(),
   q: z.string().trim().max(100).optional(),
+  /** QR участника из личного кабинета спортсмена: только его участия. */
+  qrToken: z.string().trim().min(10).max(2000).optional(),
 });
 export type WeighInQuery = z.infer<typeof WeighInQuery>;
 

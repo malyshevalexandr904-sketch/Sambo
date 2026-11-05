@@ -2,6 +2,13 @@
 // Read-модель собирается запросами с явным select — служебные поля и персональные данные сюда не попадают.
 import { Injectable } from '@nestjs/common';
 import {
+  type CompetitionMediaDto,
+  type CompetitionStatus,
+  type PublicBracketParticipant,
+  type PublicBracketsDto,
+  type PublicCategoryBracket,
+  type PublicLiveDto,
+  publicSectionsOf,
   type Page,
   type PublicCompetition,
   type PublicCompetitionsQuery,
@@ -11,7 +18,8 @@ import type { Prisma } from '@sde/db';
 import { DomainError } from '../../../common/errors/domain-error';
 import { decodeCursor, toPage } from '../../../common/http/http';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
-import { registrationWindow } from '../../competitions';
+import { BracketsService } from '../../brackets';
+import { CompetitionStagesService, registrationWindow } from '../../competitions';
 import { FilesService } from '../../files';
 
 const SUMMARY_SELECT = {
@@ -49,6 +57,13 @@ const DETAIL_SELECT = {
   ratingConfig: { select: { publicDeltas: true } },
   discipline: { select: { nameRu: true, nameEn: true } },
   regulation: { select: { storageKey: true, status: true } },
+  posterTemplate: true,
+  liveStreamUrl: true,
+  weighInWindows: {
+    where: { kind: 'OFFICIAL' },
+    orderBy: [{ startsAt: 'asc' }, { id: 'asc' }],
+    select: { name: true, startsAt: true, endsAt: true },
+  },
   requirements: {
     orderBy: [{ kind: 'asc' }, { id: 'asc' }],
     select: {
@@ -114,6 +129,8 @@ export class PublicCompetitionsService {
   constructor(
     private readonly db: PrismaService,
     private readonly files: FilesService,
+    private readonly bracketsView: BracketsService,
+    private readonly stages: CompetitionStagesService,
   ) {}
 
   private summary(r: SummaryRow, now: Date): PublicCompetitionSummary {
@@ -200,6 +217,177 @@ export class PublicCompetitionsService {
       cancelReason: row.status === 'CANCELLED' ? row.cancelReason : null,
       competitionType: row.competitionType,
       ratingPublic: row.competitionType === 'RATED' && row.ratingConfig?.publicDeltas === true,
+      posterTemplate: row.posterTemplate,
+      weighInWindows: row.weighInWindows.map((w) => ({
+        name: w.name,
+        startsAt: w.startsAt.toISOString(),
+        endsAt: w.endsAt.toISOString(),
+      })),
+      liveStreamUrl: row.liveStreamUrl,
     };
+  }
+
+  private async requireId(
+    slug: string,
+  ): Promise<{ id: string; status: CompetitionStatus; liveStreamUrl: string | null }> {
+    const row = await this.db.competition.findFirst({
+      where: { ...PUBLIC_WHERE, slug },
+      select: { id: true, status: true, liveStreamUrl: true },
+    });
+    if (!row) throw new DomainError('NOT_FOUND', { resource: 'competition' });
+    return row;
+  }
+
+  /**
+   * Турнирные сетки (правки 05.11.2026): опубликованные жеребьёвки категорий, схватки и итоговые протоколы. Имя
+   * участника — только с согласием на распространение ПДн (как на табло), иначе null.
+   */
+  async brackets(slug: string): Promise<PublicBracketsDto> {
+    const c = await this.requireId(slug);
+    if (!publicSectionsOf(c.status).includes('brackets')) return { categories: [] };
+    const categories = await this.db.competitionCategory.findMany({
+      where: { competitionId: c.id, status: { notIn: ['MERGED', 'CANCELLED'] } },
+      orderBy: [{ sortOrder: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        code: true,
+        nameRu: true,
+        nameEn: true,
+        gender: true,
+        weightKind: true,
+        weightLowerGrams: true,
+        weightUpperGrams: true,
+      },
+    });
+    const draws = await this.db.draw.findMany({
+      where: { competitionId: c.id, status: 'PUBLISHED' },
+      select: { id: true, categoryId: true, format: true, slots: { select: { entryId: true } } },
+    });
+    const results = await this.db.categoryResult.findMany({
+      where: { competitionId: c.id, status: { in: ['PUBLISHED', 'AMENDED'] } },
+      select: {
+        categoryId: true,
+        placements: {
+          orderBy: [{ place: 'asc' }, { id: 'asc' }],
+          select: { place: true, medal: true, entryId: true, wins: true, losses: true },
+        },
+      },
+    });
+    const entryIds = [
+      ...new Set([
+        ...draws.flatMap((d) => d.slots.flatMap((x) => (x.entryId ? [x.entryId] : []))),
+        ...results.flatMap((r) => r.placements.map((p) => p.entryId)),
+      ]),
+    ];
+    const entries = entryIds.length
+      ? await this.db.entry.findMany({
+          where: { id: { in: entryIds } },
+          select: {
+            id: true,
+            publicName: true,
+            snapClubName: true,
+            snapRegionName: true,
+            athlete: { select: { personId: true } },
+          },
+        })
+      : [];
+    const personIds = [...new Set(entries.map((e) => e.athlete.personId))];
+    const consents = personIds.length
+      ? await this.db.consent.findMany({
+          where: {
+            subjectPersonId: { in: personIds },
+            revokedAt: null,
+            template: { kind: 'PD_DISTRIBUTION' },
+            OR: [{ competitionId: null }, { competitionId: c.id }],
+          },
+          select: { subjectPersonId: true },
+        })
+      : [];
+    const named = new Set(consents.map((x) => x.subjectPersonId));
+    const participant = new Map(
+      entries.map((e): [string, PublicBracketParticipant] => [
+        e.id,
+        {
+          entryId: e.id,
+          name: named.has(e.athlete.personId) ? e.publicName : null,
+          club: e.snapClubName,
+          region: e.snapRegionName,
+        },
+      ]),
+    );
+    const nameOf = (entryId: string | null): string | null =>
+      entryId ? (participant.get(entryId)?.name ?? null) : null;
+    const out: PublicCategoryBracket[] = [];
+    for (const cat of categories) {
+      const draw = draws.find((d) => d.categoryId === cat.id);
+      const result = results.find((r) => r.categoryId === cat.id);
+      const nodes = draw ? ((await this.bracketsView.view(draw.id)) ?? []) : [];
+      const item: PublicCategoryBracket = {
+        code: cat.code,
+        name: { ru: cat.nameRu, en: cat.nameEn },
+        gender: cat.gender,
+        weight: { kind: cat.weightKind, lowerGrams: cat.weightLowerGrams, upperGrams: cat.weightUpperGrams },
+        format: draw?.format ?? null,
+        participants: draw
+          ? draw.slots.flatMap((x) => {
+              const p = x.entryId ? participant.get(x.entryId) : undefined;
+              return p ? [p] : [];
+            })
+          : [],
+        matches: nodes
+          .filter((n) => !(n.red.bye || n.blue.bye))
+          .map((n) => ({
+            key: n.key,
+            stage: n.stage,
+            group: n.group,
+            round: n.round,
+            position: n.position,
+            label: n.label,
+            red: nameOf(n.red.entryId),
+            blue: nameOf(n.blue.entryId),
+            winner: n.winnerSide,
+            status: n.match?.status ?? n.status,
+            score:
+              n.match?.result && n.match.result.redScore !== null && n.match.result.blueScore !== null
+                ? `${n.match.result.redScore}:${n.match.result.blueScore}`
+                : null,
+          })),
+        placements: result
+          ? result.placements.map((p) => ({
+              place: p.place,
+              medal: p.medal,
+              entryId: p.entryId,
+              wins: p.wins,
+              losses: p.losses,
+            }))
+          : null,
+      };
+      // Участники итогового протокола, которых нет в сетке (перевод между категориями), — тоже в списке.
+      for (const p of result?.placements ?? []) {
+        const info = participant.get(p.entryId);
+        if (info && !item.participants.some((x) => x.entryId === p.entryId)) item.participants.push(info);
+      }
+      out.push(item);
+    }
+    return { categories: out.filter((x) => x.format !== null || x.placements !== null) };
+  }
+
+  /** Прямая трансляция: ссылка на видео и ковры турнира (табло каждого ковра — `/api/public/v1/mats/{id}`). */
+  async live(slug: string): Promise<PublicLiveDto> {
+    const c = await this.requireId(slug);
+    if (!publicSectionsOf(c.status).includes('live')) return { streamUrl: null, mats: [] };
+    const mats = await this.db.mat.findMany({
+      where: { competitionId: c.id },
+      orderBy: [{ number: 'asc' }],
+      select: { id: true, number: true, name: true },
+    });
+    return { streamUrl: c.liveStreamUrl, mats };
+  }
+
+  /** Фото и видео завершённого турнира. */
+  async media(slug: string): Promise<CompetitionMediaDto[]> {
+    const c = await this.requireId(slug);
+    if (!publicSectionsOf(c.status).includes('media')) return [];
+    return this.stages.listMedia(c.id);
   }
 }

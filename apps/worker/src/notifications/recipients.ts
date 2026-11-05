@@ -26,7 +26,32 @@ export type RecipientsReader = Pick<
   | 'matchParticipant'
   | 'placement'
   | 'guardian'
+  | 'competition'
+  | 'follow'
 >;
+
+/** Подписавшиеся на начало регистрации турнира (правки 05.11.2026): действующие пользователи. */
+export async function competitionFollowers(
+  db: RecipientsReader,
+  competitionId: string,
+): Promise<PlannedNotification[]> {
+  const c = await db.competition.findUnique({ where: { id: competitionId }, select: { slug: true } });
+  if (!c) return [];
+  const rows = await db.follow.findMany({
+    where: {
+      targetType: 'COMPETITION',
+      targetId: competitionId,
+      user: { status: 'ACTIVE', deletedAt: null },
+    },
+    select: { userId: true },
+  });
+  return rows.map((r) => ({
+    userId: r.userId,
+    type: 'competition.registration_opened' as const,
+    params: { competitionId, slug: c.slug },
+    competitionId,
+  }));
+}
 
 /** Организационные роли с правом подавать заявки: получатели уведомлений о заявке — только они. */
 export const APPLICANT_ROLES = ROLE_CODES.filter(

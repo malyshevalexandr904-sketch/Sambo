@@ -75,7 +75,7 @@ export class CompetitionStatusWriter {
       competitionId: id,
       payload: { competitionId: id, from, to },
     });
-    if (to === 'REGISTRATION_OPEN' && from === 'DRAFT')
+    if (to === 'PUBLISHED' && from === 'DRAFT')
       await this.outbox.enqueue(tx, {
         type: 'competition.published',
         aggregate,

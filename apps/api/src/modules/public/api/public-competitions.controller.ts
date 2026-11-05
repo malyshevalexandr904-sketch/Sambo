@@ -1,6 +1,9 @@
 import { Controller, Get, Header } from '@nestjs/common';
 import {
+  type CompetitionMediaDto,
   type DataEnvelope,
+  type PublicBracketsDto,
+  type PublicLiveDto,
   type Page,
   type PublicCompetition,
   type PublicCompetitionRatingSummary,
@@ -43,6 +46,28 @@ export class PublicCompetitionsController {
   @Header('Cache-Control', PUBLIC_CACHE)
   async get(@ValidParam('slug', Slug) slug: string): Promise<DataEnvelope<PublicCompetition>> {
     return ok(await this.competitions.get(slug));
+  }
+
+  /** Турнирные сетки и итоговые протоколы (правки 05.11.2026): с жеребьёвки. */
+  @Get(':slug/brackets')
+  @Public()
+  @Header('Cache-Control', 'public, max-age=15, stale-while-revalidate=30')
+  async brackets(@ValidParam('slug', Slug) slug: string): Promise<DataEnvelope<PublicBracketsDto>> {
+    return ok(await this.competitions.brackets(slug));
+  }
+
+  @Get(':slug/live')
+  @Public()
+  @Header('Cache-Control', PUBLIC_CACHE)
+  async live(@ValidParam('slug', Slug) slug: string): Promise<DataEnvelope<PublicLiveDto>> {
+    return ok(await this.competitions.live(slug));
+  }
+
+  @Get(':slug/media')
+  @Public()
+  @Header('Cache-Control', PUBLIC_CACHE)
+  async media(@ValidParam('slug', Slug) slug: string): Promise<DataEnvelope<CompetitionMediaDto[]>> {
+    return ok(await this.competitions.media(slug));
   }
 
   /** Изменения рейтинга участников рейтингового турнира (ТЗ 45, 48), если турнир показывает их публично. */

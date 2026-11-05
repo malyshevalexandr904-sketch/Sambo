@@ -70,4 +70,62 @@ export interface PublicCompetition extends PublicCompetitionSummary {
   competitionType: CompetitionType;
   /** Рейтинговый турнир показывает изменения рейтинга публично (`rating-summary`, `rated-matches`). */
   ratingPublic: boolean;
+  /** Афиша (правки 05.11.2026): шаблон оформления, окна взвешивания для регламента, ссылка на трансляцию. */
+  posterTemplate: string;
+  weighInWindows: { name: string; startsAt: string; endsAt: string }[];
+  liveStreamUrl: string | null;
+}
+
+/** Участник публичной сетки: имя — только с согласием на распространение ПДн, иначе null. */
+export interface PublicBracketParticipant {
+  entryId: string;
+  name: string | null;
+  club: string | null;
+  region: string | null;
+}
+
+/** Схватка публичной сетки (узел сетки опубликованной жеребьёвки). */
+export interface PublicBracketMatch {
+  key: string;
+  stage: string;
+  group: string | null;
+  round: number;
+  position: number;
+  label: string;
+  red: string | null;
+  blue: string | null;
+  winner: 'RED' | 'BLUE' | null;
+  status: string;
+  score: string | null;
+}
+
+/** Итоговый протокол категории: места участников по опубликованным итогам. */
+export interface PublicPlacement {
+  place: number;
+  medal: 'GOLD' | 'SILVER' | 'BRONZE' | null;
+  entryId: string;
+  wins: number;
+  losses: number;
+}
+
+export interface PublicCategoryBracket {
+  code: string;
+  name: LocalizedText;
+  gender: Gender;
+  weight: CategoryWeight;
+  format: string | null;
+  participants: PublicBracketParticipant[];
+  matches: PublicBracketMatch[];
+  /** Опубликованные итоги категории; null — итогов ещё нет. */
+  placements: PublicPlacement[] | null;
+}
+
+export interface PublicBracketsDto {
+  categories: PublicCategoryBracket[];
+}
+
+/** Прямая трансляция: ссылка на видео и табло ковров. */
+export interface PublicLiveDto {
+  streamUrl: string | null;
+  mats: { id: string; number: number; name: string | null }[];
 }

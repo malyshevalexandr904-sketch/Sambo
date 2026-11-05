@@ -18,6 +18,7 @@ const t = (
 
 const CANCELLABLE: CompetitionStatus[] = [
   'DRAFT',
+  'PUBLISHED',
   'REGISTRATION_OPEN',
   'REGISTRATION_CLOSED',
   'CHECK_IN',
@@ -27,7 +28,10 @@ const CANCELLABLE: CompetitionStatus[] = [
 ];
 
 export const COMPETITION_TRANSITIONS: readonly CompetitionTransition[] = [
-  t('DRAFT', 'REGISTRATION_OPEN', 'competition.publish'),
+  // Стадии проведения (правки 05.11.2026): «На согласовании» → «Опубликован» → «Регистрация» (вручную или фоновой
+  // задачей в registrationStartsAt) → «Мандатная комиссия» → «Взвешивание» → «Жеребьёвка» → «Идёт» → «Завершён».
+  t('DRAFT', 'PUBLISHED', 'competition.publish'),
+  t('PUBLISHED', 'REGISTRATION_OPEN'),
   t('REGISTRATION_OPEN', 'REGISTRATION_CLOSED'),
   t('REGISTRATION_CLOSED', 'REGISTRATION_OPEN', 'competition.transition', true),
   t('REGISTRATION_CLOSED', 'CHECK_IN'),
@@ -54,7 +58,10 @@ export const isPublished = (status: CompetitionStatus): boolean =>
 
 /** Операционные данные (категории, участия) меняются до начала турнира. */
 export const isBeforeCompetition = (status: CompetitionStatus): boolean =>
-  status === 'DRAFT' || status === 'REGISTRATION_OPEN' || status === 'REGISTRATION_CLOSED';
+  status === 'DRAFT' ||
+  status === 'PUBLISHED' ||
+  status === 'REGISTRATION_OPEN' ||
+  status === 'REGISTRATION_CLOSED';
 
 export interface ScheduleFacts {
   timezone: string;
@@ -70,7 +77,7 @@ export interface PublishFacts extends ScheduleFacts {
 }
 
 /**
- * Собственные условия публикации (DRAFT → REGISTRATION_OPEN): закреплена опубликованная версия правил
+ * Собственные условия публикации (DRAFT → PUBLISHED): закреплена опубликованная версия правил
  * дисциплины турнира, сроки согласованы и регистрация ещё не закончилась. Число категорий проверяет модуль
  * категорий. Отсутствие версии правил — отдельная ошибка RULESET_REQUIRED.
  */
@@ -108,7 +115,7 @@ export function registrationWindow(
   c: { status: CompetitionStatus; registrationStartsAt: Date; registrationEndsAt: Date },
   now: Date,
 ): RegistrationWindow {
-  if (c.status === 'DRAFT') return 'NOT_OPEN';
+  if (c.status === 'DRAFT' || c.status === 'PUBLISHED') return 'NOT_OPEN';
   if (c.status !== 'REGISTRATION_OPEN') return 'CLOSED';
   if (now < c.registrationStartsAt) return 'NOT_OPEN';
   if (now >= c.registrationEndsAt) return 'CLOSED';
