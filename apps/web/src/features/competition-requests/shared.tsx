@@ -4,6 +4,7 @@ import { Badge } from '@sde/ui';
 import { useTranslations } from 'next-intl';
 
 const TONE = {
+  DRAFT: { tone: 'neutral', icon: '✎' },
   SUBMITTED: { tone: 'warning', icon: '◐' },
   APPROVED: { tone: 'success', icon: '●' },
   REJECTED: { tone: 'danger', icon: '■' },

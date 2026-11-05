@@ -23,7 +23,7 @@ import { api, uploadFile } from '@/lib/api';
 import { pickName, qk, useDocumentTypes, useSportRanks } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 
-const EDITABLE = ['DRAFT', 'REGISTRATION_OPEN'];
+const EDITABLE = ['DRAFT', 'PUBLISHED', 'REGISTRATION_OPEN'];
 
 export function RegulationTab({ competition: c }: { competition: Competition }) {
   const canEdit = c.allowedActions.includes('competition.update');
@@ -46,7 +46,7 @@ function RegulationCard({ competition: c, editable }: { competition: Competition
   const [outcome, setOutcome] = useState(c.weighInFailureOutcome);
   useEffect(() => setText(c.requirementsMd ?? ''), [c.requirementsMd]);
   useEffect(() => setOutcome(c.weighInFailureOutcome), [c.weighInFailureOutcome]);
-  const outcomeEditable = ['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(c.status);
+  const outcomeEditable = ['DRAFT', 'PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(c.status);
   const save = (body: {
     regulationFileId?: string | null;
     requirementsMd: string;

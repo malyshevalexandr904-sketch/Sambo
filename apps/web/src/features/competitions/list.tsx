@@ -11,6 +11,7 @@ import { Link } from '@/i18n/navigation';
 import { hasAnywhere, platformHas } from '@/lib/access';
 import { api } from '@/lib/api';
 import { qk, useMe } from '@/lib/queries';
+import { MyHostingRequests } from '@/features/competition-requests/drafts';
 import { HostingProcessButton } from '@/features/competition-requests/hosting-info';
 import { CompetitionTypeBadge } from './rating-card';
 import { CompetitionStatusBadge, formatDates, formatInZone } from './shared';
@@ -57,6 +58,7 @@ export function CompetitionsList() {
         }
       />
       {showHostingCta ? <HostingCta /> : null}
+      {canRequest && !canCreate ? <MyHostingRequests /> : null}
       <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label={t('title')}>
         {scopes.map((s) => (
           <Button

@@ -22,20 +22,28 @@ import { qk, useMe } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 import { EditCard } from './edit-card';
 import { RatingCard } from './rating-card';
+import { MediaCard, PresentationCard, StageGuideCard } from './stage-guide';
 import { formatDates, formatInZone, useFailedText } from './shared';
 
 /** Мандатная комиссия и соревнования: на дашборде — прибытие и допуск (раздел 34 ТЗ). */
 const OPERATIONS: readonly string[] = ['CHECK_IN', 'DRAWING', 'SCHEDULED', 'IN_PROGRESS', 'FINISHED'];
+/** Фото и видео загружают после завершения турнира. */
+const MEDIA: readonly string[] = ['FINISHED', 'ARCHIVED'];
 
 export function OverviewTab({ competition: c }: { competition: Competition }) {
   const can = (a: string): boolean => c.allowedActions.includes(a);
+  // Порядок для организатора и администратора (правки 05.11.2026): стадия и подсказка, переход к следующей
+  // стадии, сведения о турнире, оформление публичной страницы и медиа.
   return (
     <div className="grid gap-6 xl:grid-cols-2">
+      {c.viewer.staff ? <StageGuideCard competition={c} /> : null}
+      {c.allowedActions.some((a) => a.startsWith('transition:')) ? <TransitionsCard competition={c} /> : null}
+      {c.status === 'DRAFT' && can('competition.update') ? <ReadinessCard competition={c} /> : null}
       <InfoCard competition={c} />
       <RatingCard competition={c} />
-      {c.status === 'DRAFT' && can('competition.update') ? <ReadinessCard competition={c} /> : null}
-      {c.allowedActions.some((a) => a.startsWith('transition:')) ? <TransitionsCard competition={c} /> : null}
       {c.registrationOpenNow ? <ApplyCard competition={c} /> : null}
+      {can('competition.update') && MEDIA.includes(c.status) ? <MediaCard competition={c} /> : null}
+      {can('competition.update') && c.status !== 'CANCELLED' ? <PresentationCard competition={c} /> : null}
       {can('competition.update') ? <EditCard competition={c} /> : null}
     </div>
   );
@@ -232,7 +240,7 @@ function TransitionsCard({ competition: c }: { competition: Competition }) {
           return (
             <Button
               key={to}
-              variant={to === 'REGISTRATION_OPEN' ? 'primary' : 'secondary'}
+              variant={to === 'CANCELLED' || to === 'ARCHIVED' ? 'secondary' : 'primary'}
               loading={busy}
               onClick={() => void go(to)}
             >

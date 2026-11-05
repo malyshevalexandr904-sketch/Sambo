@@ -2,6 +2,8 @@
 // Заявка организации на проведение турнира (описание процесса, 02.11.2026): название, день, адрес, до двух шаблонных
 // возрастных групп, ковры, материально-техническая база и судейская бригада (с расчётом минимума), пол участников,
 // ответственный за проведение и согласие с правилами подачи. Сроки регистрации и взвешивания уточняет платформа.
+// Черновик (правки 05.11.2026): форму можно сохранить как есть и вернуться к ней из «Турниры → Ваши черновики»;
+// черновик видит только организация, данные проверяются при подаче.
 import {
   type AgeGroupDto,
   type CompetitionRequestCreate,
@@ -19,7 +21,8 @@ import {
 import { Alert, Button, Card, CardTitle, cn, Field, Input, PageHeader, Textarea } from '@sde/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
-import { useCallback, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import { QueryState } from '@/components/common';
 import { OrganizationPicker } from '@/components/organization-picker';
 import { today } from '@/features/competitions/create';
@@ -61,6 +64,38 @@ export function normalizePhone(raw: string): string {
   return digits;
 }
 
+const EMPTY: FormValues = {
+  organizationId: '',
+  name: '',
+  date: '',
+  address: '',
+  ageGroupIds: [],
+  matCount: '',
+  equipment: '',
+  refereeTeam: '',
+  gender: '',
+  responsible: 'SELF',
+  responsibleUser: null,
+  contactName: '',
+  contactPhone: '',
+  contactEmail: '',
+  comment: '',
+  rulesAccepted: false,
+};
+
+/** Данные черновика → значения формы: берём только известные поля нужного типа (согласие — всегда заново). */
+function fromDraft(data: Record<string, unknown>): Partial<FormValues> {
+  const out: Record<string, unknown> = {};
+  for (const [k, def] of Object.entries(EMPTY)) {
+    if (k === 'rulesAccepted' || !(k in data)) continue;
+    const value = data[k];
+    if (k === 'responsibleUser') out[k] = value && typeof value === 'object' ? value : null;
+    else if (Array.isArray(def)) out[k] = Array.isArray(value) ? value.filter((x) => typeof x === 'string') : def;
+    else if (typeof value === typeof def) out[k] = value;
+  }
+  return out as Partial<FormValues>;
+}
+
 function useTemplateAgeGroups() {
   const params = { owner: 'platform', disciplineCode: 'SPORT_SAMBO' };
   return useQuery({
@@ -78,24 +113,26 @@ export function CompetitionRequestForm() {
   const action = useAction();
   const queryClient = useQueryClient();
   const groups = useTemplateAgeGroups();
-  const [v, setV] = useState<FormValues>({
-    organizationId: '',
-    name: '',
-    date: '',
-    address: '',
-    ageGroupIds: [],
-    matCount: '',
-    equipment: '',
-    refereeTeam: '',
-    gender: '',
-    responsible: 'SELF',
-    responsibleUser: null,
-    contactName: '',
-    contactPhone: '',
-    contactEmail: '',
-    comment: '',
-    rulesAccepted: false,
+  const [v, setV] = useState<FormValues>(EMPTY);
+  const search = useSearchParams();
+  const [draftId, setDraftId] = useState<string | null>(search.get('draft'));
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const draft = useQuery({
+    queryKey: ['competition-requests', 'draft', draftId],
+    queryFn: async () =>
+      (await api<DataEnvelope<CompetitionRequestDto>>(`/competition-requests/${draftId}`)).data,
+    enabled: !!draftId,
+    staleTime: Infinity,
   });
+  const draftGone = !!draft.data && draft.data.status !== 'DRAFT';
+  const activeDraft = draftId && !draftGone ? draftId : null;
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    if (loaded || !draft.data) return;
+    setLoaded(true);
+    if (draft.data.status !== 'DRAFT') return;
+    setV((x) => ({ ...x, ...fromDraft(draft.data.draft ?? {}), organizationId: draft.data.organization.id }));
+  }, [draft.data, loaded]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const setOrganization = useCallback((id: string) => setV((x) => ({ ...x, organizationId: id })), []);
   /** Исправленное поле больше не подсвечивается ошибкой. */
@@ -152,6 +189,25 @@ export function CompetitionRequestForm() {
     return { kind: 'SELF' };
   };
 
+  /** Сохранить черновик как есть: без проверок, их сделает подача. */
+  const saveDraft = (): void => {
+    const { rulesAccepted: _skip, ...data } = v;
+    const body = { organizationId: v.organizationId, name: v.name.trim() || undefined, data: { ...data, startDate: v.date || undefined } };
+    void action.run(async () => {
+      const res = await api<DataEnvelope<CompetitionRequestDto>>(
+        activeDraft ? `/competition-requests/${activeDraft}/draft` : '/competition-requests/drafts',
+        { method: activeDraft ? 'PUT' : 'POST', body },
+      );
+      if (!activeDraft) {
+        setDraftId(res.data.id);
+        setLoaded(true);
+        window.history.replaceState(null, '', `${window.location.pathname}?draft=${res.data.id}`);
+      }
+      setSavedAt(new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date()));
+      await queryClient.invalidateQueries({ queryKey: ['competition-requests'] });
+    });
+  };
+
   const submit = (): void => {
     const local: Record<string, string> = {};
     if (v.name.trim().length < 3) local.name = 'too_short';
@@ -184,6 +240,7 @@ export function CompetitionRequestForm() {
       responsible: responsibleBody(),
       rulesAccepted: true,
       comment: v.comment.trim() || undefined,
+      ...(activeDraft ? { draftId: activeDraft } : {}),
     } as CompetitionRequestCreate;
     void action.run(async () => {
       try {
@@ -217,6 +274,9 @@ export function CompetitionRequestForm() {
         }}
       >
         {action.error ? <Alert tone="danger">{action.error}</Alert> : null}
+        {draftId ? (
+          <Alert tone="info">{draftGone ? tr('draftGone') : tr('draftEditing')}</Alert>
+        ) : null}
         <Card>
           <CardTitle>{t('competitions.sectionMain')}</CardTitle>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -459,10 +519,20 @@ export function CompetitionRequestForm() {
           <Button type="submit" loading={action.busy} disabled={!v.organizationId}>
             {tr('submit')}
           </Button>
+          <Button type="button" variant="secondary" loading={action.busy} disabled={!v.organizationId} onClick={saveDraft}>
+            {tr('saveDraft')}
+          </Button>
           <Button type="button" variant="ghost" onClick={() => router.push('/competitions')}>
             {t('common.cancel')}
           </Button>
         </div>
+        {savedAt ? (
+          <p role="status" className="-mt-3 text-sm text-green-800">
+            {tr('draftSaved', { time: savedAt })}
+          </p>
+        ) : (
+          <p className="-mt-3 text-sm text-slate-600">{tr('draftHint')}</p>
+        )}
       </form>
     </>
   );

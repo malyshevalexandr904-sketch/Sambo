@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl';
 import { StatusBadge } from '@/components/common';
 import { AccountSections } from '@/features/account';
 import { AthleteProgressCard } from '@/features/athletes/rating-progress';
+import { MyWeighInQr } from '@/features/tournament/weigh-in-qr';
 import { Link } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { hasAnywhere } from '@/lib/access';
@@ -184,6 +185,7 @@ export function Dashboard() {
           </a>
         </Alert>
       ) : null}
+      {role === 'ATHLETE' || role === 'GUARDIAN' ? <MyWeighInQr /> : null}
       {role === 'ATHLETE' || role === 'GUARDIAN' ? <MyProgress /> : null}
       <div className="grid gap-6 xl:grid-cols-2">
         <WorkCard />

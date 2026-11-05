@@ -1,18 +1,21 @@
 import { Controller, Delete, Get, HttpCode, Post, Put } from '@nestjs/common';
 import {
+  type Competition,
   type CompetitionFollowDto,
   CompetitionMediaCreate,
   type CompetitionMediaDto,
   CompetitionPresentationUpdate,
   type DataEnvelope,
+  Slug,
 } from '@sde/contracts';
 import { z } from 'zod';
 import { CurrentUser } from '../../../common/context/current-user';
 import type { AuthUser } from '../../../common/context/request-context';
 import { ok } from '../../../common/http/http';
-import { UuidParam, ValidBody } from '../../../common/validation/zod.pipe';
+import { UuidParam, ValidBody, ValidParam } from '../../../common/validation/zod.pipe';
 import { Authenticated } from '../../access';
 import { CompetitionStagesService } from '../application/competition-stages.service';
+import { CompetitionsService } from '../application/competitions.service';
 
 const FollowBody = z.object({ follow: z.boolean() });
 
@@ -22,7 +25,19 @@ const FollowBody = z.object({ follow: z.boolean() });
  */
 @Controller('competitions')
 export class CompetitionStagesController {
-  constructor(private readonly stages: CompetitionStagesService) {}
+  constructor(
+    private readonly stages: CompetitionStagesService,
+    private readonly competitions: CompetitionsService,
+  ) {}
+
+  @Get('slug/:slug')
+  @Authenticated()
+  async bySlug(
+    @CurrentUser() user: AuthUser,
+    @ValidParam('slug', Slug) slug: string,
+  ): Promise<DataEnvelope<Competition>> {
+    return ok(await this.competitions.getBySlug(user, slug));
+  }
 
   @Put(':id/presentation')
   @Authenticated()

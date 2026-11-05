@@ -69,6 +69,11 @@ export const EntryCreate = z.object({
   athleteId: Uuid,
   categoryId: Uuid,
   declaredWeightGrams: Grams.optional(),
+  /**
+   * Тренер спортсмена в этом участии (правки 05.11.2026): руководитель клуба указывает тренера клуба; без него — тренер
+   * из карточки спортсмена.
+   */
+  coachId: Uuid.optional(),
 });
 export type EntryCreate = z.infer<typeof EntryCreate>;
 
