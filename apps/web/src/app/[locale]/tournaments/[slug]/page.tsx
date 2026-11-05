@@ -15,6 +15,7 @@ import { setRequestLocale } from 'next-intl/server';
 import { cache } from 'react';
 import { PublicShell } from '@/components/public-shell';
 import { TournamentRating } from '@/features/rating/tournament-rating';
+import { tournamentLabels } from '@/features/tournament/labels';
 import { TournamentPage as TournamentView } from '@/features/tournament/tournament-page';
 import { PublicApiError, publicApi } from '@/lib/public-api';
 
@@ -69,7 +70,13 @@ export default async function TournamentPage({
   ]);
   return (
     <PublicShell>
-      <TournamentView competition={c} brackets={brackets} live={live} media={media} />
+      <TournamentView
+        competition={c}
+        brackets={brackets}
+        live={live}
+        media={media}
+        labels={tournamentLabels(c, locale)}
+      />
       {c.ratingPublic ? <TournamentRating slug={c.slug} locale={locale} timeZone={c.timezone} /> : null}
     </PublicShell>
   );

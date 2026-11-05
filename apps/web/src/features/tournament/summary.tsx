@@ -5,20 +5,17 @@ import { categoryWeightLabel, type PublicCompetition, type PublicCompetitionCate
 import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { MarkdownLite } from '@/components/markdown-lite';
+import type { TournamentLabels } from './labels';
 import { groupOf, posterDate } from './poster';
 
-function formatInstant(iso: string, timeZone: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    day: 'numeric',
-    month: 'long',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone,
-  }).format(new Date(iso));
-}
-
 /** Регламент: самое важное из положения — сроки, место, взвешивание, участники и категории, документы. */
-export function RegulationSummary({ competition: c }: { competition: PublicCompetition }) {
+export function RegulationSummary({
+  competition: c,
+  labels,
+}: {
+  competition: PublicCompetition;
+  labels: TournamentLabels;
+}) {
   const t = useTranslations('tournamentPage.summary');
   const tr = useTranslations('tournaments');
   const locale = useLocale();
@@ -43,21 +40,16 @@ export function RegulationSummary({ competition: c }: { competition: PublicCompe
       icon: '📝',
       label: t('registration'),
       value: t('range', {
-        from: formatInstant(c.registrationStartsAt, c.timezone, locale),
-        to: formatInstant(c.registrationEndsAt, c.timezone, locale),
+        from: labels.registrationFrom,
+        to: labels.registrationTo,
       }),
     },
     {
       icon: '⚖️',
       label: t('weighIn'),
       value:
-        c.weighInWindows.length > 0
-          ? c.weighInWindows
-              .map(
-                (w) =>
-                  `${w.name}: ${t('range', { from: formatInstant(w.startsAt, c.timezone, locale), to: formatInstant(w.endsAt, c.timezone, locale) })}`,
-              )
-              .join('; ')
+        labels.weighIn.length > 0
+          ? labels.weighIn.map((w) => `${w.name}: ${t('range', { from: w.from, to: w.to })}`).join('; ')
           : t('weighInTbd'),
     },
     { icon: '🏛️', label: t('organizer'), value: c.organizerName },

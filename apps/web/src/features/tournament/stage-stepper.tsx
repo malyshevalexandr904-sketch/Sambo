@@ -20,7 +20,7 @@ export function StageStepper({
   const stages = variant === 'public' ? TOURNAMENT_STAGES.slice(PUBLIC_FROM) : TOURNAMENT_STAGES;
   const current = stage ? stages.indexOf(stage) : -1;
   return (
-    <ol className={cn('flex gap-1 overflow-x-auto pb-1', className)} aria-label={t('label')}>
+    <ol className={cn('relative flex gap-1 overflow-x-auto pb-1', className)} aria-label={t('label')}>
       {stages.map((s, i) => {
         const done = current >= 0 && i < current;
         const active = i === current;

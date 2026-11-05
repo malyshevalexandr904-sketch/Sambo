@@ -21,6 +21,7 @@ import { LiveSection, MediaSection } from './live-media';
 import { Poster, posterDataOf } from './poster';
 import { RegistrationSection, RegulationSection } from './sections';
 import { ShareButton } from './share';
+import type { TournamentLabels } from './labels';
 import { StageStepper } from './stage-stepper';
 import { RegulationSummary } from './summary';
 
@@ -35,17 +36,6 @@ const ICON: Record<PublicSection, string> = {
 
 const REFRESH_MS = 30_000;
 
-function dates(start: string, end: string, locale: string): string {
-  const fmt = new Intl.DateTimeFormat(locale, {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-  const s = new Date(`${start}T00:00:00Z`);
-  return start === end ? fmt.format(s) : fmt.formatRange(s, new Date(`${end}T00:00:00Z`));
-}
-
 const isSection = (v: string, list: PublicSection[]): v is PublicSection => (list as string[]).includes(v);
 
 export function TournamentPage({
@@ -53,8 +43,11 @@ export function TournamentPage({
   brackets,
   live,
   media,
+  labels,
 }: {
   competition: PublicCompetition;
+  /** Даты, отформатированные на сервере. */
+  labels: TournamentLabels;
   brackets: PublicBracketsDto | null;
   live: PublicLiveDto | null;
   media: CompetitionMediaDto[] | null;
@@ -116,10 +109,10 @@ export function TournamentPage({
               className="h-16 w-16 rounded object-contain sm:h-18 sm:w-18"
             />
           ) : null}
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-64">
             <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{c.name}</h1>
             <p className="mt-1 text-slate-700">
-              {dates(c.startDate, c.endDate, locale)}
+              {labels.dates}
               {c.city ? ` · ${c.city}` : ''} · {name(c.discipline)}
             </p>
             <p className="mt-0.5 text-sm text-slate-600">{c.organizerName}</p>
@@ -129,11 +122,13 @@ export function TournamentPage({
               </span>
             ) : null}
           </div>
-          <ShareButton
-            title={c.name}
-            text={t('shareText', { name: c.name, dates: dates(c.startDate, c.endDate, locale) })}
-            label={t('shareTournament')}
-          />
+          <div className="w-full sm:w-auto sm:shrink-0">
+            <ShareButton
+              title={c.name}
+              text={t('shareText', { name: c.name, dates: labels.dates })}
+              label={t('shareTournament')}
+            />
+          </div>
         </div>
         {stage ? (
           <div className="mt-5 border-t border-slate-100 pt-4">
@@ -186,23 +181,23 @@ export function TournamentPage({
         {current === 'poster' ? (
           <div className="grid gap-6 md:grid-cols-[minmax(0,22rem)_1fr]">
             <div>
-              <div className="poster-in text-[clamp(13px,4.6vw,19px)] md:text-[19px]">
+              <div className="poster-in text-[clamp(13px,4.2vw,17px)] md:text-[16px]">
                 <Poster data={posterDataOf(c, locale)} template={c.posterTemplate} />
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 <ShareButton
                   title={c.name}
-                  text={t('shareText', { name: c.name, dates: dates(c.startDate, c.endDate, locale) })}
+                  text={t('shareText', { name: c.name, dates: labels.dates })}
                   label={t('shareTournament')}
                   variant="primary"
                 />
               </div>
             </div>
-            <RegulationSummary competition={c} />
+            <RegulationSummary competition={c} labels={labels} />
           </div>
         ) : null}
         {current === 'regulation' ? <RegulationSection competition={c} /> : null}
-        {current === 'registration' ? <RegistrationSection competition={c} /> : null}
+        {current === 'registration' ? <RegistrationSection competition={c} labels={labels} /> : null}
         {current === 'brackets' ? <BracketsSection competition={c} data={brackets} /> : null}
         {current === 'live' ? <LiveSection competition={c} data={live} /> : null}
         {current === 'media' ? <MediaSection media={media} /> : null}

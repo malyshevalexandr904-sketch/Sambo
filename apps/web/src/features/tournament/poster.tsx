@@ -171,7 +171,12 @@ function Classic({ d, locale, t }: TemplateProps) {
         <div>
           <p className="text-[3.6em] font-black leading-none">{date.day}</p>
           <p className="text-[1.1em] font-semibold uppercase">{date.rest}</p>
-          <h3 className="mt-[0.6em] text-[1.45em] font-extrabold uppercase leading-tight">{d.name}</h3>
+          <h3
+            className="mt-[0.6em] font-extrabold uppercase leading-tight"
+            style={{ fontSize: nameSize(d.name, 1.45) }}
+          >
+            {d.name}
+          </h3>
           {d.city ? (
             <p className="mt-[0.3em] text-[0.85em] opacity-90">
               {d.city}
@@ -221,7 +226,12 @@ function Arena({ d, locale, t }: TemplateProps) {
         </div>
         <div className="mt-auto">
           <p className="text-[0.7em] font-semibold uppercase tracking-[0.3em] text-amber-300">{t('sambo')}</p>
-          <h3 className="mt-[0.3em] text-[1.6em] font-black uppercase leading-tight">{d.name}</h3>
+          <h3
+            className="mt-[0.3em] font-black uppercase leading-tight"
+            style={{ fontSize: nameSize(d.name, 1.6) }}
+          >
+            {d.name}
+          </h3>
           <div
             className="mx-auto mt-[0.7em] h-[3px] w-[40%]"
             style={{ background: 'linear-gradient(90deg,#c8102e,#fbbf24,#1d4ed8)' }}
@@ -255,7 +265,9 @@ function Minimal({ d, locale, t }: TemplateProps) {
           <Brand color="#1d4ed8" />
           <Logo url={d.logoUrl} />
         </div>
-        <h3 className="mt-[1.2em] text-[1.7em] font-extrabold leading-tight">{d.name}</h3>
+        <h3 className="mt-[1.2em] font-extrabold leading-tight" style={{ fontSize: nameSize(d.name, 1.7) }}>
+          {d.name}
+        </h3>
         <p className="mt-[0.6em] text-[0.8em] text-slate-600">{d.organizerName}</p>
         <div className="mt-auto">
           <p className="text-[3em] font-black leading-none" style={{ color: '#1d4ed8' }}>
@@ -306,7 +318,12 @@ function Sunrise({ d, locale, t }: TemplateProps) {
         </div>
         <div className="mt-auto rounded-xl p-[0.9em]" style={{ background: 'rgba(15,23,42,0.35)' }}>
           <p className="text-[0.7em] font-bold uppercase tracking-[0.25em]">{t('sambo')}</p>
-          <h3 className="mt-[0.2em] text-[1.45em] font-black uppercase leading-tight">{d.name}</h3>
+          <h3
+            className="mt-[0.2em] font-black uppercase leading-tight"
+            style={{ fontSize: nameSize(d.name, 1.45) }}
+          >
+            {d.name}
+          </h3>
           <p className="mt-[0.5em] text-[1.4em] font-black leading-none">
             {date.day} <span className="text-[0.6em] font-semibold uppercase">{date.rest}</span>
           </p>
@@ -333,6 +350,12 @@ const TEMPLATES: Record<PosterTemplate, (p: TemplateProps) => ReactNode> = {
   minimal: Minimal,
   sunrise: Sunrise,
 };
+
+/** Название на постере: длинное — мельче, чтобы постер не обрезал низ (дата, город, группы). */
+function nameSize(name: string, base: number): string {
+  const k = name.length > 90 ? 0.6 : name.length > 60 ? 0.72 : name.length > 36 ? 0.85 : 1;
+  return `${(base * k).toFixed(2)}em`;
+}
 
 /** Постер; размер шрифта задаёт обёртка (все размеры постера — в em), поэтому он масштабируется целиком. */
 export function Poster({ data, template }: { data: PosterData; template: string }) {

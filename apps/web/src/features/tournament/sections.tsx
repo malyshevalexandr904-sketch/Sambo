@@ -4,7 +4,7 @@
 import { type Competition, type PublicCompetition, stageOfCompetition } from '@sde/contracts';
 import { Alert, Button } from '@sde/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { Link, usePathname } from '@/i18n/navigation';
 import { api } from '@/lib/api';
@@ -12,18 +12,9 @@ import { useErrorMessage } from '@/lib/errors';
 import { currentSubscription, enablePush, pushConfig, pushSupport } from '@/lib/push';
 import { useMe } from '@/lib/queries';
 import { DownloadIcon, ShareButton } from './share';
+import type { TournamentLabels } from './labels';
 import { Box, Placeholder } from './ui';
 import { useViewerCompetition } from './viewer';
-
-function fmt(iso: string, timeZone: string, locale: string): string {
-  return new Intl.DateTimeFormat(locale, {
-    day: 'numeric',
-    month: 'long',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone,
-  }).format(new Date(iso));
-}
 
 // ---------- Положение ----------
 
@@ -139,14 +130,19 @@ function FollowButton({ viewer }: { viewer: Competition }) {
   );
 }
 
-export function RegistrationSection({ competition: c }: { competition: PublicCompetition }) {
+export function RegistrationSection({
+  competition: c,
+  labels,
+}: {
+  competition: PublicCompetition;
+  labels: TournamentLabels;
+}) {
   const t = useTranslations('tournamentPage.registration');
-  const locale = useLocale();
   const pathname = usePathname();
   const viewer = useViewerCompetition(c.slug);
   const stage = stageOfCompetition(c.status);
-  const from = fmt(c.registrationStartsAt, c.timezone, locale);
-  const to = fmt(c.registrationEndsAt, c.timezone, locale);
+  const from = labels.registrationFrom;
+  const to = labels.registrationTo;
   const login = (
     <Link
       href={{ pathname: '/login', query: { next: pathname } }}
