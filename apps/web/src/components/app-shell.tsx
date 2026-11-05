@@ -55,7 +55,13 @@ function navItems(t: Translate, user: Me): NavItem[] {
     case 'COACH':
       return [home, competitions, { href: '/athletes', label: t('nav.myAthletes') }, settings];
     case 'ATHLETE':
-      return [home, competitions, { href: '/path-to-success', label: t('nav.pathToSuccess') }, settings];
+      return [
+        home,
+        competitions,
+        { href: '/my-documents', label: t('nav.myDocuments') },
+        { href: '/path-to-success', label: t('nav.pathToSuccess') },
+        settings,
+      ];
     case 'GUARDIAN':
       return [home, competitions, { href: '/children', label: t('nav.children') }, settings];
     case 'ADMIN':

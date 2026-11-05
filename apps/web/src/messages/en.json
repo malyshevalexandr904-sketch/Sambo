@@ -81,7 +81,8 @@
     "mySettings": "Settings",
     "myCoaches": "My coaches",
     "myAthletes": "My athletes",
-    "pathToSuccess": "Path to success"
+    "pathToSuccess": "Path to success",
+    "myDocuments": "My documents"
   },
   "auth": {
     "email": "Email",
@@ -305,6 +306,74 @@
   "pathToSuccess": {
     "title": "Path to success",
     "empty": "This section is coming soon."
+  },
+  "myDocuments": {
+    "title": "My documents",
+    "lead": "Upload the documents you need to take part in competitions. Each card is colour-coded: orange — not uploaded yet, green — all good, red — the document has expired.",
+    "noProfile": "Your athlete profile has not been created yet.",
+    "noProfileLink": "Fill in the athlete form",
+    "loadFailed": "Could not load your documents. Please reload the page.",
+    "progress": "Documents uploaded: {done} of {total}",
+    "allDone": "All documents are in order.",
+    "notAllDone": "Upload the missing documents so you can enter tournaments without delays.",
+    "legend": {
+      "missing": "needs uploading",
+      "ok": "all good",
+      "expired": "expired — upload a new one"
+    },
+    "state": {
+      "missing": "Not uploaded yet — please upload it",
+      "ok": "All good: the document is uploaded and valid",
+      "expired": "The document has expired — upload a new one"
+    },
+    "slots": {
+      "identity": {
+        "title": "Identity document",
+        "hintAdult": "From the age of 14 — passport: the photo page and the registration page.",
+        "hintChild": "Under 14 — birth certificate together with a school certificate with a photo. Both are required."
+      },
+      "insurance": {
+        "title": "Sports insurance",
+        "hint": "Accident insurance policy covering the competition."
+      },
+      "oms": {
+        "title": "Health insurance (OMS)",
+        "hint": "Compulsory health insurance policy — paper, plastic card or an extract."
+      },
+      "rank": {
+        "title": "Sports rank or title",
+        "hint": "A document confirming your sports rank or title: athlete qualification book or the assignment order."
+      },
+      "medical": {
+        "title": "Medical clearance",
+        "hint": "Clearance for sambo competitions: doctor's certificate, medical board conclusion, sports clinic certificate, etc."
+      }
+    },
+    "parts": {
+      "PASSPORT": "Passport",
+      "BIRTH_CERTIFICATE": "Birth certificate",
+      "SCHOOL_CERTIFICATE": "School certificate with a photo"
+    },
+    "notUploaded": "No file uploaded yet.",
+    "upload": "Upload",
+    "replace": "Replace",
+    "open": "Open",
+    "openFailed": "Could not open the file.",
+    "uploadedOn": "Uploaded {date}",
+    "validUntil": "valid until {date}",
+    "expiredOn": "expired {date}",
+    "noExpiry": "no expiry",
+    "expiresSoon": "{days, plural, =0 {Expires today} one {Expires in # day} other {Expires in # days}} — upload a new document in advance.",
+    "rejected": "The document was rejected during review: {reason}. Please upload a new one.",
+    "expirationLabel": "Valid until",
+    "expirationHint": "The date the document expires. We will remind you 30, 7 and 1 day in advance.",
+    "noExpiryHint": "A birth certificate does not expire — no date needed.",
+    "dateFirst": "First enter the date the document is valid until.",
+    "chooseFile": "Choose file",
+    "chooseReplacement": "Choose a new file",
+    "cancel": "Cancel",
+    "limits": "Formats: {types}; up to {size} MB.",
+    "typeMissing": "This document type is not set up on the platform yet. Please contact support."
   },
   "account": {
     "title": "My profile",
@@ -1704,6 +1773,14 @@
         "title": "Document rejected: {documentType}",
         "body": "Reason: {reason}. Please upload a corrected document."
       },
+      "document_expiring": {
+        "title": "A document is about to expire: {documentType}",
+        "body": "Its validity ends soon. Upload a new document in advance."
+      },
+      "document_expired": {
+        "title": "A document has expired: {documentType}",
+        "body": "Upload a new document to be able to enter competitions."
+      },
       "schedule_changed": {
         "title": "Schedule changed",
         "body": "Tournament \"{competitionName}\": the match schedule has changed — check your athletes' times."
@@ -1759,6 +1836,8 @@
       "application_decided": "Application decision",
       "entry_rejected": "Entry rejected",
       "document_rejected": "Document rejected",
+      "document_expiring": "Document about to expire",
+      "document_expired": "Document expired",
       "schedule_changed": "Schedule changes",
       "results_published": "Results published",
       "match_soon": "Bout coming up",
@@ -3552,6 +3631,26 @@
         "f3": {
           "title": "Next goals",
           "text": "Upcoming tournaments and how many points you need for the next level."
+        }
+      },
+      "myDocuments": {
+        "title": "My documents",
+        "lead": "All your competition documents in one place, with expiry reminders.",
+        "f1": {
+          "title": "A card for every document",
+          "text": "Passport or birth certificate, insurance, health insurance policy, sports rank and medical clearance — each has its own card with a hint on what to upload."
+        },
+        "f2": {
+          "title": "Colour shows the state",
+          "text": "Orange — not uploaded yet, green — all good, red — expired, a new one is needed."
+        },
+        "f3": {
+          "title": "Expiry reminders",
+          "text": "Enter the expiry date when uploading: the platform reminds you 30, 7 and 1 day in advance."
+        },
+        "f4": {
+          "title": "One-click replacement",
+          "text": "Replace a document at any time, no reason needed."
         }
       },
       "settings": {
