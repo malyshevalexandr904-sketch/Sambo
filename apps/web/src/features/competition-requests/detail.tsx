@@ -12,6 +12,7 @@ import { Link, useRouter } from '@/i18n/navigation';
 import { api } from '@/lib/api';
 import { pickName } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
+import { GeneratedRegulationCard } from '@/features/competitions/generated-regulation';
 import { RecruitmentSummary } from '@/features/competitions/recruitment';
 import { EquipmentList, RefereeList } from './form-parts';
 import { RequestStatusBadge } from './shared';
@@ -69,6 +70,9 @@ function RequestView({ request: r }: { request: CompetitionRequestDto }) {
           <Alert tone="danger" title={t('competitionRequests.rejectedTitle')}>
             {r.decisionReason}
           </Alert>
+        ) : null}
+        {r.status === 'SUBMITTED' || r.status === 'APPROVED' ? (
+          <GeneratedRegulationCard href={`/api/v1/competition-requests/${r.id}/regulation.pdf`} draft />
         ) : null}
         <Card>
           <CardTitle>{t('competitionRequests.proposal')}</CardTitle>

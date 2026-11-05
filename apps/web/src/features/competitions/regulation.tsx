@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react';
 import { QueryState } from '@/components/common';
 import { FilePicker } from '@/components/file-picker';
 import { MarkdownLite } from '@/components/markdown-lite';
+import { GeneratedRegulationCard } from './generated-regulation';
 import { api, uploadFile } from '@/lib/api';
 import { pickName, qk, useDocumentTypes, useSportRanks } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
@@ -30,6 +31,10 @@ export function RegulationTab({ competition: c }: { competition: Competition }) 
   const canManage = c.allowedActions.includes('competition_category.manage') && EDITABLE.includes(c.status);
   return (
     <div className="grid gap-6 xl:grid-cols-2">
+      <GeneratedRegulationCard
+        href={`/api/v1/competitions/${c.id}/regulation.pdf`}
+        draft={c.status === 'DRAFT'}
+      />
       <RegulationCard competition={c} editable={canEdit} />
       <RequirementsCard competition={c} editable={canManage} />
       <RulesCard competition={c} editable={canManage} />

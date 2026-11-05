@@ -1443,6 +1443,7 @@
     "contacts": "Contacts",
     "about": "About",
     "regulation": "Regulation",
+    "regulationOpen": "Open regulation (PDF)",
     "regulationDownload": "Download regulation (PDF)",
     "regulationTbd": "The regulation is not published yet.",
     "requirements": "Participant requirements",
@@ -3795,5 +3796,12 @@
       "register": "Sign up",
       "rating": "Open the rating"
     }
+  },
+  "generatedRegulation": {
+    "title": "Competition regulation",
+    "text": "The Digital Sambo branded regulation, assembled by the platform from the tournament data. It updates automatically when dates, categories, weigh-in or the referee panel change.",
+    "draftText": "A draft of the Digital Sambo branded regulation, assembled from the request. Once the tournament is agreed and published, the platform adds registration dates, weigh-in and the referee panel.",
+    "open": "Open",
+    "download": "Download PDF"
   }
 }

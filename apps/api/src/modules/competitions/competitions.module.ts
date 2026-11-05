@@ -14,6 +14,7 @@ import { CompetitionStatusWriter } from './application/competition-status.writer
 import { CompetitionReferences } from './application/competition-references';
 import { CompetitionsService } from './application/competitions.service';
 import { RegulationService } from './application/regulation.service';
+import { RegulationDocumentService } from './application/regulation-document.service';
 import { StaffService } from './application/staff.service';
 import { RatingModule } from '../rating';
 import { CompetitionRatingController } from './api/competition-rating.controller';
@@ -43,10 +44,17 @@ import { CompetitionTypeService } from './application/competition-type.service';
     CompetitionRequestsService,
     CompetitionTypeService,
     RegulationService,
+    RegulationDocumentService,
     StaffService,
     RefereeRecruitmentService,
   ],
-  exports: [CompetitionScopeService, CompetitionExtensions, CompetitionStatusWriter, CompetitionsService],
+  exports: [
+    CompetitionScopeService,
+    CompetitionExtensions,
+    CompetitionStatusWriter,
+    CompetitionsService,
+    RegulationDocumentService,
+  ],
 })
 export class CompetitionsModule implements OnModuleInit {
   constructor(
