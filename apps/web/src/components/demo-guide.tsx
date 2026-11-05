@@ -41,8 +41,6 @@ export function DemoGuide({ pathname, role }: { pathname: string; role: CabinetR
   const [picked, setPicked] = useState<{ key: string; index: number }>({ key, index: 0 });
   const index = picked.key === key ? picked.index : 0;
   const current = features[index] ?? features[0]!;
-  const register = useRegisterFromDemo();
-  const [busy, setBusy] = useState(false);
 
   return (
     <div key={key} className="mx-auto max-w-4xl animate-fade-up">
@@ -124,41 +122,51 @@ export function DemoGuide({ pathname, role }: { pathname: string; role: CabinetR
         </div>
       </section>
 
-      <section
-        aria-labelledby="demo-guide-cta"
-        className="mt-8 rounded-xl bg-blue-700 p-5 text-white shadow-md sm:p-6"
-      >
-        <h2 id="demo-guide-cta" className="text-xl font-bold">
-          {t('ctaTitle')}
-        </h2>
-        <p className="mt-2 max-w-2xl text-white/85">{t('ctaText')}</p>
-        <ol className="mt-5 grid gap-3 sm:grid-cols-4">
-          {STEPS.map((s, i) => (
-            <li
-              key={s}
-              className="animate-fade-up rounded-lg bg-white/10 p-3 text-sm ring-1 ring-white/20"
-              style={{ animationDelay: `${150 + i * 120}ms` }}
-            >
-              <span className="block text-xs font-semibold uppercase tracking-wide text-white/75">
-                {t('step', { n: i + 1 })}
-              </span>
-              <span className="mt-1 block font-semibold">{t(`steps.${s}`)}</span>
-            </li>
-          ))}
-        </ol>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => {
-            setBusy(true);
-            void register();
-          }}
-          className="mt-6 inline-flex min-h-11 items-center justify-center rounded-md bg-white px-6 font-semibold text-blue-800 shadow-sm transition hover:-translate-y-0.5 hover:shadow disabled:opacity-70 theme-light"
-        >
-          {t('ctaButton')}
-        </button>
-        <p className="mt-3 text-xs text-white/75">{t('privacyNote')}</p>
-      </section>
+      <DemoCta />
     </div>
+  );
+}
+
+/** Призыв зарегистрироваться: шаги регистрации и кнопка (справки демо-режима и пример личного кабинета). */
+export function DemoCta() {
+  const t = useTranslations('demoGuide');
+  const register = useRegisterFromDemo();
+  const [busy, setBusy] = useState(false);
+  return (
+    <section
+      aria-labelledby="demo-guide-cta"
+      className="mt-8 rounded-xl bg-blue-700 p-5 text-white shadow-md sm:p-6"
+    >
+      <h2 id="demo-guide-cta" className="text-xl font-bold">
+        {t('ctaTitle')}
+      </h2>
+      <p className="mt-2 max-w-2xl text-white/85">{t('ctaText')}</p>
+      <ol className="mt-5 grid gap-3 sm:grid-cols-4">
+        {STEPS.map((s, i) => (
+          <li
+            key={s}
+            className="animate-fade-up rounded-lg bg-white/10 p-3 text-sm ring-1 ring-white/20"
+            style={{ animationDelay: `${150 + i * 120}ms` }}
+          >
+            <span className="block text-xs font-semibold uppercase tracking-wide text-white/75">
+              {t('step', { n: i + 1 })}
+            </span>
+            <span className="mt-1 block font-semibold">{t(`steps.${s}`)}</span>
+          </li>
+        ))}
+      </ol>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          void register();
+        }}
+        className="mt-6 inline-flex min-h-11 items-center justify-center rounded-md bg-white px-6 font-semibold text-blue-800 shadow-sm transition hover:-translate-y-0.5 hover:shadow disabled:opacity-70 theme-light"
+      >
+        {t('ctaButton')}
+      </button>
+      <p className="mt-3 text-xs text-white/75">{t('privacyNote')}</p>
+    </section>
   );
 }

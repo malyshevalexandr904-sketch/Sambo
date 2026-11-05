@@ -6,6 +6,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { QueryState, StatusBadge } from '@/components/common';
+import { SectionLinks } from '@/components/section-links';
 import { Link } from '@/i18n/navigation';
 import { hasAnywhere } from '@/lib/access';
 import { api } from '@/lib/api';
@@ -63,6 +64,7 @@ export function AthletesList() {
           </>
         }
       />
+      <SectionLinks host="athletes" />
       {coachWithoutClub ? (
         <Alert tone="info" title={t('athletes.coachNoClubTitle')} className="mb-4">
           {t('athletes.coachNoClub')}{' '}

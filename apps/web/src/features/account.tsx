@@ -1,10 +1,8 @@
 'use client';
-// Профиль: имя и язык, смена пароля, сеансы, двухфакторная аутентификация (API.md, 3.1–3.2). Показывается в личном
-// кабинете (правки 27.10.2026: «Мой профиль» перенесён в «Личный кабинет»).
+// Профиль: имя и язык, смена пароля, сеансы, двухфакторная аутентификация (API.md, 3.1–3.2). Показывается во
+// вкладках «Настроек» (правки 05.11.2026, п. 7: все настройки — в «Настройках»).
 import type { DataEnvelope, Me, SessionDto } from '@sde/contracts';
 import { Alert, Badge, Button, Card, CardTitle, Field, Input, Select } from '@sde/ui';
-import { AvatarCard } from './avatar';
-import { MyPersonCard } from './my-person';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -17,7 +15,7 @@ import { qk } from '@/lib/queries';
 
 type Notice = { tone: 'success' | 'danger'; text: string } | null;
 
-function ProfileCard({ me }: { me: Me }) {
+export function ProfileCard({ me }: { me: Me }) {
   const t = useTranslations();
   const errorMessage = useErrorMessage();
   const queryClient = useQueryClient();
@@ -72,7 +70,7 @@ function ProfileCard({ me }: { me: Me }) {
   );
 }
 
-function PasswordCard() {
+export function PasswordCard() {
   const t = useTranslations('account');
   const errorMessage = useErrorMessage();
   const queryClient = useQueryClient();
@@ -124,7 +122,7 @@ function PasswordCard() {
   );
 }
 
-function SessionsCard() {
+export function SessionsCard() {
   const t = useTranslations('account');
   const locale = useLocale();
   const queryClient = useQueryClient();
@@ -174,7 +172,7 @@ function SessionsCard() {
   );
 }
 
-function TotpCard({ me }: { me: Me }) {
+export function TotpCard({ me }: { me: Me }) {
   const t = useTranslations('account');
   const errorMessage = useErrorMessage();
   const queryClient = useQueryClient();
@@ -273,25 +271,5 @@ function TotpCard({ me }: { me: Me }) {
         </form>
       ) : null}
     </Card>
-  );
-}
-
-/** Разделы профиля в личном кабинете. */
-export function AccountSections({ me }: { me: Me }) {
-  const t = useTranslations('account');
-  return (
-    <section aria-labelledby="account-title" className="mt-8">
-      <h2 id="account-title" className="mb-4 text-xl font-semibold text-slate-900">
-        {t('title')}
-      </h2>
-      <div className="grid gap-6 xl:grid-cols-2">
-        <ProfileCard me={me} />
-        <AvatarCard me={me} />
-        <TotpCard me={me} />
-        <MyPersonCard />
-        <PasswordCard />
-        <SessionsCard />
-      </div>
-    </section>
   );
 }
