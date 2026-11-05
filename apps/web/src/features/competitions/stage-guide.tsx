@@ -198,7 +198,9 @@ export function PresentationCard({ competition: c }: { competition: Competition 
               key={x}
               className={cn(
                 'cursor-pointer rounded-xl border-2 p-1.5 transition',
-                template === x ? 'border-blue-700 ring-2 ring-blue-200' : 'border-transparent hover:border-slate-300',
+                template === x
+                  ? 'border-blue-700 ring-2 ring-blue-200'
+                  : 'border-transparent hover:border-slate-300',
               )}
             >
               <input
@@ -360,9 +362,20 @@ export function MediaCard({ competition: c }: { competition: Competition }) {
             />
           </Field>
           <Field id="media-caption" label={t('caption')} className="mt-2">
-            <Input id="media-caption" value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={200} />
+            <Input
+              id="media-caption"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              maxLength={200}
+            />
           </Field>
-          <Button type="submit" variant="secondary" className="mt-3" loading={action.busy} disabled={!videoUrl.trim()}>
+          <Button
+            type="submit"
+            variant="secondary"
+            className="mt-3"
+            loading={action.busy}
+            disabled={!videoUrl.trim()}
+          >
             {t('addVideo')}
           </Button>
         </form>

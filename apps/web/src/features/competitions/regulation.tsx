@@ -46,7 +46,9 @@ function RegulationCard({ competition: c, editable }: { competition: Competition
   const [outcome, setOutcome] = useState(c.weighInFailureOutcome);
   useEffect(() => setText(c.requirementsMd ?? ''), [c.requirementsMd]);
   useEffect(() => setOutcome(c.weighInFailureOutcome), [c.weighInFailureOutcome]);
-  const outcomeEditable = ['DRAFT', 'PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(c.status);
+  const outcomeEditable = ['DRAFT', 'PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(
+    c.status,
+  );
   const save = (body: {
     regulationFileId?: string | null;
     requirementsMd: string;

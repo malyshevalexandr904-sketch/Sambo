@@ -150,7 +150,10 @@ export function CompetitionPage({ id }: { id: string }) {
                   >
                     {t(`tabs.${x}`)}
                     {!focused && focus.includes(x) && x !== 'overview' ? (
-                      <span className="h-1.5 w-1.5 rounded-full bg-blue-600" aria-label={t('tabs.stageFocus')} />
+                      <span
+                        className="h-1.5 w-1.5 rounded-full bg-blue-600"
+                        aria-label={t('tabs.stageFocus')}
+                      />
                     ) : null}
                   </button>
                 ))}

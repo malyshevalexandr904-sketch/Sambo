@@ -3,7 +3,13 @@
 // в «Готова к жеребьёвке», разыгрываются с форматом по правилам турнира (разведение по команде и региону) и
 // публикуются; затем — черновик расписания по коврам. Каждая категория — теми же командами, что вручную, поэтому
 // условия проверяет сервер, а сбой одной категории не мешает остальным.
-import type { Competition, CompetitionCategoryDto, DataEnvelope, DrawDto, DrawOverviewRow } from '@sde/contracts';
+import type {
+  Competition,
+  CompetitionCategoryDto,
+  DataEnvelope,
+  DrawDto,
+  DrawOverviewRow,
+} from '@sde/contracts';
 import { Alert, Button, Card, CardTitle } from '@sde/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
@@ -34,10 +40,14 @@ export function AutoDrawCard({ competition: c }: { competition: Competition }) {
   const [progress, setProgress] = useState<{ done: number; total: number; name: string } | null>(null);
   const [report, setReport] = useState<Report | null>(null);
   const pending = (overview.data ?? []).filter(
-    (r) => !r.published && r.admitted > 0 && r.category.status !== 'CANCELLED' && r.category.status !== 'MERGED',
+    (r) =>
+      !r.published && r.admitted > 0 && r.category.status !== 'CANCELLED' && r.category.status !== 'MERGED',
   );
 
-  const drawOne = async (row: DrawOverviewRow, category: CompetitionCategoryDto | undefined): Promise<void> => {
+  const drawOne = async (
+    row: DrawOverviewRow,
+    category: CompetitionCategoryDto | undefined,
+  ): Promise<void> => {
     if (NEEDS_READY.has(row.category.status) && category) {
       await api(`/competitions/${c.id}/categories/${row.category.id}/transitions`, {
         method: 'POST',

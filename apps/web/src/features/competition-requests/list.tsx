@@ -39,7 +39,10 @@ export function CompetitionRequestsList() {
   });
   const rows = list.data?.pages.flatMap((p) => p.data) ?? [];
   // Черновики видит только организация: администратору фильтр не нужен.
-  const filters: Filter[] = ['ALL', ...COMPETITION_REQUEST_STATUSES.filter((x) => !reviewer || x !== 'DRAFT')];
+  const filters: Filter[] = [
+    'ALL',
+    ...COMPETITION_REQUEST_STATUSES.filter((x) => !reviewer || x !== 'DRAFT'),
+  ];
   return (
     <>
       <PageHeader
@@ -81,7 +84,11 @@ export function CompetitionRequestsList() {
                   <Card className="h-full">
                     <div className="flex items-start justify-between gap-2">
                       <Link
-                        href={r.status === 'DRAFT' ? `/competition-requests/new?draft=${r.id}` : `/competition-requests/${r.id}`}
+                        href={
+                          r.status === 'DRAFT'
+                            ? `/competition-requests/new?draft=${r.id}`
+                            : `/competition-requests/${r.id}`
+                        }
                         className="text-lg font-semibold text-blue-800 hover:underline"
                       >
                         {r.name}
@@ -90,7 +97,9 @@ export function CompetitionRequestsList() {
                     </div>
                     <p className="mt-1 text-sm text-slate-600">
                       {r.status === 'DRAFT'
-                        ? t('draftUpdated', { date: formatDates(r.updatedAt.slice(0, 10), r.updatedAt.slice(0, 10), locale) })
+                        ? t('draftUpdated', {
+                            date: formatDates(r.updatedAt.slice(0, 10), r.updatedAt.slice(0, 10), locale),
+                          })
                         : formatDates(r.startDate, r.endDate, locale)}{' '}
                       · {r.organization.shortName}
                       {r.venue

@@ -687,6 +687,69 @@ describe('entries after submission', () => {
     expect(refused.body.error.code).toBe('WRITE_AUTHORITY_ELSEWHERE');
   });
 
+  it("the club names the athlete's coach per entry; a coach of another club is refused", async () => {
+    const w = await world();
+    const app = await application(w, w.coachA, w.clubA);
+    const clubCoach = uuidv7();
+    const person = await t.admin.person.create({
+      data: {
+        id: uuidv7(),
+        lastName: 'Наставников',
+        firstName: 'Пётр',
+        birthDate: new Date('1980-03-03'),
+        gender: 'MALE',
+      },
+    });
+    await t.admin.coachProfile.create({ data: { id: clubCoach, personId: person.id } });
+    await t.admin.coachMembership.create({
+      data: {
+        id: uuidv7(),
+        coachId: clubCoach,
+        organizationId: w.clubA,
+        validFrom: new Date('2020-01-01T00:00:00Z'),
+      },
+    });
+    const other = uuidv7();
+    await t.admin.coachProfile.create({
+      data: {
+        id: other,
+        personId: (
+          await t.admin.person.create({
+            data: {
+              id: uuidv7(),
+              lastName: 'Чужой',
+              firstName: 'Иван',
+              birthDate: new Date('1981-04-04'),
+              gender: 'MALE',
+            },
+          })
+        ).id,
+      },
+    });
+    await t.admin.coachMembership.create({
+      data: {
+        id: uuidv7(),
+        coachId: other,
+        organizationId: w.clubB,
+        validFrom: new Date('2020-01-01T00:00:00Z'),
+      },
+    });
+    const refused = await send(w.coachA, 'post', `/api/v1/applications/${app.id}/entries`, {
+      athleteId: w.athletes.boy1,
+      categoryId: w.cat('-38').id,
+      coachId: other,
+    });
+    expect(refused.status).toBe(400);
+    expect(refused.body.error.code).toBe('VALIDATION_FAILED');
+    const added = await send(w.coachA, 'post', `/api/v1/applications/${app.id}/entries`, {
+      athleteId: w.athletes.boy1,
+      categoryId: w.cat('-38').id,
+      coachId: clubCoach,
+    });
+    expect(added.status, JSON.stringify(added.body)).toBe(201);
+    expect(added.body.data.snapshot.coachName).toBe('Наставников Пётр');
+  });
+
   it("an athlete's card lists their entries across competitions", async () => {
     const w = await world();
     const app = await application(w, w.coachA, w.clubA);

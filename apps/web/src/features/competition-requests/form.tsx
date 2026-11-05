@@ -90,10 +90,11 @@ function fromDraft(data: Record<string, unknown>): Partial<FormValues> {
     if (k === 'rulesAccepted' || !(k in data)) continue;
     const value = data[k];
     if (k === 'responsibleUser') out[k] = value && typeof value === 'object' ? value : null;
-    else if (Array.isArray(def)) out[k] = Array.isArray(value) ? value.filter((x) => typeof x === 'string') : def;
+    else if (Array.isArray(def))
+      out[k] = Array.isArray(value) ? value.filter((x) => typeof x === 'string') : def;
     else if (typeof value === typeof def) out[k] = value;
   }
-  return out as Partial<FormValues>;
+  return out;
 }
 
 function useTemplateAgeGroups() {
@@ -192,7 +193,11 @@ export function CompetitionRequestForm() {
   /** Сохранить черновик как есть: без проверок, их сделает подача. */
   const saveDraft = (): void => {
     const { rulesAccepted: _skip, ...data } = v;
-    const body = { organizationId: v.organizationId, name: v.name.trim() || undefined, data: { ...data, startDate: v.date || undefined } };
+    const body = {
+      organizationId: v.organizationId,
+      name: v.name.trim() || undefined,
+      data: { ...data, startDate: v.date || undefined },
+    };
     void action.run(async () => {
       const res = await api<DataEnvelope<CompetitionRequestDto>>(
         activeDraft ? `/competition-requests/${activeDraft}/draft` : '/competition-requests/drafts',
@@ -274,9 +279,7 @@ export function CompetitionRequestForm() {
         }}
       >
         {action.error ? <Alert tone="danger">{action.error}</Alert> : null}
-        {draftId ? (
-          <Alert tone="info">{draftGone ? tr('draftGone') : tr('draftEditing')}</Alert>
-        ) : null}
+        {draftId ? <Alert tone="info">{draftGone ? tr('draftGone') : tr('draftEditing')}</Alert> : null}
         <Card>
           <CardTitle>{t('competitions.sectionMain')}</CardTitle>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -519,7 +522,13 @@ export function CompetitionRequestForm() {
           <Button type="submit" loading={action.busy} disabled={!v.organizationId}>
             {tr('submit')}
           </Button>
-          <Button type="button" variant="secondary" loading={action.busy} disabled={!v.organizationId} onClick={saveDraft}>
+          <Button
+            type="button"
+            variant="secondary"
+            loading={action.busy}
+            disabled={!v.organizationId}
+            onClick={saveDraft}
+          >
             {tr('saveDraft')}
           </Button>
           <Button type="button" variant="ghost" onClick={() => router.push('/competitions')}>

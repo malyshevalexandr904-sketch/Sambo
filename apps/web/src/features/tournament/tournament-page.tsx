@@ -16,10 +16,13 @@ import { useRouter } from 'next/navigation';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from '@/i18n/navigation';
-import { Poster, posterDataOf, RegulationSummary } from './poster';
-import { BracketsSection, LiveSection, MediaSection, RegistrationSection, RegulationSection } from './sections';
+import { BracketsSection } from './brackets';
+import { LiveSection, MediaSection } from './live-media';
+import { Poster, posterDataOf } from './poster';
+import { RegistrationSection, RegulationSection } from './sections';
 import { ShareButton } from './share';
 import { StageStepper } from './stage-stepper';
+import { RegulationSummary } from './summary';
 
 const ICON: Record<PublicSection, string> = {
   poster: '🖼️',
@@ -33,7 +36,12 @@ const ICON: Record<PublicSection, string> = {
 const REFRESH_MS = 30_000;
 
 function dates(start: string, end: string, locale: string): string {
-  const fmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  const fmt = new Intl.DateTimeFormat(locale, {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
   const s = new Date(`${start}T00:00:00Z`);
   return start === end ? fmt.format(s) : fmt.formatRange(s, new Date(`${end}T00:00:00Z`));
 }
@@ -100,7 +108,13 @@ export function TournamentPage({
       <header className="mt-3 rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
         <div className="flex flex-wrap items-start gap-4">
           {c.logoUrl ? (
-            <img src={c.logoUrl} alt="" width={72} height={72} className="h-16 w-16 rounded object-contain sm:h-18 sm:w-18" />
+            <img
+              src={c.logoUrl}
+              alt=""
+              width={72}
+              height={72}
+              className="h-16 w-16 rounded object-contain sm:h-18 sm:w-18"
+            />
           ) : null}
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">{c.name}</h1>
@@ -115,7 +129,11 @@ export function TournamentPage({
               </span>
             ) : null}
           </div>
-          <ShareButton title={c.name} text={t('shareText', { name: c.name, dates: dates(c.startDate, c.endDate, locale) })} label={t('shareTournament')} />
+          <ShareButton
+            title={c.name}
+            text={t('shareText', { name: c.name, dates: dates(c.startDate, c.endDate, locale) })}
+            label={t('shareTournament')}
+          />
         </div>
         {stage ? (
           <div className="mt-5 border-t border-slate-100 pt-4">

@@ -259,9 +259,12 @@ export class EntriesService {
   private async clubCoachName(coachId: string, organizationId: string): Promise<string> {
     const link = await this.db.coachMembership.findFirst({
       where: { coachId, organizationId, ...currentPeriod() },
-      select: { coach: { select: { person: { select: { lastName: true, firstName: true, middleName: true } } } } },
+      select: {
+        coach: { select: { person: { select: { lastName: true, firstName: true, middleName: true } } } },
+      },
     });
-    if (!link) throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'coachId', code: 'not_found' }] });
+    if (!link)
+      throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'coachId', code: 'not_found' }] });
     return fullName(link.coach.person);
   }
 
@@ -281,7 +284,8 @@ export class EntriesService {
     const ctx = await this.access.applicationContext(applicationId);
     await this.access.assertOwner(user, ctx);
     const athlete = await this.clubAthlete(input.athleteId, ctx.application.organizationId);
-    if (input.coachId) athlete.coachName = await this.clubCoachName(input.coachId, ctx.application.organizationId);
+    if (input.coachId)
+      athlete.coachName = await this.clubCoachName(input.coachId, ctx.application.organizationId);
     const id = await this.db.tx(async (tx) => {
       const competitionId = ctx.application.competitionId;
       await this.leases.assertWritable(tx, competitionId);

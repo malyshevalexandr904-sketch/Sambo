@@ -127,7 +127,10 @@ function RequestView({ request: r }: { request: CompetitionRequestDto }) {
                 </Button>
               </div>
             ) : null}
-            <Link href={`/competitions/${r.competitionId}`} className="mt-3 inline-block font-medium underline">
+            <Link
+              href={`/competitions/${r.competitionId}`}
+              className="mt-3 inline-block font-medium underline"
+            >
               {t('competitionRequests.openCompetition')}
             </Link>
           </Alert>

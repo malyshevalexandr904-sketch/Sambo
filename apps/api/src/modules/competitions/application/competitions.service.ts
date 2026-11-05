@@ -113,7 +113,10 @@ export class CompetitionsService {
 
   /** Турнир по адресу публичной страницы: кнопки страницы (подписка, заявка) для вошедшего пользователя. */
   async getBySlug(user: AuthUser, slug: string): Promise<Competition> {
-    const row = await this.db.competition.findFirst({ where: { slug, deletedAt: null }, select: { id: true } });
+    const row = await this.db.competition.findFirst({
+      where: { slug, deletedAt: null },
+      select: { id: true },
+    });
     if (!row) throw new DomainError('NOT_FOUND', { resource: 'competition' });
     return this.get(user, row.id);
   }

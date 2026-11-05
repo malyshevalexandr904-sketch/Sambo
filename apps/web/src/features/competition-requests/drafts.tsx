@@ -66,7 +66,10 @@ export function MyHostingRequests() {
                 <li key={r.id}>
                   <Card className="flex flex-wrap items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <Link href={`/competition-requests/${r.id}`} className="font-medium text-blue-800 hover:underline">
+                      <Link
+                        href={`/competition-requests/${r.id}`}
+                        className="font-medium text-blue-800 hover:underline"
+                      >
                         {r.name}
                       </Link>
                       <p className="text-xs text-slate-600">{formatDates(r.startDate, r.endDate, locale)}</p>

@@ -1419,7 +1419,21 @@
       "followAll": "Notify me about bouts of all athletes in the application",
       "unfollowAll": "Turn off for all",
       "result": "Notifications are on for {following} of {total, plural, one {# athlete} other {# athletes}} in the application."
-    }
+    },
+    "coachRequired": "Athlete’s coach",
+    "coachOptional": "Athlete’s coach (optional)",
+    "coachHint": "The club coach preparing the athlete for the tournament.",
+    "coachNeeded": "Choose the athlete’s coach",
+    "chooseCoach": "Choose a coach",
+    "stepsLabel": "How to submit an entry",
+    "stepAthlete": "Choose an athlete — eligible age categories appear right away",
+    "stepCategory": "Choose the weight category",
+    "stepDocuments": "Upload the athlete’s documents",
+    "stepSubmit": "Submit the entry for review",
+    "addedTitle": "{name} is added to the entry",
+    "addedText": "Now upload the athlete’s documents: the credentials commission checks them.",
+    "addAnother": "Add another athlete",
+    "thenSubmit": "When all athletes are added, press “Submit application” in the entry card above."
   },
   "tournaments": {
     "title": "Competitions",
