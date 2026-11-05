@@ -130,15 +130,15 @@ function CompetitionCard({ competition: c }: { competition: CompetitionSummary }
 
 /**
  * Заметный призыв организации провести рейтинговый турнир у себя: кнопка заявки и «?» с описанием процесса.
- * Фон — только оттенки 50, которые тёмная тема переворачивает в тёмные подложки: белый (`via-white`) в градиенте
- * тема не меняет, и светлый текст на нём не читается.
+ * Фон — сплошной светло-синий blue-50 в тонах платформы (правки 05.11.2026: без градиента, чтобы блок не выделялся);
+ * тёмная тема переворачивает его в тёмно-синюю подложку.
  */
 function HostingCta() {
   const t = useTranslations('competitions');
   return (
     <section
       aria-labelledby="hosting-cta-title"
-      className="mb-6 overflow-hidden rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-amber-50 p-5 shadow-sm sm:p-6"
+      className="mb-6 overflow-hidden rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm sm:p-6"
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
