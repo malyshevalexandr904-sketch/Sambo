@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CompetitionsModule } from '../competitions';
 import { FilesModule } from '../files';
 import { RatingModule } from '../rating';
 import { RefereeingModule } from '../refereeing';
@@ -10,7 +11,7 @@ import { PublicCompetitionsService } from './application/public-competitions.ser
 /** Публичные read-модели и `/api/public/v1` (ADR-15). Phase 4a — турнир и положение; Phase 8a — табло
  * ковра; полная витрина — Phase 9; таблица рейтинга — фаза 7 рейтинга. */
 @Module({
-  imports: [FilesModule, RatingModule, RefereeingModule],
+  imports: [CompetitionsModule, FilesModule, RatingModule, RefereeingModule],
   controllers: [PublicCompetitionsController, PublicRankingsController, PublicScoreboardController],
   providers: [PublicCompetitionsService],
 })

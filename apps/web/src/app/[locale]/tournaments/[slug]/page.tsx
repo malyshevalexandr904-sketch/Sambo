@@ -138,18 +138,24 @@ export default async function TournamentPage({
 
       <section className="mt-6 rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="mb-2 text-xl font-semibold">{t('regulation')}</h2>
-        {c.regulationUrl ? (
+        {/* Загруженное администратором положение, а если его нет — фирменное, собранное платформой. */}
+        <div className="flex flex-wrap gap-x-6">
           <a
-            href={c.regulationUrl}
+            href={c.regulationPdfUrl}
             className="inline-flex min-h-11 items-center text-blue-700 underline"
             target="_blank"
             rel="noopener noreferrer"
           >
+            {t('regulationOpen')}
+          </a>
+          <a
+            href={c.regulationUrl ?? `${c.generatedRegulationPdfUrl}?download=1`}
+            className="inline-flex min-h-11 items-center text-blue-700 underline"
+            download
+          >
             {t('regulationDownload')}
           </a>
-        ) : (
-          <p className="text-sm text-slate-600">{t('regulationTbd')}</p>
-        )}
+        </div>
         {c.requirementsMd ? <MarkdownLite text={c.requirementsMd} className="mt-3" /> : null}
         {c.requirements.length > 0 ? (
           <>
