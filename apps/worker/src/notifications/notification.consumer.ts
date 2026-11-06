@@ -27,6 +27,7 @@ import {
   resultsRecipients,
 } from './recipients';
 import { type OnboardingReader, planOnboardingNotifications } from './onboarding';
+import { planDocumentExpiry } from './document-expiry';
 import { renderNotificationEmail } from './templates';
 import { NotificationWriter, type PlannedFromSource } from './writer';
 
@@ -59,8 +60,13 @@ export interface SoonCheckJob {
 export interface SoonScanJob {
   kind: 'soon-scan';
 }
+/** Обход сроков документов спортсменов (правки 05.11.2026): предупреждения за 30, 7, 1 день и «срок истёк». */
+export interface DocumentExpiryScanJob {
+  kind: 'document-expiry-scan';
+}
 
-export type NotificationJob = OutboxJob | DeliveryJob | ScheduleDigestJob | SoonCheckJob | SoonScanJob;
+export type NotificationJob =
+  OutboxJob | DeliveryJob | ScheduleDigestJob | SoonCheckJob | SoonScanJob | DocumentExpiryScanJob;
 
 const kindOf = (j: NotificationJob): string | null => ('kind' in j ? j.kind : null);
 const isDigestJob = (j: NotificationJob): j is ScheduleDigestJob => kindOf(j) === 'schedule-digest';
@@ -177,6 +183,10 @@ export class NotificationConsumer {
     if (isDigestJob(data)) return this.sendDigest(data);
     if ('kind' in data && data.kind === 'soon-check') return this.soonCheck(data.competitionId);
     if ('kind' in data && data.kind === 'soon-scan') return this.soonScan();
+    if ('kind' in data && data.kind === 'document-expiry-scan') {
+      await this.documentExpiryScan();
+      return;
+    }
     return this.create(data);
   }
 
@@ -340,6 +350,20 @@ export class NotificationConsumer {
     await this.writer.enqueueDeliveries(due.map((d) => soonSourceKey(d.matchId)));
     if (created > 0)
       this.logger.info({ competitionId, notifications: created }, 'Match soon notifications created');
+  }
+
+  /**
+   * Сроки документов спортсменов: уведомления этапа, которого получатель ещё не получал (ключ источника — документ и
+   * этап). Доставки ставятся по всем источникам обхода — и ожидающие после сбоя прошлого обхода.
+   */
+  async documentExpiryScan(today: string = new Date().toISOString().slice(0, 10)): Promise<number> {
+    const planned = await planDocumentExpiry(this.db, today);
+    const stored = await this.writer.storeMany(planned);
+    await this.writer.announce(stored);
+    await this.writer.enqueueDeliveries(planned.map((p) => p.sourceId));
+    if (stored.length > 0)
+      this.logger.info({ notifications: stored.length }, 'Document expiry notifications created');
+    return stored.length;
   }
 
   /** Поминутный обход: проверка каждого турнира — своей задачей (сбой одного не мешает остальным, по одной на турнир). */

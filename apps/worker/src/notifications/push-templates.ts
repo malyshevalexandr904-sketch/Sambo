@@ -11,6 +11,9 @@ export interface PushContext extends NotificationSource {
   locale: Locale;
 }
 
+/** YYYY-MM-DD → ДД.ММ.ГГГГ. */
+const isoDate = (d: string): string => d.split('-').reverse().join('.');
+
 const join = (...parts: (string | undefined | false)[]): string => parts.filter(Boolean).join(' · ');
 
 function time(s: PushContext): string | undefined {
@@ -53,6 +56,14 @@ const TEXTS: Record<Locale, Record<NotificationType, Texts>> = {
     'application.decided': { title: 'Решение по заявке', body: (s) => join(s.competitionName) },
     'entry.rejected': { title: 'Участие в заявке отклонено', body: (s) => join(s.competitionName) },
     'document.rejected': { title: 'Документ отклонён', body: (s) => join(s.documentType) },
+    'document.expiring': {
+      title: 'Скоро истекает срок документа',
+      body: (s) => join(s.documentType, s.expirationDate && `до ${isoDate(s.expirationDate)}`),
+    },
+    'document.expired': {
+      title: 'Истёк срок документа — загрузите новый',
+      body: (s) => join(s.documentType),
+    },
     'schedule.changed': { title: 'Расписание турнира изменилось', body: (s) => join(s.competitionName) },
     'results.published': {
       title: 'Опубликованы результаты',
@@ -91,6 +102,14 @@ const TEXTS: Record<Locale, Record<NotificationType, Texts>> = {
     'application.decided': { title: 'Application decided', body: (s) => join(s.competitionName) },
     'entry.rejected': { title: 'Entry rejected', body: (s) => join(s.competitionName) },
     'document.rejected': { title: 'Document rejected', body: (s) => join(s.documentType) },
+    'document.expiring': {
+      title: 'A document is about to expire',
+      body: (s) => join(s.documentType, s.expirationDate && `until ${isoDate(s.expirationDate)}`),
+    },
+    'document.expired': {
+      title: 'A document has expired — upload a new one',
+      body: (s) => join(s.documentType),
+    },
     'schedule.changed': { title: 'Tournament schedule changed', body: (s) => join(s.competitionName) },
     'results.published': { title: 'Results published', body: (s) => join(s.categoryName, s.competitionName) },
     'match.soon': {
