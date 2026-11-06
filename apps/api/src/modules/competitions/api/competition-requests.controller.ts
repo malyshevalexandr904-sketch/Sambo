@@ -1,4 +1,4 @@
-import { Controller, Get, HttpCode, Post } from '@nestjs/common';
+import { Controller, Get, HttpCode, Post, Res, type StreamableFile } from '@nestjs/common';
 import {
   CompetitionRequestCreate,
   type CompetitionRequestDto,
@@ -14,7 +14,10 @@ import type { AuthUser } from '../../../common/context/request-context';
 import { IfMatchVersion, ok } from '../../../common/http/http';
 import { UuidParam, ValidBody, ValidQuery } from '../../../common/validation/zod.pipe';
 import { Authenticated } from '../../access';
+import type { Response } from 'express';
 import { CompetitionRequestsService } from '../application/competition-requests.service';
+import { RegulationDocumentService } from '../application/regulation-document.service';
+import { RegulationPdfQuery, regulationPdfResponse } from './regulation-pdf.response';
 
 /**
  * Заявки организаций на проведение турнира (docs/RATED_ONLY.md, 2). Права зависят от стороны (организация —
@@ -22,7 +25,10 @@ import { CompetitionRequestsService } from '../application/competition-requests.
  */
 @Controller('competition-requests')
 export class CompetitionRequestsController {
-  constructor(private readonly requests: CompetitionRequestsService) {}
+  constructor(
+    private readonly requests: CompetitionRequestsService,
+    private readonly regulation: RegulationDocumentService,
+  ) {}
 
   @Get()
   @Authenticated()
@@ -59,6 +65,18 @@ export class CompetitionRequestsController {
     @UuidParam('id') id: string,
   ): Promise<DataEnvelope<CompetitionRequestDto>> {
     return ok(await this.requests.get(user, id));
+  }
+
+  /** Проект положения по заявке (правки 05.11.2026, п. 8): организатор видит готовый документ сразу после подачи. */
+  @Get(':id/regulation.pdf')
+  @Authenticated()
+  async regulationPdf(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @ValidQuery(RegulationPdfQuery) q: RegulationPdfQuery,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return regulationPdfResponse(res, await this.regulation.forRequest(user, id), q, 'no-store');
   }
 
   @Post(':id/withdraw')

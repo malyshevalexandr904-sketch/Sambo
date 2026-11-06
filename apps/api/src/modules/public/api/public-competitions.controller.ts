@@ -1,4 +1,4 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import { Controller, Get, Header, Res, type StreamableFile } from '@nestjs/common';
 import {
   type DataEnvelope,
   type Page,
@@ -10,10 +10,12 @@ import {
   RatedMatchesQuery,
   Slug,
 } from '@sde/contracts';
+import type { Response } from 'express';
 import { ok } from '../../../common/http/http';
 import { RateLimit } from '../../../common/security/rate-limit';
 import { ValidParam, ValidQuery } from '../../../common/validation/zod.pipe';
 import { Public } from '../../access';
+import { RegulationDocumentService, RegulationPdfQuery, regulationPdfResponse } from '../../competitions';
 import { CompetitionRatingResultsService } from '../../rating';
 import { PublicCompetitionsService } from '../application/public-competitions.service';
 
@@ -27,6 +29,7 @@ export class PublicCompetitionsController {
   constructor(
     private readonly competitions: PublicCompetitionsService,
     private readonly rating: CompetitionRatingResultsService,
+    private readonly regulation: RegulationDocumentService,
   ) {}
 
   @Get()
@@ -43,6 +46,20 @@ export class PublicCompetitionsController {
   @Header('Cache-Control', PUBLIC_CACHE)
   async get(@ValidParam('slug', Slug) slug: string): Promise<DataEnvelope<PublicCompetition>> {
     return ok(await this.competitions.get(slug));
+  }
+
+  /**
+   * Фирменное положение турнира «Цифровое Самбо» (правки 05.11.2026, п. 8): PDF по текущим данным турнира.
+   * `?download=1` — скачать файлом, без параметра — показать во встроенном просмотрщике страницы турнира.
+   */
+  @Get(':slug/regulation.pdf')
+  @Public()
+  async regulationPdf(
+    @ValidParam('slug', Slug) slug: string,
+    @ValidQuery(RegulationPdfQuery) q: RegulationPdfQuery,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return regulationPdfResponse(res, await this.regulation.forPublic(slug), q, PUBLIC_CACHE);
   }
 
   /** Изменения рейтинга участников рейтингового турнира (ТЗ 45, 48), если турнир показывает их публично. */

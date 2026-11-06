@@ -54,7 +54,12 @@ export interface PublicCompetition extends PublicCompetitionSummary {
   descriptionMd: string | null;
   discipline: LocalizedText;
   venue: { name: string; address: string | null; city: string | null } | null;
+  /** Положение, загруженное администратором (PDF). */
   regulationUrl: string | null;
+  /** Фирменное положение «Цифровое Самбо», собранное платформой по данным турнира (`?download=1` — скачать). */
+  generatedRegulationPdfUrl: string;
+  /** Что показывать в разделе «Положение»: загруженный PDF, а если его нет — сформированный платформой. */
+  regulationPdfUrl: string;
   requirementsMd: string | null;
   requirements: {
     kind: RequirementKind;
@@ -70,4 +75,9 @@ export interface PublicCompetition extends PublicCompetitionSummary {
   competitionType: CompetitionType;
   /** Рейтинговый турнир показывает изменения рейтинга публично (`rating-summary`, `rated-matches`). */
   ratingPublic: boolean;
+}
+
+/** Адрес фирменного положения турнира в публичном API (тот же сайт; `?download=1` — скачать файлом). */
+export function publicRegulationPdfPath(slug: string): string {
+  return `/api/public/v1/competitions/${encodeURIComponent(slug)}/regulation.pdf`;
 }
