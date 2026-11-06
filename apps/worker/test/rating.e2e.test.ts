@@ -2,7 +2,7 @@
 // поздняя схватка спортсмена ждёт более раннюю; изменённый результат → корректировка; нерейтинговый турнир — без
 // расчёта; ожидающие расчёты досчитывает регламентная задача.
 import { type EventType } from '@sde/contracts';
-import { PrismaClient, uuidv7 } from '@sde/db';
+import { PrismaClient, publicId, uuidv7 } from '@sde/db';
 import { createLogger } from '@sde/server-kit';
 import type { Job } from 'bullmq';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -108,6 +108,52 @@ describe('rating consumer', () => {
     const [first] = await db.ratingHistory.findMany({ where: { matchId: w.ab, athleteId: w.athleteB } });
     const [second] = await db.ratingHistory.findMany({ where: { matchId: w.late, athleteId: w.athleteB } });
     expect(second!.ratingBefore).toBe(first!.ratingAfter);
+  });
+
+  it('does not wait for a bye of the same athlete (it is never rated)', async () => {
+    // Проход без соперника в первом круге: результат подтверждает система при публикации сетки, события нет.
+    const bye = uuidv7();
+    const published = new Date(Date.now() - 60 * 60_000);
+    await db.match.create({
+      data: {
+        id: bye,
+        competitionId: w.competitionId,
+        categoryId: w.categoryId,
+        publicId: publicId(),
+        roundLabel: 'R1',
+        status: 'FINISHED',
+        winnerSide: 'RED',
+        finishedAt: published,
+      },
+    });
+    await db.matchParticipant.createMany({
+      data: [
+        { id: uuidv7(), competitionId: w.competitionId, matchId: bye, side: 'RED', entryId: w.entryB },
+        {
+          id: uuidv7(),
+          competitionId: w.competitionId,
+          matchId: bye,
+          side: 'BLUE',
+          entryId: null,
+          isBye: true,
+        },
+      ],
+    });
+    await db.matchResult.create({
+      data: {
+        id: uuidv7(),
+        competitionId: w.competitionId,
+        matchId: bye,
+        status: 'CONFIRMED',
+        winnerSide: 'RED',
+        method: 'BYE',
+        confirmedAt: published,
+      },
+    });
+    await run(await confirm(w.ab, { winnerSide: 'RED', method: 'POINTS' }));
+    expect((await calculationsOf(w.ab)).map((c) => c.status)).toEqual(['COMPLETED']);
+    expect(await ratingOf(w.athleteA)).toBe(212);
+    expect(await ratingOf(w.athleteB)).toBe(188);
   });
 
   it('corrects the ratings when a rated result is amended', async () => {
