@@ -14,13 +14,14 @@ import {
   zonedToInstant,
   type CompetitionRequestAction,
   type CompetitionRequestCreate,
+  type CompetitionRequestDraftInput,
   type CompetitionRequestDto,
   type CompetitionRequestsQuery,
   type CompetitionRequestStatus,
   type Page,
   ROLE_PERMISSIONS,
 } from '@sde/contracts';
-import { type Prisma, type Tx, uuidv7 } from '@sde/db';
+import { Prisma, type Tx, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
 import { decodeCursor, toPage } from '../../../common/http/http';
@@ -35,6 +36,7 @@ import { CompetitionsService } from './competitions.service';
 const INCLUDE = {
   organization: { select: { id: true, name: true, shortName: true } },
   submittedBy: { select: { id: true, displayName: true } },
+  competition: { select: { id: true, slug: true, status: true } },
 } satisfies Prisma.CompetitionRequestInclude;
 
 type Row = Prisma.CompetitionRequestGetPayload<{ include: typeof INCLUDE }>;
@@ -43,6 +45,7 @@ const dateOnly = (d: Date): string => d.toISOString().slice(0, 10);
 
 const DEFAULT_TIMEZONE = 'Europe/Moscow';
 const DEFAULT_DISCIPLINE = 'SPORT_SAMBO';
+const DRAFT_NAME = 'Черновик турнира';
 
 interface References {
   venues: Map<string, CompetitionRequestDto['venue']>;
@@ -115,6 +118,8 @@ export class CompetitionRequestsService {
   async list(user: AuthUser, q: CompetitionRequestsQuery): Promise<Page<CompetitionRequestDto>> {
     const and: Prisma.CompetitionRequestWhereInput[] = [];
     const platform = await this.isPlatform(user);
+    // Черновики видит только организация-автор (правки 05.11.2026).
+    if (platform) and.push({ status: { not: 'DRAFT' } });
     if (!platform) {
       const grants = await this.policy.grants(user);
       const own = grants.organizations
@@ -149,6 +154,8 @@ export class CompetitionRequestsService {
       !platform &&
       (await this.policy.can(user, 'competition.request', await this.orgScopes.scopeOf(row.organizationId)));
     if (!platform && !own) throw new DomainError('NOT_FOUND', { resource: 'competition_request' });
+    if (platform && row.status === 'DRAFT')
+      throw new DomainError('NOT_FOUND', { resource: 'competition_request' });
     return this.toDto(row, await this.references([row]), this.actions(row, platform, own));
   }
 
@@ -220,19 +227,20 @@ export class CompetitionRequestsService {
         responsible,
         rulesAcceptedAt: new Date().toISOString(),
       });
-      const created = await tx.competitionRequest.create({
-        data: {
-          id: uuidv7(),
-          organizationId,
-          submittedById: user.id,
-          name: proposal.name,
-          startDate: toDate(proposal.startDate),
-          endDate: toDate(proposal.endDate),
-          proposal,
-          expectedParticipants: null,
-          comment: comment || null,
-        },
-      });
+      const fields = {
+        organizationId,
+        submittedById: user.id,
+        name: proposal.name,
+        startDate: toDate(proposal.startDate),
+        endDate: toDate(proposal.endDate),
+        proposal,
+        expectedParticipants: null,
+        comment: comment || null,
+      };
+      // Подача черновика: та же запись становится поданной заявкой, данные формы черновика больше не нужны.
+      const created = input.draftId
+        ? await this.submitDraft(tx, input.draftId, fields)
+        : await tx.competitionRequest.create({ data: { id: uuidv7(), ...fields } });
       await this.audit.record(tx, {
         action: 'competition_request.submitted',
         entityType: 'CompetitionRequest',
@@ -248,6 +256,129 @@ export class CompetitionRequestsService {
       });
       return created.id;
     });
+    return this.get(user, id);
+  }
+
+  /** Черновик под блокировкой: той же организации и ещё не поданный. */
+  private async submitDraft(
+    tx: Tx,
+    draftId: string,
+    fields: Omit<Prisma.CompetitionRequestUncheckedCreateInput, 'id'>,
+  ): Promise<{ id: string }> {
+    const [row] = await tx.$queryRaw<{ organization_id: string; status: CompetitionRequestStatus }[]>`
+      SELECT organization_id, status FROM competition_request WHERE id = ${draftId}::uuid FOR UPDATE`;
+    if (!row || row.organization_id !== fields.organizationId)
+      throw new DomainError('NOT_FOUND', { resource: 'competition_request' });
+    if (row.status !== 'DRAFT')
+      throw new DomainError('COMPETITION_REQUEST_NOT_PENDING', { status: row.status });
+    return tx.competitionRequest.update({
+      where: { id: draftId },
+      data: { ...fields, status: 'SUBMITTED', draft: Prisma.DbNull, version: { increment: 1 } },
+      select: { id: true },
+    });
+  }
+
+  /**
+   * Черновик заявки (правки 05.11.2026): данные формы сохраняются как есть, проверка — при подаче. Новый черновик
+   * или правка своего (`id`). В списке и карточке черновик виден только организации.
+   */
+  async saveDraft(
+    user: AuthUser,
+    input: CompetitionRequestDraftInput,
+    id?: string,
+  ): Promise<CompetitionRequestDto> {
+    await this.policy.assert(user, 'competition.request', await this.orgScopes.scopeOf(input.organizationId));
+    const today = new Date().toISOString().slice(0, 10);
+    const dateOf = (v: unknown): string =>
+      typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : today;
+    const startDate = dateOf(input.data.startDate);
+    const endRaw = dateOf(input.data.endDate ?? startDate);
+    const endDate = endRaw < startDate ? startDate : endRaw;
+    const name = input.name && input.name.length >= 3 ? input.name : DRAFT_NAME;
+    const proposal = CompetitionRequestProposal.parse({
+      name,
+      startDate,
+      endDate,
+      timezone: DEFAULT_TIMEZONE,
+      level: 'CLUB',
+      disciplineCode: DEFAULT_DISCIPLINE,
+    });
+    const fields = {
+      organizationId: input.organizationId,
+      submittedById: user.id,
+      name,
+      startDate: toDate(startDate),
+      endDate: toDate(endDate),
+      proposal,
+      draft: input.data as Prisma.InputJsonValue,
+    };
+    const savedId = await this.db.tx(async (tx) => {
+      if (!id) {
+        const created = await tx.competitionRequest.create({
+          data: { id: uuidv7(), status: 'DRAFT', ...fields },
+        });
+        return created.id;
+      }
+      const [row] = await tx.$queryRaw<{ organization_id: string; status: CompetitionRequestStatus }[]>`
+        SELECT organization_id, status FROM competition_request WHERE id = ${id}::uuid FOR UPDATE`;
+      if (!row) throw new DomainError('NOT_FOUND', { resource: 'competition_request' });
+      await this.policy.assert(
+        user,
+        'competition.request',
+        await this.orgScopes.scopeOf(row.organization_id),
+      );
+      if (row.status !== 'DRAFT')
+        throw new DomainError('COMPETITION_REQUEST_NOT_PENDING', { status: row.status });
+      await tx.competitionRequest.update({ where: { id }, data: { ...fields, version: { increment: 1 } } });
+      return id;
+    });
+    return this.get(user, savedId);
+  }
+
+  /** Удаление черновика: запись остаётся отозванной (удаление строк заявок запрещено ролью приложения). */
+  async discardDraft(user: AuthUser, id: string): Promise<void> {
+    const current = await this.require(id);
+    await this.policy.assert(
+      user,
+      'competition.request',
+      await this.orgScopes.scopeOf(current.organizationId),
+    );
+    await this.db.tx(async (tx) => {
+      const { count } = await tx.competitionRequest.updateMany({
+        where: { id, status: 'DRAFT' },
+        data: { status: 'WITHDRAWN', draft: Prisma.DbNull, version: { increment: 1 } },
+      });
+      if (count === 0) throw new DomainError('COMPETITION_REQUEST_NOT_PENDING', {});
+    });
+  }
+
+  /**
+   * Публикация турнира по одобренной заявке (правки 05.11.2026, «На согласовании» → «Опубликован»): когда условия
+   * согласованы и турнир подготовлен, организатор публикует его сам; дальше турниром управляет платформа. Условия
+   * публикации (категории, правила, сроки) — те же, что у перехода турнира DRAFT → PUBLISHED.
+   */
+  async publish(user: AuthUser, id: string): Promise<CompetitionRequestDto> {
+    const row = await this.db.competitionRequest.findUnique({
+      where: { id },
+      select: {
+        organizationId: true,
+        status: true,
+        competition: { select: { id: true, status: true, version: true } },
+      },
+    });
+    if (!row) throw new DomainError('NOT_FOUND', { resource: 'competition_request' });
+    const platform = await this.isPlatform(user);
+    if (!platform)
+      await this.policy.assert(user, 'competition.request', await this.orgScopes.scopeOf(row.organizationId));
+    if (row.status !== 'APPROVED' || !row.competition || row.competition.status !== 'DRAFT')
+      throw new DomainError('COMPETITION_STAGE_MISMATCH', { status: row.competition?.status ?? row.status });
+    await this.competitions.transition(
+      user,
+      row.competition.id,
+      row.competition.version,
+      { to: 'PUBLISHED' },
+      true,
+    );
     return this.get(user, id);
   }
 
@@ -417,6 +548,9 @@ export class CompetitionRequestsService {
   }
 
   private actions(row: Row, platform: boolean, own: boolean): CompetitionRequestAction[] {
+    if (row.status === 'DRAFT') return own ? ['edit', 'discard'] : [];
+    if (row.status === 'APPROVED')
+      return (own || platform) && row.competition?.status === 'DRAFT' ? ['publish'] : [];
     if (row.status !== 'SUBMITTED') return [];
     const actions: CompetitionRequestAction[] = [];
     if (platform) actions.push('approve', 'reject');
@@ -485,6 +619,8 @@ export class CompetitionRequestsService {
       decisionReason: row.decisionReason,
       decidedAt: row.decidedAt?.toISOString() ?? null,
       competitionId: row.competitionId,
+      competition: row.competition,
+      draft: row.status === 'DRAFT' ? ((row.draft ?? {}) as Record<string, unknown>) : null,
       version: row.version,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

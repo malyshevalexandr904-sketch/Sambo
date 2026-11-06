@@ -12,7 +12,12 @@ export interface CategoryTransition {
   competition: readonly CompetitionStatus[];
 }
 
-const REGISTRATION_PHASE: CompetitionStatus[] = ['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'];
+const REGISTRATION_PHASE: CompetitionStatus[] = [
+  'DRAFT',
+  'PUBLISHED',
+  'REGISTRATION_OPEN',
+  'REGISTRATION_CLOSED',
+];
 const OPERATIONS_PHASE: CompetitionStatus[] = ['CHECK_IN', 'DRAWING', 'SCHEDULED', 'IN_PROGRESS'];
 const ANY_ACTIVE: CompetitionStatus[] = [...REGISTRATION_PHASE, ...OPERATIONS_PHASE];
 

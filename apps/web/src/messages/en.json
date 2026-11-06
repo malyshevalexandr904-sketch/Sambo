@@ -528,7 +528,8 @@
     "contact_required": "Enter a phone or an email",
     "consent_required": "You need to accept the rules",
     "user_not_found": "No user with this email",
-    "responsible_not_chosen": "Choose a person from the list"
+    "responsible_not_chosen": "Choose a person from the list",
+    "https_required": "The link must start with https://"
   },
   "errors": {
     "VALIDATION_FAILED": "Please check the form fields.",
@@ -624,7 +625,9 @@
     "NON_RATED_COMPETITION_FORBIDDEN": "All competitions are rated: a competition cannot be made non-rated.",
     "COMPETITION_REQUEST_NOT_PENDING": "The request has already been reviewed or withdrawn.",
     "DIVISION_OVERLAP": "The age range overlaps another division.",
-    "DEMO_READ_ONLY": "Sign up to unlock all features"
+    "DEMO_READ_ONLY": "Sign up to unlock all features",
+    "COMPETITION_STAGE_MISMATCH": "This action is not available at the current tournament stage.",
+    "MEDIA_LIMIT_EXCEEDED": "The tournament media limit is reached."
   },
   "people": {
     "lastName": "Last name",
@@ -1073,15 +1076,19 @@
       "schedule": "Schedule",
       "crews": "Crews",
       "results": "Results",
-      "recruitment": "Referee recruitment"
+      "recruitment": "Referee recruitment",
+      "stageFocus": "important at this stage",
+      "showAll": "All sections (+{count})",
+      "showStage": "Stage sections only"
     },
     "statuses": {
-      "DRAFT": "Draft",
+      "DRAFT": "Under review",
+      "PUBLISHED": "Published",
       "REGISTRATION_OPEN": "Registration open",
-      "REGISTRATION_CLOSED": "Registration closed",
-      "CHECK_IN": "Check-in",
+      "REGISTRATION_CLOSED": "Credentials check",
+      "CHECK_IN": "Weigh-in",
       "DRAWING": "Draw",
-      "SCHEDULED": "Scheduled",
+      "SCHEDULED": "Brackets ready",
       "IN_PROGRESS": "In progress",
       "FINISHED": "Finished",
       "ARCHIVED": "Archived",
@@ -1146,7 +1153,8 @@
       "matches_started": "matches of the category have already started or been played",
       "newer_draft_exists": "the category has a newer draft — only the latest one can be published",
       "results_not_published": "results are not published in every category",
-      "categories_without_results": "some categories have no draw — they will have no results"
+      "categories_without_results": "some categories have no draw — they will have no results",
+      "applications_will_be_rejected": "entries awaiting fixes will be rejected automatically"
     },
     "dates": "Dates",
     "registrationWindow": "Registration",
@@ -1172,24 +1180,25 @@
       "done": "done",
       "notDone": "not done"
     },
-    "transitionsTitle": "Competition status",
+    "transitionsTitle": "Move to the next stage",
     "confirmWarnings": "Warnings: {warnings}. Continue?",
     "confirmAndContinue": "Continue",
     "transitionTo": {
-      "REGISTRATION_OPEN": "Publish and open registration",
+      "PUBLISHED": "Publish tournament",
+      "REGISTRATION_OPEN": "Open registration now",
       "REOPEN": "Reopen registration",
-      "REGISTRATION_CLOSED": "Close registration",
-      "CHECK_IN": "Go to check-in",
-      "DRAWING": "Go to draw",
-      "SCHEDULED": "Confirm schedule",
+      "REGISTRATION_CLOSED": "Close registration → credentials check",
+      "CHECK_IN": "Finish credentials check → weigh-in",
+      "DRAWING": "Finish weigh-in → draw",
+      "SCHEDULED": "Approve brackets and schedule",
       "IN_PROGRESS": "Start competition",
-      "FINISHED": "Finish competition",
+      "FINISHED": "Finish tournament",
       "ARCHIVED": "Archive",
-      "CANCELLED": "Cancel competition"
+      "CANCELLED": "Cancel tournament"
     },
     "transitionTitle": {
       "CANCELLED": "Cancel the competition: participants will see the reason",
-      "CHECK_IN": "Return to check-in"
+      "CHECK_IN": "Back to weigh-in"
     },
     "newDeadline": "New registration deadline",
     "reopenTitle": "Reopen registration",
@@ -1482,7 +1491,21 @@
       "followAll": "Notify me about bouts of all athletes in the application",
       "unfollowAll": "Turn off for all",
       "result": "Notifications are on for {following} of {total, plural, one {# athlete} other {# athletes}} in the application."
-    }
+    },
+    "coachRequired": "Athlete’s coach",
+    "coachOptional": "Athlete’s coach (optional)",
+    "coachHint": "The club coach preparing the athlete for the tournament.",
+    "coachNeeded": "Choose the athlete’s coach",
+    "chooseCoach": "Choose a coach",
+    "stepsLabel": "How to submit an entry",
+    "stepAthlete": "Choose an athlete — eligible age categories appear right away",
+    "stepCategory": "Choose the weight category",
+    "stepDocuments": "Upload the athlete’s documents",
+    "stepSubmit": "Submit the entry for review",
+    "addedTitle": "{name} is added to the entry",
+    "addedText": "Now upload the athlete’s documents: the credentials commission checks them.",
+    "addAnother": "Add another athlete",
+    "thenSubmit": "When all athletes are added, press “Submit application” in the entry card above."
   },
   "tournaments": {
     "title": "Competitions",
@@ -1493,12 +1516,13 @@
     "cancelled": "Cancelled",
     "registrationOpen": "Registration open",
     "status": {
-      "DRAFT": "Draft",
+      "DRAFT": "Under review",
+      "PUBLISHED": "Published",
       "REGISTRATION_OPEN": "Registration open",
-      "REGISTRATION_CLOSED": "Registration closed",
-      "CHECK_IN": "Check-in",
+      "REGISTRATION_CLOSED": "Credentials check",
+      "CHECK_IN": "Weigh-in",
       "DRAWING": "Draw",
-      "SCHEDULED": "Scheduled",
+      "SCHEDULED": "Brackets ready",
       "IN_PROGRESS": "In progress",
       "FINISHED": "Finished",
       "ARCHIVED": "Archived",
@@ -1724,7 +1748,12 @@
     "declared": "declared {weight} kg",
     "notArrived": "arrival not marked",
     "history": "Attempt history",
-    "categoriesCount": "Categories: {count}"
+    "categoriesCount": "Categories: {count}",
+    "qrTitle": "Quick weigh-in by QR",
+    "qrHint": "The athlete opens their account and shows the QR. Point the camera — only that athlete stays in the list; enter the weight and press “Record”.",
+    "qrShown": "Showing the athlete from the QR",
+    "qrNext": "Scan next athlete",
+    "qrNotFound": "No entries for this QR in the selected weigh-in window"
   },
   "medical": {
     "states": {
@@ -1831,6 +1860,10 @@
       "onboarding_linked": {
         "title": "A new member in your organization",
         "body": "Role: {role}. Organization: {organizationName}."
+      },
+      "competition_registration_opened": {
+        "title": "Registration open: “{competitionName}”",
+        "body": "Registration for the tournament is open — submit an entry on the tournament page."
       }
     },
     "preferencesTitle": "Email and push",
@@ -1852,7 +1885,8 @@
       "onboarding_awaiting_review": "A request awaits my review",
       "onboarding_changes_requested": "Request needs corrections",
       "onboarding_decided": "Registration request decision",
-      "onboarding_linked": "New organization member"
+      "onboarding_linked": "New organization member",
+      "competition_registration_opened": "Tournament registration opened"
     },
     "saved": "Saved",
     "noValue": "—",
@@ -2010,6 +2044,23 @@
         "G": "G",
         "H": "H"
       }
+    },
+    "auto": {
+      "title": "Auto draw",
+      "hint": "One button instead of drawing each category by hand. The format follows tournament rules; teammates and same-region athletes are separated.",
+      "step1": "Categories become “Ready for draw”",
+      "step2": "Participants are split into groups, brackets are published",
+      "step3": "Categories are assigned to mats (schedule draft)",
+      "button": "Run auto draw ({count})",
+      "nothing": "All categories are drawn",
+      "confirm": "Draw and publish {count, plural, one {# category} other {# categories}}? Participants will see the brackets right away.",
+      "progress": "{name}: {done} of {total}",
+      "scheduleStep": "mat schedule",
+      "doneCount": "Done: {count, plural, one {# category} other {# categories}} drawn and published.",
+      "failedTitle": "Failed: {count}",
+      "scheduleCreated": "A mat schedule draft is created — review and publish it.",
+      "openSchedule": "Open schedule",
+      "scheduleFailed": "Schedule not created: {error}. You can build it in the Schedule tab."
     }
   },
   "bracket": {
@@ -3191,6 +3242,7 @@
     "submit": "Submit request",
     "all": "All",
     "statuses": {
+      "DRAFT": "Draft",
       "SUBMITTED": "Under review",
       "APPROVED": "Approved",
       "REJECTED": "Rejected",
@@ -3202,7 +3254,7 @@
     "loadMore": "Show more",
     "fromOrganization": "Request from “{name}”",
     "approvedTitle": "Request approved",
-    "approvedText": "The tournament is created as a draft and is now managed by the platform administrator, who clarifies details with the person in charge and prepares registration, categories and publication.",
+    "approvedText": "The tournament is created and under review: the platform admin agrees the details with the responsible person and prepares registration and weigh-in dates, categories and regulations.",
     "openCompetition": "Open competition",
     "rejectedTitle": "Request rejected",
     "proposal": "Organization’s proposal",
@@ -3279,7 +3331,30 @@
     "responsibleSearching": "Searching…",
     "responsibleSearchFailed": "Search failed, please try again",
     "responsibleNotFound": "Nobody found. Check the spelling or enter contact details.",
-    "responsibleChange": "Change"
+    "responsibleChange": "Change",
+    "saveDraft": "Save draft",
+    "draftHint": "You can save an unfinished request as a draft and return to it from “Tournaments → Your drafts”.",
+    "draftSaved": "Draft saved at {time}. Only your organization sees it.",
+    "draftEditing": "You are continuing a draft. Save changes or submit the request.",
+    "draftGone": "This draft was already submitted or deleted — submitting creates a new request.",
+    "draftUpdated": "Draft, edited {date}",
+    "draftTitle": "Request draft",
+    "draftText": "Only you and your organization see the draft. Complete it and submit it for review.",
+    "continueDraft": "Continue editing",
+    "discardDraft": "Delete draft",
+    "discardConfirm": "Delete the request draft? This cannot be undone.",
+    "myDrafts": "Your drafts",
+    "myDraftsHint": "Unfinished hosting requests — only you see them.",
+    "myReview": "Under review",
+    "myReviewHint": "Requests being reviewed by the admin, and tournaments ready to publish.",
+    "readyToPublish": "Ready to publish",
+    "publishTitle": "All agreed? Publish the tournament",
+    "publishText": "After publication the tournament appears in the public list: a page with the poster, regulations and registration date. Registration opens automatically on schedule. From then on the platform admin manages the tournament.",
+    "publish": "Publish tournament",
+    "publishConfirm": "Publish the tournament? The page becomes public.",
+    "publishedTitle": "Tournament published",
+    "publishedText": "The tournament page is public. The platform admin manages the tournament from here; you can follow the stages and upload media after it ends.",
+    "openPublic": "Open tournament page"
   },
   "divisions": {
     "title": "Divisions",
@@ -3897,6 +3972,256 @@
       "text": "Sign up in your role and run your next tournament in the system.",
       "register": "Sign up",
       "rating": "Open the rating"
+    }
+  },
+  "stages": {
+    "label": "Tournament stages",
+    "current": "current stage",
+    "done": "completed",
+    "upcoming": "upcoming",
+    "nowLabel": "Now:",
+    "names": {
+      "DRAFT": "Draft",
+      "REVIEW": "Under review",
+      "PUBLISHED": "Published",
+      "REGISTRATION": "Registration",
+      "MANDATE": "Credentials check",
+      "WEIGH_IN": "Weigh-in",
+      "DRAW": "Draw",
+      "LIVE": "Live",
+      "FINISHED": "Finished"
+    },
+    "public": {
+      "DRAFT": "the tournament is being prepared.",
+      "REVIEW": "the tournament is being prepared for publication.",
+      "PUBLISHED": "the tournament is announced, registration opens soon.",
+      "REGISTRATION": "coaches and clubs are submitting entries.",
+      "MANDATE": "registration is closed, the commission checks participants’ documents.",
+      "WEIGH_IN": "participants are weighing in.",
+      "DRAW": "the draw is under way, brackets will appear soon.",
+      "LIVE": "bouts are under way — follow the brackets and the stream.",
+      "FINISHED": "the tournament is over: final protocols and media."
+    },
+    "manage": {
+      "title": "Stage: {stage}",
+      "publicPage": "Public page",
+      "open": "open",
+      "whatTitle": "What is happening",
+      "todoTitle": "What to do now",
+      "nextTitle": "What comes next",
+      "what": {
+        "DRAFT": "The hosting request has not been submitted yet.",
+        "REVIEW": "The tournament is under review: only the organizer and the platform admin see it. Terms are being agreed and the tournament prepared for publication.",
+        "PUBLISHED": "The tournament is published: the page with the poster and regulations is public. Registration opens {opens}.",
+        "REGISTRATION": "Registration is open: coaches and club heads submit entries until {closes}.",
+        "MANDATE": "Credentials check: new entries are closed, the commission reviews submitted entries and documents.",
+        "WEIGH_IN": "Weigh-in: athletes show the QR from their account, you scan it and mark whether they made weight.",
+        "DRAW": "Draw: participants are split into groups, categories assigned to mats, brackets published.",
+        "LIVE": "The competition is live: brackets and scoreboards update in real time, viewers watch the stream.",
+        "FINISHED": "The tournament is over: final protocols are available to everyone."
+      },
+      "why": {
+        "DRAFT": "Only your organization sees the draft.",
+        "REVIEW": "Publish once everything is agreed: after publication the discipline and rules are locked.",
+        "PUBLISHED": "Participants learn about the tournament early and subscribe to the registration notification.",
+        "REGISTRATION": "Subscribers were notified that registration opened.",
+        "MANDATE": "Entries change only at the commission’s request; entries not fixed by the end are rejected automatically.",
+        "WEIGH_IN": "The actual weight decides admission and the category.",
+        "DRAW": "While the draw runs, the public page says “draw in progress, brackets coming soon”.",
+        "LIVE": "The public page refreshes brackets itself and shows mat scoreboards.",
+        "FINISHED": "Photos and videos appear in the Media section of the public page."
+      },
+      "todo": {
+        "categories": "Check categories: ages and weights.",
+        "regulation": "Upload the regulations and document requirements.",
+        "dates": "Check registration dates and the venue (“Edit tournament” card below).",
+        "poster": "Choose a poster template (“Public page” card below).",
+        "checkPublic": "Open the public page: check the poster and regulations.",
+        "judges": "Recruit referees.",
+        "autoOpen": "Nothing to press: registration opens by itself {opens}.",
+        "review": "Review incoming entries.",
+        "entries": "Track participants and documents.",
+        "autoClose": "Registration closes {closes} — then press “Close registration → credentials check”.",
+        "mandate": "Check entries: approve or return for fixes.",
+        "fixOnly": "No new entries — only fixes you requested.",
+        "autoReject": "When you move to weigh-in, entries that were never fixed are rejected automatically.",
+        "qr": "Open “Weigh-in” and scan athletes’ QR codes with a phone or tablet camera.",
+        "arrival": "Mark arrivals.",
+        "admission": "Check admission.",
+        "autoDraw": "Press “Auto draw”: all ready categories are drawn and published.",
+        "schedule": "Build and publish the mat schedule.",
+        "crews": "Assign referee crews.",
+        "stream": "Paste the stream link (“Public page” card below).",
+        "mats": "Watch the mats and schedule.",
+        "results": "Check category results.",
+        "publishResults": "Publish category results — final protocols become public.",
+        "media": "Upload photos and video links (“Media” card below)."
+      },
+      "next": {
+        "DRAFT": "Submit the request for review.",
+        "REVIEW": "“Publish tournament”: a public page with the poster, regulations and registration date appears.",
+        "PUBLISHED": "Registration opens automatically {opens}; subscribers get notified.",
+        "REGISTRATION": "After {closes}, close registration — the credentials check starts.",
+        "MANDATE": "Finish the credentials check — weigh-in starts.",
+        "WEIGH_IN": "Finish the weigh-in — the draw starts.",
+        "DRAW": "Approve brackets and schedule, then start the competition.",
+        "LIVE": "When all bouts are done, finish the tournament.",
+        "FINISHED": "Later you can archive the tournament."
+      }
+    },
+    "presentation": {
+      "title": "Public page",
+      "hint": "Poster template and stream link. Changes show on the public page right away.",
+      "template": "Poster template",
+      "templates": {
+        "classic": "Classic",
+        "arena": "Arena",
+        "minimal": "Minimal",
+        "sunrise": "Sunrise"
+      },
+      "stream": "Live stream link",
+      "streamHint": "YouTube, Rutube or VK Video — we embed the player in “Live stream”. Other sites are shown as a link.",
+      "save": "Save",
+      "saved": "Saved"
+    },
+    "media": {
+      "title": "Tournament media",
+      "hint": "Photos and videos appear in the Media section of the public page.",
+      "photos": "Photos",
+      "photosHint": "PNG, JPEG or WebP up to 15 MB, several at once.",
+      "choosePhotos": "Choose photos",
+      "uploading": "Uploaded {done} of {total}…",
+      "video": "Video",
+      "videoUrl": "Video link",
+      "videoHint": "YouTube, Rutube, VK Video or another site (https).",
+      "caption": "Caption (optional)",
+      "addVideo": "Add video",
+      "remove": "Remove",
+      "removeConfirm": "Remove this item from tournament media?",
+      "empty": "Nothing uploaded yet."
+    },
+    "qr": {
+      "title": "Weigh-in QR",
+      "hint": "Show this QR to the official at the weigh-in — they scan it and record your weight.",
+      "alt": "Participant QR: {name}",
+      "now": "Weigh-in is under way — show the QR to the official.",
+      "soon": "You will need this QR at the weigh-in.",
+      "validUntil": "Valid until {date}"
+    }
+  },
+  "tournamentPage": {
+    "shareTournament": "Share tournament",
+    "shareText": "{name}, {dates}. Regulations, registration and brackets on Digital Sambo.",
+    "cancelled": "The tournament is cancelled.",
+    "sectionsLabel": "Tournament sections",
+    "liveNow": "live now",
+    "sections": {
+      "poster": "Poster",
+      "regulation": "Regulations",
+      "registration": "Registration",
+      "brackets": "Brackets",
+      "live": "Live stream",
+      "media": "Media"
+    },
+    "share": {
+      "button": "Share",
+      "copyPrompt": "Copy the link",
+      "telegram": "Telegram",
+      "whatsapp": "WhatsApp",
+      "vk": "VK",
+      "email": "Email",
+      "copy": "Copy link",
+      "copied": "Link copied"
+    },
+    "poster": {
+      "rated": "Rated tournament",
+      "sambo": "Sambo"
+    },
+    "summary": {
+      "title": "Key facts",
+      "dates": "Dates",
+      "venue": "Venue",
+      "registration": "Registration",
+      "range": "from {from} to {to}",
+      "weighIn": "Weigh-in",
+      "weighInTbd": "time to be announced",
+      "organizer": "Organizer",
+      "categories": "Age groups and weight categories",
+      "documents": "Documents for admission"
+    },
+    "regulation": {
+      "title": "Tournament regulations",
+      "download": "Download",
+      "share": "Share",
+      "shareTitle": "Regulations: {name}",
+      "viewer": "Regulations of “{name}”",
+      "notShown": "Not showing?",
+      "openTab": "Open in a new tab"
+    },
+    "registration": {
+      "soonTitle": "Registration opens soon",
+      "daysLeft": "days to go",
+      "window": "Entries accepted from {from} to {to}.",
+      "whoCan": "Entries are submitted by coaches (for their athletes) and club heads (for club athletes, naming the coach).",
+      "follow": "Notify me when registration opens",
+      "followed": "We will notify you when registration opens",
+      "unfollow": "Unsubscribe",
+      "followHint": "You will get a notification in the feed and by email, and, if you allow it, a push notification on this device.",
+      "pushOn": "Push notifications are on for this device.",
+      "pushOff": "Push notifications are off — we will notify you in the feed and by email.",
+      "loginToFollow": "Sign in to get notified",
+      "openTitle": "Registration is open",
+      "openUntil": "Entries are accepted until {to}.",
+      "step1": "Choose an athlete of eligible age",
+      "step2": "Choose the weight category",
+      "step3": "Upload documents",
+      "step4": "Submit the entry for review",
+      "apply": "Submit an entry",
+      "loginToApply": "Sign in to submit an entry",
+      "closedTitle": "Registration is closed",
+      "closedText": "Sorry, entries are no longer accepted (registration ran from {from} to {to}). Follow the brackets and the stream."
+    },
+    "brackets": {
+      "categories": "Categories",
+      "drawingTitle": "Draw in progress",
+      "drawingText": "Participants are being split into groups and categories assigned to mats. Brackets will appear here soon; the page refreshes itself.",
+      "emptyTitle": "Brackets not published yet",
+      "emptyText": "Brackets appear after the draw.",
+      "finalNote": "The tournament is over. Final protocols can be downloaded or printed.",
+      "liveNote": "Brackets update in real time: the page refreshes every 30 seconds.",
+      "protocol": "Final protocol",
+      "downloadCsv": "Download",
+      "print": "Print",
+      "place": "Place",
+      "athlete": "Athlete",
+      "club": "Club",
+      "winsLosses": "Wins / losses",
+      "hiddenName": "Participant",
+      "group": "Group",
+      "winner": "winner",
+      "live": "live",
+      "noMatches": "No bouts in this category yet."
+    },
+    "live": {
+      "soonTitle": "Stream coming soon",
+      "soonText": "The live stream and mat scoreboards open on competition day.",
+      "stream": "Live stream",
+      "openStream": "Open the stream on the video site",
+      "mats": "Mat scoreboards",
+      "matsHint": "Score and time of the bouts on each mat in real time.",
+      "noMats": "Mats are not assigned yet.",
+      "mat": "Mat {number}",
+      "scoreboard": "Open scoreboard"
+    },
+    "media": {
+      "emptyTitle": "Media coming soon",
+      "emptyText": "The organizer and the administrator will publish photos and videos.",
+      "videos": "Videos",
+      "video": "Video",
+      "openVideo": "Watch video",
+      "photos": "Photos ({count})",
+      "photo": "Photo {n}",
+      "close": "Close"
     }
   },
   "generatedRegulation": {

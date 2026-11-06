@@ -9,6 +9,7 @@ import { QueryState } from '@/components/common';
 import { CategoryStatusBadge } from '@/features/competitions/shared';
 import { usePathname, useRouter } from '@/i18n/navigation';
 import { pickName } from '@/lib/queries';
+import { AutoDrawCard } from './auto-draw';
 import { CategoryDraws } from './category-draws';
 import { DrawStatusBadge, useCategoryDraws, useDrawOverview, useFormatLabel } from './shared';
 
@@ -131,6 +132,7 @@ export function DrawsTab({ competition }: { competition: Competition }) {
         </>
       ) : (
         <>
+          {competition.status === 'DRAWING' ? <AutoDrawCard competition={competition} /> : null}
           <p className="text-sm text-slate-600">{t('hint')}</p>
           <Overview competition={competition} onOpen={(id) => go({ category: id })} />
         </>

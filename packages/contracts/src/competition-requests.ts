@@ -2,11 +2,23 @@
 // подаёт заявку с предлагаемыми сроками и местом. Одобрение создаёт черновик рейтингового турнира по заявке.
 import { z } from 'zod';
 import { E164, Email, type LocalizedText, PageQuery, Reason, Uuid } from './common.js';
-import { type CompetitionLevel, CompetitionFields, scheduleIssues, type VenueRef } from './competitions.js';
+import {
+  type CompetitionLevel,
+  CompetitionFields,
+  type CompetitionStatus,
+  scheduleIssues,
+  type VenueRef,
+} from './competitions.js';
 import type { OrganizationRef } from './organizations.js';
 import { RefereeRecruitmentInput } from './referee-recruitment-input.js';
 
-export const COMPETITION_REQUEST_STATUSES = ['SUBMITTED', 'APPROVED', 'REJECTED', 'WITHDRAWN'] as const;
+export const COMPETITION_REQUEST_STATUSES = [
+  'DRAFT',
+  'SUBMITTED',
+  'APPROVED',
+  'REJECTED',
+  'WITHDRAWN',
+] as const;
 export type CompetitionRequestStatus = (typeof COMPETITION_REQUEST_STATUSES)[number];
 
 /** Наличие материально-технической базы и судейской бригады у организатора. */
@@ -153,6 +165,8 @@ export const CompetitionRequestCreate = z
     rulesAccepted: z.literal(true, { error: 'consent_required' }),
     /** Пояснение для администратора платформы. */
     comment: z.string().trim().max(2000, { error: 'too_long' }).optional(),
+    /** Подача сохранённого черновика: черновик становится поданной заявкой. */
+    draftId: Uuid.optional(),
   })
   .superRefine((v, ctx) => {
     for (const i of scheduleIssues({ startDate: v.startDate, endDate: v.endDate ?? v.startDate }))
@@ -191,7 +205,28 @@ export const CompetitionRequestsQuery = PageQuery.extend({
 });
 export type CompetitionRequestsQuery = z.infer<typeof CompetitionRequestsQuery>;
 
-export type CompetitionRequestAction = 'approve' | 'reject' | 'withdraw';
+export type CompetitionRequestAction =
+  | 'approve'
+  | 'reject'
+  | 'withdraw'
+  /** Черновик: продолжить заполнение и подать, или удалить. */
+  | 'edit'
+  | 'discard'
+  /** Одобренная заявка: организатор публикует подготовленный турнир (стадия «Опубликован»). */
+  | 'publish';
+
+/**
+ * Черновик заявки (правки 05.11.2026): организатор сохраняет форму как есть и продолжает позже. Данные формы —
+ * произвольный объект (проверка — при подаче), название — для списка «Ваши черновики».
+ */
+export const CompetitionRequestDraftInput = z.object({
+  organizationId: Uuid,
+  name: z.string().trim().max(300).optional(),
+  data: z
+    .record(z.string(), z.unknown())
+    .refine((v) => JSON.stringify(v).length <= 20_000, { error: 'too_long' }),
+});
+export type CompetitionRequestDraftInput = z.infer<typeof CompetitionRequestDraftInput>;
 
 export interface CompetitionRequestDto {
   id: string;
@@ -214,6 +249,10 @@ export interface CompetitionRequestDto {
   decidedAt: string | null;
   /** Турнир, созданный при одобрении. */
   competitionId: string | null;
+  /** Созданный турнир: адрес публичной страницы и статус (стадия). */
+  competition: { id: string; slug: string; status: CompetitionStatus } | null;
+  /** Данные формы черновика (DRAFT); у поданной заявки — null. */
+  draft: Record<string, unknown> | null;
   version: number;
   createdAt: string;
   updatedAt: string;

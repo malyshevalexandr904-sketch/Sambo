@@ -54,6 +54,7 @@ type BoundsData = Pick<
 
 const REGISTRATION_PHASE: readonly CompetitionStatus[] = [
   'DRAFT',
+  'PUBLISHED',
   'REGISTRATION_OPEN',
   'REGISTRATION_CLOSED',
 ];

@@ -1,7 +1,13 @@
 'use client';
 // Заявка на проведение турнира: предложение организации и решение платформы. Одобрение создаёт черновик
 // рейтингового турнира — администратор продолжает подготовку на его странице (правила, категории, публикация).
-import type { CompetitionRequestDto, DataEnvelope, HostingResponsible } from '@sde/contracts';
+import {
+  type CompetitionRequestDto,
+  type DataEnvelope,
+  type HostingResponsible,
+  stageOfCompetition,
+  type TournamentStage,
+} from '@sde/contracts';
 import { Alert, Button, Card, CardTitle, PageHeader } from '@sde/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
@@ -15,7 +21,16 @@ import { useAction } from '@/lib/use-action';
 import { GeneratedRegulationCard } from '@/features/competitions/generated-regulation';
 import { RecruitmentSummary } from '@/features/competitions/recruitment';
 import { EquipmentList, RefereeList } from './form-parts';
+import { StageStepper } from '@/features/tournament/stage-stepper';
 import { RequestStatusBadge } from './shared';
+
+/** Стадия по заявке: черновик, на согласовании (подана или турнир ещё не опубликован), дальше — стадия турнира. */
+function stageOfRequest(r: CompetitionRequestDto): TournamentStage | null {
+  if (r.status === 'DRAFT') return 'DRAFT';
+  if (r.status === 'SUBMITTED') return 'REVIEW';
+  if (r.status === 'APPROVED' && r.competition) return stageOfCompetition(r.competition.status);
+  return null;
+}
 
 export function CompetitionRequestDetail({ id }: { id: string }) {
   const t = useTranslations('competitionRequests');
@@ -40,7 +55,7 @@ function RequestView({ request: r }: { request: CompetitionRequestDto }) {
   const refresh = async (): Promise<void> => {
     await queryClient.invalidateQueries({ queryKey: ['competition-requests'] });
   };
-  const command = async (path: 'approve' | 'withdraw' | 'reject', body?: object) => {
+  const command = async (path: 'approve' | 'withdraw' | 'reject' | 'publish', body?: object) => {
     const res = await api<DataEnvelope<CompetitionRequestDto>>(`/competition-requests/${r.id}/${path}`, {
       method: 'POST',
       version: r.version,
@@ -58,12 +73,80 @@ function RequestView({ request: r }: { request: CompetitionRequestDto }) {
       />
       <div className="grid max-w-3xl gap-6">
         {action.error ? <Alert tone="danger">{action.error}</Alert> : null}
-        {r.status === 'APPROVED' && r.competitionId ? (
+        {stageOfRequest(r) ? (
+          <Card>
+            <StageStepper stage={stageOfRequest(r)} variant="manage" />
+          </Card>
+        ) : null}
+        {r.status === 'DRAFT' ? (
+          <Alert tone="info" title={t('competitionRequests.draftTitle')}>
+            <p>{t('competitionRequests.draftText')}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                href={`/competition-requests/new?draft=${r.id}`}
+                className="inline-flex min-h-11 items-center rounded-md bg-blue-700 px-4 font-medium text-white hover:bg-blue-800"
+              >
+                {t('competitionRequests.continueDraft')}
+              </Link>
+              {r.allowedActions.includes('discard') ? (
+                <Button
+                  variant="ghost"
+                  loading={action.busy}
+                  onClick={() =>
+                    void action.run(async () => {
+                      if (!window.confirm(t('competitionRequests.discardConfirm'))) return;
+                      await api(`/competition-requests/${r.id}/discard`, { method: 'POST' });
+                      await refresh();
+                      router.push('/competitions');
+                    })
+                  }
+                >
+                  {t('competitionRequests.discardDraft')}
+                </Button>
+              ) : null}
+            </div>
+          </Alert>
+        ) : null}
+        {r.status === 'APPROVED' && r.competitionId && r.competition?.status === 'DRAFT' ? (
           <Alert tone="success" title={t('competitionRequests.approvedTitle')}>
-            {t('competitionRequests.approvedText')}{' '}
-            <Link href={`/competitions/${r.competitionId}`} className="font-medium underline">
+            <p>{t('competitionRequests.approvedText')}</p>
+            {r.allowedActions.includes('publish') ? (
+              <div className="mt-3 rounded-md border border-green-300 p-3">
+                <p className="font-medium">{t('competitionRequests.publishTitle')}</p>
+                <p className="mt-1 text-sm">{t('competitionRequests.publishText')}</p>
+                <Button
+                  className="mt-3"
+                  loading={action.busy}
+                  onClick={() =>
+                    void action.run(async () => {
+                      if (!window.confirm(t('competitionRequests.publishConfirm'))) return;
+                      await command('publish');
+                    })
+                  }
+                >
+                  {t('competitionRequests.publish')}
+                </Button>
+              </div>
+            ) : null}
+            <Link
+              href={`/competitions/${r.competitionId}`}
+              className="mt-3 inline-block font-medium underline"
+            >
               {t('competitionRequests.openCompetition')}
             </Link>
+          </Alert>
+        ) : null}
+        {r.status === 'APPROVED' && r.competition && r.competition.status !== 'DRAFT' ? (
+          <Alert tone="success" title={t('competitionRequests.publishedTitle')}>
+            <p>{t('competitionRequests.publishedText')}</p>
+            <div className="mt-2 flex flex-wrap gap-4">
+              <Link href={`/tournaments/${r.competition.slug}`} className="font-medium underline">
+                {t('competitionRequests.openPublic')}
+              </Link>
+              <Link href={`/competitions/${r.competition.id}`} className="font-medium underline">
+                {t('competitionRequests.openCompetition')}
+              </Link>
+            </div>
           </Alert>
         ) : null}
         {r.status === 'REJECTED' ? (
@@ -170,7 +253,7 @@ function RequestView({ request: r }: { request: CompetitionRequestDto }) {
           </Card>
         ) : null}
         <RecruitmentSummary positions={p.refereeRecruitment ?? []} />
-        {r.allowedActions.length > 0 ? (
+        {r.allowedActions.some((a) => a === 'approve' || a === 'reject' || a === 'withdraw') ? (
           <div className="flex flex-wrap items-start gap-3">
             {r.allowedActions.includes('approve') ? (
               <Button

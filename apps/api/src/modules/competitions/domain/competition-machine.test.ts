@@ -20,10 +20,12 @@ const now = new Date('2026-10-05T12:00:00Z');
 
 describe('competition state machine', () => {
   it('publication needs competition.publish; other steps — competition.transition; cancel and rollbacks need a reason', () => {
-    expect(findTransition('DRAFT', 'REGISTRATION_OPEN')).toMatchObject({
+    expect(findTransition('DRAFT', 'PUBLISHED')).toMatchObject({
       permission: 'competition.publish',
       reasonRequired: false,
     });
+    expect(findTransition('DRAFT', 'REGISTRATION_OPEN')).toBeNull();
+    expect(transitionsFrom('PUBLISHED').map((t) => t.to)).toEqual(['REGISTRATION_OPEN', 'CANCELLED']);
     expect(findTransition('REGISTRATION_CLOSED', 'REGISTRATION_OPEN')?.reasonRequired).toBe(true);
     expect(findTransition('DRAWING', 'CHECK_IN')?.reasonRequired).toBe(true);
     expect(findTransition('IN_PROGRESS', 'CANCELLED')?.reasonRequired).toBe(true);
@@ -36,6 +38,7 @@ describe('competition state machine', () => {
   it('a competition is published from registration on; a cancelled draft is not', () => {
     expect(isPublished('DRAFT')).toBe(false);
     expect(isPublished('CANCELLED')).toBe(false);
+    expect(isPublished('PUBLISHED')).toBe(true);
     expect(isPublished('REGISTRATION_OPEN')).toBe(true);
     expect(isPublished('ARCHIVED')).toBe(true);
   });
@@ -72,6 +75,7 @@ describe('competition state machine', () => {
     expect(registrationWindow(c, new Date('2026-11-10T20:59:58Z'))).toBe('OPEN');
     expect(registrationWindow(c, new Date('2026-11-10T20:59:59Z'))).toBe('CLOSED');
     expect(registrationWindow({ ...c, status: 'DRAFT' }, now)).toBe('NOT_OPEN');
+    expect(registrationWindow({ ...c, status: 'PUBLISHED' }, now)).toBe('NOT_OPEN');
     expect(registrationWindow({ ...c, status: 'REGISTRATION_CLOSED' }, now)).toBe('CLOSED');
   });
 

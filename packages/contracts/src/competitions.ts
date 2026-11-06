@@ -13,6 +13,7 @@ import { localDateIn } from './time.js';
 
 export const COMPETITION_STATUSES = [
   'DRAFT',
+  'PUBLISHED',
   'REGISTRATION_OPEN',
   'REGISTRATION_CLOSED',
   'CHECK_IN',
@@ -275,6 +276,11 @@ export interface Competition extends CompetitionSummary {
   /** «Скоро выступает»: за сколько схваток уведомлять (0 — не уведомлять). */
   notifyMatchesAhead: number;
   writeAuthority: WriteAuthority;
+  /** Шаблон афиши публичной страницы (`POSTER_TEMPLATES`) и ссылка на прямую трансляцию (правки 05.11.2026). */
+  posterTemplate: string;
+  liveStreamUrl: string | null;
+  /** Пользователь подписан на начало регистрации турнира. */
+  followed: boolean;
   /** Роли пользователя в турнире и отношение к нему (для кабинетов). */
   viewer: { roles: RoleCode[]; staff: boolean };
   version: number;

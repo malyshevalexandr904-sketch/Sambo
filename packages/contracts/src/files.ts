@@ -16,6 +16,7 @@ export const UPLOAD_PURPOSES = [
   'IMPORT',
   'ONBOARDING_DOCUMENT',
   'AVATAR',
+  'COMPETITION_MEDIA',
 ] as const;
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 
@@ -47,6 +48,12 @@ export const UPLOAD_POLICIES: Record<UploadPurpose, UploadPolicy> = {
     bucket: 'PUBLIC_MEDIA',
     mimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
     maxSizeBytes: 2 * MB,
+  },
+  /** Фото завершённого турнира (правки 05.11.2026): публичны вместе со страницей турнира. */
+  COMPETITION_MEDIA: {
+    bucket: 'PUBLIC_MEDIA',
+    mimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
+    maxSizeBytes: 15 * MB,
   },
   REGULATION: { bucket: 'PUBLIC_MEDIA', mimeTypes: ['application/pdf'], maxSizeBytes: 20 * MB },
   DOCUMENT: {

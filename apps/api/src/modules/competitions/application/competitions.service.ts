@@ -111,6 +111,16 @@ export class CompetitionsService {
     return this.toDto(user, row);
   }
 
+  /** Турнир по адресу публичной страницы: кнопки страницы (подписка, заявка) для вошедшего пользователя. */
+  async getBySlug(user: AuthUser, slug: string): Promise<Competition> {
+    const row = await this.db.competition.findFirst({
+      where: { slug, deletedAt: null },
+      select: { id: true },
+    });
+    if (!row) throw new DomainError('NOT_FOUND', { resource: 'competition' });
+    return this.get(user, row.id);
+  }
+
   private async toDto(user: AuthUser, row: CompetitionRow): Promise<Competition> {
     const scope = await this.scopes.scopeFor(row);
     const grants = await this.policy.grants(user);
@@ -139,6 +149,12 @@ export class CompetitionsService {
       weighInFailureOutcome: row.weighInFailureOutcome,
       notifyMatchesAhead: row.notifyMatchesAhead,
       writeAuthority: await this.leases.authority(row.id),
+      posterTemplate: row.posterTemplate,
+      liveStreamUrl: row.liveStreamUrl,
+      followed:
+        (await this.db.follow.count({
+          where: { userId: user.id, targetType: 'COMPETITION', targetId: row.id },
+        })) > 0,
       viewer: { roles, staff: actions.includes('competition.view') },
       version: row.version,
       createdAt: row.createdAt.toISOString(),
@@ -307,6 +323,8 @@ export class CompetitionsService {
     id: string,
     version: number,
     req: CompetitionTransitionRequest,
+    /** Право уже проверено вызывающим (публикация турнира организатором по одобренной заявке). */
+    preauthorized = false,
   ): Promise<Competition> {
     const basics = await this.scopes.require(id);
     const def = findTransition(basics.status, req.to);
@@ -317,7 +335,9 @@ export class CompetitionsService {
         allowed: transitionsFrom(basics.status).map((t) => t.to),
       });
     const scope = await this.scopes.scopeFor(basics);
-    const access = await this.policy.assert(user, def.permission, scope);
+    const access = preauthorized
+      ? { viaPlatform: false }
+      : await this.policy.assert(user, def.permission, scope);
     if (def.reasonRequired && !req.reason) throw new DomainError('REASON_REQUIRED');
 
     await this.db.tx(async (tx) => {
@@ -339,7 +359,7 @@ export class CompetitionsService {
         now,
       };
       const warnings = await this.checkExtensions(ctx, req.confirm === true);
-      const data = transitionData(basics.status, req, user.id, now);
+      const data = transitionData(basics.status, req, user.id, now, competition.registrationStartsAt);
       await this.status.commit(
         ctx,
         data,
@@ -387,7 +407,7 @@ export class CompetitionsService {
       registrationStartsAt: c.registrationStartsAt.toISOString(),
       registrationEndsAt: c.registrationEndsAt.toISOString(),
     };
-    if (c.status === 'DRAFT' && req.to === 'REGISTRATION_OPEN') {
+    if (c.status === 'DRAFT' && req.to === 'PUBLISHED') {
       if (!c.ruleSetVersionId) throw new DomainError('RULESET_REQUIRED');
       const v = await this.rulesets.versionInfo(c.ruleSetVersionId, tx);
       const failed = publishIssues(
@@ -399,6 +419,10 @@ export class CompetitionsService {
         now,
       );
       if (failed.length > 0) throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed });
+    }
+    if (c.status === 'PUBLISHED' && req.to === 'REGISTRATION_OPEN') {
+      if (c.registrationEndsAt.getTime() <= now.getTime())
+        throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed: ['registration_ends_in_past'] });
     }
     if (c.status === 'REGISTRATION_CLOSED' && req.to === 'REGISTRATION_OPEN') {
       const failed = reopenIssues(schedule, req.registrationEndsAt, now);

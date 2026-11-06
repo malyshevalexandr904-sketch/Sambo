@@ -21,6 +21,7 @@ import {
 import {
   affectedOrganizations,
   applicationRecipients,
+  competitionFollowers,
   organizationRecipients,
   type PlannedNotification,
   type RecipientsReader,
@@ -145,6 +146,11 @@ export async function planNotifications(
           competitionId: doc.competitionId,
         },
       ];
+    }
+    case 'competition.status_changed': {
+      const p = EVENT_SCHEMAS[type].parse(payload);
+      if (p.from !== 'PUBLISHED' || p.to !== 'REGISTRATION_OPEN') return [];
+      return competitionFollowers(db, p.competitionId);
     }
     case 'category.results_published': {
       const p = EVENT_SCHEMAS[type].parse(payload);

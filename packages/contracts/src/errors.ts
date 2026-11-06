@@ -117,6 +117,9 @@ export const ERROR_CODES = {
     'RATING_UNCHANGED',
     'COMPETITION_NOT_RATED',
     'RATING_SEASON_OVERLAP',
+    /** Действие недоступно на текущей стадии турнира (правки 05.11.2026). */
+    'COMPETITION_STAGE_MISMATCH',
+    'MEDIA_LIMIT_EXCEEDED',
   ] as const),
   ...codes('RATE_LIMIT_ERROR', ['RATE_LIMITED'] as const),
   ...codes('INTERNAL_ERROR', ['INTERNAL_ERROR', 'DEPENDENCY_UNAVAILABLE'] as const),

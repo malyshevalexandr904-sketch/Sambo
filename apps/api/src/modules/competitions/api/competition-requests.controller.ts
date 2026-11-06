@@ -1,6 +1,7 @@
-import { Controller, Get, HttpCode, Post, Res, type StreamableFile } from '@nestjs/common';
+import { Controller, Get, HttpCode, Post, Put, Res, type StreamableFile } from '@nestjs/common';
 import {
   CompetitionRequestCreate,
+  CompetitionRequestDraftInput,
   type CompetitionRequestDto,
   CompetitionRequestReject,
   CompetitionRequestsQuery,
@@ -56,6 +57,44 @@ export class CompetitionRequestsController {
     @ValidBody(CompetitionRequestCreate) body: CompetitionRequestCreate,
   ): Promise<DataEnvelope<CompetitionRequestDto>> {
     return ok(await this.requests.submit(user, body));
+  }
+
+  /** Черновик заявки (правки 05.11.2026): виден только организации, проверка данных — при подаче. */
+  @Post('drafts')
+  @Authenticated()
+  async createDraft(
+    @CurrentUser() user: AuthUser,
+    @ValidBody(CompetitionRequestDraftInput) body: CompetitionRequestDraftInput,
+  ): Promise<DataEnvelope<CompetitionRequestDto>> {
+    return ok(await this.requests.saveDraft(user, body));
+  }
+
+  @Put(':id/draft')
+  @Authenticated()
+  async updateDraft(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @ValidBody(CompetitionRequestDraftInput) body: CompetitionRequestDraftInput,
+  ): Promise<DataEnvelope<CompetitionRequestDto>> {
+    return ok(await this.requests.saveDraft(user, body, id));
+  }
+
+  @Post(':id/discard')
+  @Authenticated()
+  @HttpCode(204)
+  async discard(@CurrentUser() user: AuthUser, @UuidParam('id') id: string): Promise<void> {
+    await this.requests.discardDraft(user, id);
+  }
+
+  /** Организатор публикует подготовленный турнир по одобренной заявке (стадия «Опубликован»). */
+  @Post(':id/publish')
+  @Authenticated()
+  @HttpCode(200)
+  async publish(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+  ): Promise<DataEnvelope<CompetitionRequestDto>> {
+    return ok(await this.requests.publish(user, id));
   }
 
   @Get(':id')

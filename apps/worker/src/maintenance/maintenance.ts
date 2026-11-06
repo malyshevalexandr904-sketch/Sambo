@@ -13,6 +13,7 @@ export const MAINTENANCE_JOBS = {
   cleanupPendingUploads: { every: 60 * 60 * 1000 },
   expireDocuments: { every: 60 * 60 * 1000 },
   closeRegistrations: { every: 5 * 60 * 1000 },
+  openRegistrations: { every: 5 * 60 * 1000 },
   cleanupSyncLog: { every: DAY },
   // Места таблицы рейтинга — для «изменения позиции» (docs/RATING_ARCHITECTURE.md, 10). Каждый час: снимок дня
   // пишется первым запуском после полуночи UTC, повтор в тот же день ничего не меняет.
@@ -44,6 +45,9 @@ export class Maintenance {
         return;
       case 'closeRegistrations':
         await this.closeRegistrations();
+        return;
+      case 'openRegistrations':
+        await this.openRegistrations();
         return;
       case 'cleanupSyncLog':
         await this.cleanupSyncLog();
@@ -219,6 +223,63 @@ export class Maintenance {
     }
     if (closed > 0) this.logger.info({ count: closed }, 'Registrations closed');
     return closed;
+  }
+
+  /**
+   * Наступил срок начала регистрации — опубликованный турнир переходит в «Регистрацию» (правки 05.11.2026: стадия
+   * «Опубликован» → «Регистрация»). Подписавшимся уходит уведомление по событию перехода.
+   */
+  async openRegistrations(now: Date = new Date()): Promise<number> {
+    const due = await this.db.competition.findMany({
+      where: {
+        status: 'PUBLISHED',
+        deletedAt: null,
+        registrationStartsAt: { lte: now },
+        registrationEndsAt: { gt: now },
+        writeLease: { holderType: 'CLOUD' },
+      },
+      select: { id: true, organizerOrganizationId: true },
+      take: 100,
+    });
+    let opened = 0;
+    for (const c of due) {
+      await this.db.$transaction(async (tx) => {
+        const { count } = await tx.competition.updateMany({
+          where: { id: c.id, status: 'PUBLISHED' },
+          data: { status: 'REGISTRATION_OPEN', version: { increment: 1 } },
+        });
+        if (count === 0) return;
+        opened += 1;
+        await tx.auditLog.create({
+          data: {
+            id: uuidv7(),
+            actorType: 'SYSTEM',
+            action: 'competition.status_changed',
+            entityType: 'Competition',
+            entityId: c.id,
+            competitionId: c.id,
+            organizationId: c.organizerOrganizationId,
+            before: { status: 'PUBLISHED' },
+            after: { status: 'REGISTRATION_OPEN' },
+            reason: 'registration_start',
+            traceId: 'maintenance:openRegistrations',
+          },
+        });
+        await tx.outboxEvent.create({
+          data: {
+            id: uuidv7(),
+            type: 'competition.status_changed',
+            aggregateType: 'Competition',
+            aggregateId: c.id,
+            competitionId: c.id,
+            traceId: 'maintenance:openRegistrations',
+            payload: { competitionId: c.id, from: 'PUBLISHED', to: 'REGISTRATION_OPEN' },
+          },
+        });
+      });
+    }
+    if (opened > 0) this.logger.info({ count: opened }, 'Registrations opened');
+    return opened;
   }
 
   /**

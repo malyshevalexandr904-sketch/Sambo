@@ -9,7 +9,12 @@ import { AuditService } from '../../audit';
 import { FilesService } from '../../files';
 
 /** Исход взвешивания (D-06) меняется до начала мандатной комиссии и взвешивания. */
-const BEFORE_WEIGH_IN: readonly CompetitionStatus[] = ['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'];
+const BEFORE_WEIGH_IN: readonly CompetitionStatus[] = [
+  'DRAFT',
+  'PUBLISHED',
+  'REGISTRATION_OPEN',
+  'REGISTRATION_CLOSED',
+];
 
 @Injectable()
 export class RegulationService {

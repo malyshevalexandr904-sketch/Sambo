@@ -32,6 +32,8 @@ export const CONSUMERS: Partial<Record<EventType, readonly string[]>> = {
   'onboarding.submitted': ['notifications'],
   'onboarding.changes_requested': ['notifications'],
   'onboarding.decided': ['notifications'],
+  // Правки 05.11.2026: открылась регистрация — подписавшимся на турнир.
+  'competition.status_changed': ['notifications'],
 };
 
 /** Очередь потребителя: достаточно постановки задачи (очередь может принимать и другие задачи). */

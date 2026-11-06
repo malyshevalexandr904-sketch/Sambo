@@ -8,6 +8,7 @@ import {
   type EntriesQuery,
   type EntryCreate,
   type EntryDto,
+  fullName,
   type Page,
   type PermissionCode,
 } from '@sde/contracts';
@@ -26,6 +27,7 @@ import { ScheduleQueriesService } from '../../scheduling';
 import { WriteLeaseService } from '../../venue-sync';
 import { isEditableByOwner, isUnderStaffReview } from '../domain/application-machine';
 import { decisionAllowed, isActiveEntry } from '../domain/entry-rules';
+import { currentPeriod } from './application-effects';
 import { EligibilityService } from './eligibility.service';
 import {
   assertWindowOpen,
@@ -253,6 +255,19 @@ export class EntriesService {
   }
 
   /** Действующее согласие на обработку ПДн (ФЗ-152) — условие любой заявки спортсмена. */
+  /** Тренер, которого руководитель клуба указал в участии: действующий тренер клуба заявки. */
+  private async clubCoachName(coachId: string, organizationId: string): Promise<string> {
+    const link = await this.db.coachMembership.findFirst({
+      where: { coachId, organizationId, ...currentPeriod() },
+      select: {
+        coach: { select: { person: { select: { lastName: true, firstName: true, middleName: true } } } },
+      },
+    });
+    if (!link)
+      throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'coachId', code: 'not_found' }] });
+    return fullName(link.coach.person);
+  }
+
   private async assertConsent(personId: string): Promise<void> {
     const consents = (await this.athleteExtensions.consentsStatusOf([personId])).get(personId);
     if (consents?.PD_PROCESSING !== 'GIVEN')
@@ -269,6 +284,8 @@ export class EntriesService {
     const ctx = await this.access.applicationContext(applicationId);
     await this.access.assertOwner(user, ctx);
     const athlete = await this.clubAthlete(input.athleteId, ctx.application.organizationId);
+    if (input.coachId)
+      athlete.coachName = await this.clubCoachName(input.coachId, ctx.application.organizationId);
     const id = await this.db.tx(async (tx) => {
       const competitionId = ctx.application.competitionId;
       await this.leases.assertWritable(tx, competitionId);

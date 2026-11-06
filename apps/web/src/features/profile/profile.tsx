@@ -18,6 +18,7 @@ import { AthleteProgressCard } from '@/features/athletes/rating-progress';
 import { useRankName } from '@/features/athletes/shared';
 import { ageRange } from '@/features/divisions/shared';
 import { useAthleteHistory } from '@/features/results/api';
+import { MyWeighInQr } from '@/features/tournament/weigh-in-qr';
 import { CountUp } from './animated';
 import { OrganizationsList } from './organizations';
 import { Link } from '@/i18n/navigation';
@@ -181,6 +182,8 @@ export function ProfilePage() {
           </Link>
         </Alert>
       ) : null}
+      {/* Мандатная комиссия и взвешивание турнира: QR участия для судьи на весах. */}
+      {role === 'ATHLETE' || role === 'GUARDIAN' ? <MyWeighInQr /> : null}
     </>
   );
 

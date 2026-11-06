@@ -32,6 +32,8 @@ function csp(nonce: string, dev: boolean, storage: string | undefined, live: str
     // воркеров — источник указан явно; манифест PWA — свой origin.
     "worker-src 'self'",
     "manifest-src 'self'",
+    // Положение (PDF) во встроенном просмотрщике и прямая трансляция турнира (правки 05.11.2026).
+    `frame-src 'self'${storage ? ` ${storage}` : ''} https://vk.com https://vkvideo.ru https://www.youtube.com https://www.youtube-nocookie.com https://rutube.ru`,
     "frame-ancestors 'none'",
     "form-action 'self'",
     "base-uri 'self'",

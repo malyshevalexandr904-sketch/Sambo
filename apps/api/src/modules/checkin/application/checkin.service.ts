@@ -209,6 +209,12 @@ export class CheckInService {
     };
   }
 
+  /** Спортсмен по QR участника этого турнира (быстрое взвешивание по QR, правки 05.11.2026); чужой — null. */
+  athleteByQr(competitionId: string, qrToken: string): string | null {
+    const claims = verifyQrToken(this.qrKey, qrToken, new Date());
+    return claims && claims.competitionId === competitionId ? claims.athleteId : null;
+  }
+
   /** Сканирование QR (API.md, 5.5): карточка спортсмена без смены статуса. Чужой или поддельный токен — 404. */
   async scan(user: AuthUser, competitionId: string, qrToken: string): Promise<CheckInRow> {
     const claims = verifyQrToken(this.qrKey, qrToken, new Date());

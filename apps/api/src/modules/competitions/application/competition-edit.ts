@@ -144,13 +144,22 @@ export function transitionData(
   req: CompetitionTransitionRequest,
   userId: string,
   now: Date,
+  registrationStartsAt?: Date,
 ): Prisma.CompetitionUncheckedUpdateInput {
   const data: Prisma.CompetitionUncheckedUpdateInput = {
     status: req.to,
     version: { increment: 1 },
     updatedById: userId,
   };
-  if (req.to === 'REGISTRATION_OPEN' && from === 'DRAFT') data.publishedAt = now;
+  if (req.to === 'PUBLISHED' && from === 'DRAFT') data.publishedAt = now;
+  // Регистрацию открыли раньше объявленного срока — заявки принимаются с этого момента.
+  if (
+    req.to === 'REGISTRATION_OPEN' &&
+    from === 'PUBLISHED' &&
+    registrationStartsAt &&
+    registrationStartsAt > now
+  )
+    data.registrationStartsAt = now;
   if (req.to === 'REGISTRATION_OPEN' && from === 'REGISTRATION_CLOSED' && req.registrationEndsAt)
     data.registrationEndsAt = new Date(req.registrationEndsAt);
   if (req.to === 'CANCELLED') {

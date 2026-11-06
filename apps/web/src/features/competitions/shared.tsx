@@ -29,6 +29,7 @@ type Tone = 'success' | 'warning' | 'danger' | 'neutral' | 'info';
 
 const COMPETITION_TONE: Record<string, Tone> = {
   DRAFT: 'neutral',
+  PUBLISHED: 'info',
   REGISTRATION_OPEN: 'success',
   REGISTRATION_CLOSED: 'warning',
   CHECK_IN: 'info',

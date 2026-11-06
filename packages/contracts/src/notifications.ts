@@ -22,6 +22,8 @@ export const NOTIFICATION_TYPES = [
   'onboarding.changes_requested',
   'onboarding.decided',
   'onboarding.linked',
+  /** Открылась регистрация на турнир, на который пользователь подписан (правки 05.11.2026). */
+  'competition.registration_opened',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -152,6 +154,8 @@ export function notificationLink(type: NotificationType, params: Record<string, 
     if (params.athleteId) return `/athletes/${params.athleteId}`;
     return params.competitionId ? `/competitions/${params.competitionId}` : null;
   }
+  if (type === 'competition.registration_opened')
+    return params.slug ? `/tournaments/${params.slug}#registration` : null;
   if (type === 'schedule.changed')
     return params.competitionId ? `/competitions/${params.competitionId}` : null;
   return params.applicationId ? `/applications/${params.applicationId}` : null;

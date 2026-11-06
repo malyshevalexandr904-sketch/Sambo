@@ -21,6 +21,8 @@ import { CompetitionRatingController } from './api/competition-rating.controller
 import { CompetitionRequestsController } from './api/competition-requests.controller';
 import { CompetitionRequestsService } from './application/competition-requests.service';
 import { CompetitionTypeService } from './application/competition-type.service';
+import { CompetitionStagesController } from './api/competition-stages.controller';
+import { CompetitionStagesService } from './application/competition-stages.service';
 
 /**
  * Турниры (Phase 4a): турнир, машина состояний, положение, персонал. Категории, требования и заявки подключаются
@@ -34,6 +36,7 @@ import { CompetitionTypeService } from './application/competition-type.service';
     CompetitionRatingController,
     CompetitionRequestsController,
     RefereeRecruitmentController,
+    CompetitionStagesController,
   ],
   providers: [
     CompetitionScopeService,
@@ -47,12 +50,14 @@ import { CompetitionTypeService } from './application/competition-type.service';
     RegulationDocumentService,
     StaffService,
     RefereeRecruitmentService,
+    CompetitionStagesService,
   ],
   exports: [
     CompetitionScopeService,
     CompetitionExtensions,
     CompetitionStatusWriter,
     CompetitionsService,
+    CompetitionStagesService,
     RegulationDocumentService,
   ],
 })
@@ -71,5 +76,6 @@ export class CompetitionsModule implements OnModuleInit {
         (await this.policy.holdsAnywhere(user, 'competition.request')));
     this.files.registerUploadPolicy('REGULATION', canUpload);
     this.files.registerUploadPolicy('COMPETITION_LOGO', canUpload);
+    this.files.registerUploadPolicy('COMPETITION_MEDIA', canUpload);
   }
 }

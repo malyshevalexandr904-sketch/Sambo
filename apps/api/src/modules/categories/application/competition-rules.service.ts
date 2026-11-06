@@ -19,7 +19,7 @@ import { WriteLeaseService } from '../../venue-sync';
 import type { CategoryRuleSpec } from '../domain/eligibility';
 import { CompetitionCategoriesService } from './competition-categories.service';
 
-const EDITABLE: readonly CompetitionStatus[] = ['DRAFT', 'REGISTRATION_OPEN'];
+const EDITABLE: readonly CompetitionStatus[] = ['DRAFT', 'PUBLISHED', 'REGISTRATION_OPEN'];
 
 @Injectable()
 export class CompetitionRulesService {

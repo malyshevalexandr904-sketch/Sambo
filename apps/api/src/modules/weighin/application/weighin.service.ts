@@ -33,7 +33,7 @@ import {
 } from '../../admission';
 import { AuditService } from '../../audit';
 import { MERGEABLE } from '../../categories';
-import { CHECK_IN_PHASE } from '../../checkin';
+import { CHECK_IN_PHASE, CheckInService } from '../../checkin';
 import { OutboxService } from '../../outbox';
 import { RegistrationAccessService } from '../../registrations';
 import { WriteLeaseService } from '../../venue-sync';
@@ -95,6 +95,7 @@ export class WeighInService {
     private readonly leases: WriteLeaseService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly checkins: CheckInService,
   ) {}
 
   /** Допуск по весу из закреплённой версии правил и исход по положению. */
@@ -352,6 +353,12 @@ export class WeighInService {
   async list(competitionId: string, q: WeighInQuery): Promise<Page<WeighInRow>> {
     const and: Prisma.EntryWhereInput[] = [{ competitionId, status: 'APPROVED' }];
     if (q.categoryId) and.push({ categoryId: q.categoryId });
+    // Быстрое взвешивание (правки 05.11.2026): спортсмен показывает QR из личного кабинета — только его участия.
+    if (q.qrToken) {
+      const athleteId = this.checkins.athleteByQr(competitionId, q.qrToken);
+      if (!athleteId) throw new DomainError('NOT_FOUND', { resource: 'qr' });
+      and.push({ athleteId });
+    }
     if (q.windowId) and.push({ category: { weighInWindows: { some: { windowId: q.windowId } } } });
     if (q.status === 'EXPECTED')
       and.push({ OR: [{ weighInRecord: null }, { weighInRecord: { status: 'EXPECTED' } }] });

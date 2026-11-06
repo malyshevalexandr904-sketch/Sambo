@@ -53,7 +53,7 @@ export function CategoriesTab({ competition: c }: { competition: Competition }) 
   const weight = useWeightLabel();
   const age = useAgeLabel();
   const manage = c.allowedActions.includes('competition_category.manage');
-  const editablePhase = ['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(c.status);
+  const editablePhase = ['DRAFT', 'PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'].includes(c.status);
   return (
     <div className="space-y-6">
       {manage && editablePhase ? (

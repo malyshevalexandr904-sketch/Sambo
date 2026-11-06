@@ -1,6 +1,8 @@
 'use client';
 // Экран взвешивания (API.md, 5.6; D-06): окно и весы, крупный ввод веса и мгновенный результат соответствия
 // категории (та же функция, что на сервере), запись попытки, перевод по весу, если так решает положение.
+// Быстрый режим (правки 05.11.2026): спортсмен показывает QR из личного кабинета, судья сканирует его камерой —
+// в списке остаётся только этот спортсмен, поле веса уже в фокусе.
 import {
   attemptKindsForWindow,
   type CategoryRef,
@@ -28,6 +30,7 @@ import { useWeightLabel } from '@/features/competitions/shared';
 import { api } from '@/lib/api';
 import { pickName } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
+import { QrScanner } from './qr-scanner';
 import { athleteName, CheckInBadge, WeighInBadge } from './shared';
 import { useScales, useWindows, WeighInSetup } from './weighin-setup';
 
@@ -95,12 +98,15 @@ function WeighRow({
   canRecord,
   canTransfer,
   onChanged,
+  focus = false,
 }: {
   row: WeighInRow;
   station: Station;
   canRecord: boolean;
   canTransfer: boolean;
   onChanged: () => Promise<unknown>;
+  /** Спортсмен найден по QR: сразу вводить вес. */
+  focus?: boolean;
 }) {
   const t = useTranslations('weighin');
   const locale = useLocale();
@@ -168,6 +174,7 @@ function WeighRow({
               id={`w-${row.entryId}`}
               inputMode="decimal"
               autoComplete="off"
+              autoFocus={focus}
               className="w-36 text-2xl font-semibold"
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -247,6 +254,7 @@ export function WeighInTab({ competition: c }: { competition: Competition }) {
   const [windowId, setWindowId] = useState('');
   const [scaleId, setScaleId] = useState('');
   const [filters, setFilters] = useState({ categoryId: '', status: '', q: '' });
+  const [qrToken, setQrToken] = useState<string | null>(null);
   const openWindows = (windows.data ?? []).filter((w) => w.open);
   const current = (windows.data ?? []).find((w) => w.id === windowId) ?? openWindows[0] ?? null;
   const verified = (scales.data ?? []).filter((s) => s.verified);
@@ -256,6 +264,7 @@ export function WeighInTab({ competition: c }: { competition: Competition }) {
     categoryId: filters.categoryId || undefined,
     status: filters.status || undefined,
     q: filters.q.trim() || undefined,
+    qrToken: qrToken ?? undefined,
   };
   const list = useInfiniteQuery({
     queryKey: ['competitions', c.id, 'weigh-in', params],
@@ -279,6 +288,22 @@ export function WeighInTab({ competition: c }: { competition: Competition }) {
         </p>
       ) : null}
       <WeighInSetup competition={c} />
+      {c.allowedActions.includes('weighin.record') ? (
+        <Card>
+          <CardTitle>{t('qrTitle')}</CardTitle>
+          <p className="-mt-2 mb-3 text-sm text-slate-600">{t('qrHint')}</p>
+          {qrToken ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <Badge tone="info">{t('qrShown')}</Badge>
+              <Button variant="secondary" onClick={() => setQrToken(null)}>
+                {t('qrNext')}
+              </Button>
+            </div>
+          ) : (
+            <QrScanner onToken={setQrToken} />
+          )}
+        </Card>
+      ) : null}
       <Card>
         <CardTitle>{t('stationTitle')}</CardTitle>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -352,7 +377,7 @@ export function WeighInTab({ competition: c }: { competition: Competition }) {
       <QueryState isPending={list.isPending || !settings.data} error={list.error ?? settings.error}>
         {() =>
           rows.length === 0 ? (
-            <EmptyState title={t('empty')} />
+            <EmptyState title={qrToken ? t('qrNotFound') : t('empty')} />
           ) : (
             <ul className="divide-y divide-slate-200 rounded-md border border-slate-200 bg-white">
               {rows.map((r) => (
@@ -367,6 +392,7 @@ export function WeighInTab({ competition: c }: { competition: Competition }) {
                   canRecord={c.allowedActions.includes('weighin.record')}
                   canTransfer={c.allowedActions.includes('entry.transfer')}
                   onChanged={refresh}
+                  focus={!!qrToken && rows.length === 1}
                 />
               ))}
             </ul>

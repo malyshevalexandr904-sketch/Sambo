@@ -2,10 +2,11 @@
 // Страница турнира: обзор и переходы, положение, категории, персонал, заявки и участники, мандатная комиссия
 // (допуск, прибытие, взвешивание, медицина), жеребьёвка, расписание, бригады, итоги. Вкладки и действия —
 // по allowedActions турнира: интерфейс лишь скрывает недоступное, решает сервер.
-import { type Competition } from '@sde/contracts';
+import { type Competition, stageOfCompetition } from '@sde/contracts';
 import { Alert, Badge, EmptyState, PageHeader, cn } from '@sde/ui';
 import { useLocale, useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
+import { useState } from 'react';
 import { QueryState } from '@/components/common';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
 import { ApiError } from '@/lib/api';
@@ -25,6 +26,7 @@ import { OverviewTab } from './overview';
 import { RecruitmentTab } from './recruitment';
 import { RegulationTab } from './regulation';
 import { CompetitionStatusBadge, formatDates, useCompetition } from './shared';
+import { STAGE_TABS } from './stage-guide';
 import { StaffTab } from './staff';
 
 const TABS = [
@@ -47,7 +49,9 @@ const TABS = [
 type Tab = (typeof TABS)[number];
 
 /** До мандатной комиссии жеребьёвки нет — вкладка не нужна. */
-const BEFORE_DRAW: readonly string[] = ['DRAFT', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'];
+const BEFORE_DRAW: readonly string[] = ['DRAFT', 'PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'];
+/** До регистрации нет участников — мандатной комиссии, прибытия, взвешивания и медицины тоже. */
+const BEFORE_REGISTRATION: readonly string[] = ['DRAFT', 'PUBLISHED'];
 
 function visibleTabs(c: Competition): Tab[] {
   const can = (a: string): boolean => c.allowedActions.includes(a);
@@ -55,10 +59,10 @@ function visibleTabs(c: Competition): Tab[] {
     if (tab === 'staff') return can('competition.view');
     if (tab === 'recruitment') return can('competition.members.manage');
     if (tab === 'entries') return can('registration.view');
-    if (tab === 'admission') return can('admission.view') && c.status !== 'DRAFT';
-    if (tab === 'checkin') return can('checkin.view') && c.status !== 'DRAFT';
-    if (tab === 'weighin') return can('weighin.view') && c.status !== 'DRAFT';
-    if (tab === 'medical') return can('medical.view') && c.status !== 'DRAFT';
+    if (tab === 'admission') return can('admission.view') && !BEFORE_REGISTRATION.includes(c.status);
+    if (tab === 'checkin') return can('checkin.view') && !BEFORE_REGISTRATION.includes(c.status);
+    if (tab === 'weighin') return can('weighin.view') && !BEFORE_REGISTRATION.includes(c.status);
+    if (tab === 'medical') return can('medical.view') && !BEFORE_REGISTRATION.includes(c.status);
     if (tab === 'draws') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
     if (tab === 'schedule') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
     if (tab === 'crews') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
@@ -76,6 +80,7 @@ export function CompetitionPage({ id }: { id: string }) {
   const params = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
+  const [allTabs, setAllTabs] = useState(false);
   if (query.error instanceof ApiError && query.error.code === 'NOT_FOUND') {
     return (
       <EmptyState title={t('notFound')}>
@@ -93,6 +98,13 @@ export function CompetitionPage({ id }: { id: string }) {
         const tabs = visibleTabs(c);
         const requested = params.get('tab') as Tab | null;
         const tab: Tab = requested && tabs.includes(requested) ? requested : 'overview';
+        // Стадия (правки 05.11.2026): у организатора и администратора сначала — вкладки текущей стадии, остальные
+        // — по кнопке «Все разделы».
+        const stage = stageOfCompetition(c.status);
+        const focus = stage && c.viewer.staff ? STAGE_TABS[stage].filter((x) => tabs.includes(x as Tab)) : [];
+        const focused = focus.length > 1 && !allTabs && (focus.includes(tab) || tab === 'overview');
+        const shown: Tab[] = focused ? (focus as Tab[]) : tabs;
+        const hiddenCount = tabs.length - shown.length;
         return (
           <>
             <div className="print:hidden">
@@ -122,14 +134,14 @@ export function CompetitionPage({ id }: { id: string }) {
                 className="mb-6 flex gap-1 overflow-x-auto border-b border-slate-200"
                 aria-label={t('tabs.label')}
               >
-                {tabs.map((x) => (
+                {shown.map((x) => (
                   <button
                     key={x}
                     type="button"
                     role="tab"
                     aria-selected={tab === x}
                     className={cn(
-                      'min-h-11 whitespace-nowrap border-b-2 px-3 text-sm font-medium',
+                      'flex min-h-11 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 text-sm font-medium',
                       tab === x
                         ? 'border-blue-700 text-blue-800'
                         : 'border-transparent text-slate-600 hover:text-slate-900',
@@ -137,8 +149,31 @@ export function CompetitionPage({ id }: { id: string }) {
                     onClick={() => router.replace({ pathname, query: x === 'overview' ? {} : { tab: x } })}
                   >
                     {t(`tabs.${x}`)}
+                    {!focused && focus.includes(x) && x !== 'overview' ? (
+                      <span
+                        className="h-1.5 w-1.5 rounded-full bg-blue-600"
+                        aria-label={t('tabs.stageFocus')}
+                      />
+                    ) : null}
                   </button>
                 ))}
+                {focus.length > 1 && (hiddenCount > 0 || allTabs) ? (
+                  <button
+                    type="button"
+                    className="min-h-11 whitespace-nowrap px-3 text-sm text-blue-700 hover:underline"
+                    aria-expanded={!focused}
+                    onClick={() => {
+                      if (focused) {
+                        setAllTabs(true);
+                        return;
+                      }
+                      setAllTabs(false);
+                      if (!focus.includes(tab)) router.replace({ pathname, query: {} });
+                    }}
+                  >
+                    {focused ? t('tabs.showAll', { count: hiddenCount }) : t('tabs.showStage')}
+                  </button>
+                ) : null}
               </nav>
             </div>
             {tab === 'overview' ? <OverviewTab competition={c} /> : null}

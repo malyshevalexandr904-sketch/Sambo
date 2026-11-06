@@ -12,7 +12,7 @@ import {
   type TestApp,
 } from './helpers/app';
 import { send } from './helpers/phase3';
-import { categoryTemplate, clubAthlete, isoDate } from './helpers/phase4';
+import { categoryTemplate, clubAthlete, isoDate, publishedRuleSet } from './helpers/phase4';
 
 let t: TestApp;
 let admin: Session;
@@ -176,7 +176,8 @@ describe('competition hosting requests', () => {
     const approved = await send(admin, 'post', `/api/v1/competition-requests/${r.id}/approve`, {}, r.version);
     expect(approved.status, JSON.stringify(approved.body)).toBe(200);
     const done = approved.body.data as RequestBody;
-    expect(done).toMatchObject({ status: 'APPROVED', allowedActions: [] });
+    // Стадия «На согласовании»: турнир готовит платформа, опубликовать его может организатор (или платформа).
+    expect(done).toMatchObject({ status: 'APPROVED', allowedActions: ['publish'] });
     const competition = await t.admin.competition.findUniqueOrThrow({
       where: { id: done.competitionId! },
       include: { ratingConfig: true },
@@ -276,6 +277,124 @@ describe('competition hosting requests', () => {
       withdrawn.body.data.version,
     );
     expect(late.body.error.code).toBe('COMPETITION_REQUEST_NOT_PENDING');
+  });
+});
+
+describe('tournament stages (05.11.2026)', () => {
+  it('draft → review → organizer publishes → registration opens for followers', async () => {
+    // Черновик: сохраняется как есть, виден только организации.
+    const saved = await send(manager, 'post', '/api/v1/competition-requests/drafts', {
+      organizationId: clubId,
+      name: 'Осенний турнир',
+      data: { name: 'Осенний турнир', matCount: 2 },
+    });
+    expect(saved.status, JSON.stringify(saved.body)).toBe(201);
+    const draftId = saved.body.data.id as string;
+    expect(saved.body.data).toMatchObject({
+      status: 'DRAFT',
+      allowedActions: ['edit', 'discard'],
+      draft: { name: 'Осенний турнир', matCount: 2 },
+    });
+    const updated = await send(manager, 'put', `/api/v1/competition-requests/${draftId}/draft`, {
+      organizationId: clubId,
+      name: 'Осенний турнир клуба',
+      data: { name: 'Осенний турнир клуба', matCount: 3 },
+    });
+    expect(updated.status, JSON.stringify(updated.body)).toBe(200);
+    expect(updated.body.data.name).toBe('Осенний турнир клуба');
+    await admin.agent.get(`/api/v1/competition-requests/${draftId}`).expect(404);
+    const adminList = await admin.agent.get('/api/v1/competition-requests?limit=100').expect(200);
+    expect(adminList.body.data.map((x: { id: string }) => x.id)).not.toContain(draftId);
+
+    // Подача черновика: та же заявка становится поданной («На согласовании»).
+    const submitted = await submit({ name: 'Осенний турнир клуба', draftId });
+    expect(submitted).toMatchObject({ id: draftId, status: 'SUBMITTED' });
+    const approved = await send(
+      admin,
+      'post',
+      `/api/v1/competition-requests/${draftId}/approve`,
+      {},
+      submitted.version,
+    );
+    expect(approved.status, JSON.stringify(approved.body)).toBe(200);
+    const competitionId = approved.body.data.competitionId as string;
+    expect(approved.body.data.competition).toMatchObject({ id: competitionId, status: 'DRAFT' });
+
+    const root = await login(t, (await createUser(t, { platform: ['SUPER_ADMIN'] })).email, { totp: true });
+    // Пока платформа не подготовила турнир (правила, категории), опубликовать его нельзя.
+    const early = await send(manager, 'post', `/api/v1/competition-requests/${draftId}/publish`, {});
+    expect(early.status).toBe(422);
+    const c = await root.agent.get(`/api/v1/competitions/${competitionId}`).expect(200);
+    const withRules = await send(
+      root,
+      'patch',
+      `/api/v1/competitions/${competitionId}`,
+      { ruleSetVersionId: await publishedRuleSet(t) },
+      c.body.data.version,
+    );
+    expect(withRules.status, JSON.stringify(withRules.body)).toBe(200);
+    const { templateId } = await categoryTemplate(t);
+    await send(root, 'post', `/api/v1/competitions/${competitionId}/categories/generate`, {
+      templateId,
+    }).expect(201);
+
+    const published = await send(manager, 'post', `/api/v1/competition-requests/${draftId}/publish`, {});
+    expect(published.status, JSON.stringify(published.body)).toBe(200);
+    expect(published.body.data).toMatchObject({ competition: { status: 'PUBLISHED' }, allowedActions: [] });
+    const slug = published.body.data.competition.slug as string;
+    const pub = await t.http().get(`/api/public/v1/competitions/${slug}`).expect(200);
+    expect(pub.body.data).toMatchObject({ status: 'PUBLISHED', registrationOpenNow: false });
+    expect(
+      (await t.http().get(`/api/public/v1/competitions/${slug}/brackets`).expect(200)).body.data,
+    ).toEqual({
+      categories: [],
+    });
+
+    // Подписка на начало регистрации и шаблон афиши.
+    const fan = await login(t, (await createUser(t)).email);
+    const followed = await send(fan, 'put', `/api/v1/competitions/${competitionId}/follow`, { follow: true });
+    expect(followed.status, JSON.stringify(followed.body)).toBe(200);
+    expect(
+      (await fan.agent.get(`/api/v1/competitions/${competitionId}`).expect(200)).body.data.followed,
+    ).toBe(true);
+    expect(
+      (
+        await send(manager, 'put', `/api/v1/competitions/${competitionId}/presentation`, {
+          posterTemplate: 'arena',
+        })
+      ).status,
+    ).toBe(403);
+    await send(root, 'put', `/api/v1/competitions/${competitionId}/presentation`, {
+      posterTemplate: 'arena',
+      liveStreamUrl: 'https://vk.com/video-1_2',
+    }).expect(204);
+
+    // Администратор открывает регистрацию — событие для уведомления подписавшихся.
+    const current = await root.agent.get(`/api/v1/competitions/${competitionId}`).expect(200);
+    expect(current.body.data).toMatchObject({ status: 'PUBLISHED', posterTemplate: 'arena' });
+    const opened = await send(
+      root,
+      'post',
+      `/api/v1/competitions/${competitionId}/transitions`,
+      { to: 'REGISTRATION_OPEN' },
+      current.body.data.version,
+    );
+    expect(opened.status, JSON.stringify(opened.body)).toBe(200);
+    expect(opened.body.data.registrationOpenNow).toBe(true);
+    const events = await t.admin.outboxEvent.findMany({
+      where: { competitionId, type: 'competition.status_changed' },
+    });
+    expect(events.map((e) => e.payload)).toContainEqual({
+      competitionId,
+      from: 'PUBLISHED',
+      to: 'REGISTRATION_OPEN',
+    });
+    // Медиа — только после завершения турнира.
+    const media = await send(root, 'post', `/api/v1/competitions/${competitionId}/media`, {
+      kind: 'VIDEO',
+      url: 'https://vk.com/video-1_3',
+    });
+    expect(media.body.error.code).toBe('COMPETITION_STAGE_MISMATCH');
   });
 });
 
