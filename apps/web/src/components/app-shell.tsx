@@ -17,6 +17,8 @@ import { useMe } from '@/lib/queries';
 import { ConsoleRoleBar, RoleChangedElsewhere, RoleSwitcher } from '@/features/cabinet-role';
 import { Avatar } from '@/features/avatar';
 import { NotificationBell } from '@/features/notifications/bell';
+import { DemoProfile } from '@/features/profile/demo-profile';
+import { hostTabOf } from '@/lib/sections';
 import { Brand } from './brand';
 import { DemoGuide } from './demo-guide';
 import { LocaleSwitcher } from './locale-switcher';
@@ -35,9 +37,9 @@ type Translate = ReturnType<typeof useTranslations>;
 
 /**
  * Вкладки меню по выбранной роли (правки 28.10.2026): у каждой из четырёх ролей платформы — свой фиксированный набор,
- * одинаковый в обычном и демо-входе; уведомления и тексты согласий — в «Настройках». Прочие разделы роли (заявки,
- * судейство, проверка заявок и документов) открываются из личного кабинета. Администратор платформы сохраняет свои
- * разделы по правам.
+ * одинаковый в обычном и демо-входе; все настройки — в «Настройках». Прочие разделы роли (заявки, судейство,
+ * проверка заявок и документов) — плитками внутри вкладок, к которым относятся (правки 05.11.2026, п. 4;
+ * lib/sections.ts). Администратор платформы сохраняет свои разделы по правам.
  */
 function navItems(t: Translate, user: Me): NavItem[] {
   const home = { href: '/admin', label: t('nav.dashboard') };
@@ -163,7 +165,14 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
   // Демо-вход: действия перехватываются до запроса (lib/demo.ts).
   setDemoMode(user.demo);
   // Демо-вход (правки 28.10.2026): вкладка показывает справку о разделе и призыв зарегистрироваться, а не содержимое.
-  const content = user.demo ? <DemoGuide pathname={pathname} role={user.activeRole} /> : children;
+  // Личный кабинет в демо (правки 05.11.2026) — пример профиля с вымышленными данными.
+  const content = !user.demo ? (
+    children
+  ) : pathname === '/admin' ? (
+    <DemoProfile role={user.activeRole} />
+  ) : (
+    <DemoGuide pathname={pathname} role={user.activeRole} />
+  );
   if (bare) {
     return (
       <main id="main" className="min-h-screen bg-slate-100">
@@ -174,8 +183,14 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
     );
   }
   const nav = navItems(t, user);
+  // Раздел из вкладки (например, «Судейство» во «Турнирах») подсвечивает свою вкладку.
+  const host = hostTabOf(user, pathname);
   const isActive = (href: string): boolean =>
-    href === '/admin' ? pathname === '/admin' : pathname === href || pathname.startsWith(`${href}/`);
+    host
+      ? href === host
+      : href === '/admin'
+        ? pathname === '/admin'
+        : pathname === href || pathname.startsWith(`${href}/`);
 
   const logout = async (): Promise<void> => {
     try {
