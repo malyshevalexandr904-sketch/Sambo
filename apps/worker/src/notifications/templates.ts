@@ -186,6 +186,24 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       action: { label: 'Перейти к документам', param: 'url' },
       required: ['documentType', 'url'],
     },
+    'document.expiring': {
+      subject: 'Скоро истекает срок документа — Цифровое самбо',
+      lines: [
+        'Срок действия документа «{documentType}» истекает {expirationText}.',
+        'Загрузите новый документ заранее, чтобы не остаться без допуска к соревнованиям.',
+      ],
+      action: { label: 'Открыть документы', param: 'url' },
+      required: ['documentType', 'expirationText', 'url'],
+    },
+    'document.expired': {
+      subject: 'Истёк срок документа — Цифровое самбо',
+      lines: [
+        'Срок действия документа «{documentType}» истёк {expirationText}.',
+        'Загрузите новый документ — без него не получится заявиться на соревнования.',
+      ],
+      action: { label: 'Загрузить документ', param: 'url' },
+      required: ['documentType', 'expirationText', 'url'],
+    },
     'schedule.changed': {
       subject: 'Расписание турнира изменилось — Цифровое самбо',
       lines: [
@@ -257,6 +275,24 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       action: { label: 'Open documents', param: 'url' },
       required: ['documentType', 'url'],
     },
+    'document.expiring': {
+      subject: 'A document is about to expire — Цифровое самбо',
+      lines: [
+        'The document “{documentType}” expires on {expirationText}.',
+        'Upload a new one in advance so that you stay eligible for competitions.',
+      ],
+      action: { label: 'Open documents', param: 'url' },
+      required: ['documentType', 'expirationText', 'url'],
+    },
+    'document.expired': {
+      subject: 'A document has expired — Цифровое самбо',
+      lines: [
+        'The document “{documentType}” expired on {expirationText}.',
+        'Upload a new one: you cannot be entered into competitions without it.',
+      ],
+      action: { label: 'Upload document', param: 'url' },
+      required: ['documentType', 'expirationText', 'url'],
+    },
     'schedule.changed': {
       subject: 'Tournament schedule changed — Цифровое самбо',
       lines: [
@@ -291,6 +327,12 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
   },
 };
 
+/** Дата YYYY-MM-DD → ДД.ММ.ГГГГ (в письмах обеих локалей). */
+const formatIsoDate = (d: string): string => {
+  const [y, m, day] = d.split('-');
+  return y && m && day ? `${day}.${m}.${y}` : d;
+};
+
 export function renderNotificationEmail(
   type: NotificationType,
   locale: Locale,
@@ -299,10 +341,12 @@ export function renderNotificationEmail(
   const statusText = params.status ? (STATUS[locale][params.status] ?? params.status) : '';
   const details = isMatchDayNotification(type) ? renderPush(type, { ...params, locale }).body : '';
   const roleText = params.onboardingRole ? (ONBOARDING_ROLE[locale][params.onboardingRole] ?? '') : '';
+  const expirationText = params.expirationDate ? formatIsoDate(params.expirationDate) : '';
   return renderDefinition(TEMPLATES[locale][type], `notification:${type}`, locale, {
     ...params,
     statusText,
     details,
     roleText,
+    expirationText,
   });
 }

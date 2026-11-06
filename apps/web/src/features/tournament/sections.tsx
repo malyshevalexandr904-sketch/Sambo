@@ -20,12 +20,9 @@ import { useViewerCompetition } from './viewer';
 
 export function RegulationSection({ competition: c }: { competition: PublicCompetition }) {
   const t = useTranslations('tournamentPage.regulation');
-  // Сформированное положение (PDF платформы) — поле появится в контракте вместе с генератором положения.
-  const pdf =
-    (c as PublicCompetition & { regulationPdfUrl?: string | null }).regulationPdfUrl ?? c.regulationUrl;
-  if (!pdf) return <Placeholder icon="📄" title={t('tbdTitle')} text={t('tbdText')} />;
-  const sameOrigin = pdf.startsWith('/');
-  const download = sameOrigin ? `${pdf}${pdf.includes('?') ? '&' : '?'}download=1` : pdf;
+  // Загруженное администратором положение, а если его нет — фирменное, собранное платформой по данным турнира.
+  const pdf = c.regulationPdfUrl;
+  const download = c.regulationUrl ?? `${c.generatedRegulationPdfUrl}?download=1`;
   return (
     <Box>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -33,7 +30,7 @@ export function RegulationSection({ competition: c }: { competition: PublicCompe
         <div className="flex flex-wrap gap-2">
           <a
             href={download}
-            download={sameOrigin ? undefined : `${c.slug}-polozhenie.pdf`}
+            download
             className="inline-flex min-h-11 items-center rounded-md bg-blue-700 px-4 font-medium text-white hover:bg-blue-800"
           >
             <DownloadIcon className="mr-2" />

@@ -549,6 +549,11 @@ const finishedAtOf = (d: Draft): Date => d.match.finishedAt ?? d.result.confirme
 /**
  * Есть ли у спортсменов более ранняя (по окончанию, затем по id) схватка рейтингового турнира с результатом, ещё
  * не посчитанная в его текущем варианте. Посчитанная с ошибкой (FAILED) не держит очередь — её видит администратор.
+ * Очередь держат только схватки, расчёт которых когда-нибудь будет записан. Не держат:
+ *  - проход без соперника (BYE): результат подтверждает система при публикации сетки без события — расчёта у такой
+ *    схватки нет и не будет, а «окончание» у неё раньше всех схваток турнира; иначе каждый спортсмен с проходом
+ *    в первом круге и все его соперники навсегда оставались с ожидающим расчётом и прежним Эло;
+ *  - схватка без второго участника, отменённая схватка, турнир удалённый, отменённый или без версии правил.
  */
 async function hasEarlierUnrated(
   tx: Tx,
@@ -564,7 +569,15 @@ async function hasEarlierUnrated(
     JOIN competition c ON c.id = m.competition_id
     WHERE e.athlete_id = ANY(${[...athleteIds]}::uuid[])
       AND c.competition_type = 'RATED'
+      AND c.deleted_at IS NULL
+      AND c.status <> 'CANCELLED'
+      AND EXISTS (SELECT 1 FROM competition_rating_config cfg WHERE cfg.competition_id = c.id)
       AND m.id <> ${matchId}::uuid
+      AND m.status <> 'CANCELLED'
+      AND r.method <> 'BYE'
+      AND NOT EXISTS (
+        SELECT 1 FROM match_participant other
+        WHERE other.match_id = m.id AND (other.is_bye OR other.entry_id IS NULL))
       AND (COALESCE(m.finished_at, r.confirmed_at), m.id) < (${finishedAt}::timestamptz, ${matchId}::uuid)
       AND NOT EXISTS (
         SELECT 1 FROM rating_calculation rc

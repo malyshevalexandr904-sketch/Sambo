@@ -1,4 +1,14 @@
-import { Controller, Delete, Get, HttpCode, Patch, Post, Put, Res } from '@nestjs/common';
+import {
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Patch,
+  Post,
+  Put,
+  Res,
+  type StreamableFile,
+} from '@nestjs/common';
 import {
   AcceptCompetitionInviteRequest,
   type AuditEntry,
@@ -32,6 +42,8 @@ import { WriteAuthority } from '../../venue-sync';
 import { CompetitionsService } from '../application/competitions.service';
 import { RefereeRecruitmentService } from '../application/referee-recruitment.service';
 import { RegulationService } from '../application/regulation.service';
+import { RegulationDocumentService } from '../application/regulation-document.service';
+import { RegulationPdfQuery, regulationPdfResponse } from './regulation-pdf.response';
 import { StaffService } from '../application/staff.service';
 
 const COMP = { resolver: 'competition', param: 'id' };
@@ -45,6 +57,7 @@ export class CompetitionsController {
   constructor(
     private readonly competitions: CompetitionsService,
     private readonly regulation: RegulationService,
+    private readonly regulationDocument: RegulationDocumentService,
     private readonly staff: StaffService,
     private readonly audit: AuditQueryService,
     private readonly recruitment: RefereeRecruitmentService,
@@ -83,6 +96,21 @@ export class CompetitionsController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<DataEnvelope<Competition>> {
     return this.send(res, await this.competitions.get(user, id));
+  }
+
+  /**
+   * Фирменное положение турнира (правки 05.11.2026, п. 8), собранное по текущим данным; черновик — с пометкой
+   * «ПРОЕКТ». Видимость — как у турнира: черновик только персоналу и организаторам.
+   */
+  @Get(':id/regulation.pdf')
+  @Authenticated()
+  async regulationPdf(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @ValidQuery(RegulationPdfQuery) q: RegulationPdfQuery,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return regulationPdfResponse(res, await this.regulationDocument.forCompetition(user, id), q, 'no-store');
   }
 
   @Patch(':id')

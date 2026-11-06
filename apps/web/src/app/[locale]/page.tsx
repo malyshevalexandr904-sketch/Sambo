@@ -13,7 +13,8 @@ import { Link } from '@/i18n/navigation';
  * выбором роли и демо-вход: все роли и разделы для просмотра, без действий (правки 27.10.2026). Правки 28.10.2026:
  * переключатели языка и темы вверху, ниже первого экрана — секции «О платформе» с рейтинговой системой. Правки 31.10.2026:
  * фон первого экрана — видео зала с самбистами (на телефоне — неподвижный кадр), карточки входа — стеклянные.
- * Правки 04.11.2026: под названием — цитата Василия Шестакова с автором.
+ * Правки 04.11.2026: под названием — цитата Василия Шестакова с автором. Правки 05.11.2026: без надписи над названием,
+ * цитата в одну строку, под автором — кратко, кто он; рядом с названием — анимированная эмблема из логотипа.
  */
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -32,27 +33,44 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             <ThemeSwitcher />
           </div>
           <div className="flex flex-1 flex-col justify-center py-10">
-            <p className="animate-fade-up text-xs font-semibold uppercase tracking-[0.25em] text-white/70 sm:text-sm">
-              {t('eyebrow')}
-            </p>
-            <h1
-              className="mt-3 animate-fade-up text-5xl font-extrabold tracking-tight text-white [text-shadow:0_2px_24px_rgb(0_0_0/0.45)] sm:text-7xl"
-              style={{ animationDelay: '80ms' }}
-            >
-              {t('title')}
-            </h1>
+            {/* Правки 05.11.2026: эмблема-узел из логотипа рядом с названием. Появляется с поворотом, затем слегка
+                «дышит» и по ней пробегает блик (globals.css, .hero-logo*); при «уменьшить движение» — неподвижна. */}
+            <div className="flex items-center gap-4 sm:gap-6">
+              <div aria-hidden="true" className="hero-logo relative w-24 shrink-0 sm:w-40">
+                <div className="hero-logo-float relative">
+                  <img
+                    src="/media/hero/logo-knot.webp"
+                    alt=""
+                    width={640}
+                    height={381}
+                    className="block h-auto w-full"
+                  />
+                  <span className="hero-logo-shine pointer-events-none absolute inset-0" />
+                </div>
+              </div>
+              <h1
+                className="animate-fade-up text-5xl font-extrabold tracking-tight text-white [text-shadow:0_2px_24px_rgb(0_0_0/0.45)] sm:text-7xl"
+                style={{ animationDelay: '80ms' }}
+              >
+                {t('title')}
+              </h1>
+            </div>
             {/* Цвета самбо: красная и синяя куртки. */}
             <div aria-hidden="true" className="mt-5 flex h-1.5 w-40 overflow-hidden rounded-full">
               <span className="hero-bar flex-1 bg-red-600" />
               <span className="hero-bar flex-1 bg-blue-600" style={{ animationDelay: '250ms' }} />
             </div>
             {/* Цитата Василия Шестакова (правки 04.11.2026) — вместо прежней подписи «Окунись в мир самбо». */}
-            <figure className="mt-5 max-w-2xl animate-fade-up" style={{ animationDelay: '160ms' }}>
-              <blockquote className="text-xl italic text-white/90 [text-shadow:0_1px_12px_rgb(0_0_0/0.5)] sm:text-2xl">
+            {/* Правки 05.11.2026: цитата в одну строку (с планшета), под автором — кто он. */}
+            <figure className="mt-5 animate-fade-up" style={{ animationDelay: '160ms' }}>
+              <blockquote className="text-lg italic text-white/90 [text-shadow:0_1px_12px_rgb(0_0_0/0.5)] sm:whitespace-nowrap sm:text-[clamp(0.9rem,2.3vw,1.5rem)]">
                 {t('lead')}
               </blockquote>
               <figcaption className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-white/70 [text-shadow:0_1px_12px_rgb(0_0_0/0.5)] sm:text-base">
                 — {t('leadAuthor')}
+                <span className="mt-1 block text-xs font-normal normal-case tracking-normal text-white/60 sm:text-sm">
+                  {t('leadAuthorAbout')}
+                </span>
               </figcaption>
             </figure>
             <div className="mt-10 grid gap-4 md:grid-cols-3">

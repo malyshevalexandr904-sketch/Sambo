@@ -9,6 +9,8 @@ export const NOTIFICATION_TYPES = [
   'application.decided',
   'entry.rejected',
   'document.rejected',
+  'document.expiring',
+  'document.expired',
   'schedule.changed',
   'results.published',
   'match.soon',
@@ -92,6 +94,8 @@ export interface NotificationContext {
   timezone?: string;
   /** Заявка на регистрацию (Phase 9a): роль заявки. */
   onboardingRole?: string;
+  /** Срок действия документа (YYYY-MM-DD) — «истекает срок», «истёк срок» (правки 05.11.2026). */
+  expirationDate?: string;
 }
 
 export interface NotificationDto {
@@ -137,6 +141,11 @@ export function notificationLink(type: NotificationType, params: Record<string, 
     return params.requestId ? `/onboarding/review/${params.requestId}` : '/onboarding/review';
   if (isOnboardingNotification(type)) return '/onboarding';
   if (type === 'document.rejected') return '/documents';
+  // Сам спортсмен — «Мои документы»; представитель и тренер — карточка спортсмена.
+  if (type === 'document.expiring' || type === 'document.expired') {
+    if (params.self === '1') return '/my-documents';
+    return params.athleteId ? `/athletes/${params.athleteId}` : '/my-documents';
+  }
   if (isMatchDayNotification(type)) {
     if (params.athleteId) return `/athletes/${params.athleteId}`;
     return params.competitionId ? `/competitions/${params.competitionId}` : null;

@@ -21,6 +21,7 @@ export function demoGuideKey(pathname: string, role: CabinetRole | null): string
   if (is('/athletes')) return r === 'COACH' ? 'athletes.COACH' : 'athletes.ORGANIZATION_HEAD';
   if (is('/coaches')) return 'coaches';
   if (is('/path-to-success')) return 'pathToSuccess';
+  if (is('/my-documents')) return 'myDocuments';
   if (is('/settings') || is('/notifications') || is('/account')) return 'settings';
   if (is('/referee') || is('/protocols')) return 'refereeing';
   if (is('/applications')) return 'applications';

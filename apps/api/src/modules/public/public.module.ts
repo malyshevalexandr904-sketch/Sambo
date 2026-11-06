@@ -12,7 +12,7 @@ import { PublicCompetitionsService } from './application/public-competitions.ser
 /** Публичные read-модели и `/api/public/v1` (ADR-15). Phase 4a — турнир и положение; Phase 8a — табло
  * ковра; полная витрина — Phase 9; таблица рейтинга — фаза 7 рейтинга. */
 @Module({
-  imports: [FilesModule, RatingModule, RefereeingModule, BracketsModule, CompetitionsModule],
+  imports: [BracketsModule, CompetitionsModule, FilesModule, RatingModule, RefereeingModule],
   controllers: [PublicCompetitionsController, PublicRankingsController, PublicScoreboardController],
   providers: [PublicCompetitionsService],
 })

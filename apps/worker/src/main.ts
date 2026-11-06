@@ -17,6 +17,7 @@ import { EmailConsumer } from './email/email.consumer';
 import { createMailer } from './email/mailer';
 import { ImportConsumer } from './imports/import.consumer';
 import { MAINTENANCE_JOBS, Maintenance, type MaintenanceJob } from './maintenance/maintenance';
+import { DOCUMENT_EXPIRY_SCAN_EVERY_MS } from './notifications/document-expiry';
 import {
   NotificationConsumer,
   type NotificationJob,
@@ -68,6 +69,15 @@ async function scheduleRepeatables(
     'match-soon-scan',
     { every: SOON_SCAN_EVERY_MS },
     { name: 'soon-scan', data: { kind: 'soon-scan' }, opts: { removeOnComplete: true, removeOnFail: 100 } },
+  );
+  await notificationQueue.upsertJobScheduler(
+    'document-expiry-scan',
+    { every: DOCUMENT_EXPIRY_SCAN_EVERY_MS },
+    {
+      name: 'document-expiry-scan',
+      data: { kind: 'document-expiry-scan' },
+      opts: { removeOnComplete: true, removeOnFail: 100 },
+    },
   );
   await ratingQueue.upsertJobScheduler(
     'rating-sweep',

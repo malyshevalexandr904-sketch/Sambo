@@ -208,4 +208,15 @@ export const DOCUMENT_TYPES: [
     10 * MB,
     1095,
   ],
+  // «Мои документы» спортсмена (правки 05.11.2026).
+  ['OMS_POLICY', 'Полис ОМС', 'Compulsory health insurance policy', 'IDENTITY', DOC_MIME, 10 * MB, 400],
+  [
+    'SCHOOL_CERTIFICATE',
+    'Справка из школы с фотографией',
+    'School certificate with a photo',
+    'IDENTITY',
+    DOC_MIME,
+    10 * MB,
+    400,
+  ],
 ];

@@ -13,6 +13,8 @@ export {
 } from './application/competition-extensions';
 export { CompetitionStatusWriter } from './application/competition-status.writer';
 export { CompetitionsService } from './application/competitions.service';
+export { RegulationDocumentService } from './application/regulation-document.service';
+export { RegulationPdfQuery, regulationPdfResponse } from './api/regulation-pdf.response';
 export {
   isBeforeCompetition,
   isPublished,

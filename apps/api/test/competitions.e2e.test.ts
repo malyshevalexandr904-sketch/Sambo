@@ -319,8 +319,31 @@ describe('competition lifecycle', () => {
       'WEIGH_IN',
     ]);
     expect(pub.body.data).not.toHaveProperty('id');
+    // Фирменное положение платформы: в DTO — адрес сформированного PDF; показывается загруженное, если оно есть.
+    const generatedPdf = `/api/public/v1/competitions/${c.slug}/regulation.pdf`;
+    expect(pub.body.data.generatedRegulationPdfUrl).toBe(generatedPdf);
+    expect(pub.body.data.regulationPdfUrl).toBe(pub.body.data.regulationUrl);
+    const pdfRes = await t.http().get(generatedPdf).buffer(true).expect(200);
+    expect(pdfRes.headers['content-type']).toBe('application/pdf');
+    expect(pdfRes.headers['content-disposition']).toMatch(/^inline; filename="polozhenie-/);
+    expect(pdfRes.headers['content-security-policy']).toBe("frame-ancestors 'self'");
+    expect(pdfRes.headers['x-frame-options']).toBe('SAMEORIGIN');
+    expect(
+      Buffer.from(pdfRes.body as Buffer)
+        .subarray(0, 5)
+        .toString('latin1'),
+    ).toBe('%PDF-');
+    const download = await t.http().get(`${generatedPdf}?download=1`).buffer(true).expect(200);
+    expect(download.headers['content-disposition']).toMatch(/^attachment; .*filename\*=UTF-8''/);
     const other = await draft(w, { name: 'Черновик для витрины' });
     await t.http().get(`/api/public/v1/competitions/${other.slug}`).expect(404);
+    await t.http().get(`/api/public/v1/competitions/${other.slug}/regulation.pdf`).expect(404);
+    // Черновик видит персонал — с пометкой «ПРОЕКТ».
+    const staffPdf = await w.organizer.agent
+      .get(`/api/v1/competitions/${other.id}/regulation.pdf`)
+      .buffer(true);
+    expect(staffPdf.status).toBe(200);
+    expect(staffPdf.headers['content-type']).toBe('application/pdf');
     const listed = await t.http().get('/api/public/v1/competitions').expect(200);
     expect(listed.body.data.map((x: { slug: string }) => x.slug)).toContain(c.slug);
     expect(listed.body.data.map((x: { slug: string }) => x.slug)).not.toContain(other.slug);

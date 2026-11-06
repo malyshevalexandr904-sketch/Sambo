@@ -54,7 +54,12 @@ export interface PublicCompetition extends PublicCompetitionSummary {
   descriptionMd: string | null;
   discipline: LocalizedText;
   venue: { name: string; address: string | null; city: string | null } | null;
+  /** Положение, загруженное администратором (PDF). */
   regulationUrl: string | null;
+  /** Фирменное положение «Цифровое Самбо», собранное платформой по данным турнира (`?download=1` — скачать). */
+  generatedRegulationPdfUrl: string;
+  /** Что показывать в разделе «Положение»: загруженный PDF, а если его нет — сформированный платформой. */
+  regulationPdfUrl: string;
   requirementsMd: string | null;
   requirements: {
     kind: RequirementKind;
@@ -128,4 +133,9 @@ export interface PublicBracketsDto {
 export interface PublicLiveDto {
   streamUrl: string | null;
   mats: { id: string; number: number; name: string | null }[];
+}
+
+/** Адрес фирменного положения турнира в публичном API (тот же сайт; `?download=1` — скачать файлом). */
+export function publicRegulationPdfPath(slug: string): string {
+  return `/api/public/v1/competitions/${encodeURIComponent(slug)}/regulation.pdf`;
 }

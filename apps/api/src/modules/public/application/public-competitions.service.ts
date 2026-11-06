@@ -13,6 +13,7 @@ import {
   type PublicCompetition,
   type PublicCompetitionsQuery,
   type PublicCompetitionSummary,
+  publicRegulationPdfPath,
 } from '@sde/contracts';
 import type { Prisma } from '@sde/db';
 import { DomainError } from '../../../common/errors/domain-error';
@@ -196,13 +197,17 @@ export class PublicCompetitionsService {
     });
     const participants = new Map(counts.map((c) => [c.categoryId, c._count._all]));
     const contact = (row.contactInfo ?? null) as PublicCompetition['contacts'];
+    const uploadedRegulation =
+      row.regulation?.status === 'AVAILABLE' ? this.files.publicUrl(row.regulation.storageKey) : null;
+    const generatedRegulation = publicRegulationPdfPath(row.slug);
     return {
       ...this.summary(row, new Date()),
       descriptionMd: row.descriptionMd,
       discipline: { ru: row.discipline.nameRu, en: row.discipline.nameEn },
       venue: row.venue ? { name: row.venue.name, address: row.venue.address, city: row.venue.city } : null,
-      regulationUrl:
-        row.regulation?.status === 'AVAILABLE' ? this.files.publicUrl(row.regulation.storageKey) : null,
+      regulationUrl: uploadedRegulation,
+      generatedRegulationPdfUrl: generatedRegulation,
+      regulationPdfUrl: uploadedRegulation ?? generatedRegulation,
       requirementsMd: row.requirementsMd,
       requirements: row.requirements.map((r) => ({
         kind: r.kind,

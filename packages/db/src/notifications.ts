@@ -25,6 +25,8 @@ export interface NotificationSource {
   timezone?: string;
   /** Заявка на регистрацию в системе (Phase 9a): роль заявки. */
   onboardingRole?: string;
+  /** Срок действия документа (YYYY-MM-DD). */
+  expirationDate?: string;
 }
 
 /**
@@ -151,6 +153,23 @@ export async function notificationSource(
     return {
       documentType: locale === 'en' ? doc.type.nameEn : doc.type.nameRu,
       reason: doc.rejectReason ?? undefined,
+    };
+  }
+  if (type === 'document.expiring' || type === 'document.expired') {
+    const doc = params.documentId
+      ? await db.document.findUnique({
+          where: { id: params.documentId },
+          select: {
+            expirationDate: true,
+            deletedAt: true,
+            type: { select: { nameRu: true, nameEn: true } },
+          },
+        })
+      : null;
+    if (!doc || doc.deletedAt) return {};
+    return {
+      documentType: locale === 'en' ? doc.type.nameEn : doc.type.nameRu,
+      expirationDate: doc.expirationDate?.toISOString().slice(0, 10),
     };
   }
   if (type.startsWith('onboarding.')) return onboardingSource(db, params);

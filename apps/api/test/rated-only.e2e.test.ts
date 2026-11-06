@@ -218,6 +218,26 @@ describe('competition hosting requests', () => {
     expect(stale.body.error.code).toBe('VERSION_CONFLICT');
   });
 
+  it('the organization gets a draft regulation (PDF) right after submitting; strangers do not', async () => {
+    const r = await submit({ name: 'Турнир с положением' });
+    const pdf = await manager.agent.get(`/api/v1/competition-requests/${r.id}/regulation.pdf`).buffer(true);
+    expect(pdf.status).toBe(200);
+    expect(pdf.headers['content-type']).toBe('application/pdf');
+    expect(
+      Buffer.from(pdf.body as Buffer)
+        .subarray(0, 5)
+        .toString('latin1'),
+    ).toBe('%PDF-');
+    await admin.agent.get(`/api/v1/competition-requests/${r.id}/regulation.pdf?download=1`).expect(200);
+    const otherOrg = await createOrg(t);
+    const stranger = await login(
+      t,
+      (await createUser(t, { orgs: [{ organizationId: otherOrg, role: 'CLUB_MANAGER' }] })).email,
+    );
+    await stranger.agent.get(`/api/v1/competition-requests/${r.id}/regulation.pdf`).expect(404);
+    await t.http().get(`/api/v1/competition-requests/${r.id}/regulation.pdf`).expect(401);
+  });
+
   it('the platform rejects with a reason; the organization withdraws its own pending request', async () => {
     const r = await submit({ name: 'Турнир на отклонение' });
     const noReason = await send(admin, 'post', `/api/v1/competition-requests/${r.id}/reject`, {}, r.version);
