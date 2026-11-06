@@ -40,6 +40,7 @@
     "title": "Цифровое самбо",
     "lead": "“Sambo is our country's calling card, alongside space and ballet”",
     "leadAuthor": "Vasily Shestakov",
+    "leadAuthorAbout": "President of the International Sambo Federation (FIAS), Master of Sport in sambo and judo",
     "login": "Sign in",
     "register": "Sign up",
     "loginTitle": "Already registered",
@@ -51,7 +52,6 @@
     "continue": "Continue",
     "openCabinet": "Open my account",
     "aboutLink": "About the platform",
-    "eyebrow": "Tournaments · rating · refereeing",
     "videoPause": "Pause background video",
     "videoPlay": "Play background video"
   },

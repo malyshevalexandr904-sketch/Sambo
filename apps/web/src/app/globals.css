@@ -199,6 +199,60 @@ body {
   animation: sde-hero-bar 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
 }
 
+/* Эмблема-узел на первом экране (правки 05.11.2026): появляется с лёгким поворотом, потом медленно покачивается
+   с мягким красно-синим свечением, и раз в несколько секунд по ткани пояса пробегает блик (маска по самой картинке). */
+@keyframes sde-logo-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7) rotate(-18deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sde-logo-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+    filter: drop-shadow(-6px 4px 14px rgb(37 99 235 / 0.35)) drop-shadow(6px -4px 14px rgb(220 38 38 / 0.25));
+  }
+  50% {
+    transform: translateY(-4px) rotate(-2deg);
+    filter: drop-shadow(-6px 4px 18px rgb(37 99 235 / 0.5)) drop-shadow(6px -4px 18px rgb(220 38 38 / 0.45));
+  }
+}
+
+@keyframes sde-logo-shine {
+  0%,
+  55% {
+    background-position: 160% 0;
+  }
+  85%,
+  100% {
+    background-position: -60% 0;
+  }
+}
+
+.hero-logo {
+  animation: sde-logo-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.hero-logo-float {
+  animation: sde-logo-float 6s ease-in-out 0.9s infinite both;
+}
+
+.hero-logo-shine {
+  background: linear-gradient(105deg, transparent 38%, rgb(255 255 255 / 0.55) 50%, transparent 62%) no-repeat;
+  background-size: 220% 100%;
+  background-position: 160% 0;
+  mix-blend-mode: soft-light;
+  -webkit-mask: url('/media/hero/logo-knot.webp') center / 100% 100% no-repeat;
+  mask: url('/media/hero/logo-knot.webp') center / 100% 100% no-repeat;
+  animation: sde-logo-shine 7s ease-in-out 1.4s infinite;
+}
+
 /* Табло ковра (правки 04.11.2026): карточка предупреждения «влетает» и ложится на место; жест судьи вспыхивает и
    делает своё движение — удержание прижимает вниз, болевой — толчок, активность — поднятый кулак; пока приём идёт,
    плашка мягко светится. При «уменьшить движение» — правило ниже. */
@@ -322,6 +376,11 @@ body {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+  /* Бесконечные покачивание и блик эмблемы просто выключаем, иначе они мигали бы с нулевой длительностью. */
+  .hero-logo-float,
+  .hero-logo-shine {
+    animation: none !important;
   }
 }
 
