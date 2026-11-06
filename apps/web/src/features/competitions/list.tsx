@@ -7,6 +7,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { QueryState } from '@/components/common';
+import { SectionLinks } from '@/components/section-links';
 import { Link } from '@/i18n/navigation';
 import { hasAnywhere, platformHas } from '@/lib/access';
 import { api } from '@/lib/api';
@@ -58,6 +59,7 @@ export function CompetitionsList() {
         }
       />
       {showHostingCta ? <HostingCta /> : null}
+      <SectionLinks host="competitions" />
       {canRequest && !canCreate ? <MyHostingRequests /> : null}
       <div className="mb-4 flex flex-wrap gap-2" role="tablist" aria-label={t('title')}>
         {scopes.map((s) => (

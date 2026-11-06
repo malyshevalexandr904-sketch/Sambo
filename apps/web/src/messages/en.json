@@ -164,29 +164,8 @@
   },
   "dashboard": {
     "title": "My account",
-    "welcome": "Hello, {name}!",
-    "myOrganizations": "My organizations",
-    "noOrganizations": "You are not a member of any organization yet.",
-    "createOrganization": "Register an organization",
     "platformRoles": "Platform roles",
-    "totpWarning": "Platform roles require two-factor authentication. Enable it in your profile — without it administrator rights do not apply.",
-    "work": "Work",
-    "links": {
-      "athletes": "Athletes",
-      "newAthlete": "Add athlete",
-      "import": "Import from file",
-      "children": "My athletes and consents",
-      "documents": "Documents to review",
-      "referee": "Refereeing",
-      "applications": "Tournament applications",
-      "review": "Registration requests to review",
-      "competitionRequests": "Tournament hosting requests",
-      "recruitment": "Open referee recruitment",
-      "referees": "Referees",
-      "categories": "Categories",
-      "rulesets": "Rules"
-    },
-    "welcomeRole": "Hello, {name}! You are working as “{role}”.",
+    "totpWarning": "Platform roles require two-factor authentication. Turn it on in Settings — admin rights do not apply without it.",
     "noRoleTitle": "No role yet",
     "noRole": "Choose a role and apply — its features open after the review."
   },
@@ -299,7 +278,31 @@
   },
   "mySettings": {
     "title": "Settings",
-    "lead": "Notifications and consent texts.",
+    "lead": "All settings in one place, by tab.",
+    "tabs": {
+      "profile": "Profile and appearance",
+      "security": "Security and sign-in",
+      "notifications": "Notifications",
+      "organizations": "Organisations",
+      "tournaments": "Tournament reference data",
+      "consents": "Consent texts"
+    },
+    "tabHints": {
+      "profile": "Photo, name, personal details, language, time zone and theme.",
+      "security": "Password, two-factor authentication and devices you are signed in on.",
+      "notifications": "Notification feed, push on this device and notification types.",
+      "organizations": "Organisations you belong to, and registering a new one.",
+      "tournaments": "Categories and rules tournaments are run by.",
+      "consents": "Documents you accepted when registering."
+    },
+    "appearance": {
+      "title": "Appearance",
+      "hint": "The theme is saved in this browser.",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "createOrganization": "Register an organisation",
+    "tournamentsHint": "Reference data opens on separate pages.",
     "consentsTitle": "Consent texts",
     "consentsHint": "Documents you accepted when signing up. They open in a new tab."
   },
@@ -3731,7 +3734,7 @@
       },
       "settings": {
         "title": "Settings",
-        "lead": "Notifications and platform documents.",
+        "lead": "All settings in tabs: profile, security, notifications and platform documents.",
         "f1": {
           "title": "Notification feed",
           "text": "All platform messages in one place."
@@ -4227,5 +4230,139 @@
     "draftText": "A draft of the Digital Sambo branded regulation, assembled from the request. Once the tournament is agreed and published, the platform adds registration dates, weigh-in and the referee panel.",
     "open": "Open",
     "download": "Download PDF"
+  },
+  "sections": {
+    "hosts": {
+      "competitions": "Tournament sections",
+      "athletes": "Athlete sections",
+      "settings": "Tournament reference data"
+    },
+    "links": {
+      "competitionRequests": {
+        "title": "Hosting requests",
+        "hint": "Apply to host and track the decision"
+      },
+      "applications": {
+        "title": "Entries",
+        "hint": "Athletes entered into tournaments"
+      },
+      "referee": {
+        "title": "Refereeing",
+        "hint": "My assignments, mats and protocols"
+      },
+      "recruitment": {
+        "title": "Open referee calls",
+        "hint": "Tournaments that need referees"
+      },
+      "referees": {
+        "title": "Referees",
+        "hint": "Referee pool and assignments"
+      },
+      "review": {
+        "title": "Application review",
+        "hint": "Club registration requests"
+      },
+      "documents": {
+        "title": "Documents to check",
+        "hint": "Documents uploaded by athletes"
+      },
+      "children": {
+        "title": "My children and consents",
+        "hint": "Athletes you represent"
+      },
+      "athletes": {
+        "title": "Athletes",
+        "hint": "Organisation athletes"
+      },
+      "categories": {
+        "title": "Categories",
+        "hint": "Weight and age categories"
+      },
+      "rulesets": {
+        "title": "Rules",
+        "hint": "Bout rule sets"
+      }
+    }
+  },
+  "profile": {
+    "edit": "Edit profile",
+    "openSecurity": "Open Security",
+    "roleAthlete": "Athlete",
+    "club": "Club",
+    "coach": "Coach",
+    "rank": "Rank",
+    "city": "City",
+    "age": "Age",
+    "categoryLabel": "Category",
+    "years": "{n, plural, one {# year} other {# years}}",
+    "division": "Division",
+    "elo": "Elo rating",
+    "level": "Level {level}",
+    "lastBout": "last bout",
+    "winRate": "wins",
+    "peak": "Best rating",
+    "bouts": "Bouts",
+    "wins": "Wins",
+    "losses": "Losses",
+    "noRating": "Your rating appears after your first rated bout.",
+    "medals": "Medals",
+    "tracker": "Elo tracker",
+    "noTracker": "A bout-by-bout rating chart will appear here.",
+    "fights": "Bout history",
+    "noFights": "No bouts yet — enter a tournament on the Tournaments tab.",
+    "win": "Win",
+    "loss": "Loss",
+    "winShort": "W",
+    "lossShort": "L",
+    "vs": "vs {name}",
+    "hiddenOpponent": "opponent hidden",
+    "more": "Show {n} more",
+    "tournaments": "Tournament results",
+    "noTournaments": "No published results yet.",
+    "place": "Place {place}",
+    "record": "{wins} wins, {losses} losses",
+    "athletePending": "Your athlete profile appears once your coach or club approves your application. Rating, medals and bout history will show here.",
+    "loadError": "Could not load rating and results. Refresh the page.",
+    "organizations": "My organisations",
+    "noOrganizations": "You are not a member of any organisation yet.",
+    "manageOrganizations": "Manage organisations",
+    "exampleRibbon": "Sample profile",
+    "exampleNote": "This is a sample with made-up data. After you register, your own profile will be here.",
+    "exampleWhatTitle": "What your profile shows",
+    "example": {
+      "ATHLETE": {
+        "name": "Artem Sokolov",
+        "club": "Club «Primer»",
+        "age": "14 years",
+        "coach": "I. Petrov",
+        "rank": "1st junior",
+        "city": "Moscow"
+      },
+      "COACH": {
+        "name": "Ilya Petrov",
+        "club": "Club «Primer»",
+        "age": "38 years",
+        "city": "Moscow",
+        "what": "Photo, name, club and experience. Your athletes are on My athletes, entries and refereeing on Tournaments, profile and notification settings in Settings."
+      },
+      "ORGANIZATION_HEAD": {
+        "name": "Anna Morozova",
+        "club": "Club «Primer»",
+        "age": "45 years",
+        "city": "Moscow",
+        "what": "Photo, name and the organisations you lead. Coaches and athletes have their own tabs, hosting requests are on Tournaments, organisation details in Settings."
+      },
+      "REFEREE": {
+        "name": "Oleg Kuznetsov",
+        "club": "National",
+        "age": "41 years",
+        "city": "Moscow",
+        "what": "Photo, name and referee category. Open referee calls and your assignments are on Tournaments, notifications in Settings."
+      }
+    },
+    "team": "My team",
+    "teamAthletes": "{n, plural, one {athlete} other {athletes}}",
+    "openAthletes": "Open My athletes",
+    "medalsSummary": "{competitions, plural, one {# tournament} other {# tournaments}} · {medals, plural, one {# medal} other {# medals}}"
   }
 }

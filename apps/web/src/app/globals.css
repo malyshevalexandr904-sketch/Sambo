@@ -253,6 +253,70 @@ body {
   animation: sde-logo-shine 7s ease-in-out 1.4s infinite;
 }
 
+/* Личный кабинет-профиль (правки 05.11.2026): фото «выпрыгивает», обложка медленно плывёт, медали качаются на
+   ленте. При «уменьшить движение» — правило ниже. */
+@keyframes sde-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sde-cover-drift {
+  from {
+    transform: translateX(0) scale(1.05);
+  }
+  to {
+    transform: translateX(-3%) scale(1.1);
+  }
+}
+
+@keyframes sde-medal-swing {
+  0% {
+    opacity: 0;
+    transform: translateY(-1.5rem) rotate(-14deg);
+  }
+  45% {
+    opacity: 1;
+    transform: rotate(9deg);
+  }
+  70% {
+    transform: rotate(-4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-pop {
+  animation: sde-pop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.profile-avatar {
+  box-shadow:
+    0 0 0 4px var(--surface, #fff),
+    0 10px 25px -10px rgb(15 23 42 / 0.45);
+}
+
+.profile-cover-drift {
+  animation: sde-cover-drift 18s ease-in-out infinite alternate;
+}
+
+.medal-swing {
+  display: inline-block;
+  transform-origin: 50% 0;
+  animation: sde-medal-swing 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* Табло ковра (правки 04.11.2026): карточка предупреждения «влетает» и ложится на место; жест судьи вспыхивает и
    делает своё движение — удержание прижимает вниз, болевой — толчок, активность — поднятый кулак; пока приём идёт,
    плашка мягко светится. При «уменьшить движение» — правило ниже. */
