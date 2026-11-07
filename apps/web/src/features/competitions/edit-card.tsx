@@ -2,16 +2,19 @@
 // Изменение основных данных турнира (API.md, 5.1): у опубликованного турнира изменение сроков требует причины
 // и уведомляет участников (competition.dates_changed); запрещённые после публикации поля сервер отклоняет.
 // «Скоро выступает» (Phase 8b): за сколько схваток до схватки спортсмена на его ковре уведомлять (0 — не уведомлять).
+// Версия правил выбирается, пока турнир — черновик: у турнира из одобренной заявки её больше негде указать, а без неё
+// турнир не опубликовать (RULESET_REQUIRED).
 import {
   COMPETITION_LEVELS,
   type Competition,
   type CompetitionPatch,
   type DataEnvelope,
   localDateTimeIn,
+  type RuleSetDto,
   zonedToInstant,
 } from '@sde/contracts';
 import { Alert, Button, Card, CardTitle, Field, Input, Select, Textarea } from '@sde/ui';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { ApiError, api } from '@/lib/api';
@@ -39,6 +42,7 @@ export function EditCard({ competition: c }: { competition: Competition }) {
     contactEmail: c.contactInfo?.email ?? '',
     contactPhone: c.contactInfo?.phone ?? '',
     notifyMatchesAhead: String(c.notifyMatchesAhead),
+    ruleSetVersionId: c.ruleSetVersion?.id ?? '',
     reason: '',
   };
   const [v, setV] = useState(initial);
@@ -65,6 +69,8 @@ export function EditCard({ competition: c }: { competition: Competition }) {
       },
       notifyMatchesAhead: Number(v.notifyMatchesAhead),
     };
+    if (!published && v.ruleSetVersionId !== initial.ruleSetVersionId)
+      patch.ruleSetVersionId = v.ruleSetVersionId || null;
     if (scheduleChanged) {
       Object.assign(patch, {
         startDate: v.startDate,
@@ -125,6 +131,14 @@ export function EditCard({ competition: c }: { competition: Competition }) {
             ))}
           </Select>
         </Field>
+        {published ? null : (
+          <RuleSetField
+            disciplineCode={c.disciplineCode}
+            value={v.ruleSetVersionId}
+            onChange={set('ruleSetVersionId')}
+            error={tf(errors.ruleSetVersionId)}
+          />
+        )}
         {SCHEDULE_KEYS.map((k) => (
           <Field
             key={k}
@@ -204,5 +218,48 @@ export function EditCard({ competition: c }: { competition: Competition }) {
         </div>
       </form>
     </Card>
+  );
+}
+
+/** Опубликованные версии правил дисциплины турнира; «Выбрать позже» снимает выбор. */
+function RuleSetField({
+  disciplineCode,
+  value,
+  onChange,
+  error,
+}: {
+  disciplineCode: string;
+  value: string;
+  onChange: (e: { target: { value: string } }) => void;
+  error: string | undefined;
+}) {
+  const t = useTranslations();
+  const rulesets = useQuery({
+    queryKey: [...qk.rulesets, disciplineCode],
+    queryFn: async () =>
+      (await api<DataEnvelope<RuleSetDto[]>>('/rulesets', { query: { disciplineCode } })).data,
+  });
+  const versions = (rulesets.data ?? []).flatMap((rs) =>
+    rs.versions
+      .filter((x) => x.status === 'PUBLISHED')
+      .map((x) => ({ id: x.id, label: `${rs.name} · v${x.version}` })),
+  );
+  return (
+    <Field
+      id="e-ruleset"
+      label={t('competitions.ruleSet')}
+      hint={t('competitions.ruleSetHint')}
+      error={error}
+      className="sm:col-span-2"
+    >
+      <Select id="e-ruleset" value={value} onChange={onChange}>
+        <option value="">{t('competitions.ruleSetLater')}</option>
+        {versions.map((x) => (
+          <option key={x.id} value={x.id}>
+            {x.label}
+          </option>
+        ))}
+      </Select>
+    </Field>
   );
 }
