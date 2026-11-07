@@ -577,7 +577,7 @@
     "RULESET_PARAMETERS_INVALID": "The rule parameters contain errors.",
     "DOCUMENT_ALREADY_REVIEWED": "The document has already been reviewed. Upload a new one to correct it.",
     "DOCUMENT_EXPIRED": "The document has expired.",
-    "RULESET_REQUIRED": "Choose a rules version — the competition cannot be published without it.",
+    "RULESET_REQUIRED": "Choose a rules version on the competition page, in «Edit competition» — the competition cannot be published without it.",
     "REGISTRATION_NOT_OPEN": "Registration for the competition is not open yet.",
     "REGISTRATION_CLOSED": "Registration for the competition is closed.",
     "CATEGORY_INCOMPATIBLE": "The athlete is not eligible for this category.",
