@@ -13,6 +13,7 @@ import { SectionLinks } from '@/components/section-links';
 import { PasswordCard, ProfileCard, SessionsCard, TotpCard } from '@/features/account';
 import { AvatarCard } from '@/features/avatar';
 import { MyPersonCard } from '@/features/my-person';
+import { RefereeExperienceCard } from '@/features/people/referee-experience';
 import { NotificationsSection } from '@/features/notifications/list';
 import { ProfilePanel } from '@/features/profile/profile-view';
 import { Link, usePathname, useRouter } from '@/i18n/navigation';
@@ -121,6 +122,7 @@ function TabBody({ tab, me }: { tab: Tab; me: Me }): ReactNode {
           </div>
           <ProfileCard me={me} />
           <MyPersonCard />
+          <RefereeExperienceCard me={me} />
         </div>
       );
     case 'security':

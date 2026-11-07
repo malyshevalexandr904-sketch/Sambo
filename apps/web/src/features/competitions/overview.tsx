@@ -61,7 +61,9 @@ function InfoCard({ competition: c }: { competition: Competition }) {
     [t('level'), t(`levels.${c.level}`)],
     [
       t('ruleSet'),
-      c.ruleSetVersion ? `${c.ruleSetVersion.ruleSetName} · v${c.ruleSetVersion.version}` : t('ruleSetNone'),
+      c.ruleSetVersion
+        ? `${c.ruleSetVersion.ruleSetName} · v${c.ruleSetVersion.version}`
+        : t('ruleSetDefault'),
     ],
   ];
   return (
@@ -107,7 +109,6 @@ function InfoCard({ competition: c }: { competition: Competition }) {
 function ReadinessCard({ competition: c }: { competition: Competition }) {
   const t = useTranslations('competitions.readiness');
   const items: { ok: boolean; label: string; required: boolean }[] = [
-    { ok: !!c.ruleSetVersion, label: t('ruleSet'), required: true },
     { ok: c.counters.categories > 0, label: t('categories'), required: true },
     { ok: Date.parse(c.registrationEndsAt) > Date.now(), label: t('deadline'), required: true },
     { ok: !!c.regulation, label: t('regulation'), required: false },

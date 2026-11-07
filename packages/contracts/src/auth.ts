@@ -113,8 +113,8 @@ export interface Me {
   demo: boolean;
 }
 
+/** Правки 07.11.2026: имя не меняется — оно всегда равно ФИО участника (держит база, см. миграцию 20261107100000). */
 export const UpdateMeRequest = z.object({
-  displayName: z.string().trim().min(1).max(100).optional(),
   locale: Locale.optional(),
   timezone: Timezone.nullable().optional(),
 });

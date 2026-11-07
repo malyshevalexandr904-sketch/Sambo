@@ -81,6 +81,22 @@ export class RuleSetsService implements OnModuleInit {
     this.registry.register('ruleset', (id) => this.scopeOf(id));
   }
 
+  /**
+   * Действующие правила по умолчанию (правки 07.11.2026, п. 14): последняя опубликованная версия правил платформы
+   * (без организации-владельца) для дисциплины. Турниры проводятся по ним — выбирать версию не нужно.
+   */
+  async latestPublishedId(disciplineCode: string, tx?: Tx): Promise<string | null> {
+    const v = await (tx ?? this.db).ruleSetVersion.findFirst({
+      where: {
+        status: 'PUBLISHED',
+        ruleSet: { disciplineCode, ownerOrganizationId: null, status: 'ACTIVE' },
+      },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+      select: { id: true },
+    });
+    return v?.id ?? null;
+  }
+
   async versionInfo(id: string, tx?: Tx): Promise<RuleSetVersionInfo | null> {
     const v = await (tx ?? this.db).ruleSetVersion.findUnique({
       where: { id },

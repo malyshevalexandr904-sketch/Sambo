@@ -183,3 +183,33 @@ export interface EntryQrDto {
   athlete: { publicName: string };
   categories: { code: string; name: LocalizedText }[];
 }
+
+// ---- Единые требования допуска (правки 07.11.2026, п. 13) ----
+
+/** С этого возраста личность удостоверяет паспорт; младше — свидетельство о рождении и справка из школы. */
+export const ADMISSION_PASSPORT_AGE = 14;
+
+/**
+ * Единые для всех турниров требования допуска спортсмена — пять документов из «Моих документов»: документ личности,
+ * страховой полис от несчастного случая, полис ОМС, документ о разряде (если разряд есть) и медицинская справка
+ * о допуске. Других требований к участию нет; взвешивание проходит по регламенту турнира. Возраст — на дату начала
+ * турнира.
+ */
+export function admissionDocumentTypes(
+  age: number,
+  hasRank: boolean,
+): { documents: string[]; insurance: string[] } {
+  return {
+    documents: [
+      ...(age >= ADMISSION_PASSPORT_AGE ? ['PASSPORT'] : ['BIRTH_CERTIFICATE', 'SCHOOL_CERTIFICATE']),
+      'OMS_POLICY',
+      ...(hasRank ? ['SPORT_RANK_ORDER'] : []),
+      'MEDICAL_CERTIFICATE',
+    ],
+    insurance: ['INSURANCE_POLICY'],
+  };
+}
+
+/** Пять документов допуска — для перечня в положении и на странице турнира (ключи `admissionDocs.*`). */
+export const ADMISSION_DOCUMENT_SLOTS = ['identity', 'insurance', 'oms', 'rank', 'medical'] as const;
+export type AdmissionDocumentSlot = (typeof ADMISSION_DOCUMENT_SLOTS)[number];

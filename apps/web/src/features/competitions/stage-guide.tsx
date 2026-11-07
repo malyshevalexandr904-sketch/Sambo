@@ -27,13 +27,13 @@ import { formatInZone } from './shared';
 export const STAGE_TABS: Record<TournamentStage, readonly string[]> = {
   DRAFT: ['overview', 'regulation', 'categories'],
   REVIEW: ['overview', 'regulation', 'categories', 'staff'],
-  PUBLISHED: ['overview', 'regulation', 'categories', 'recruitment'],
+  PUBLISHED: ['overview', 'regulation', 'categories', 'staff'],
   REGISTRATION: ['overview', 'applications', 'entries'],
   MANDATE: ['overview', 'applications', 'entries', 'admission'],
   WEIGH_IN: ['overview', 'weighin', 'checkin', 'admission', 'medical'],
   DRAW: ['overview', 'draws', 'schedule', 'crews'],
   LIVE: ['overview', 'schedule', 'results'],
-  FINISHED: ['overview', 'results'],
+  FINISHED: ['overview', 'results', 'staff'],
 };
 
 /** Что сделать на стадии: текст и вкладка, куда ведёт ссылка. */
@@ -47,7 +47,7 @@ const TODO: Record<TournamentStage, { key: string; tab: string | null }[]> = {
   ],
   PUBLISHED: [
     { key: 'checkPublic', tab: null },
-    { key: 'judges', tab: 'recruitment' },
+    { key: 'judges', tab: 'staff' },
     { key: 'autoOpen', tab: null },
   ],
   REGISTRATION: [

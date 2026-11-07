@@ -24,6 +24,8 @@ export const NOTIFICATION_TYPES = [
   'onboarding.linked',
   /** Открылась регистрация на турнир, на который пользователь подписан (правки 05.11.2026). */
   'competition.registration_opened',
+  /** Приглашение в персонал турнира (правки 07.11.2026, п. 15): принять или отказаться — во «Входящих приглашениях». */
+  'competition.staff_invited',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -96,6 +98,8 @@ export interface NotificationContext {
   onboardingRole?: string;
   /** Срок действия документа (YYYY-MM-DD) — «истекает срок», «истёк срок» (правки 05.11.2026). */
   expirationDate?: string;
+  /** Роль в персонале турнира (код роли доступа) — «приглашение в персонал» (правки 07.11.2026). */
+  roleCode?: string;
 }
 
 export interface NotificationDto {
@@ -156,6 +160,7 @@ export function notificationLink(type: NotificationType, params: Record<string, 
   }
   if (type === 'competition.registration_opened')
     return params.slug ? `/tournaments/${params.slug}#registration` : null;
+  if (type === 'competition.staff_invited') return '/invitations';
   if (type === 'schedule.changed')
     return params.competitionId ? `/competitions/${params.competitionId}` : null;
   return params.applicationId ? `/applications/${params.applicationId}` : null;

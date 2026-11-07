@@ -4,11 +4,8 @@
 import {
   type CategoryRuleDto,
   type CategoryRuleInput,
-  CONSENT_KINDS,
   type Competition,
   type DataEnvelope,
-  type RequirementDto,
-  type RequirementInput,
   WEIGH_IN_FAILURE_OUTCOMES,
   type WeighInFailureOutcome,
 } from '@sde/contracts';
@@ -18,10 +15,11 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useEffect, useState } from 'react';
 import { QueryState } from '@/components/common';
 import { FilePicker } from '@/components/file-picker';
+import { UnifiedRequirementsList } from '@/features/documents/unified-requirements';
 import { MarkdownLite } from '@/components/markdown-lite';
 import { GeneratedRegulationCard } from './generated-regulation';
 import { api, uploadFile } from '@/lib/api';
-import { pickName, qk, useDocumentTypes, useSportRanks } from '@/lib/queries';
+import { pickName, qk, useSportRanks } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 
 const EDITABLE = ['DRAFT', 'PUBLISHED', 'REGISTRATION_OPEN'];
@@ -36,7 +34,7 @@ export function RegulationTab({ competition: c }: { competition: Competition }) 
         draft={c.status === 'DRAFT'}
       />
       <RegulationCard competition={c} editable={canEdit} />
-      <RequirementsCard competition={c} editable={canManage} />
+      <RequirementsCard />
       <RulesCard competition={c} editable={canManage} />
     </div>
   );
@@ -156,128 +154,13 @@ function RegulationCard({ competition: c, editable }: { competition: Competition
   );
 }
 
-interface RequirementChoice {
-  key: string;
-  input: RequirementInput;
-  label: string;
-}
-
-function RequirementsCard({ competition: c, editable }: { competition: Competition; editable: boolean }) {
-  const t = useTranslations('competitions.requirements');
-  const tc = useTranslations('consents.kinds');
-  const locale = useLocale();
-  const queryClient = useQueryClient();
-  const docTypes = useDocumentTypes();
-  const action = useAction();
-  const list = useQuery({
-    queryKey: qk.competitionRequirements(c.id),
-    queryFn: async () =>
-      (await api<DataEnvelope<RequirementDto[]>>(`/competitions/${c.id}/requirements`)).data,
-  });
-  const keyOf = (r: {
-    kind: string;
-    documentTypeCode?: string | null;
-    consentKind?: string | null;
-  }): string => `${r.kind}:${r.documentTypeCode ?? ''}:${r.consentKind ?? ''}`;
-  const choices: RequirementChoice[] = [
-    ...(docTypes.data ?? [])
-      .filter((d) => d.code !== 'INSURANCE_POLICY')
-      .map((d) => ({
-        key: `DOCUMENT:${d.code}:`,
-        input: { kind: 'DOCUMENT' as const, documentTypeCode: d.code, mandatory: true },
-        label: t('document', { name: pickName(d.name, locale) }),
-      })),
-    {
-      key: 'INSURANCE:INSURANCE_POLICY:',
-      input: { kind: 'INSURANCE', documentTypeCode: 'INSURANCE_POLICY', mandatory: true },
-      label: t('INSURANCE'),
-    },
-    ...CONSENT_KINDS.map((k) => ({
-      key: `CONSENT::${k}`,
-      input: { kind: 'CONSENT' as const, consentKind: k, mandatory: true },
-      label: t('consent', { kind: tc(k) }),
-    })),
-    {
-      key: 'MEDICAL_CLEARANCE::',
-      input: { kind: 'MEDICAL_CLEARANCE', mandatory: true },
-      label: t('MEDICAL_CLEARANCE'),
-    },
-    { key: 'WEIGH_IN::', input: { kind: 'WEIGH_IN', mandatory: true }, label: t('WEIGH_IN') },
-    { key: 'CHECK_IN::', input: { kind: 'CHECK_IN', mandatory: true }, label: t('CHECK_IN') },
-  ];
-  const current = new Set((list.data ?? []).filter((r) => r.categoryId === null).map(keyOf));
-  const [selected, setSelected] = useState<Set<string> | null>(null);
-  const chosen = selected ?? current;
+/** Требования допуска едины для всех турниров (правки 07.11.2026, п. 13) — только перечень, без настройки. */
+function RequirementsCard() {
+  const t = useTranslations('admissionDocs');
   return (
     <Card>
       <CardTitle>{t('title')}</CardTitle>
-      <p className="mb-3 text-sm text-slate-600">{t('hint')}</p>
-      {action.error ? (
-        <Alert tone="danger" className="mb-3">
-          {action.error}
-        </Alert>
-      ) : null}
-      <QueryState isPending={list.isPending || docTypes.isPending} error={list.error}>
-        {() => (
-          <>
-            <ul className="space-y-2">
-              {choices
-                .filter((ch) => editable || chosen.has(ch.key))
-                .map((ch) => (
-                  <li key={ch.key}>
-                    <label className="flex min-h-11 items-center gap-3 text-sm">
-                      <input
-                        type="checkbox"
-                        className="h-5 w-5"
-                        checked={chosen.has(ch.key)}
-                        disabled={!editable}
-                        onChange={(e) => {
-                          const next = new Set(chosen);
-                          if (e.target.checked) next.add(ch.key);
-                          else next.delete(ch.key);
-                          setSelected(next);
-                        }}
-                      />
-                      {ch.label}
-                    </label>
-                  </li>
-                ))}
-            </ul>
-            {!editable && chosen.size === 0 ? <p className="text-sm text-slate-600">{t('none')}</p> : null}
-            {editable ? (
-              <Button
-                className="mt-3"
-                loading={action.busy}
-                disabled={selected === null}
-                onClick={() =>
-                  void action.run(async () => {
-                    const perCategory = (list.data ?? []).filter((r) => r.categoryId !== null);
-                    const requirements = [
-                      ...choices.filter((ch) => chosen.has(ch.key)).map((ch) => ch.input),
-                      ...perCategory.map((r) => ({
-                        categoryId: r.categoryId,
-                        kind: r.kind,
-                        documentTypeCode: r.documentTypeCode,
-                        consentKind: r.consentKind,
-                        mandatory: r.mandatory,
-                        noteMd: r.noteMd,
-                      })),
-                    ];
-                    await api(`/competitions/${c.id}/requirements`, {
-                      method: 'PUT',
-                      body: { requirements },
-                    });
-                    setSelected(null);
-                    await queryClient.invalidateQueries({ queryKey: qk.competitionRequirements(c.id) });
-                  })
-                }
-              >
-                {t('save')}
-              </Button>
-            ) : null}
-          </>
-        )}
-      </QueryState>
+      <UnifiedRequirementsList />
     </Card>
   );
 }

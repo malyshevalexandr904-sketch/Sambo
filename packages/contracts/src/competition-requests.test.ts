@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   CompetitionRequestCreate,
   CompetitionRequestProposal,
+  HostingContact,
+  hostingContactHref,
   hostingRequirements,
   maskEmail,
 } from './competition-requests.js';
@@ -23,6 +25,7 @@ const valid = {
   refereeTeam: 'NONE',
   gender: 'SEPARATE',
   responsible: { kind: 'SELF' },
+  contact: { channel: 'EMAIL' as const, value: 'org@test.local' },
   rulesAccepted: true,
 };
 
@@ -96,5 +99,21 @@ describe('maskEmail', () => {
   it('hides most of the local part', () => {
     expect(maskEmail('ivanov@mail.ru')).toBe('iv****@mail.ru');
     expect(maskEmail('ab@x.ru')).toBe('a***@x.ru');
+  });
+});
+
+describe('organizer contact for the platform admin (07.11.2026, item 11)', () => {
+  it('validates e-mail and builds links only for safe values', () => {
+    expect(HostingContact.safeParse({ channel: 'EMAIL', value: 'не почта' }).success).toBe(false);
+    expect(hostingContactHref({ channel: 'EMAIL', value: 'org@example.ru' })).toBe('mailto:org@example.ru');
+    expect(hostingContactHref({ channel: 'TELEGRAM', value: '@sambo_club' })).toBe('https://t.me/sambo_club');
+    expect(hostingContactHref({ channel: 'TELEGRAM', value: 'https://t.me/sambo_club' })).toBe(
+      'https://t.me/sambo_club',
+    );
+    expect(hostingContactHref({ channel: 'TELEGRAM', value: '+7 900 000-00-00' })).toBeNull();
+    expect(hostingContactHref({ channel: 'MAX', value: 'https://max.ru/u/abc' })).toBe(
+      'https://max.ru/u/abc',
+    );
+    expect(hostingContactHref({ channel: 'MAX', value: 'javascript:alert(1)' })).toBeNull();
   });
 });

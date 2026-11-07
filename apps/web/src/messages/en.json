@@ -40,7 +40,7 @@
     "title": "Цифровое самбо",
     "lead": "“Sambo is our country's calling card, alongside space and ballet”",
     "leadAuthor": "Vasily Shestakov",
-    "leadAuthorAbout": "President of the International Sambo Federation (FIAS), Master of Sport in sambo and judo",
+    "leadAuthorAbout": "President of the International Sambo Federation",
     "login": "Sign in",
     "register": "Sign up",
     "loginTitle": "Already registered",
@@ -381,7 +381,8 @@
   "account": {
     "title": "My profile",
     "profile": "Profile",
-    "displayName": "Display name",
+    "fullName": "Full name",
+    "fullNameHint": "Your name on the platform always matches the full name in “My data”. To correct it, edit it there.",
     "locale": "Interface language",
     "timezone": "Time zone (IANA, e.g. Europe/Moscow)",
     "password": "Change password",
@@ -1314,7 +1315,7 @@
       "showEnded": "Show ended",
       "hint": "Roles apply to this competition only. You cannot assign a role to yourself.",
       "empty": "No staff yet",
-      "person": "Person",
+      "person": "Member",
       "status": "Status",
       "actions": "Actions",
       "to": {
@@ -1323,9 +1324,16 @@
         "ENDED": "End"
       },
       "inviteTitle": "Invite staff",
-      "inviteHint": "A link will be sent by email; the role takes effect once the invitation is accepted.",
-      "invited": "Invitation sent.",
-      "invite": "Invite"
+      "inviteHint": "Find a platform member by full name and choose a role. They get the invitation as a notification on the platform; the role takes effect once they accept it.",
+      "invited": "Invitation sent — the member will see it in notifications.",
+      "invite": "Invite",
+      "ratings": {
+        "title": "Referee ratings",
+        "hint": "Give each referee who worked at the tournament 1 to 5 stars. Organizers’ ratings make up the referee rating on their page. You can change a rating.",
+        "empty": "No referees to rate in this tournament",
+        "label": "Rating for {name}",
+        "stars": "{n, plural, one {# star} other {# stars}}"
+      }
     },
     "invite": {
       "title": "Competition staff invitation",
@@ -1373,11 +1381,17 @@
       "levelsRange": "1 to {count}",
       "format": "Format",
       "formatHint": "The rated tournament group scheme will be added at the next stage.",
-      "allRated": "All competitions on the platform are rated: confirmed bouts change the Elo rating. There is one format: rating-based groups with snake seeding and a playoff."
+      "allRated": "All competitions on the platform are rated: confirmed bouts change the Elo rating. There is one format: rating-based groups with snake seeding and a playoff.",
+      "elo": {
+        "p1": "All tournaments on the platform are rated: every bout changes both athletes’ Elo rating.",
+        "p2": "The winner gains points and the loser loses the same amount. The stronger the opponent’s rating, the more a win over them is worth and the less a loss costs; beating a much weaker opponent gives little.",
+        "p3": "The K factor sets how fast the rating moves: it is larger for lower-rated athletes, so newcomers reach their level faster. The rating is recalculated as soon as a bout result is confirmed."
+      }
     },
     "requestCreate": "Apply to host a tournament",
     "hostingCtaTitle": "Want to host a rated tournament at your venue?",
-    "hostingCtaText": "Bring the region’s young sambo athletes to your mats: apply now — we help with refereeing, electronic draws and live results, and every bout counts towards the official rating."
+    "hostingCtaText": "Bring the region’s young sambo athletes to your mats: apply now — we help with refereeing, electronic draws and live results, and every bout counts towards the official rating.",
+    "ruleSetDefault": "The latest sambo rules in force — assigned automatically"
   },
   "applications": {
     "cardTitle": "Competition application",
@@ -1864,6 +1878,10 @@
       "competition_registration_opened": {
         "title": "Registration open: “{competitionName}”",
         "body": "Registration for the tournament is open — submit an entry on the tournament page."
+      },
+      "competition_staff_invited": {
+        "title": "Staff invitation: “{competitionName}”",
+        "body": "You have been invited to the tournament staff (role: {role}). Accept or decline it under “Invitations”."
       }
     },
     "preferencesTitle": "Email and push",
@@ -1886,7 +1904,8 @@
       "onboarding_changes_requested": "Request needs corrections",
       "onboarding_decided": "Registration request decision",
       "onboarding_linked": "New organization member",
-      "competition_registration_opened": "Tournament registration opened"
+      "competition_registration_opened": "Tournament registration opened",
+      "competition_staff_invited": "Invitation to the tournament staff"
     },
     "saved": "Saved",
     "noValue": "—",
@@ -3354,7 +3373,25 @@
     "publishConfirm": "Publish the tournament? The page becomes public.",
     "publishedTitle": "Tournament published",
     "publishedText": "The tournament page is public. The platform admin manages the tournament from here; you can follow the stages and upload media after it ends.",
-    "openPublic": "Open tournament page"
+    "openPublic": "Open tournament page",
+    "contactMethod": "How to contact the organizer",
+    "contactMethodHint": "How the platform administrator should contact you about this request.",
+    "contactMethodQuestion": "Where can we reach you?",
+    "contactChannels": {
+      "EMAIL": "Email",
+      "TELEGRAM": "Telegram",
+      "MAX": "Max"
+    },
+    "contactValue": {
+      "EMAIL": "Email address",
+      "TELEGRAM": "Telegram: username or phone",
+      "MAX": "Max: phone or profile link"
+    },
+    "contactValueHint": {
+      "EMAIL": "For example, org@mail.ru",
+      "TELEGRAM": "For example, @ivanov or +7 999 123-45-67",
+      "MAX": "For example, +7 999 123-45-67 or a max.ru link"
+    }
   },
   "divisions": {
     "title": "Divisions",
@@ -4363,6 +4400,65 @@
     "team": "My team",
     "teamAthletes": "{n, plural, one {athlete} other {athletes}}",
     "openAthletes": "Open My athletes",
-    "medalsSummary": "{competitions, plural, one {# tournament} other {# tournaments}} · {medals, plural, one {# medal} other {# medals}}"
+    "medalsSummary": "{competitions, plural, one {# tournament} other {# tournaments}} · {medals, plural, one {# medal} other {# medals}}",
+    "teamCoaches": "{n, plural, one {coach} other {coaches}}",
+    "openCoaches": "Open “My coaches”"
+  },
+  "directory": {
+    "searchLabel": "Search members by full name",
+    "searchPlaceholder": "Find a member by full name",
+    "searching": "Searching…",
+    "searchFailed": "Search failed. Please try again.",
+    "notFound": "Nobody found. Check the spelling.",
+    "pageTitle": "Member page",
+    "notFoundPage": "Member not found.",
+    "loadError": "Could not load the member page.",
+    "roles": {
+      "ORGANIZATION_HEAD": "Head of organization",
+      "COACH": "Coach",
+      "REFEREE": "Referee",
+      "ATHLETE": "Athlete"
+    },
+    "referee": {
+      "title": "Refereeing",
+      "category": "Referee category",
+      "noCategory": "not set",
+      "experience": "Experience",
+      "years": "{n, plural, one {# year} other {# years}}",
+      "since": "since {year}",
+      "noExperience": "not set",
+      "setExperience": "Set",
+      "tournaments": "Tournaments refereed",
+      "rating": "Referee rating",
+      "ratings": "{n, plural, one {# rating} other {# ratings}}",
+      "noRating": "no ratings yet",
+      "ratingHint": "The rating is the average of 1–5 star ratings that organizers give referees who worked at their tournaments.",
+      "experienceTitle": "Refereeing experience",
+      "experienceHint": "Enter the year you started refereeing sambo competitions; your experience is calculated from it.",
+      "sinceYear": "Year you started refereeing",
+      "save": "Save"
+    }
+  },
+  "invitations": {
+    "title": "Invitations",
+    "hint": "Invitations to tournament staff. Accept one and the role takes effect; the tournament appears in your account.",
+    "empty": "No new invitations",
+    "role": "role: {role}",
+    "invitedBy": "Invited by {name}",
+    "accept": "Accept",
+    "decline": "Decline",
+    "badge": "{n, plural, one {# invitation} other {# invitations}}"
+  },
+  "admissionDocs": {
+    "title": "Admission requirements",
+    "intro": "The requirements are the same for every tournament on the platform: the athlete uploads five documents to “My documents”.",
+    "items": {
+      "identity": "Identity document: passport from age 14; under 14 — birth certificate and a school certificate",
+      "insurance": "Accident insurance policy valid on the tournament days",
+      "oms": "Compulsory health insurance (OMS) policy",
+      "rank": "Sports rank (title) document — if the athlete has a rank",
+      "medical": "Medical certificate of fitness for sambo competitions"
+    },
+    "outro": "There are no other participation requirements. The mandate commission checks the documents."
   }
 }

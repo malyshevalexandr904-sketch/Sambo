@@ -177,6 +177,8 @@ model User {
   refereeRecruitmentsCreated RefereeRecruitmentPosition[]    @relation("RefereeRecruitmentCreator")
   refereeApplications        RefereeRecruitmentApplication[] @relation("RefereeApplicant")
   refereeApplicationsDecided RefereeRecruitmentApplication[] @relation("RefereeApplicationDecider")
+  refereeRatingsReceived     RefereeRating[]                 @relation("RefereeRatingReferee")
+  refereeRatingsGiven        RefereeRating[]                 @relation("RefereeRatingRater")
 
   @@index([status, createdAt])
   @@map("user")
@@ -868,6 +870,8 @@ model RefereeProfile {
   personId            String        @unique @map("person_id") @db.Uuid
   refereeCategoryCode String        @map("referee_category_code")
   categoryAssignedAt  DateTime?     @map("category_assigned_at") @db.Date
+  /// Год начала судейской практики (правки 07.11.2026, п. 10): по нему на странице судьи считается стаж.
+  refereeSinceYear    Int?          @map("referee_since_year")
   status              ProfileStatus @default(ACTIVE)
   version             Int           @default(1)
   createdById         String?       @map("created_by_id") @db.Uuid
@@ -1429,6 +1433,7 @@ model Competition {
   ratingConfig        CompetitionRatingConfig?
   request             CompetitionRequest?
   refereeRecruitments RefereeRecruitmentPosition[]
+  refereeRatings      RefereeRating[]
   media               CompetitionMedia[]
 
   @@index([status, startDate])
@@ -3256,4 +3261,24 @@ model CompetitionMedia {
 
   @@index([competitionId, createdAt])
   @@map("competition_media")
+}
+
+/// Оценка судьи организатором турнира (правки 07.11.2026, п. 10): от 1 до 5 звёзд, одна на судью в турнире (повторная
+/// оценка заменяет прежнюю). Рейтинг судьи — среднее арифметическое всех его оценок.
+model RefereeRating {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  competitionId String   @map("competition_id") @db.Uuid
+  refereeUserId String   @map("referee_user_id") @db.Uuid
+  ratedById     String   @map("rated_by_id") @db.Uuid
+  stars         Int
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  competition Competition @relation(fields: [competitionId], references: [id], onDelete: Restrict)
+  referee     User        @relation("RefereeRatingReferee", fields: [refereeUserId], references: [id], onDelete: Restrict)
+  ratedBy     User        @relation("RefereeRatingRater", fields: [ratedById], references: [id], onDelete: Restrict)
+
+  @@unique([competitionId, refereeUserId])
+  @@index([refereeUserId])
+  @@map("referee_rating")
 }

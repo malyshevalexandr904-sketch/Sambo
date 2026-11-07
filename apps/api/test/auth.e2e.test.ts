@@ -229,18 +229,18 @@ describe('login', () => {
   it('rejects unsafe cookie requests without a valid CSRF token', async () => {
     const u = await createUser(t);
     const s = await login(t, u.email);
-    const res = await s.agent.patch('/api/v1/me').send({ displayName: 'Новое имя' });
+    const res = await s.agent.patch('/api/v1/me').send({ timezone: 'Europe/Moscow' });
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('CSRF_TOKEN_INVALID');
     const forged = await s.agent
       .patch('/api/v1/me')
       .set('x-csrf-token', 'forged.value')
-      .send({ displayName: 'Новое имя' });
+      .send({ timezone: 'Europe/Moscow' });
     expect(forged.body.error.code).toBe('CSRF_TOKEN_INVALID');
     await s.agent
       .patch('/api/v1/me')
       .set('x-csrf-token', s.csrf)
-      .send({ displayName: 'Новое имя' })
+      .send({ timezone: 'Europe/Moscow' })
       .expect(200);
   });
 });

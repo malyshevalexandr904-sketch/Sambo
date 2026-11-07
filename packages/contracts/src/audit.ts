@@ -218,5 +218,9 @@ export const AUDIT_ACTIONS = [
   'division.updated',
   'division.deleted',
   'division.policy_changed',
+  // Правки 07.11.2026: стаж и оценки судей, отказ от приглашения в персонал турнира.
+  'referee.experience_updated',
+  'referee.rated',
+  'competition.member_declined',
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];

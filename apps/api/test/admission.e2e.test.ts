@@ -219,10 +219,14 @@ async function world(opts: { outcome?: 'WITHDRAW' | 'RECHECK' | 'TRANSFER' } = {
   };
 }
 
-async function birthCertificate(w: World, athleteId: string): Promise<{ id: string; version: number }> {
-  const fileId = await upload(t, w.coach, 'DOCUMENT', PDF, 'application/pdf', 'свидетельство.pdf');
+async function document(
+  w: World,
+  athleteId: string,
+  typeCode: string,
+): Promise<{ id: string; version: number }> {
+  const fileId = await upload(t, w.coach, 'DOCUMENT', PDF, 'application/pdf', 'документ.pdf');
   const r = await send(w.coach, 'post', '/api/v1/documents', {
-    typeCode: 'BIRTH_CERTIFICATE',
+    typeCode,
     fileId,
     owner: { athleteId },
     competitionId: w.competitionId,
@@ -230,6 +234,9 @@ async function birthCertificate(w: World, athleteId: string): Promise<{ id: stri
   expect(r.status, JSON.stringify(r.body)).toBe(201);
   return { id: r.body.data.id as string, version: r.body.data.version as number };
 }
+
+/** Единые требования допуска для спортсмена 12 лет без разряда (правки 07.11.2026, п. 13). */
+const CHILD_DOCUMENTS = ['BIRTH_CERTIFICATE', 'SCHOOL_CERTIFICATE', 'OMS_POLICY', 'MEDICAL_CERTIFICATE'];
 
 const checks = (body: { data: { checks: { kind: string; status: string; reasonCode: string | null }[] } }) =>
   Object.fromEntries(
@@ -293,7 +300,7 @@ async function openWeighIn(w: World, categoryIds: string[]) {
 }
 
 describe('admission (G-06)', () => {
-  it('checks come from the regulation; documents, consent, medical clearance, arrival and weight decide', async () => {
+  it('the same checks for every tournament: five documents, arrival and weight decide', async () => {
     const w = await world();
     const { boy1, boy2 } = w.entries;
 
@@ -302,28 +309,33 @@ describe('admission (G-06)', () => {
     expect(initial.body.data.status).toBe('NOT_ADMITTED');
     expect(checks(initial.body)).toEqual({
       DOCUMENTS: 'FAILED:document_missing',
-      CONSENTS: 'PASSED',
-      MEDICAL: 'PENDING:medical_missing',
+      INSURANCE: 'FAILED:document_missing',
       WEIGHT: 'PENDING:weigh_in_expected',
       CHECK_IN: 'PENDING:check_in_expected',
     });
+    const missing = initial.body.data.checks.find((c: { kind: string }) => c.kind === 'DOCUMENTS');
+    expect(missing.reasonParams).toEqual({ types: CHILD_DOCUMENTS });
     expect(initial.body.data.allowedActions).toEqual([]);
     // Чужой тренер допуск не видит.
     const stranger = await coachOf(await createOrg(t));
     await admissionOf(stranger, boy1.id).expect(404);
 
-    // Документ загружен — ждёт проверки; проверен — проверка пройдена (пересчёт в транзакции проверки).
-    const doc = await birthCertificate(w, boy1.athleteId);
-    expect(checks((await admissionOf(w.coach, boy1.id)).body).DOCUMENTS).toBe(
-      'PENDING:document_not_verified',
-    );
-    await send(
-      w.secretary,
-      'post',
-      `/api/v1/documents/${doc.id}/transitions`,
-      { to: 'VERIFIED' },
-      doc.version,
-    ).expect(200);
+    // Документы загружены — ждут проверки; проверены — проверка пройдена (пересчёт в транзакции проверки).
+    const docs = [];
+    for (const type of [...CHILD_DOCUMENTS, 'INSURANCE_POLICY'])
+      docs.push(await document(w, boy1.athleteId, type));
+    expect(checks((await admissionOf(w.coach, boy1.id)).body)).toMatchObject({
+      DOCUMENTS: 'PENDING:document_not_verified',
+      INSURANCE: 'PENDING:document_not_verified',
+    });
+    for (const doc of docs)
+      await send(
+        w.secretary,
+        'post',
+        `/api/v1/documents/${doc.id}/transitions`,
+        { to: 'VERIFIED' },
+        doc.version,
+      ).expect(200);
     expect((await admissionOf(w.coach, boy1.id)).body.data.status).toBe('PENDING');
 
     // Мандатная комиссия: категории переходят к взвешиванию, строки прибытия созданы.
@@ -410,9 +422,9 @@ describe('admission (G-06)', () => {
         where: { resourceType: 'MedicalList', resourceId: w.competitionId },
       }),
     ).toBe(1);
+    // Осмотр врача турнира допуск не задерживает: медицинская справка — среди пяти документов.
     const secretaryView = await admissionOf(w.secretary, boy1.id).expect(200);
-    const medical = secretaryView.body.data.checks.find((c: { kind: string }) => c.kind === 'MEDICAL');
-    expect(medical).toMatchObject({ status: 'PASSED', reasonCode: null, reasonParams: null });
+    expect(checks(secretaryView.body).MEDICAL).toBeUndefined();
 
     // Взвешивание ещё не прошло — категория не готова к жеребьёвке (допуск не решён).
     const m38 = cat(w, '-38');
@@ -496,14 +508,16 @@ describe('admission (G-06)', () => {
       send(s, 'post', `/api/v1/entries/${boy2.id}/admission/checks/${kind}/waive`, { reason });
     expect((await waive(w.secretary, 'DOCUMENTS')).status).toBe(403);
     expect((await waive(w.organizer, 'DOCUMENTS', 'нет')).body.error.code).toBe('VALIDATION_FAILED');
-    expect((await waive(w.organizer, 'CONSENTS')).body.error.code).toBe('INVALID_TRANSITION');
+    expect((await waive(w.organizer, 'CONSENTS')).body.error.code).toBe('NOT_FOUND');
     const waived = await waive(w.organizer, 'DOCUMENTS');
     expect(waived.status, JSON.stringify(waived.body)).toBe(200);
     expect(checks(waived.body).DOCUMENTS).toBe('WAIVED:document_missing');
-    expect(waived.body.data.status).toBe('PENDING');
+    expect(waived.body.data.status).toBe('NOT_ADMITTED');
+    const insured = await waive(w.organizer, 'INSURANCE', 'Полис предъявлен на комиссии в оригинале');
+    expect(insured.body.data.status).toBe('PENDING');
     expect(
       await t.admin.auditLog.count({ where: { action: 'admission.check_waived', entityId: boy2.id } }),
-    ).toBe(1);
+    ).toBe(2);
 
     // Не прибыл — не допущен; допуск решён по всем — категория готова к жеребьёвке.
     expect((await checkIn(w, boy2.athleteId, 'NOT_ARRIVED')).status).toBe(200);
@@ -669,7 +683,7 @@ describe('weigh-in outcome by regulation (D-06)', () => {
 });
 
 describe('medical clearance access (G-05)', () => {
-  it('the guardian sees the clearances of the child; a coach does not; revoking fails the check', async () => {
+  it('the guardian sees the clearances of the child; a coach does not; the doctor can revoke', async () => {
     const w = await world();
     const { boy1 } = w.entries;
     const guardianUser = await createUser(t);
@@ -731,7 +745,7 @@ describe('medical clearance access (G-05)', () => {
       { reason: 'Травма на разминке' },
     );
     expect(revoked.body.data).toMatchObject({ status: 'REVOKED', revokeReason: 'Травма на разминке' });
-    expect(checks((await admissionOf(w.secretary, boy1.id)).body).MEDICAL).toBe('FAILED:medical_revoked');
+    expect(checks((await admissionOf(w.secretary, boy1.id)).body).MEDICAL).toBeUndefined();
     expect((await w.organizer.agent.get(`/api/v1/competitions/${w.competitionId}/medical`)).status).toBe(403);
   });
 });

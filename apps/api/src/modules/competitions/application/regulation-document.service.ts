@@ -84,10 +84,6 @@ const COMPETITION_SELECT = {
     orderBy: { startsAt: 'asc' },
     select: { name: true, startsAt: true, endsAt: true, kind: true },
   },
-  requirements: {
-    where: { kind: 'DOCUMENT', documentTypeCode: { not: null } },
-    select: { documentType: { select: { nameRu: true } } },
-  },
   staff: {
     where: { status: 'ACTIVE', role: { code: { in: ['CHIEF_REFEREE', 'SECRETARY'] } } },
     orderBy: { createdAt: 'asc' },
@@ -246,9 +242,8 @@ export class RegulationDocumentService {
         endsAt: w.endsAt.toISOString(),
         official: w.kind === 'OFFICIAL',
       })),
-      extraDocuments: [
-        ...new Set(row.requirements.flatMap((r) => (r.documentType ? [r.documentType.nameRu] : []))),
-      ],
+      // Единые требования допуска (правки 07.11.2026, п. 13): дополнительных документов у турнира нет.
+      extraDocuments: [],
       extraConditionsMd: row.requirementsMd,
       weighInFailureOutcome: row.weighInFailureOutcome,
       pageUrl: `${this.appUrl}/ru/tournaments/${row.slug}`,

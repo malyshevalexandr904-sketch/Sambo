@@ -1,6 +1,7 @@
-// Персонал турнира (API.md, 5.1; D-07): приглашение по email или пользователю, принятие, приостановка.
-// Роль действует только после принятия приглашения владельцем подтверждённого email.
-import { Inject, Injectable } from '@nestjs/common';
+// Персонал турнира (API.md, 5.1; D-07): приглашение пользователя платформы, ответ на него, приостановка.
+// Правки 07.11.2026, п. 15: приглашают найденного по ФИО пользователя, приглашение приходит уведомлением на платформе
+// (не письмом); роль действует после того, как приглашённый её примет. Ссылки из прежних писем принимаются (`accept`).
+import { Injectable } from '@nestjs/common';
 import {
   type CompetitionMember,
   type CompetitionMemberInvite,
@@ -8,21 +9,19 @@ import {
   type CompetitionMembersQuery,
   cabinetRoleOf,
   isRoleCode,
-  type Locale,
+  type MyCompetitionInviteDto,
   type Page,
   type RoleCode,
 } from '@sde/contracts';
-import { type Prisma, type Tx, uuidv7 } from '@sde/db';
-import type { Env } from '@sde/server-kit';
+import { type Prisma, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
 import { decodeCursor, toPage } from '../../../common/http/http';
-import { ENV } from '../../../config/config.module';
 import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { CabinetRolesService } from '../../access';
 import { AuditService } from '../../audit';
-import { INVITE_TTL_SECONDS, VerificationTokenService } from '../../auth';
-import { EmailRequestService } from '../../outbox';
+import { VerificationTokenService } from '../../auth';
+import { OutboxService } from '../../outbox';
 import { selfAssignment, staffTransitionAllowed, staffTransitionsFrom } from '../domain/staff-rules';
 import { CompetitionScopeService } from './competition-scope.service';
 
@@ -52,8 +51,7 @@ export class StaffService {
     private readonly scopes: CompetitionScopeService,
     private readonly audit: AuditService,
     private readonly tokens: VerificationTokenService,
-    private readonly emails: EmailRequestService,
-    @Inject(ENV) private readonly env: Env,
+    private readonly outbox: OutboxService,
     private readonly cabinetRoles: CabinetRolesService,
   ) {}
 
@@ -80,17 +78,25 @@ export class StaffService {
     return toPage(rows, q.limit, (r) => ({ k: r.createdAt.toISOString(), id: r.id }), toDto);
   }
 
+  /**
+   * Приглашение в персонал (правки 07.11.2026, п. 15): зарегистрированного пользователя — по выбору из поиска по ФИО.
+   * Письмо не отправляется: приглашённый получает уведомление на платформе и отвечает в кабинете («Приглашения»).
+   */
   async invite(
     user: AuthUser,
     competitionId: string,
     req: CompetitionMemberInvite,
-    locale: Locale,
   ): Promise<CompetitionMember> {
     const competition = await this.scopes.require(competitionId);
     if (['FINISHED', 'ARCHIVED', 'CANCELLED'].includes(competition.status))
       throw new DomainError('TRANSITION_PRECONDITIONS_NOT_MET', { failed: ['competition_closed'] });
-    const email = await this.inviteeEmail(req);
-    if (selfAssignment(user, { userId: req.userId, email }))
+    const target = await this.db.user.findFirst({
+      where: { id: req.userId, status: 'ACTIVE', deletedAt: null, isDemo: false },
+      select: { id: true, email: true },
+    });
+    if (!target)
+      throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'userId', code: 'not_found' }] });
+    if (selfAssignment(user, { userId: target.id, email: target.email }))
       throw new DomainError('FORBIDDEN', { reason: 'self_assignment' });
     const created = await this.db.tx(async (tx) => {
       const role = await tx.role.findUniqueOrThrow({ where: { code: req.roleCode } });
@@ -99,7 +105,7 @@ export class StaffService {
           competitionId,
           roleId: role.id,
           status: { in: ['INVITED', 'ACTIVE', 'SUSPENDED'] },
-          OR: [{ invitedEmail: email }, { user: { email } }],
+          OR: [{ userId: target.id }, ...(target.email ? [{ invitedEmail: target.email }] : [])],
         },
       });
       if (existing) throw new DomainError('ALREADY_EXISTS', { resource: 'competition_membership' });
@@ -107,16 +113,19 @@ export class StaffService {
         data: {
           id: uuidv7(),
           competitionId,
-          invitedEmail: email,
+          userId: target.id,
+          invitedEmail: target.email,
           roleId: role.id,
           status: 'INVITED',
           invitedById: user.id,
         },
         include: INCLUDE,
       });
-      await this.sendInvite(tx, membership.id, email, locale, {
-        competitionName: competition.name,
-        roleCode: req.roleCode,
+      await this.outbox.enqueue(tx, {
+        type: 'competition.member_invited',
+        aggregate: { type: 'CompetitionMembership', id: membership.id },
+        competitionId,
+        payload: { membershipId: membership.id, competitionId, userId: target.id, roleCode: req.roleCode },
       });
       await this.audit.record(tx, {
         action: 'competition.member_invited',
@@ -124,53 +133,73 @@ export class StaffService {
         entityId: membership.id,
         competitionId,
         organizationId: competition.organizerOrganizationId,
-        after: { roleCode: req.roleCode, status: 'INVITED', invitedEmail: email },
+        after: { roleCode: req.roleCode, status: 'INVITED', userId: target.id },
       });
       return membership;
     });
     return toDto(created);
   }
 
-  /** Email приглашённого: указанный или email существующего активного пользователя. */
-  private async inviteeEmail(req: CompetitionMemberInvite): Promise<string> {
-    if (!req.userId) {
-      if (!req.email)
-        throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'email', code: 'required' }] });
-      return req.email;
-    }
-    const target = await this.db.user.findFirst({
-      where: { id: req.userId, status: 'ACTIVE', deletedAt: null },
-      select: { email: true },
-    });
-    if (!target?.email)
-      throw new DomainError('VALIDATION_FAILED', { fields: [{ path: 'userId', code: 'not_found' }] });
-    return target.email;
-  }
-
-  /** Одноразовая ссылка приглашения письмом (outbox): принять — после входа с этим email. */
-  private async sendInvite(
-    tx: Tx,
-    membershipId: string,
-    email: string,
-    locale: Locale,
-    params: { competitionName: string; roleCode: string },
-  ): Promise<void> {
-    const token = await this.tokens.issue(tx, 'INVITE', {
-      userId: null,
-      ttlSeconds: INVITE_TTL_SECONDS,
-      payload: { competitionMembershipId: membershipId },
-    });
-    const base = this.env.APP_URL.replace(/\/$/, '');
-    await this.emails.request(tx, {
-      template: 'competition.invite',
-      to: email,
-      userId: null,
-      locale,
-      params: {
-        ...params,
-        acceptUrl: `${base}/${locale}/invites/competition?token=${encodeURIComponent(token)}`,
+  /** Приглашения пользователю, ждущие его ответа (правки 07.11.2026, п. 15). */
+  async myInvites(user: AuthUser): Promise<MyCompetitionInviteDto[]> {
+    const rows = await this.db.competitionMembership.findMany({
+      where: {
+        userId: user.id,
+        status: 'INVITED',
+        competition: { deletedAt: null, status: { notIn: ['FINISHED', 'ARCHIVED', 'CANCELLED'] } },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      take: 100,
+      select: {
+        id: true,
+        createdAt: true,
+        role: { select: { code: true } },
+        invitedBy: { select: { displayName: true } },
+        competition: { select: { id: true, name: true, startDate: true, endDate: true } },
       },
     });
+    return rows.map((r) => ({
+      id: r.id,
+      roleCode: r.role.code as RoleCode,
+      competition: {
+        id: r.competition.id,
+        name: r.competition.name,
+        startDate: r.competition.startDate.toISOString().slice(0, 10),
+        endDate: r.competition.endDate.toISOString().slice(0, 10),
+      },
+      invitedBy: r.invitedBy?.displayName ?? null,
+      createdAt: r.createdAt.toISOString(),
+    }));
+  }
+
+  /** Ответ на приглашение на платформе: принять (роль начинает действовать) или отказаться. */
+  async respond(user: AuthUser, membershipId: string, accept: boolean): Promise<CompetitionMember> {
+    const updated = await this.db.tx(async (tx) => {
+      const m = await tx.competitionMembership.findUnique({ where: { id: membershipId }, include: INCLUDE });
+      if (!m || m.userId !== user.id)
+        throw new DomainError('NOT_FOUND', { resource: 'competition_membership' });
+      if (m.status !== 'INVITED')
+        throw new DomainError('INVALID_TRANSITION', { from: m.status, to: 'ACTIVE' });
+      const row = await tx.competitionMembership.update({
+        where: { id: m.id },
+        data: { status: accept ? 'ACTIVE' : 'ENDED', version: { increment: 1 } },
+        include: INCLUDE,
+      });
+      if (accept)
+        await tx.user.update({ where: { id: user.id }, data: { permissionsVersion: { increment: 1 } } });
+      await this.audit.record(tx, {
+        action: accept ? 'competition.member_joined' : 'competition.member_declined',
+        entityType: 'CompetitionMembership',
+        entityId: m.id,
+        competitionId: m.competitionId,
+        before: { status: 'INVITED' },
+        after: { status: accept ? 'ACTIVE' : 'ENDED', userId: user.id },
+      });
+      return row;
+    });
+    if (accept && isRoleCode(updated.role.code))
+      await this.cabinetRoles.selectIfHeld(user.id, user.sessionId, cabinetRoleOf(updated.role.code));
+    return toDto(updated);
   }
 
   /** Принять приглашение может только владелец приглашённого email, подтвердивший его. */

@@ -237,6 +237,7 @@ describe('роль в кабинете', () => {
       refereeTeam: 'FULL',
       gender: 'MIXED',
       responsible: { kind: 'SELF' },
+      contact: { channel: 'TELEGRAM', value: '@organizer' },
       rulesAccepted: true,
     });
     const admin = await login(t, (await createUser(t, { platform: ['PLATFORM_ADMIN'] })).email, {

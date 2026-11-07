@@ -12,6 +12,7 @@ import {
   drawCategory,
   drawWorld,
   type DrawWorld,
+  satisfyAdmission,
   SEED_A,
   SEED_B,
 } from './helpers/phase5';
@@ -384,8 +385,10 @@ describe('which draft can be published', () => {
 describe('new version of a published draw', () => {
   let cat: CategoryFixture;
   let d: DrawDto;
+  let documentIds: string[];
   beforeAll(async () => {
     cat = await drawCategory(t, w, 7);
+    documentIds = await satisfyAdmission(t, w.competitionId, cat.entries);
     d = await publish(w.staff.manager, await draft(w.staff.manager, cat.categoryId, { randomSeed: SEED_A }));
   });
 
@@ -407,10 +410,11 @@ describe('new version of a published draw', () => {
   });
 
   it('waits until admission is decided again (the category returns to READY_FOR_DRAW)', async () => {
-    // После публикации положение потребовало взвешивания: допуск снова не решён — к жеребьёвке категорию не вернуть.
-    const requirement = await t.admin.competitionRequirement.create({
-      data: { competitionId: w.competitionId, categoryId: cat.categoryId, kind: 'WEIGH_IN', mandatory: true },
-    });
+    // После публикации документ одного спортсмена вернули на проверку: допуск снова не решён — к жеребьёвке
+    // категорию не вернуть.
+    const { athleteId } = await t.admin.entry.findUniqueOrThrow({ where: { id: cat.entries[0] as string } });
+    const returned = { id: { in: documentIds }, athleteId };
+    await t.admin.document.updateMany({ where: returned, data: { status: 'UNDER_REVIEW' } });
     const view = (await w.staff.chief.agent.get(`/api/v1/draws/${d.id}`)).body.data as DrawDto;
     const r = await send(
       w.staff.chief,
@@ -422,11 +426,7 @@ describe('new version of a published draw', () => {
     expect(r.status).toBe(422);
     expect(r.body.error.details.failed).toEqual(['admission_pending']);
     expect((await t.admin.draw.findUniqueOrThrow({ where: { id: d.id } })).status).toBe('PUBLISHED');
-    await t.admin.competitionRequirement.delete({ where: { id: requirement.id } });
-    await t.admin.admission.updateMany({
-      where: { entryId: { in: cat.entries } },
-      data: { status: 'ADMITTED' },
-    });
+    await t.admin.document.updateMany({ where: returned, data: { status: 'VERIFIED' } });
   });
 
   it('removes the bracket, returns the category to READY_FOR_DRAW and allows a new version', async () => {

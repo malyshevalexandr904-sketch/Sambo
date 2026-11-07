@@ -1,21 +1,25 @@
-// Каркас публичных страниц витрины: шапка с названием и переключателем языка, без меню кабинета.
+// Каркас публичных страниц витрины: шапка с логотипом и переключателем темы, без меню кабинета.
 import type { PublicCompetitionSummary } from '@sde/contracts';
 import { getTranslations } from 'next-intl/server';
 import type { ReactNode } from 'react';
 import { LegalLinks } from '@/components/legal-links';
-import { LocaleSwitcher } from '@/components/locale-switcher';
+import { Brand } from '@/components/brand';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { Link } from '@/i18n/navigation';
 
 export async function PublicShell({ children }: { children: ReactNode }) {
   const t = await getTranslations('tournaments');
-  const tc = await getTranslations('common');
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-3">
-          <Link href="/tournaments" className="font-semibold text-slate-900">
-            {tc('appName')} · {t('title')}
+          {/* Правки 07.11.2026, п. 9: логотип в левом верхнем углу. */}
+          <Link href="/" className="inline-flex items-center gap-2 font-semibold text-slate-900">
+            <Brand />
+            <span className="text-slate-400" aria-hidden="true">
+              ·
+            </span>
+            <span>{t('title')}</span>
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/rating" className="inline-flex min-h-11 items-center text-blue-700 underline">
@@ -24,7 +28,6 @@ export async function PublicShell({ children }: { children: ReactNode }) {
             <Link href="/login" className="inline-flex min-h-11 items-center text-blue-700 underline">
               {t('login')}
             </Link>
-            <LocaleSwitcher />
             <ThemeSwitcher />
           </div>
         </div>

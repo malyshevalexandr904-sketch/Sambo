@@ -4,6 +4,7 @@
 // отклонён при проверке). При загрузке указывается срок действия: платформа заранее предупредит об окончании
 // (уведомления за 30, 7 и 1 день — worker). Заменить документ можно в любой момент без объяснения причин.
 import {
+  ADMISSION_PASSPORT_AGE,
   type Athlete,
   type DataEnvelope,
   type DocumentDto,
@@ -27,7 +28,7 @@ import { useAction } from '@/lib/use-action';
 import { DocumentStatusBadge } from './shared';
 
 /** С 14 лет личность удостоверяет паспорт; младше — свидетельство о рождении вместе со справкой из школы. */
-const PASSPORT_AGE = 14;
+const PASSPORT_AGE = ADMISSION_PASSPORT_AGE;
 /** «Скоро истекает» — за столько дней карточка показывает предупреждение (уведомления — те же 30 дней). */
 const SOON_DAYS = 30;
 const DAY = 24 * 60 * 60 * 1000;

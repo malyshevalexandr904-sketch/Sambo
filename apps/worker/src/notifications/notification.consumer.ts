@@ -152,6 +152,22 @@ export async function planNotifications(
       if (p.from !== 'PUBLISHED' || p.to !== 'REGISTRATION_OPEN') return [];
       return competitionFollowers(db, p.competitionId);
     }
+    case 'competition.member_invited': {
+      const p = EVENT_SCHEMAS[type].parse(payload);
+      const m = await db.competitionMembership.findUnique({
+        where: { id: p.membershipId },
+        select: { status: true, user: { select: { status: true } } },
+      });
+      if (!m || m.status !== 'INVITED' || m.user?.status !== 'ACTIVE') return [];
+      return [
+        {
+          userId: p.userId,
+          type: 'competition.staff_invited',
+          params: { membershipId: p.membershipId, competitionId: p.competitionId, roleCode: p.roleCode },
+          competitionId: p.competitionId,
+        },
+      ];
+    }
     case 'category.results_published': {
       const p = EVENT_SCHEMAS[type].parse(payload);
       return resultsRecipients(db, p.competitionId, p.categoryId);

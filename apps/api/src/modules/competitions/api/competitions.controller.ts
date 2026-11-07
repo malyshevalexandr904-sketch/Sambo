@@ -16,6 +16,9 @@ import {
   type Competition,
   CompetitionCreate,
   type CompetitionMember,
+  type CompetitionRefereeRatingDto,
+  RefereeRatingPut,
+  type MyCompetitionInviteDto,
   CompetitionMemberInvite,
   CompetitionMemberPatch,
   CompetitionMembersQuery,
@@ -33,7 +36,7 @@ import {
 } from '@sde/contracts';
 import type { Response } from 'express';
 import { CurrentUser } from '../../../common/context/current-user';
-import { type AuthUser, RequestContextStore } from '../../../common/context/request-context';
+import type { AuthUser } from '../../../common/context/request-context';
 import { etag, IfMatchVersion, ok } from '../../../common/http/http';
 import { UuidParam, ValidBody, ValidQuery } from '../../../common/validation/zod.pipe';
 import { Authenticated, RequirePermission } from '../../access';
@@ -45,6 +48,7 @@ import { RegulationService } from '../application/regulation.service';
 import { RegulationDocumentService } from '../application/regulation-document.service';
 import { RegulationPdfQuery, regulationPdfResponse } from './regulation-pdf.response';
 import { StaffService } from '../application/staff.service';
+import { RefereeRatingsService } from '../application/referee-ratings.service';
 
 const COMP = { resolver: 'competition', param: 'id' };
 
@@ -61,6 +65,7 @@ export class CompetitionsController {
     private readonly staff: StaffService,
     private readonly audit: AuditQueryService,
     private readonly recruitment: RefereeRecruitmentService,
+    private readonly refereeRatingsService: RefereeRatingsService,
   ) {}
 
   private send(res: Response, c: Competition): DataEnvelope<Competition> {
@@ -177,7 +182,7 @@ export class CompetitionsController {
     @UuidParam('id') id: string,
     @ValidBody(CompetitionMemberInvite) body: CompetitionMemberInvite,
   ): Promise<DataEnvelope<CompetitionMember>> {
-    return ok(await this.staff.invite(user, id, body, RequestContextStore.current().locale));
+    return ok(await this.staff.invite(user, id, body));
   }
 
   @Patch(':id/members/:membershipId')
@@ -190,6 +195,25 @@ export class CompetitionsController {
     @ValidBody(CompetitionMemberPatch) body: CompetitionMemberPatch,
   ): Promise<DataEnvelope<CompetitionMember>> {
     return ok(await this.staff.update(user, id, membershipId, version, body));
+  }
+
+  /** Оценки судей организатором (правки 07.11.2026, п. 10): 1–5 звёзд отработавшим судьям. */
+  @Get(':id/referee-ratings')
+  @RequirePermission('competition.members.manage', COMP)
+  async refereeRatings(@UuidParam('id') id: string): Promise<DataEnvelope<CompetitionRefereeRatingDto[]>> {
+    return ok(await this.refereeRatingsService.list(id));
+  }
+
+  @Put(':id/referee-ratings/:userId')
+  @RequirePermission('competition.members.manage', COMP)
+  async rateReferee(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @UuidParam('userId') userId: string,
+    @ValidBody(RefereeRatingPut) body: RefereeRatingPut,
+  ): Promise<DataEnvelope<CompetitionRefereeRatingDto[]>> {
+    await this.refereeRatingsService.rate(user, id, userId, body.stars);
+    return ok(await this.refereeRatingsService.list(id));
   }
 
   /** Открытый набор судей (правки 27.10.2026): должности, требования и поступившие заявки. */
@@ -248,7 +272,34 @@ export class CompetitionsController {
 export class CompetitionInvitesController {
   constructor(private readonly staff: StaffService) {}
 
-  /** Принять приглашение в персонал турнира: только владелец приглашённого подтверждённого email. */
+  /** Приглашения в персонал турнира, ждущие ответа (правки 07.11.2026, п. 15). */
+  @Get('mine')
+  @Authenticated()
+  async mine(@CurrentUser() user: AuthUser): Promise<DataEnvelope<MyCompetitionInviteDto[]>> {
+    return ok(await this.staff.myInvites(user));
+  }
+
+  @Post(':id/accept')
+  @Authenticated()
+  @HttpCode(200)
+  async acceptById(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+  ): Promise<DataEnvelope<CompetitionMember>> {
+    return ok(await this.staff.respond(user, id, true));
+  }
+
+  @Post(':id/decline')
+  @Authenticated()
+  @HttpCode(200)
+  async decline(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+  ): Promise<DataEnvelope<CompetitionMember>> {
+    return ok(await this.staff.respond(user, id, false));
+  }
+
+  /** Принять приглашение по ссылке из письма (приглашения до 07.11.2026): владелец подтверждённого email. */
   @Post('accept')
   @Authenticated()
   @HttpCode(200)

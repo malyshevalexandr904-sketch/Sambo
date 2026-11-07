@@ -199,6 +199,12 @@ export class CompetitionsService {
         input.disciplineCode,
         input.organizerOrganizationId,
       );
+    else
+      // Правки 07.11.2026, п. 14: версию правил не выбирают — турнир идёт по последним действующим правилам.
+      input = {
+        ...input,
+        ruleSetVersionId: (await this.rulesets.latestPublishedId(input.disciplineCode, tx)) ?? undefined,
+      };
     if (input.logoFileId) await this.refs.assertLogo(tx, input.logoFileId, user);
     const competitionId = uuidv7();
     const slug = await this.refs.uniqueSlug(tx, input.name, input.startDate, input.slug);
@@ -408,8 +414,14 @@ export class CompetitionsService {
       registrationEndsAt: c.registrationEndsAt.toISOString(),
     };
     if (c.status === 'DRAFT' && req.to === 'PUBLISHED') {
-      if (!c.ruleSetVersionId) throw new DomainError('RULESET_REQUIRED');
-      const v = await this.rulesets.versionInfo(c.ruleSetVersionId, tx);
+      // Правки 07.11.2026, п. 14: турнир без версии правил публикуется по последним действующим правилам самбо.
+      let ruleSetVersionId = c.ruleSetVersionId;
+      if (!ruleSetVersionId) {
+        ruleSetVersionId = await this.rulesets.latestPublishedId(c.disciplineCode, tx);
+        if (!ruleSetVersionId) throw new DomainError('RULESET_REQUIRED');
+        await tx.competition.update({ where: { id: c.id }, data: { ruleSetVersionId } });
+      }
+      const v = await this.rulesets.versionInfo(ruleSetVersionId, tx);
       const failed = publishIssues(
         {
           ...schedule,

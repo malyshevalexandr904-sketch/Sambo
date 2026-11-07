@@ -23,7 +23,6 @@ import { OtherRolesHint } from '@/features/cabinet-role';
 import { ApplicationsTab, EntriesTab } from './registrations-tabs';
 import { CategoriesTab } from './categories';
 import { OverviewTab } from './overview';
-import { RecruitmentTab } from './recruitment';
 import { RegulationTab } from './regulation';
 import { CompetitionStatusBadge, formatDates, useCompetition } from './shared';
 import { STAGE_TABS } from './stage-guide';
@@ -34,7 +33,6 @@ const TABS = [
   'regulation',
   'categories',
   'staff',
-  'recruitment',
   'applications',
   'entries',
   'admission',
@@ -57,7 +55,6 @@ function visibleTabs(c: Competition): Tab[] {
   const can = (a: string): boolean => c.allowedActions.includes(a);
   return TABS.filter((tab) => {
     if (tab === 'staff') return can('competition.view');
-    if (tab === 'recruitment') return can('competition.members.manage');
     if (tab === 'entries') return can('registration.view');
     if (tab === 'admission') return can('admission.view') && !BEFORE_REGISTRATION.includes(c.status);
     if (tab === 'checkin') return can('checkin.view') && !BEFORE_REGISTRATION.includes(c.status);
@@ -96,7 +93,9 @@ export function CompetitionPage({ id }: { id: string }) {
       {() => {
         const c = query.data as Competition;
         const tabs = visibleTabs(c);
-        const requested = params.get('tab') as Tab | null;
+        // «Набор судей» перенесён в «Персонал» (правки 07.11.2026, п. 16): старые ссылки ведут туда.
+        const rawTab = params.get('tab');
+        const requested = (rawTab === 'recruitment' ? 'staff' : rawTab) as Tab | null;
         const tab: Tab = requested && tabs.includes(requested) ? requested : 'overview';
         // Стадия (правки 05.11.2026): у организатора и администратора сначала — вкладки текущей стадии, остальные
         // — по кнопке «Все разделы».
@@ -180,7 +179,6 @@ export function CompetitionPage({ id }: { id: string }) {
             {tab === 'regulation' ? <RegulationTab competition={c} /> : null}
             {tab === 'categories' ? <CategoriesTab competition={c} /> : null}
             {tab === 'staff' ? <StaffTab competition={c} /> : null}
-            {tab === 'recruitment' ? <RecruitmentTab competition={c} /> : null}
             {tab === 'applications' ? <ApplicationsTab competition={c} /> : null}
             {tab === 'entries' ? <EntriesTab competition={c} /> : null}
             {tab === 'admission' ? <AdmissionTab competition={c} /> : null}

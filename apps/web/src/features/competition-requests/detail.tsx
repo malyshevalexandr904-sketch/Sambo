@@ -4,6 +4,8 @@
 import {
   type CompetitionRequestDto,
   type DataEnvelope,
+  type HostingContact,
+  hostingContactHref,
   type HostingResponsible,
   stageOfCompetition,
   type TournamentStage,
@@ -244,6 +246,7 @@ function RequestView({ request: r }: { request: CompetitionRequestDto }) {
             </p>
           ) : null}
         </Card>
+        {p.contact ? <ContactCard contact={p.contact} /> : null}
         {p.responsible ? <ResponsibleCard responsible={p.responsible} /> : null}
         {r.requirements && p.matCount ? (
           <Card>
@@ -291,6 +294,31 @@ function RequestView({ request: r }: { request: CompetitionRequestDto }) {
         ) : null}
       </div>
     </>
+  );
+}
+
+/** Способ связи с организатором, выбранный в заявке (правки 07.11.2026, п. 11). */
+function ContactCard({ contact }: { contact: HostingContact }) {
+  const t = useTranslations('competitionRequests');
+  const href = hostingContactHref(contact);
+  return (
+    <Card>
+      <CardTitle>{t('contactMethod')}</CardTitle>
+      <p className="text-sm text-slate-600">{t(`contactChannels.${contact.channel}`)}</p>
+      <p className="mt-1 font-medium">
+        {href ? (
+          <a
+            className="text-blue-700 underline"
+            href={href}
+            {...(href.startsWith('https:') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+          >
+            {contact.value}
+          </a>
+        ) : (
+          contact.value
+        )}
+      </p>
+    </Card>
   );
 }
 

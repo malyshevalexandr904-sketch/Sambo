@@ -16,6 +16,6 @@ import { ResultsQueriesService } from './application/results-queries.service';
   imports: [AthletesModule, BracketsModule, CategoriesModule, CompetitionsModule],
   controllers: [ResultsController],
   providers: [CategoryResultsService, ResultsQueriesService, ResultsLifecycle],
-  exports: [CategoryResultsService],
+  exports: [CategoryResultsService, ResultsQueriesService],
 })
 export class ResultsModule {}

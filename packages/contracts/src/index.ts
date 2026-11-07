@@ -39,3 +39,4 @@ export * from './rating.js';
 export * from './divisions.js';
 export * from './referee-recruitment-input.js';
 export * from './referee-recruitment.js';
+export * from './people-directory.js';

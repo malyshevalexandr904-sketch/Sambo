@@ -27,6 +27,8 @@ export interface NotificationSource {
   onboardingRole?: string;
   /** Срок действия документа (YYYY-MM-DD). */
   expirationDate?: string;
+  /** Роль в персонале турнира — приглашение (правки 07.11.2026). */
+  roleCode?: string;
 }
 
 /**
@@ -191,6 +193,12 @@ export async function notificationSource(
     };
   }
   if (type === 'application.decided') return { ...app, status: params.status ?? app.status };
+  if (type === 'competition.staff_invited') {
+    const competition = params.competitionId
+      ? await db.competition.findUnique({ where: { id: params.competitionId }, select: { name: true } })
+      : null;
+    return { competitionName: competition?.name, roleCode: params.roleCode };
+  }
   if (type === 'schedule.changed' || type === 'competition.registration_opened') {
     const competition = params.competitionId
       ? await db.competition.findUnique({ where: { id: params.competitionId }, select: { name: true } })
