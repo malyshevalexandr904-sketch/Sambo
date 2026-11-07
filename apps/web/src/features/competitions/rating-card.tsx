@@ -1,7 +1,6 @@
 'use client';
-// Тип турнира на карточке (docs/RATING_ARCHITECTURE.md, 3.1, 9): все видят «Рейтинговый» / «Безрейтинговый»;
-// включить рейтинг или сменить тип может только администратор платформы — сервер проверяет право сам, кнопки
-// лишь повторяют проверку.
+// Тип турнира на карточке (docs/RATING_ARCHITECTURE.md, 3.1, 9): все видят «Рейтинговый» / «Безрейтинговый» и
+// кратко — как считается рейтинг Эло (правки 07.11.2026). Сервер проверяет права сам, кнопка лишь повторяет проверку.
 import type { Competition, DataEnvelope, RatingRuleSetSummary } from '@sde/contracts';
 import { Badge, Card, CardTitle } from '@sde/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -21,6 +20,11 @@ export function CompetitionTypeBadge({
   );
 }
 
+/**
+ * Рейтинг на карточке турнира. Правки 07.11.2026, п. 12: все турниры платформы рейтинговые — кнопки «Сделать без
+ * рейтинга» больше нет, вместо неё кратко о том, как считается рейтинг Эло. Включить рейтинг можно только у старого
+ * безрейтингового черновика (до перехода на рейтинговую систему).
+ */
 export function RatingCard({ competition: c }: { competition: Competition }) {
   const t = useTranslations('competitions.rating');
   const queryClient = useQueryClient();
@@ -28,10 +32,10 @@ export function RatingCard({ competition: c }: { competition: Competition }) {
   const rated = c.competitionType === 'RATED';
   if (!rated && !admin) return null;
 
-  const run = async (path: string, body: Record<string, unknown>): Promise<void> => {
-    const res = await api<DataEnvelope<Competition>>(`/admin/competitions/${c.id}/${path}`, {
+  const enable = async (reason: string): Promise<void> => {
+    const res = await api<DataEnvelope<Competition>>(`/admin/competitions/${c.id}/rating`, {
       method: 'POST',
-      body,
+      body: { reason },
     });
     queryClient.setQueryData(qk.competition(c.id), res.data);
     await queryClient.invalidateQueries({ queryKey: ['competitions', c.id] });
@@ -42,38 +46,25 @@ export function RatingCard({ competition: c }: { competition: Competition }) {
       <CardTitle>
         {t('title')} <CompetitionTypeBadge competition={c} />
       </CardTitle>
+      <div className="space-y-2 text-sm text-slate-700">
+        <p>{t('elo.p1')}</p>
+        <p>{t('elo.p2')}</p>
+        <p>{t('elo.p3')}</p>
+      </div>
       {c.rating ? (
-        <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
-          <dt className="text-slate-600">{t('ruleSet')}</dt>
-          <dd>
-            {c.rating.ruleSet.name} · {c.rating.ruleSet.calculationVersion}
-          </dd>
-          <dt className="text-slate-600">{t('publicDeltas')}</dt>
-          <dd>{c.rating.publicDeltas ? t('yes') : t('no')}</dd>
-        </dl>
+        <p className="mt-3 text-xs text-slate-500">
+          {t('ruleSet')}: {c.rating.ruleSet.name} · {c.rating.ruleSet.calculationVersion}
+        </p>
       ) : null}
-      <p className="mt-3 text-sm text-slate-600">{rated ? t('ratedHint') : t('nonRatedHint')}</p>
-      {admin ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {!rated && !c.publishedAt ? (
-            <ReasonAction
-              variant="primary"
-              label={t('enable')}
-              title={t('enableTitle')}
-              description={t('enableDescription')}
-              onConfirm={(reason) => run('rating', { reason })}
-            />
-          ) : (
-            <ReasonAction
-              variant={rated ? 'danger' : 'secondary'}
-              label={rated ? t('makeNonRated') : t('makeRated')}
-              title={t('changeTitle')}
-              description={t('changeDescription')}
-              onConfirm={(reason) =>
-                run('rating-type-change', { competitionType: rated ? 'NON_RATED' : 'RATED', reason })
-              }
-            />
-          )}
+      {admin && !rated && !c.publishedAt ? (
+        <div className="mt-4">
+          <ReasonAction
+            variant="primary"
+            label={t('enable')}
+            title={t('enableTitle')}
+            description={t('enableDescription')}
+            onConfirm={(reason) => enable(reason)}
+          />
         </div>
       ) : null}
     </Card>

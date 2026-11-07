@@ -165,6 +165,14 @@ export class ResultsQueriesService {
    */
   async history(user: AuthUser, athleteId: string): Promise<AthleteHistoryDto> {
     await this.athletes.assertView(user, athleteId);
+    return this.historyOf(athleteId);
+  }
+
+  /**
+   * История выступлений без проверки доступа — для страницы участника (правки 07.11.2026, п. 8): места и медали
+   * опубликованных итогов, которые и так видны на публичных страницах турниров.
+   */
+  async historyOf(athleteId: string): Promise<AthleteHistoryDto> {
     const rows = await this.db.athleteResult.findMany({
       where: { athleteId },
       orderBy: [{ competitionStartDate: 'desc' }, { publishedAt: 'desc' }],

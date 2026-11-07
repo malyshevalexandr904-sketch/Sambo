@@ -47,6 +47,26 @@ const mat = (s: PushContext): string | undefined =>
 const bout = (s: PushContext): string | undefined =>
   s.matchNumber ? (s.locale === 'en' ? `bout № ${s.matchNumber}` : `схватка № ${s.matchNumber}`) : undefined;
 
+/** Роль в персонале турнира — в приглашении (правки 07.11.2026). */
+export const STAFF_ROLE_NAMES: Record<Locale, Record<string, string>> = {
+  ru: {
+    TOURNAMENT_MANAGER: 'руководитель турнира',
+    SECRETARY: 'секретарь',
+    CHIEF_REFEREE: 'главный судья',
+    REFEREE: 'судья',
+    MEDICAL_STAFF: 'врач',
+  },
+  en: {
+    TOURNAMENT_MANAGER: 'tournament manager',
+    SECRETARY: 'secretary',
+    CHIEF_REFEREE: 'chief referee',
+    REFEREE: 'referee',
+    MEDICAL_STAFF: 'medical staff',
+  },
+};
+const staffRole = (s: PushContext): string | undefined =>
+  s.roleCode ? (STAFF_ROLE_NAMES[s.locale][s.roleCode] ?? s.roleCode) : undefined;
+
 const TEXTS: Record<Locale, Record<NotificationType, Texts>> = {
   ru: {
     'application.returned': {
@@ -72,6 +92,10 @@ const TEXTS: Record<Locale, Record<NotificationType, Texts>> = {
     'competition.registration_opened': {
       title: 'Открыта регистрация на турнир',
       body: (s) => join(s.competitionName),
+    },
+    'competition.staff_invited': {
+      title: 'Приглашение в персонал турнира',
+      body: (s) => join(staffRole(s), s.competitionName),
     },
     'match.soon': {
       title: 'Скоро схватка',
@@ -119,6 +143,10 @@ const TEXTS: Record<Locale, Record<NotificationType, Texts>> = {
     'competition.registration_opened': {
       title: 'Tournament registration is open',
       body: (s) => join(s.competitionName),
+    },
+    'competition.staff_invited': {
+      title: 'Invitation to the tournament staff',
+      body: (s) => join(staffRole(s), s.competitionName),
     },
     'match.soon': {
       title: 'Bout coming up',

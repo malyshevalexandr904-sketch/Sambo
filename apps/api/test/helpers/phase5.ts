@@ -177,3 +177,96 @@ export async function drawCategory(
 
 export const SEED_A = '0f1e2d3c4b5a69788796a5b4c3d2e1f0';
 export const SEED_B = 'a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5';
+
+/**
+ * Все условия единого допуска выполнены (правки 07.11.2026, п. 13): проверенные документы всех типов из «Моих
+ * документов», прибытие и пройденное взвешивание. Нужны, когда тест пересчитывает допуск категории.
+ */
+export async function satisfyAdmission(
+  t: TestApp,
+  competitionId: string,
+  entryIds: string[],
+): Promise<string[]> {
+  const types = [
+    'PASSPORT',
+    'BIRTH_CERTIFICATE',
+    'SCHOOL_CERTIFICATE',
+    'OMS_POLICY',
+    'SPORT_RANK_ORDER',
+    'MEDICAL_CERTIFICATE',
+    'INSURANCE_POLICY',
+  ];
+  const documentIds: string[] = [];
+  for (const entryId of entryIds) {
+    const { athleteId } = await t.admin.entry.findUniqueOrThrow({ where: { id: entryId } });
+    for (const typeCode of types) {
+      const fileId = uuidv7();
+      await t.admin.storedFile.create({
+        data: {
+          id: fileId,
+          bucket: 'PRIVATE_DOCUMENTS',
+          purpose: 'DOCUMENT',
+          storageKey: `test/${fileId}`,
+          originalName: 'документ.pdf',
+          mimeType: 'application/pdf',
+          sizeBytes: 100n,
+          sha256: '0'.repeat(64),
+          status: 'AVAILABLE',
+        },
+      });
+      const id = uuidv7();
+      await t.admin.document.create({ data: { id, typeCode, athleteId, fileId, status: 'VERIFIED' } });
+      documentIds.push(id);
+    }
+    await t.admin.checkIn.upsert({
+      where: { competitionId_athleteId: { competitionId, athleteId } },
+      create: { competitionId, athleteId, status: 'ARRIVED', method: 'MANUAL', arrivedAt: new Date() },
+      update: { status: 'ARRIVED' },
+    });
+    const entry = await t.admin.entry.findUniqueOrThrow({
+      where: { id: entryId },
+      select: { categoryId: true },
+    });
+    const { scaleId, windowId } = await weighInSetup(t, competitionId, entry.categoryId);
+    await t.admin.weighInAttempt.create({
+      data: {
+        competitionId,
+        entryId,
+        categoryId: entry.categoryId,
+        windowId,
+        scaleId,
+        weightGrams: 36_000,
+        measuredAt: new Date(),
+        kind: 'OFFICIAL',
+        result: 'PASSED',
+        limitUpperGrams: 38_000,
+        toleranceGrams: 0,
+      },
+    });
+  }
+  return documentIds;
+}
+
+const weighIns = new Map<string, { scaleId: string; windowId: string }>();
+
+/** Весы и официальное окно взвешивания категории (одни на категорию). */
+async function weighInSetup(t: TestApp, competitionId: string, categoryId: string) {
+  const known = weighIns.get(categoryId);
+  if (known) return known;
+  const scale = await t.admin.scale.create({
+    data: { competitionId, name: 'Весы', verifiedUntil: new Date(Date.now() + 365 * 86_400_000) },
+  });
+  const window = await t.admin.weighInWindow.create({
+    data: {
+      competitionId,
+      name: `Взвешивание ${categoryId.slice(-4)}`,
+      startsAt: new Date(Date.now() - 3_600_000),
+      endsAt: new Date(Date.now() - 60_000),
+      kind: 'OFFICIAL',
+      categories: { create: { competitionId, categoryId } },
+    },
+  });
+  const ids = { scaleId: scale.id, windowId: window.id };
+  weighIns.set(categoryId, ids);
+  return ids;
+}

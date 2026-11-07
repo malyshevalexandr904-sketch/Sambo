@@ -7,6 +7,7 @@ import {
   type AdmissionCheckKind,
   admissionStatusOf,
   type CompetitionStatus,
+  fullYearsOn,
 } from '@sde/contracts';
 import { Prisma, type Tx } from '@sde/db';
 import { ConsentsService } from '../../consents';
@@ -20,7 +21,7 @@ import {
   type MergedCheck,
   mergeCheck,
   type RequiredChecks,
-  requiredChecks,
+  unifiedRequiredChecks,
 } from '../domain/admission-rules';
 import {
   type AdmissionCompetition,
@@ -140,11 +141,30 @@ export class AdmissionEngine {
     subjects: AdmissionSubject[],
     now: Date,
   ): Promise<Map<string, ComputedChecks>> {
-    const requirements = await tx.competitionRequirement.findMany({
-      where: { competitionId: competition.id, mandatory: true },
-      select: { categoryId: true, kind: true, documentTypeCode: true, consentKind: true, mandatory: true },
+    // Правки 07.11.2026, п. 13: требования допуска едины для всех турниров (возраст — на дату начала турнира).
+    const athletes = await tx.athleteProfile.findMany({
+      where: { id: { in: [...new Set(subjects.map((s) => s.athleteId))] } },
+      select: {
+        id: true,
+        person: { select: { birthDate: true } },
+        ranks: { where: { revokedAt: null }, select: { id: true }, take: 1 },
+      },
     });
-    const required = new Map(subjects.map((s) => [s.entryId, requiredChecks(requirements, s.categoryId)]));
+    const facts = new Map(
+      athletes.map((a) => [
+        a.id,
+        {
+          age: fullYearsOn(dateOnly(a.person.birthDate), competition.startDate),
+          hasRank: a.ranks.length > 0,
+        },
+      ]),
+    );
+    const required = new Map(
+      subjects.map((s) => {
+        const f = facts.get(s.athleteId) ?? { age: 0, hasRank: false };
+        return [s.entryId, unifiedRequiredChecks(f.age, f.hasRank)];
+      }),
+    );
     const docs = await this.documentFacts(tx, competition.id, subjects, required);
     const needConsents = subjects.filter((s) => required.get(s.entryId)?.kinds.has('CONSENTS'));
     const consents =

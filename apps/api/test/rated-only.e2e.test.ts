@@ -50,6 +50,7 @@ const request = (over: Record<string, unknown> = {}) => {
     refereeTeam: 'NONE',
     gender: 'SEPARATE',
     responsible: { kind: 'SELF' },
+    contact: { channel: 'EMAIL', value: 'org@test.local' },
     rulesAccepted: true,
     comment: 'Просим двух судей категории ВК',
     ...over,

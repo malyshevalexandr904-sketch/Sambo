@@ -8,7 +8,6 @@ import {
   createUser,
   login,
   resetData,
-  sentEmails,
   type Session,
   type TestApp,
 } from './helpers/app';
@@ -167,18 +166,19 @@ describe('competition lifecycle', () => {
     expect(await t.admin.competition.count()).toBe(before);
   });
 
-  it('publication pins a published rule set version and needs categories; afterwards rules and discipline are frozen', async () => {
+  it('a draft gets the latest published rule set version; publication needs categories; afterwards rules and discipline are frozen', async () => {
     const w = await world();
     const c = await draft(w);
-    const noRules = await send(
-      w.organizer,
-      'post',
-      `/api/v1/competitions/${c.id}/transitions`,
-      { to: 'PUBLISHED' },
-      c.version,
-    );
-    expect(noRules.body.error.code).toBe('RULESET_REQUIRED');
-
+    // Правки 07.11.2026, п. 14: версия правил не выбирается — черновик получает последнюю опубликованную.
+    const pinned = await t.admin.competition.findUniqueOrThrow({ where: { id: c.id } });
+    const latest = await t.admin.ruleSetVersion.findFirst({
+      where: {
+        status: 'PUBLISHED',
+        ruleSet: { disciplineCode: 'SPORT_SAMBO', ownerOrganizationId: null, status: 'ACTIVE' },
+      },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+    });
+    expect(pinned.ruleSetVersionId).toBe(latest?.id);
     const withRules = await send(
       w.organizer,
       'patch',
@@ -499,8 +499,9 @@ describe('competition lifecycle', () => {
   it('only a draft can be deleted; its staff lose their roles', async () => {
     const w = await world();
     const c = await draft(w);
+    const judge = await createUser(t);
     await send(w.organizer, 'post', `/api/v1/competitions/${c.id}/members`, {
-      email: 'judge.for.draft@test.local',
+      userId: judge.id,
       roleCode: 'CHIEF_REFEREE',
     }).expect(201);
     await send(w.organizer, 'delete', `/api/v1/competitions/${c.id}`).expect(204);
@@ -514,45 +515,63 @@ describe('competition lifecycle', () => {
 });
 
 describe('competition staff', () => {
-  it('the manager invites a secretary by email; only the invitee accepts; nobody appoints themselves', async () => {
+  it('the manager invites a platform user; only the invitee accepts or declines; nobody appoints themselves', async () => {
     const w = await world();
     const c = await draft(w);
     const self = await send(w.organizer, 'post', `/api/v1/competitions/${c.id}/members`, {
-      email: w.organizerUser.email,
+      userId: w.organizerUser.id,
       roleCode: 'CHIEF_REFEREE',
     });
     expect(self.status).toBe(403);
+    const secretaryUser = await createUser(t);
     const invited = await send(w.organizer, 'post', `/api/v1/competitions/${c.id}/members`, {
-      email: 'Secretary.New@Test.Local',
+      userId: secretaryUser.id,
       roleCode: 'SECRETARY',
     });
     expect(invited.status, JSON.stringify(invited.body)).toBe(201);
-    expect(invited.body.data).toMatchObject({
-      status: 'INVITED',
-      invitedEmail: 'secretary.new@test.local',
-      user: null,
-    });
+    expect(invited.body.data).toMatchObject({ status: 'INVITED', user: { id: secretaryUser.id } });
     const dup = await send(w.organizer, 'post', `/api/v1/competitions/${c.id}/members`, {
-      email: 'secretary.new@test.local',
+      userId: secretaryUser.id,
       roleCode: 'SECRETARY',
     });
     expect(dup.body.error.code).toBe('ALREADY_EXISTS');
-
-    const mail = (await sentEmails(t, 'competition.invite')).at(-1);
-    expect(mail?.to).toBe('secretary.new@test.local');
-    const token = new URL(mail?.params.acceptUrl ?? '').searchParams.get('token') ?? '';
+    // Приглашение — уведомление на платформе, не письмо.
+    expect(
+      await t.admin.outboxEvent.count({
+        where: { type: 'competition.member_invited', competitionId: c.id },
+      }),
+    ).toBe(1);
+    const membershipId = invited.body.data.id as string;
 
     const intruder = await createUser(t);
     const intruderSession = await login(t, intruder.email);
-    const wrong = await send(intruderSession, 'post', '/api/v1/competition-invites/accept', { token });
-    expect(wrong.status).toBe(403);
+    const wrong = await send(intruderSession, 'post', `/api/v1/competition-invites/${membershipId}/accept`);
+    expect(wrong.status).toBe(404);
 
-    const secretaryUser = await createUser(t, { email: 'secretary.new@test.local' });
     const secretary = await login(t, secretaryUser.email);
     await secretary.agent.get(`/api/v1/competitions/${c.id}`).expect(404);
-    const accepted = await send(secretary, 'post', '/api/v1/competition-invites/accept', { token });
+    const mine = await secretary.agent.get('/api/v1/competition-invites/mine').expect(200);
+    expect(mine.body.data).toEqual([
+      expect.objectContaining({
+        id: membershipId,
+        roleCode: 'SECRETARY',
+        competition: expect.objectContaining({ id: c.id }),
+      }),
+    ]);
+    const accepted = await send(secretary, 'post', `/api/v1/competition-invites/${membershipId}/accept`);
     expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
     expect(accepted.body.data).toMatchObject({ status: 'ACTIVE', roleCode: 'SECRETARY' });
+
+    const refereeUser = await createUser(t);
+    const offer = await send(w.organizer, 'post', `/api/v1/competitions/${c.id}/members`, {
+      userId: refereeUser.id,
+      roleCode: 'REFEREE',
+    }).expect(201);
+    const referee = await login(t, refereeUser.email);
+    const declined = await send(referee, 'post', `/api/v1/competition-invites/${offer.body.data.id}/decline`);
+    expect(declined.body.data).toMatchObject({ status: 'ENDED' });
+    await referee.agent.get(`/api/v1/competitions/${c.id}`).expect(404);
+
     const view = await secretary.agent.get(`/api/v1/competitions/${c.id}`).expect(200);
     expect(view.body.data.viewer.roles).toEqual(['SECRETARY']);
     expect(view.body.data.allowedActions).toEqual(

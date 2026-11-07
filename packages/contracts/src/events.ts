@@ -36,6 +36,13 @@ export const EVENT_SCHEMAS = {
   // Phase 4a — турнир и заявки. Потребители (уведомления, публичные страницы) — с Phase 4b.
   'competition.published': z.object({ competitionId: Uuid }),
   'competition.status_changed': z.object({ competitionId: Uuid, from: z.string(), to: z.string() }),
+  /** Приглашение в персонал турнира (правки 07.11.2026): уведомление приглашённому на платформе. */
+  'competition.member_invited': z.object({
+    membershipId: Uuid,
+    competitionId: Uuid,
+    userId: Uuid,
+    roleCode: z.string(),
+  }),
   'competition.dates_changed': z.object({ competitionId: Uuid }),
   'category.status_changed': z.object({ categoryId: Uuid, from: z.string(), to: z.string() }),
   'category.merged': z.object({ targetCategoryId: Uuid, sourceCategoryIds: z.array(Uuid) }),

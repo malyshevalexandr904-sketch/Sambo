@@ -16,6 +16,7 @@ import { CompetitionsService } from './application/competitions.service';
 import { RegulationService } from './application/regulation.service';
 import { RegulationDocumentService } from './application/regulation-document.service';
 import { StaffService } from './application/staff.service';
+import { RefereeRatingsService } from './application/referee-ratings.service';
 import { RatingModule } from '../rating';
 import { CompetitionRatingController } from './api/competition-rating.controller';
 import { CompetitionRequestsController } from './api/competition-requests.controller';
@@ -49,6 +50,7 @@ import { CompetitionStagesService } from './application/competition-stages.servi
     RegulationService,
     RegulationDocumentService,
     StaffService,
+    RefereeRatingsService,
     RefereeRecruitmentService,
     CompetitionStagesService,
   ],

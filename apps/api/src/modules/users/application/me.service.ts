@@ -118,14 +118,14 @@ export class MeService {
       const before = await tx.user.findUniqueOrThrow({ where: { id: userId } });
       const after = await tx.user.update({
         where: { id: userId },
-        data: { displayName: patch.displayName, locale: patch.locale, timezone: patch.timezone },
+        data: { locale: patch.locale, timezone: patch.timezone },
       });
       await this.audit.record(tx, {
         action: 'user.updated',
         entityType: 'User',
         entityId: userId,
-        before: { displayName: before.displayName, locale: before.locale, timezone: before.timezone },
-        after: { displayName: after.displayName, locale: after.locale, timezone: after.timezone },
+        before: { locale: before.locale, timezone: before.timezone },
+        after: { locale: after.locale, timezone: after.timezone },
       });
     });
     return this.get(ref);

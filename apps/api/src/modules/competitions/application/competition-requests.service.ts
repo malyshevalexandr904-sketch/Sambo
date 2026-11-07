@@ -225,6 +225,7 @@ export class CompetitionRequestsService {
         refereeTeam: input.refereeTeam,
         gender: input.gender,
         responsible,
+        contact: input.contact,
         rulesAcceptedAt: new Date().toISOString(),
       });
       const fields = {

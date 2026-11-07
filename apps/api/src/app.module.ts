@@ -28,6 +28,7 @@ import { CoachesModule } from './modules/coaches';
 import { CompetitionsModule } from './modules/competitions';
 import { ConsentsModule } from './modules/consents';
 import { DictionariesModule } from './modules/dictionaries';
+import { DirectoryModule } from './modules/directory';
 import { DocumentsModule } from './modules/documents';
 import { DrawsModule } from './modules/draws';
 import { FilesModule } from './modules/files';
@@ -124,6 +125,7 @@ import { VenueSyncModule, WriteAuthorityGuard } from './modules/venue-sync';
     LiveModule,
     AdminModule,
     DictionariesModule,
+    DirectoryModule,
     HealthModule,
   ],
   providers: [

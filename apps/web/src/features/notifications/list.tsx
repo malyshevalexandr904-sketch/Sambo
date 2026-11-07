@@ -49,6 +49,7 @@ function useNotificationText(): (n: NotificationDto) => { title: string; body: s
   const t = useTranslations('notifications');
   const statuses = useTranslations('applications.statuses');
   const onboarding = useTranslations('onboarding');
+  const roles = useTranslations('roles');
   const locale = useLocale();
   return (n) => {
     const none = t('noValue');
@@ -69,7 +70,9 @@ function useNotificationText(): (n: NotificationDto) => { title: string; body: s
       role:
         n.context.onboardingRole && onboarding.has(`roles.${n.context.onboardingRole}`)
           ? onboarding(`roles.${n.context.onboardingRole}`)
-          : none,
+          : n.context.roleCode && roles.has(n.context.roleCode)
+            ? roles(n.context.roleCode)
+            : none,
       matNumber: n.context.matNumber ?? none,
       matchNumber: n.context.matchNumber ?? none,
       time: matchTime(n.context.plannedAt, n.context.timezone, locale) ?? none,

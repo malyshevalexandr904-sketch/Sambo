@@ -5,6 +5,7 @@ import { categoryWeightLabel, type PublicCompetition, type PublicCompetitionCate
 import { useLocale, useTranslations } from 'next-intl';
 import type { ReactNode } from 'react';
 import { MarkdownLite } from '@/components/markdown-lite';
+import { UnifiedRequirementsList } from '@/features/documents/unified-requirements';
 import type { TournamentLabels } from './labels';
 import { groupOf, posterDate } from './poster';
 
@@ -20,7 +21,6 @@ export function RegulationSummary({
   const tr = useTranslations('tournaments');
   const locale = useLocale();
   const lang = locale === 'en' ? 'en' : 'ru';
-  const name = (x: { ru: string; en: string }) => (lang === 'en' ? x.en : x.ru);
   const date = posterDate(c.startDate, c.endDate, locale);
   const groups = new Map<string, PublicCompetitionCategory[]>();
   for (const cat of c.categories) {
@@ -54,7 +54,6 @@ export function RegulationSummary({
     },
     { icon: '🏛️', label: t('organizer'), value: c.organizerName },
   ];
-  const docs = c.requirements.filter((r) => r.mandatory);
   return (
     <div className="space-y-4">
       <section className="rounded-xl border border-slate-200 bg-white p-4">
@@ -95,19 +94,12 @@ export function RegulationSummary({
           </ul>
         )}
       </section>
-      {docs.length > 0 || c.requirementsMd ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-4">
-          <h3 className="mb-2 text-lg font-semibold">{t('documents')}</h3>
-          {docs.length > 0 ? (
-            <ul className="list-disc space-y-1 pl-5 text-sm text-slate-700">
-              {docs.map((r, i) => (
-                <li key={i}>{r.documentType ? name(r.documentType) : tr(`requirementKinds.${r.kind}`)}</li>
-              ))}
-            </ul>
-          ) : null}
-          {c.requirementsMd ? <MarkdownLite text={c.requirementsMd} className="mt-2" /> : null}
-        </section>
-      ) : null}
+      {/* Правки 07.11.2026, п. 13: требования допуска едины для всех турниров платформы. */}
+      <section className="rounded-xl border border-slate-200 bg-white p-4">
+        <h3 className="mb-2 text-lg font-semibold">{t('documents')}</h3>
+        <UnifiedRequirementsList />
+        {c.requirementsMd ? <MarkdownLite text={c.requirementsMd} className="mt-2" /> : null}
+      </section>
       {c.descriptionMd ? (
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <h3 className="mb-2 text-lg font-semibold">{tr('about')}</h3>

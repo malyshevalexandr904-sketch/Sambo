@@ -2,7 +2,7 @@
 // и место показываются только в приложении, куда пользователь входит с проверкой прав.
 import { isMatchDayNotification, type Locale, type NotificationType } from '@sde/contracts';
 import { type RenderedEmail, renderDefinition, type TemplateDef } from '../email/templates';
-import { renderPush } from './push-templates';
+import { renderPush, STAFF_ROLE_NAMES } from './push-templates';
 
 /** Письмо о схватке (Phase 8b): та же строка, что в push, — ковёр, номер, время, турнир; без имён. */
 const matchDay = (subject: string, more: string, action: string): TemplateDef => ({
@@ -222,6 +222,15 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       action: { label: 'Посмотреть результаты', param: 'url' },
       required: ['competitionName', 'categoryName', 'url'],
     },
+    'competition.staff_invited': {
+      subject: 'Приглашение в персонал турнира — Цифровое самбо',
+      lines: [
+        'Вас пригласили в персонал турнира «{competitionName}» (роль: {roleName}).',
+        'Принять приглашение или отказаться можно в личном кабинете, в разделе «Приглашения».',
+      ],
+      action: { label: 'Открыть приглашения', param: 'url' },
+      required: ['competitionName', 'roleName', 'url'],
+    },
     'competition.registration_opened': {
       subject: 'Открыта регистрация на турнир — Цифровое самбо',
       lines: [
@@ -311,6 +320,15 @@ const TEMPLATES: Record<Locale, Record<NotificationType, TemplateDef>> = {
       action: { label: 'View results', param: 'url' },
       required: ['competitionName', 'categoryName', 'url'],
     },
+    'competition.staff_invited': {
+      subject: 'Invitation to the tournament staff — Цифровое самбо',
+      lines: [
+        'You have been invited to the staff of “{competitionName}” (role: {roleName}).',
+        'Accept or decline the invitation in your account, under “Invitations”.',
+      ],
+      action: { label: 'Open invitations', param: 'url' },
+      required: ['competitionName', 'roleName', 'url'],
+    },
     'competition.registration_opened': {
       subject: 'Tournament registration is open — Цифровое самбо',
       lines: [
@@ -342,11 +360,13 @@ export function renderNotificationEmail(
   const details = isMatchDayNotification(type) ? renderPush(type, { ...params, locale }).body : '';
   const roleText = params.onboardingRole ? (ONBOARDING_ROLE[locale][params.onboardingRole] ?? '') : '';
   const expirationText = params.expirationDate ? formatIsoDate(params.expirationDate) : '';
+  const roleName = params.roleCode ? (STAFF_ROLE_NAMES[locale][params.roleCode] ?? params.roleCode) : '';
   return renderDefinition(TEMPLATES[locale][type], `notification:${type}`, locale, {
     ...params,
     statusText,
     details,
     roleText,
     expirationText,
+    roleName,
   });
 }

@@ -365,12 +365,11 @@ export interface CategoryRuleDto {
 
 const CompetitionRole = z.enum(COMPETITION_ROLE_CODES as [RoleCode, ...RoleCode[]]);
 
-export const CompetitionMemberInvite = z
-  .object({ email: Email.optional(), userId: Uuid.optional(), roleCode: CompetitionRole })
-  .refine((v) => (v.email === undefined) !== (v.userId === undefined), {
-    error: 'email_or_user_required',
-    path: ['email'],
-  });
+/**
+ * Приглашение в персонал турнира (правки 07.11.2026, п. 15): только зарегистрированного пользователя, найденного по
+ * ФИО. Приглашение приходит уведомлением на платформе, не письмом; принять или отказаться — в кабинете.
+ */
+export const CompetitionMemberInvite = z.object({ userId: Uuid, roleCode: CompetitionRole });
 export type CompetitionMemberInvite = z.infer<typeof CompetitionMemberInvite>;
 
 export const CompetitionMemberPatch = z.object({ status: z.enum(['SUSPENDED', 'ACTIVE', 'ENDED']) });
@@ -395,6 +394,15 @@ export interface CompetitionMember {
 
 export const AcceptCompetitionInviteRequest = z.object({ token: z.string().min(20).max(200) });
 export type AcceptCompetitionInviteRequest = z.infer<typeof AcceptCompetitionInviteRequest>;
+
+/** Приглашение в персонал турнира, ждущее ответа приглашённого (правки 07.11.2026, п. 15). */
+export interface MyCompetitionInviteDto {
+  id: string;
+  roleCode: RoleCode;
+  competition: { id: string; name: string; startDate: string; endDate: string };
+  invitedBy: string | null;
+  createdAt: string;
+}
 
 // ---- Места проведения ----
 

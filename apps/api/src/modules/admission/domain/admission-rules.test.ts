@@ -10,6 +10,7 @@ import {
   mergeCheck,
   PASSED,
   requiredChecks,
+  unifiedRequiredChecks,
   type RequirementFact,
 } from './admission-rules';
 
@@ -195,5 +196,26 @@ describe('admission status and waivers', () => {
     };
     expect(checkChanged(stored, next)).toBe(false);
     expect(checkChanged({ ...stored, status: 'PENDING' }, next)).toBe(true);
+  });
+});
+
+describe('unified admission requirements (07.11.2026, item 13)', () => {
+  it('five documents by age and rank, insurance, arrival and weight; nothing else', () => {
+    const child = unifiedRequiredChecks(12, false);
+    expect([...child.kinds].sort()).toEqual(['CHECK_IN', 'DOCUMENTS', 'INSURANCE', 'WEIGHT']);
+    expect(child.documentTypes).toEqual([
+      'BIRTH_CERTIFICATE',
+      'SCHOOL_CERTIFICATE',
+      'OMS_POLICY',
+      'MEDICAL_CERTIFICATE',
+    ]);
+    expect(child.insuranceTypes).toEqual(['INSURANCE_POLICY']);
+    expect(child.consentKinds).toEqual([]);
+    expect(unifiedRequiredChecks(14, true).documentTypes).toEqual([
+      'PASSPORT',
+      'OMS_POLICY',
+      'SPORT_RANK_ORDER',
+      'MEDICAL_CERTIFICATE',
+    ]);
   });
 });

@@ -1,6 +1,7 @@
 // Допуск участия (G-06; ARCHITECTURE.md, 16.3; DATABASE.md, 3.5): какие проверки требует положение и как
 // из фактов (документы, согласия, медицинский допуск, взвешивание, прибытие) получается итог проверки.
 import {
+  admissionDocumentTypes,
   type AdmissionCheckKind,
   type AdmissionCheckStatus,
   type AdmissionReason,
@@ -50,6 +51,22 @@ export function requiredChecks(requirements: readonly RequirementFact[], categor
     documentTypes: typesOf('DOCUMENT'),
     insuranceTypes: typesOf('INSURANCE'),
     consentKinds: uniq(own.filter((r) => r.consentKind).map((r) => r.consentKind as ConsentKind)),
+  };
+}
+
+/**
+ * Единые требования допуска (правки 07.11.2026, п. 13): пять документов из «Моих документов» (личность по возрасту,
+ * страховка, ОМС, разряд — если есть, медицинская справка). Прибытие и взвешивание — не требования, а порядок дня
+ * соревнований: без них спортсмен не выходит на ковёр. Положение турнира других требований не добавляет: согласия и
+ * осмотр врача турнира допуск не задерживают (медицинская справка — среди пяти документов).
+ */
+export function unifiedRequiredChecks(age: number, hasRank: boolean): RequiredChecks {
+  const { documents, insurance } = admissionDocumentTypes(age, hasRank);
+  return {
+    kinds: new Set<AdmissionCheckKind>(['DOCUMENTS', 'INSURANCE', 'CHECK_IN', 'WEIGHT']),
+    documentTypes: documents,
+    insuranceTypes: insurance,
+    consentKinds: [],
   };
 }
 

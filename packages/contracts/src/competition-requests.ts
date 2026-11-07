@@ -65,6 +65,35 @@ export function hostingRequirements(mats: number, ageGroups: number): HostingReq
 const FullName = z.string().trim().min(3, { error: 'too_short' }).max(200, { error: 'too_long' });
 
 /**
+ * Как администратору платформы связаться с организатором (правки 07.11.2026, п. 11): электронная почта, Telegram
+ * или Max и данные для связи (адрес почты; имя пользователя, телефон или ссылка в мессенджере).
+ */
+export const HOSTING_CONTACT_CHANNELS = ['EMAIL', 'TELEGRAM', 'MAX'] as const;
+export type HostingContactChannel = (typeof HOSTING_CONTACT_CHANNELS)[number];
+
+export const HostingContact = z
+  .object({
+    channel: z.enum(HOSTING_CONTACT_CHANNELS),
+    value: z.string().trim().min(3, { error: 'too_short' }).max(200, { error: 'too_long' }),
+  })
+  .superRefine((v, ctx) => {
+    if (v.channel === 'EMAIL' && !Email.safeParse(v.value).success)
+      ctx.addIssue({ code: 'custom', path: ['value'], message: 'invalid_email' });
+  });
+export type HostingContact = z.infer<typeof HostingContact>;
+
+/** Ссылка для связи: почта — mailto, Telegram — t.me по имени пользователя, Max — только ссылка max.ru. */
+export function hostingContactHref(c: HostingContact): string | null {
+  if (c.channel === 'EMAIL') return `mailto:${c.value}`;
+  if (c.channel === 'TELEGRAM') {
+    if (/^https:\/\/t\.me\//.test(c.value)) return c.value;
+    const name = c.value.replace(/^@/, '');
+    return /^[A-Za-z0-9_]{4,32}$/.test(name) ? `https://t.me/${name}` : null;
+  }
+  return /^https:\/\/(web\.)?max\.ru\//.test(c.value) ? c.value : null;
+}
+
+/**
  * Ответственный за проведение (для связи с администратором платформы): сам автор заявки, другой
  * зарегистрированный пользователь (найден поиском по ФИО или почте) или контактные данные — ФИО и телефон или почта.
  */
@@ -144,6 +173,8 @@ export const CompetitionRequestProposal = z.object({
   refereeTeam: z.enum(HOSTING_AVAILABILITY).optional(),
   gender: z.enum(HOSTING_GENDERS).optional(),
   responsible: HostingResponsible.optional(),
+  /** Способ связи с организатором (правки 07.11.2026, п. 11). */
+  contact: HostingContact.optional(),
   /** Когда автор согласился с правилами подачи заявки. */
   rulesAcceptedAt: z.string().optional(),
 });
@@ -162,6 +193,8 @@ export const CompetitionRequestCreate = z
     endDate: CompetitionFields.endDate.optional(),
     ...HostingFields,
     responsible: HostingResponsibleInput,
+    /** Как администратору платформы связаться с организатором (правки 07.11.2026, п. 11). */
+    contact: HostingContact,
     rulesAccepted: z.literal(true, { error: 'consent_required' }),
     /** Пояснение для администратора платформы. */
     comment: z.string().trim().max(2000, { error: 'too_long' }).optional(),

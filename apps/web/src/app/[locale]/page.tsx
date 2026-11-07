@@ -1,10 +1,10 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { BrandWordmark } from '@/components/brand';
 import { DemoLoginAction } from '@/components/demo-login-action';
 import { HomeAbout } from '@/components/home-about';
 import { HomeHeroBackdrop } from '@/components/home-hero-backdrop';
 import { HomeLoginAction } from '@/components/home-login-action';
 import { LegalLinks } from '@/components/legal-links';
-import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { Link } from '@/i18n/navigation';
 
@@ -15,6 +15,7 @@ import { Link } from '@/i18n/navigation';
  * фон первого экрана — видео зала с самбистами (на телефоне — неподвижный кадр), карточки входа — стеклянные.
  * Правки 04.11.2026: под названием — цитата Василия Шестакова с автором. Правки 05.11.2026: без надписи над названием,
  * цитата в одну строку, под автором — кратко, кто он; рядом с названием — анимированная эмблема из логотипа.
+ * Правки 07.11.2026: без выбора языка, название — в фирменном начертании, под автором цитаты — только должность.
  */
 export default async function HomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -28,8 +29,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
       <div className="theme-light relative isolate overflow-hidden bg-[#070d1a] text-white">
         <HomeHeroBackdrop />
         <div className="mx-auto flex min-h-[100svh] max-w-5xl flex-col px-4 py-6">
-          <div className="flex justify-end gap-2">
-            <LocaleSwitcher />
+          {/* Правки 07.11.2026, п. 2: выбора языка больше нет, переключатель темы — в правом верхнем углу. */}
+          <div className="flex justify-end">
             <ThemeSwitcher />
           </div>
           <div className="flex flex-1 flex-col justify-center py-10">
@@ -52,7 +53,8 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
                 className="animate-fade-up text-5xl font-extrabold tracking-tight text-white [text-shadow:0_2px_24px_rgb(0_0_0/0.45)] sm:text-7xl"
                 style={{ animationDelay: '80ms' }}
               >
-                {t('title')}
+                {/* Правки 07.11.2026, п. 3: фирменное начертание надписи (components/brand.tsx). */}
+                <BrandWordmark className="brand-word-on-dark flex-wrap" />
               </h1>
             </div>
             {/* Цвета самбо: красная и синяя куртки. */}

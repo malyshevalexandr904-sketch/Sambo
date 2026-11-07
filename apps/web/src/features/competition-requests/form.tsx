@@ -10,10 +10,12 @@ import {
   type CompetitionRequestDto,
   type DataEnvelope,
   HOSTING_AVAILABILITY,
+  HOSTING_CONTACT_CHANNELS,
   HOSTING_GENDERS,
   HOSTING_MAX_AGE_GROUPS,
   HOSTING_MAX_MATS,
   type HostingAvailability,
+  type HostingContactChannel,
   type HostingGender,
   type ResponsibleCandidateDto,
   hostingRequirements,
@@ -52,6 +54,9 @@ interface FormValues {
   contactName: string;
   contactPhone: string;
   contactEmail: string;
+  /** Способ связи администратора платформы с организатором (правки 07.11.2026, п. 11). */
+  contactChannel: HostingContactChannel | '';
+  contactValue: string;
   comment: string;
   rulesAccepted: boolean;
 }
@@ -79,6 +84,8 @@ const EMPTY: FormValues = {
   contactName: '',
   contactPhone: '',
   contactEmail: '',
+  contactChannel: '',
+  contactValue: '',
   comment: '',
   rulesAccepted: false,
 };
@@ -144,6 +151,8 @@ export function CompetitionRequestForm() {
     contactPhone: ['responsible.phone'],
     contactEmail: ['responsible.phone', 'responsible.email'],
     responsible: ['responsible.userId', 'responsible.email', 'responsible.fullName', 'responsible.phone'],
+    contactChannel: ['contact.channel', 'contact.value'],
+    contactValue: ['contact.value'],
   };
   const clearErrors = (keys: (keyof FormValues)[]): void =>
     setErrors((e) => {
@@ -229,6 +238,8 @@ export function CompetitionRequestForm() {
       if (v.contactName.trim().length < 3) local['responsible.fullName'] = 'required';
       if (!v.contactPhone.trim() && !v.contactEmail.trim()) local['responsible.phone'] = 'contact_required';
     }
+    if (!v.contactChannel) local['contact.channel'] = 'required';
+    else if (v.contactValue.trim().length < 3) local['contact.value'] = 'required';
     if (!v.rulesAccepted) local.rulesAccepted = 'consent_required';
     setErrors(local);
     if (Object.keys(local).length > 0) return;
@@ -243,6 +254,7 @@ export function CompetitionRequestForm() {
       refereeTeam: v.refereeTeam,
       gender: v.gender,
       responsible: responsibleBody(),
+      contact: { channel: v.contactChannel, value: v.contactValue.trim() },
       rulesAccepted: true,
       comment: v.comment.trim() || undefined,
       ...(activeDraft ? { draftId: activeDraft } : {}),
@@ -487,6 +499,38 @@ export function CompetitionRequestForm() {
                 />
               </Field>
             </div>
+          ) : null}
+        </Card>
+
+        <Card>
+          <CardTitle>{tr('contactMethod')}</CardTitle>
+          <p className="mb-3 text-sm text-slate-600">{tr('contactMethodHint')}</p>
+          <Choice
+            name="r-contact-channel"
+            legend={tr('contactMethodQuestion')}
+            options={HOSTING_CONTACT_CHANNELS}
+            value={v.contactChannel}
+            onChange={(contactChannel) => patch({ contactChannel })}
+            label={(k) => tr(`contactChannels.${k}`)}
+            error={tf(errors['contact.channel'])}
+          />
+          {v.contactChannel ? (
+            <Field
+              id="r-contact-value"
+              label={tr(`contactValue.${v.contactChannel}`)}
+              hint={tr(`contactValueHint.${v.contactChannel}`)}
+              error={tf(errors['contact.value'])}
+              className="mt-4"
+            >
+              <Input
+                id="r-contact-value"
+                type={v.contactChannel === 'EMAIL' ? 'email' : 'text'}
+                autoComplete={v.contactChannel === 'EMAIL' ? 'email' : 'off'}
+                value={v.contactValue}
+                onChange={set('contactValue')}
+                maxLength={200}
+              />
+            </Field>
           ) : null}
         </Card>
 

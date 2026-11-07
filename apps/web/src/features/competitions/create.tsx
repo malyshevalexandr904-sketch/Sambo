@@ -7,19 +7,18 @@ import {
   type Competition,
   type CompetitionCreate,
   type DataEnvelope,
-  type RuleSetDto,
   scheduleIssues,
   zonedToInstant,
 } from '@sde/contracts';
 import { Alert, Button, Card, CardTitle, Field, Input, PageHeader, Select } from '@sde/ui';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useCallback, useState } from 'react';
 import { OrganizationPicker } from '@/components/organization-picker';
 import { useRouter } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useFieldMessage } from '@/lib/errors';
-import { pickName, qk, useDisciplines } from '@/lib/queries';
+import { pickName, useDisciplines } from '@/lib/queries';
 import { useAction } from '@/lib/use-action';
 import { ActiveRatingRules } from './rating-card';
 import {
@@ -64,7 +63,6 @@ interface FormValues extends ScheduleValues {
   disciplineCode: string;
   level: string;
   venueId: string;
-  ruleSetVersionId: string;
 }
 
 export const today = (): string => new Date().toISOString().slice(0, 10);
@@ -89,17 +87,10 @@ export function CompetitionCreateForm() {
     registrationStartsLocal: `${today()}T09:00`,
     registrationEndsLocal: '',
     venueId: '',
-    ruleSetVersionId: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [recruitment, setRecruitment] = useState<RecruitmentDraft>(emptyRecruitment);
   const organizer = v.organizerOrganizationId;
-  const rulesets = useQuery({
-    queryKey: [...qk.rulesets, v.disciplineCode],
-    queryFn: async () =>
-      (await api<DataEnvelope<RuleSetDto[]>>('/rulesets', { query: { disciplineCode: v.disciplineCode } }))
-        .data,
-  });
   const setOrganizer = useCallback((id: string) => setV((x) => ({ ...x, organizerOrganizationId: id })), []);
   const set = (k: keyof FormValues) => (e: { target: { value: string } }) =>
     setV((x) => ({ ...x, [k]: e.target.value }));
@@ -125,7 +116,6 @@ export function CompetitionCreateForm() {
       registrationStartsAt: toInstant(v.registrationStartsLocal),
       registrationEndsAt: toInstant(v.registrationEndsLocal),
       venueId: v.venueId || undefined,
-      ruleSetVersionId: v.ruleSetVersionId || undefined,
       refereeRecruitment: recruitmentBody(recruitment),
     };
     const local: Record<string, string> = recruitmentIssues(recruitment);
@@ -150,12 +140,6 @@ export function CompetitionCreateForm() {
       }
     });
   };
-
-  const versions = (rulesets.data ?? []).flatMap((rs) =>
-    rs.versions
-      .filter((x) => x.status === 'PUBLISHED')
-      .map((x) => ({ id: x.id, label: `${rs.name} · v${x.version}` })),
-  );
 
   return (
     <>
@@ -209,21 +193,11 @@ export function CompetitionCreateForm() {
                 ))}
               </Select>
             </Field>
-            <Field
-              id="c-ruleset"
-              label={t('competitions.ruleSet')}
-              hint={t('competitions.ruleSetHint')}
-              error={tf(errors.ruleSetVersionId)}
-            >
-              <Select id="c-ruleset" value={v.ruleSetVersionId} onChange={set('ruleSetVersionId')}>
-                <option value="">{t('competitions.ruleSetLater')}</option>
-                {versions.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {x.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            {/* Правки 07.11.2026, п. 14: версию правил не выбирают — все турниры идут по последним правилам. */}
+            <div className="text-sm">
+              <p className="font-medium text-slate-700">{t('competitions.ruleSet')}</p>
+              <p className="mt-1 text-slate-600">{t('competitions.ruleSetDefault')}</p>
+            </div>
           </div>
         </Card>
         <Card>

@@ -28,6 +28,7 @@ export type RecipientsReader = Pick<
   | 'guardian'
   | 'competition'
   | 'follow'
+  | 'competitionMembership'
 >;
 
 /** Подписавшиеся на начало регистрации турнира (правки 05.11.2026): действующие пользователи. */

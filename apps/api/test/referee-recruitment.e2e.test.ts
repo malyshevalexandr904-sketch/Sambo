@@ -228,7 +228,7 @@ describe('demo access', () => {
 
     // Любое действие — отказ.
     for (const [method, url, body] of [
-      ['patch', '/api/v1/me', { displayName: 'Хакер' }],
+      ['patch', '/api/v1/me', { timezone: 'Europe/Moscow' }],
       ['post', '/api/v1/competition-requests', {}],
       ['post', '/api/v1/auth/totp/setup', {}],
     ] as const) {

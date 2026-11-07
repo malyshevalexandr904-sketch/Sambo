@@ -18,10 +18,11 @@ import { ConsoleRoleBar, RoleChangedElsewhere, RoleSwitcher } from '@/features/c
 import { Avatar } from '@/features/avatar';
 import { NotificationBell } from '@/features/notifications/bell';
 import { DemoProfile } from '@/features/profile/demo-profile';
+import { useMyInvites } from '@/features/people/invitations';
+import { PeopleSearch } from '@/features/people/search';
 import { hostTabOf } from '@/lib/sections';
 import { Brand } from './brand';
 import { DemoGuide } from './demo-guide';
-import { LocaleSwitcher } from './locale-switcher';
 import { ThemeSwitcher } from './theme-switcher';
 
 export function hasPlatformPermission(me: Me | undefined, permission: PermissionCode): boolean {
@@ -215,7 +216,7 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
         {t('common.skipToContent')}
       </a>
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 lg:hidden print:hidden">
-        <Link href="/admin" className="font-bold">
+        <Link href="/admin" className="font-bold" aria-label={t('common.appName')}>
           <Brand />
         </Link>
         {user.activeRole ? (
@@ -234,6 +235,10 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
         >
           {open ? t('common.close') : t('common.menu')}
         </Button>
+        {/* Правки 07.11.2026, п. 2: переключатель темы — в самом правом верхнем углу. */}
+        <span className="ml-1">
+          <ThemeSwitcher />
+        </span>
       </header>
       <aside
         id="sidebar"
@@ -276,14 +281,17 @@ export function AppShell({ children, bare = false }: { children: ReactNode; bare
           onClick={() => setOpen(false)}
         />
       ) : null}
-      <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 print:p-0">
-        {content}
-      </main>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar demo={user.demo} />
+        <main id="main" className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 print:p-0">
+          {content}
+        </main>
+      </div>
     </div>
   );
 }
 
-/** Низ меню: фото и имя (ссылка в личный кабинет), язык, тема, выход. */
+/** Низ меню: фото и имя (ссылка в личный кабинет), выход. Тема — в правом верхнем углу (правки 07.11.2026). */
 function SidebarFooter({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const t = useTranslations('common');
   return (
@@ -295,15 +303,37 @@ function SidebarFooter({ me, onLogout }: { me: Me; onLogout: () => void }) {
           <span className="block truncate text-slate-500">{me.email}</span>
         </span>
       </Link>
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="flex items-center gap-2">
-          <LocaleSwitcher />
-          <ThemeSwitcher />
-        </span>
+      <div className="mt-3 flex items-center justify-end gap-2">
         <Button variant="secondary" size="sm" onClick={onLogout}>
           {t('logout')}
         </Button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Верх кабинета (правки 07.11.2026): поиск участников по ФИО (п. 7), входящие приглашения в персонал турнира (п. 15)
+ * и переключатель темы в самом правом верхнем углу (п. 2). На телефоне тема — в шапке, поиск — над содержимым.
+ */
+function TopBar({ demo }: { demo: boolean }) {
+  const t = useTranslations('invitations');
+  const invites = useMyInvites();
+  const count = demo ? 0 : (invites.data?.length ?? 0);
+  return (
+    <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-4 py-2 sm:px-6 lg:px-10 print:hidden">
+      {demo ? <span className="flex-1" /> : <PeopleSearch className="flex-1" />}
+      {count > 0 ? (
+        <Link
+          href="/invitations"
+          className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full bg-blue-50 px-3 text-sm font-medium text-blue-800 hover:bg-blue-100"
+        >
+          {t('badge', { n: count })}
+        </Link>
+      ) : null}
+      <span className="ml-auto hidden lg:inline-flex">
+        <ThemeSwitcher />
+      </span>
     </div>
   );
 }

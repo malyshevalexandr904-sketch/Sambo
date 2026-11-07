@@ -1,8 +1,8 @@
 'use client';
-// Профиль: имя и язык, смена пароля, сеансы, двухфакторная аутентификация (API.md, 3.1–3.2). Показывается во
+// Профиль: часовой пояс, смена пароля, сеансы, двухфакторная аутентификация (API.md, 3.1–3.2). Показывается во
 // вкладках «Настроек» (правки 05.11.2026, п. 7: все настройки — в «Настройках»).
 import type { DataEnvelope, Me, SessionDto } from '@sde/contracts';
-import { Alert, Badge, Button, Card, CardTitle, Field, Input, Select } from '@sde/ui';
+import { Alert, Badge, Button, Card, CardTitle, Field, Input } from '@sde/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
@@ -15,12 +15,14 @@ import { qk } from '@/lib/queries';
 
 type Notice = { tone: 'success' | 'danger'; text: string } | null;
 
+/**
+ * Профиль: часовой пояс. Правки 07.11.2026: «Имя для отображения» убрано — на платформе всегда показывается ФИО
+ * участника (сервер сам держит имя равным ФИО из «Моих данных»), выбора языка нет — интерфейс только на русском.
+ */
 export function ProfileCard({ me }: { me: Me }) {
   const t = useTranslations();
   const errorMessage = useErrorMessage();
   const queryClient = useQueryClient();
-  const [displayName, setDisplayName] = useState(me.displayName);
-  const [locale, setLocale] = useState(me.locale);
   const [timezone, setTimezone] = useState(me.timezone ?? '');
   const [notice, setNotice] = useState<Notice>(null);
   return (
@@ -33,7 +35,7 @@ export function ProfileCard({ me }: { me: Me }) {
           try {
             const res = await api<DataEnvelope<Me>>('/me', {
               method: 'PATCH',
-              body: { displayName, locale, timezone: timezone || null },
+              body: { timezone: timezone || null },
             });
             queryClient.setQueryData(qk.me, res.data);
             setNotice({ tone: 'success', text: t('common.saved') });
@@ -43,19 +45,11 @@ export function ProfileCard({ me }: { me: Me }) {
         }}
       >
         {notice ? <Alert tone={notice.tone}>{notice.text}</Alert> : null}
-        <Field id="displayName" label={t('account.displayName')}>
-          <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-        </Field>
-        <Field id="locale" label={t('account.locale')}>
-          <Select
-            id="locale"
-            value={locale}
-            onChange={(e) => setLocale(e.target.value === 'en' ? 'en' : 'ru')}
-          >
-            <option value="ru">Русский</option>
-            <option value="en">English</option>
-          </Select>
-        </Field>
+        <div>
+          <p className="text-sm font-medium text-slate-700">{t('account.fullName')}</p>
+          <p className="mt-1 text-slate-900">{me.displayName}</p>
+          <p className="mt-1 text-xs text-slate-500">{t('account.fullNameHint')}</p>
+        </div>
         <Field id="timezone" label={t('account.timezone')}>
           <Input
             id="timezone"
