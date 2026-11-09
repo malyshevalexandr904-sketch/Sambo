@@ -11,7 +11,7 @@ import {
   isEliminationFormat,
   type SeparationReportDto,
 } from '@sde/contracts';
-import { Alert, Badge, Button, Card, CardTitle } from '@sde/ui';
+import { Alert, Badge, Button, Card, CardTitle, Field, Select } from '@sde/ui';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { ReasonAction } from '@/components/common';
@@ -239,6 +239,8 @@ export function DrawView({
           </Button>
         </div>
       </Card>
+      {/* Перестановка — пока черновик можно опубликовать (правки 09.11.2026). */}
+      {can('draw.publish') ? <SwapCard draw={draw} onChanged={onChanged} /> : null}
       {isEliminationFormat(draw.format) ? (
         <Card className="print:hidden">
           <CardTitle>{t('separation.title')}</CardTitle>
@@ -270,5 +272,82 @@ export function DrawView({
       </Card>
       {draw.status === 'PUBLISHED' ? <CategoryPlacements categoryId={draw.categoryId} /> : null}
     </div>
+  );
+}
+
+/**
+ * Ручная правка черновика (правки 09.11.2026, п. 3): поменять местами двух спортсменов (или спортсмена и свободное
+ * место) перед публикацией. Сетка ниже сразу показывает новую расстановку.
+ */
+function SwapCard({ draw, onChanged }: { draw: DrawDto; onChanged: () => Promise<void> }) {
+  const t = useTranslations('draws.swap');
+  const describe = useCommandError();
+  const [a, setA] = useState('');
+  const [b, setB] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const names = new Map(draw.bracket.participants.map((p) => [p.entryId, p]));
+  const label = (position: number, entryId: string | null, pool: string | null): string => {
+    const p = entryId ? names.get(entryId) : null;
+    const who = p ? `${p.publicName}${p.organization?.name ? ` (${p.organization.name})` : ''}` : t('empty');
+    return `${pool ? `${pool} · ` : ''}${t('position', { n: position })}: ${who}`;
+  };
+  const slots = draw.slots;
+  return (
+    <Card className="print:hidden">
+      <CardTitle>{t('title')}</CardTitle>
+      <p className="-mt-2 mb-3 text-sm text-slate-600">{t('hint')}</p>
+      {draw.manualSwaps.length > 0 ? (
+        <p className="mb-3 text-sm text-slate-700">{t('done', { count: draw.manualSwaps.length })}</p>
+      ) : null}
+      {error ? (
+        <Alert tone="danger" className="mb-3">
+          {error}
+        </Alert>
+      ) : null}
+      <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+        {(
+          [
+            ['a', a, setA],
+            ['b', b, setB],
+          ] as const
+        ).map(([key, value, set]) => (
+          <Field key={key} id={`swap-${draw.id}-${key}`} label={t(key)}>
+            <Select id={`swap-${draw.id}-${key}`} value={value} onChange={(e) => set(e.target.value)}>
+              <option value="">{t('choose')}</option>
+              {slots.map((s) => (
+                <option key={s.position} value={String(s.position)}>
+                  {label(s.position, s.entryId, s.pool)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ))}
+        <Button
+          loading={busy}
+          disabled={!a || !b || a === b}
+          onClick={async () => {
+            setBusy(true);
+            setError(null);
+            try {
+              await api(`/draws/${draw.id}/swap`, {
+                method: 'POST',
+                body: { a: Number(a), b: Number(b) },
+                version: draw.version,
+              });
+              setA('');
+              setB('');
+              await onChanged();
+            } catch (e) {
+              setError(describe(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {t('action')}
+        </Button>
+      </div>
+    </Card>
   );
 }

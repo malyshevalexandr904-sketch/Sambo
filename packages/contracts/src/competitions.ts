@@ -279,6 +279,8 @@ export interface Competition extends CompetitionSummary {
   /** Шаблон афиши публичной страницы (`POSTER_TEMPLATES`) и ссылка на прямую трансляцию (правки 05.11.2026). */
   posterTemplate: string;
   liveStreamUrl: string | null;
+  /** Сроки этапов дня соревнований (правки 09.11.2026): комиссия, взвешивание, жеребьёвка, схватки. */
+  daySchedule: CompetitionDaySchedule;
   /** Пользователь подписан на начало регистрации турнира. */
   followed: boolean;
   /** Роли пользователя в турнире и отношение к нему (для кабинетов). */
@@ -429,4 +431,34 @@ export interface VenueDto extends VenueRef {
   regionId: string | null;
   timezone: string;
   allowedActions: string[];
+}
+
+// ---- Сроки этапов (правки 09.11.2026, п. 3) ----
+
+/** Местное время турнира: «2026-11-20T09:00». */
+export const LocalDateTime = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, { error: 'local_datetime' });
+
+export const DAY_SCHEDULE_STEPS = ['mandate', 'weighIn', 'draw', 'bouts'] as const;
+export type DayScheduleStep = (typeof DAY_SCHEDULE_STEPS)[number];
+
+const SchedulePeriod = z
+  .object({ from: LocalDateTime.nullable(), to: LocalDateTime.nullable() })
+  .refine((v) => !v.from || !v.to || v.from <= v.to, { error: 'period_invalid', path: ['to'] });
+
+/**
+ * Комиссия по допуску (обычно накануне), взвешивание, жеребьёвка и схватки — в местном времени турнира. Регистрация —
+ * отдельными полями турнира (registrationStartsAt / registrationEndsAt).
+ */
+export const CompetitionDaySchedule = z.object({
+  mandate: SchedulePeriod.optional(),
+  weighIn: SchedulePeriod.optional(),
+  draw: SchedulePeriod.optional(),
+  bouts: SchedulePeriod.optional(),
+});
+export type CompetitionDaySchedule = z.infer<typeof CompetitionDaySchedule>;
+
+/** Сохранённое значение (JSON) → сроки: неизвестное и неверное отбрасывается. */
+export function parseDaySchedule(raw: unknown): CompetitionDaySchedule {
+  const r = CompetitionDaySchedule.safeParse(raw ?? {});
+  return r.success ? r.data : {};
 }

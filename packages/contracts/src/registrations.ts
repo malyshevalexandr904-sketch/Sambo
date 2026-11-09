@@ -1,7 +1,7 @@
 // Заявки и участия (API.md, 5.3; DATABASE.md, 3.5; C-02; ARCHITECTURE.md, 16.3).
 // Application — заявка клуба на турнир; Entry — спортсмен × категория со снимком данных (ADR-10).
 import { z } from 'zod';
-import type { AdmissionSummary } from './admission.js';
+import type { AdmissionSummary, DocumentReadinessDto } from './admission.js';
 import type { EligibilityReason } from './categories.js';
 import { Grams, type LocalizedText, PageQuery, Reason, Uuid } from './common.js';
 import type { CategoryRef, CategoryWeight } from './competition-categories.js';
@@ -220,4 +220,69 @@ export interface EligibleCategoriesDto {
 /** Имя файла выгрузки участников: `participants-<slug>-<YYYY-MM-DD>.csv`. */
 export function entriesExportFileName(slug: string, date: string): string {
   return `participants-${slug}-${date}.csv`;
+}
+
+// ---- Заявка тренера списком (правки 09.11.2026, п. 3) ----
+
+/** Спортсмены организации (у тренера — свои) для заявки на турнир: с подходящими категориями и документами. */
+export const RosterQuery = z.object({ organizationId: Uuid });
+export type RosterQuery = z.infer<typeof RosterQuery>;
+
+export interface RosterAthlete {
+  athleteId: string;
+  lastName: string;
+  firstName: string;
+  middleName: string | null;
+  birthDate: string;
+  gender: Gender;
+  /** Полных лет на дату начала турнира. */
+  age: number;
+  rankCode: string | null;
+  coachName: string | null;
+  /** Готовность пяти документов допуска на дату начала турнира. */
+  documents: DocumentReadinessDto;
+  /** Категории, куда спортсмена можно заявить (возраст, пол, разряд); вес решает тренер и взвешивание. */
+  eligible: EligibleCategory[];
+  /** Уже заявлен на этот турнир (действующее участие). */
+  entered: { entryId: string; applicationId: string; categoryId: string; status: EntryStatus } | null;
+}
+
+export interface RosterDto {
+  competitionId: string;
+  organizationId: string;
+  athletes: RosterAthlete[];
+}
+
+/** Несколько спортсменов в заявку одним запросом; каждый проверяется как при одиночном добавлении. */
+export const EntriesBulkCreate = z.object({
+  items: z
+    .array(
+      z.object({
+        athleteId: Uuid,
+        categoryId: Uuid,
+        declaredWeightGrams: z.number().int().min(10_000).max(250_000).optional(),
+        coachId: Uuid.optional(),
+      }),
+    )
+    .min(1)
+    .max(200),
+});
+export type EntriesBulkCreate = z.infer<typeof EntriesBulkCreate>;
+
+export interface EntriesBulkResult {
+  added: number;
+  failed: { athleteId: string; code: string }[];
+}
+
+/** Комиссия по допуску: решение по заявке клуба целиком; отказ — с причиной. */
+export const ApplicationCommissionRequest = z
+  .object({ decision: z.enum(['APPROVE', 'REJECT']), reason: Reason.optional() })
+  .refine((v) => v.decision === 'APPROVE' || !!v.reason, { error: 'reason_required', path: ['reason'] });
+export type ApplicationCommissionRequest = z.infer<typeof ApplicationCommissionRequest>;
+
+/** Комиссия по допуску: документы участников заявки (для просмотра администратором). */
+export interface ApplicationDocumentsRow {
+  entryId: string;
+  athleteId: string;
+  documents: DocumentReadinessDto;
 }

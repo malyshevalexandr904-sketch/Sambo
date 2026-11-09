@@ -169,6 +169,24 @@ body {
   animation: sde-float 2s ease-in-out infinite;
 }
 
+/* Кнопка «О платформе» на первом экране (правки 09.11.2026, п. 1): мягко пульсирующее свечение обводки. */
+@keyframes sde-about-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 10px 25px rgb(0 0 0 / 0.3),
+      0 0 0 0 rgb(255 255 255 / 0.45);
+  }
+  50% {
+    box-shadow:
+      0 10px 25px rgb(0 0 0 / 0.3),
+      0 0 0 10px rgb(255 255 255 / 0);
+  }
+}
+.about-cta {
+  animation: sde-about-pulse 2.4s ease-out infinite;
+}
+
 /* Первый экран главной (правки 31.10.2026): медленное «дыхание» неподвижного кадра (на телефоне он и есть фон)
    и полоса цветов самбо, которая вырастает под заголовком. */
 @keyframes sde-hero-drift {
@@ -255,28 +273,69 @@ body {
 
 /* Надпись «Цифровое самбо» (правки 07.11.2026, п. 3): «Цифровое» — тонко, «самбо» — жирно, заглавными, с градиентом
    красной и синей куртки. Цвета градиента — светлее в тёмной теме и на первом экране (тёмный зал). */
+/* Правки 09.11.2026, п. 2: надпись «Цифровое самбо» — спортивным наклонным шрифтом Exo 2 (OFL, public/fonts/exo2),
+   оба слова одного начертания; на тёмном первом экране — оба белые. */
+@font-face {
+  font-family: 'Exo 2 Brand';
+  font-style: italic;
+  font-weight: 900;
+  font-display: swap;
+  src: url('/fonts/exo2/exo-2-cyrillic-900-italic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Exo 2 Brand';
+  font-style: italic;
+  font-weight: 900;
+  font-display: swap;
+  src: url('/fonts/exo2/exo-2-latin-900-italic.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC;
+}
+@font-face {
+  font-family: 'Exo 2 Brand';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/exo2/exo-2-cyrillic-700-italic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Exo 2 Brand';
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/exo2/exo-2-latin-700-italic.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC;
+}
 .brand-word {
-  letter-spacing: -0.01em;
+  font-family: 'Exo 2 Brand', ui-sans-serif, system-ui, sans-serif;
+  font-style: italic;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
 }
 .brand-word-light {
-  font-weight: 300;
+  font-weight: 700;
 }
 .brand-word-strong {
   font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   background-image: linear-gradient(90deg, #dc2626 0%, #b91c1c 30%, #1d4ed8 70%, #1e40af 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* Наклонный шрифт выходит за правый край: запас, чтобы градиент не обрезал последнюю букву. */
+  padding-right: 0.08em;
 }
-:root[data-theme='dark'] .brand-word-strong:where(:not(.theme-light *)),
-.brand-word-on-dark .brand-word-strong {
+:root[data-theme='dark'] .brand-word-strong:where(:not(.theme-light *)) {
   background-image: linear-gradient(90deg, #f87171 0%, #ef4444 30%, #60a5fa 70%, #93c5fd 100%);
 }
+/* Первый экран: оба слова белые, с тенью для читаемости на видео. */
+.brand-word-on-dark .brand-word-light,
 .brand-word-on-dark .brand-word-strong {
-  text-shadow: none;
-  filter: drop-shadow(0 2px 14px rgb(0 0 0 / 0.45));
+  background-image: none;
+  color: #fff;
+  font-weight: 900;
+  text-shadow: 0 2px 24px rgb(0 0 0 / 0.45);
 }
 
 /* Личный кабинет-профиль (правки 05.11.2026): фото «выпрыгивает», обложка медленно плывёт, медали качаются на
@@ -509,7 +568,8 @@ body {
   }
   /* Бесконечные покачивание и блик эмблемы просто выключаем, иначе они мигали бы с нулевой длительностью. */
   .hero-logo-float,
-  .hero-logo-shine {
+  .hero-logo-shine,
+  .about-cta {
     animation: none !important;
   }
 }

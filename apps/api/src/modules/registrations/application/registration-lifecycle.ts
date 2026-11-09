@@ -10,6 +10,7 @@ import { AuditService } from '../../audit';
 import { CompetitionExtensions, type TransitionContext } from '../../competitions';
 import { OutboxService } from '../../outbox';
 import { ACTIVE_ENTRY_STATUSES } from '../domain/entry-rules';
+import { RosterService } from './roster.service';
 
 const ACTIVE = [...ACTIVE_ENTRY_STATUSES];
 const AUTO_REJECT_REASON = 'Заявка не исправлена до окончания мандатной комиссии';
@@ -23,6 +24,7 @@ export class RegistrationLifecycle implements OnModuleInit {
     private readonly athletes: AthleteExtensions,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly roster: RosterService,
   ) {}
 
   onModuleInit(): void {
@@ -58,6 +60,9 @@ export class RegistrationLifecycle implements OnModuleInit {
     // окончания комиссии, отклоняется автоматически вместе с её нерассмотренными участиями.
     this.competitions.registerEffect(async (ctx) => {
       if (ctx.from === 'REGISTRATION_CLOSED' && ctx.to === 'CHECK_IN') await this.rejectUnfixed(ctx);
+      // Правки 09.11.2026: при окончании регистрации спортсмены без документов или с просроченными исключаются.
+      if (ctx.from === 'REGISTRATION_OPEN' && ctx.to === 'REGISTRATION_CLOSED')
+        await this.roster.removeNotReady(ctx.tx, ctx.competition, ctx.userId);
     });
 
     this.categories.registerEntryStats((tx, ids) => this.stats(tx, ids));

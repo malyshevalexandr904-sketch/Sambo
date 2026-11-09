@@ -257,6 +257,31 @@ export class CheckInService {
     return this.row(user, competitionId, athleteId);
   }
 
+  /**
+   * Быстрое взвешивание (правки 09.11.2026): спортсмен подошёл к весам с QR — он прибыл. Отметка в транзакции
+   * вызывающего; уже прибывший или снятый не меняется.
+   */
+  async arriveInTx(
+    tx: Tx,
+    competitionId: string,
+    athleteId: string,
+    userId: string,
+    viaPlatform: boolean,
+  ): Promise<void> {
+    await this.ensureRows(tx, competitionId, [athleteId]);
+    const [row] = await tx.$queryRaw<{ id: string; status: CheckInStatus }[]>`
+      SELECT id, status FROM check_in
+      WHERE competition_id = ${competitionId}::uuid AND athlete_id = ${athleteId}::uuid FOR UPDATE`;
+    if (!row || row.status === 'ARRIVED' || !canCheckIn(row.status, 'ARRIVED')) return;
+    await this.apply(
+      tx,
+      { ...row, competitionId, athleteId },
+      { status: 'ARRIVED', method: 'QR' },
+      userId,
+      viaPlatform,
+    );
+  }
+
   private async apply(
     tx: Tx,
     row: { id: string; status: CheckInStatus; competitionId: string; athleteId: string },

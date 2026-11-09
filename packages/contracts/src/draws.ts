@@ -97,6 +97,15 @@ export const DrawCreate = z.object({
 export type DrawCreate = z.infer<typeof DrawCreate>;
 
 export const DrawSupersede = z.object({ reason: Reason });
+
+/**
+ * Ручная правка черновика жеребьёвки (правки 09.11.2026, п. 3): поменять местами две позиции. Перестановки
+ * сохраняются с версией, поэтому проверка воспроизводимости повторяет их после расстановки по seed.
+ */
+export const DrawSwap = z
+  .object({ a: z.number().int().min(1).max(512), b: z.number().int().min(1).max(512) })
+  .refine((v) => v.a !== v.b, { error: 'same_position', path: ['b'] });
+export type DrawSwap = z.infer<typeof DrawSwap>;
 export type DrawSupersede = z.infer<typeof DrawSupersede>;
 
 /**
@@ -303,6 +312,8 @@ export interface DrawDto extends DrawSummaryDto {
   publishedBy: UserRef | null;
   supersededBy: UserRef | null;
   supersedeReason: string | null;
+  /** Ручные перестановки позиций черновика (по порядку). */
+  manualSwaps: DrawSwap[];
   /** Сетка по слотам этой версии: для черновика — предпросмотр без схваток. */
   bracket: BracketViewDto;
 }

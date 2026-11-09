@@ -23,6 +23,7 @@ import { CompetitionScopeService } from '../../competitions';
 import { DRAW_ALGORITHM_VERSION, drawInputHash } from '../domain/draw-input';
 import { categoryDrawActions, drawActions } from '../domain/draw-rules';
 import { computeDrawLayout } from '../domain/layout';
+import { applySwaps, parseSwaps } from '../domain/manual-swaps';
 import {
   DRAW_FULL_INCLUDE,
   DRAW_SUMMARY_SELECT,
@@ -223,6 +224,7 @@ export class DrawQueriesService {
       publishedBy: toUserRef(row.publishedBy),
       supersededBy: toUserRef(row.supersededBy),
       supersedeReason: row.supersedeReason,
+      manualSwaps: parseSwaps(row.manualSwaps),
       bracket: {
         format: row.format,
         size: slots.length,
@@ -287,7 +289,11 @@ export class DrawQueriesService {
     const ctx = await this.participants.context(null, category);
     const inputHashMatches = drawInputHash(input) === row.inputHash;
     const supported = row.algorithmVersion === DRAW_ALGORITHM_VERSION;
-    const layout = supported ? computeDrawLayout(input, row.randomSeed) : null;
+    // Ручные перестановки черновика (правки 09.11.2026) повторяются после расстановки по seed.
+    const computed = supported ? computeDrawLayout(input, row.randomSeed) : null;
+    const layout = computed
+      ? { ...computed, slots: applySwaps(computed.slots, parseSwaps(row.manualSwaps)) }
+      : null;
     const slotsMatch =
       layout !== null &&
       layout.slots.length === row.slots.length &&

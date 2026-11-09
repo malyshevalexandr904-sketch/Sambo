@@ -21,6 +21,7 @@ import { EntryDecisionsService } from './application/entry-decisions.service';
 import { EntriesExportService } from './application/export.service';
 import { RegistrationAccessService } from './application/registration-access.service';
 import { RegistrationLifecycle } from './application/registration-lifecycle';
+import { RosterService } from './application/roster.service';
 
 /** Заявки и участия (Phase 4a): Application / Entry, совместимость, решения секретариата, выгрузка. */
 @Module({
@@ -49,7 +50,14 @@ import { RegistrationLifecycle } from './application/registration-lifecycle';
     RegistrationLifecycle,
     ActiveMatchService,
     EntryWithdrawalService,
+    RosterService,
   ],
-  exports: [RegistrationAccessService, ActiveMatchService, EntryWithdrawalService],
+  exports: [
+    RegistrationAccessService,
+    ActiveMatchService,
+    EntryWithdrawalService,
+    EntryDecisionsService,
+    RosterService,
+  ],
 })
 export class RegistrationsModule {}

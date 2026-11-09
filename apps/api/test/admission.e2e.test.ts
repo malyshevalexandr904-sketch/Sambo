@@ -87,7 +87,9 @@ async function coachOf(clubId: string): Promise<Session> {
  * Турнир с требованиями положения (свидетельство о рождении, согласие, медицинский допуск, взвешивание,
  * прибытие), одобренная заявка клуба с двумя спортсменами в категории «до 38 кг».
  */
-async function world(opts: { outcome?: 'WITHDRAW' | 'RECHECK' | 'TRANSFER' } = {}): Promise<World> {
+async function world(
+  opts: { outcome?: 'WITHDRAW' | 'RECHECK' | 'TRANSFER'; boy1WithoutDocuments?: boolean } = {},
+): Promise<World> {
   const organizerOrgId = await createOrg(t, { type: 'ORGANIZER' });
   const organizerUser = await createUser(t, {
     orgs: [{ organizationId: organizerOrgId, role: 'ORGANIZER' }],
@@ -199,6 +201,10 @@ async function world(opts: { outcome?: 'WITHDRAW' | 'RECHECK' | 'TRANSFER' } = {
     entries[e.snapshot.lastName === 'Алексеев' ? 'boy1' : 'boy2'] = { id: e.id, athleteId: e.athleteId };
   }
   const reviewed = await secretary.agent.get(`/api/v1/applications/${applicationId}`).expect(200);
+  // Документы загружены, но не проверены: по окончании регистрации снимают только тех, у кого документов нет или
+  // они просрочены (правки 09.11.2026), а непроверенные решает мандатная комиссия.
+  if (!opts.boy1WithoutDocuments) await pendingDocuments({ competitionId, coach }, entries.boy1.athleteId);
+  await pendingDocuments({ competitionId, coach }, entries.boy2.athleteId);
   await send(
     secretary,
     'post',
@@ -220,7 +226,7 @@ async function world(opts: { outcome?: 'WITHDRAW' | 'RECHECK' | 'TRANSFER' } = {
 }
 
 async function document(
-  w: World,
+  w: Pick<World, 'competitionId' | 'coach'>,
   athleteId: string,
   typeCode: string,
 ): Promise<{ id: string; version: number }> {
@@ -233,6 +239,11 @@ async function document(
   });
   expect(r.status, JSON.stringify(r.body)).toBe(201);
   return { id: r.body.data.id as string, version: r.body.data.version as number };
+}
+
+/** Документы допуска загружены и ждут проверки — спортсмен не снимается с заявки при закрытии регистрации. */
+async function pendingDocuments(w: Pick<World, 'competitionId' | 'coach'>, athleteId: string): Promise<void> {
+  for (const type of [...CHILD_DOCUMENTS, 'INSURANCE_POLICY']) await document(w, athleteId, type);
 }
 
 /** Единые требования допуска для спортсмена 12 лет без разряда (правки 07.11.2026, п. 13). */
@@ -301,7 +312,7 @@ async function openWeighIn(w: World, categoryIds: string[]) {
 
 describe('admission (G-06)', () => {
   it('the same checks for every tournament: five documents, arrival and weight decide', async () => {
-    const w = await world();
+    const w = await world({ boy1WithoutDocuments: true });
     const { boy1, boy2 } = w.entries;
 
     // Сразу после одобрения: документа нет — не допущен; остальное ждёт мандатной комиссии.
@@ -511,8 +522,9 @@ describe('admission (G-06)', () => {
     expect((await waive(w.organizer, 'CONSENTS')).body.error.code).toBe('NOT_FOUND');
     const waived = await waive(w.organizer, 'DOCUMENTS');
     expect(waived.status, JSON.stringify(waived.body)).toBe(200);
-    expect(checks(waived.body).DOCUMENTS).toBe('WAIVED:document_missing');
-    expect(waived.body.data.status).toBe('NOT_ADMITTED');
+    // Без документов спортсмена сняли бы при закрытии регистрации — исключают непроверенные (правки 09.11.2026).
+    expect(checks(waived.body).DOCUMENTS).toBe('WAIVED:document_not_verified');
+    expect(waived.body.data.status).toBe('PENDING');
     const insured = await waive(w.organizer, 'INSURANCE', 'Полис предъявлен на комиссии в оригинале');
     expect(insured.body.data.status).toBe('PENDING');
     expect(

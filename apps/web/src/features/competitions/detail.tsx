@@ -2,7 +2,7 @@
 // Страница турнира: обзор и переходы, положение, категории, персонал, заявки и участники, мандатная комиссия
 // (допуск, прибытие, взвешивание, медицина), жеребьёвка, расписание, бригады, итоги. Вкладки и действия —
 // по allowedActions турнира: интерфейс лишь скрывает недоступное, решает сервер.
-import { type Competition, stageOfCompetition } from '@sde/contracts';
+import type { Competition } from '@sde/contracts';
 import { Alert, Badge, EmptyState, PageHeader, cn } from '@sde/ui';
 import { useLocale, useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
@@ -25,10 +25,15 @@ import { CategoriesTab } from './categories';
 import { OverviewTab } from './overview';
 import { RegulationTab } from './regulation';
 import { CompetitionStatusBadge, formatDates, useCompetition } from './shared';
-import { STAGE_TABS } from './stage-guide';
 import { StaffTab } from './staff';
+import { BracketsTab } from '@/features/draws/brackets-tab';
+import { QuickWeighInCard } from '@/features/operations/quick-weighin';
+import { CommissionTab } from './commission';
+import { GeneralTab } from './general-tab';
+import { MatsStaffCard } from './mats-staff';
 
 const TABS = [
+  'general',
   'overview',
   'regulation',
   'categories',
@@ -43,8 +48,12 @@ const TABS = [
   'schedule',
   'crews',
   'results',
+  'brackets',
 ] as const;
 type Tab = (typeof TABS)[number];
+
+/** Вкладки администратора и организатора (правки 09.11.2026, п. 3): весь турнир — в пяти вкладках. */
+const STAFF_MAIN: readonly Tab[] = ['general', 'applications', 'staff', 'weighin', 'brackets'];
 
 /** До мандатной комиссии жеребьёвки нет — вкладка не нужна. */
 const BEFORE_DRAW: readonly string[] = ['DRAFT', 'PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'];
@@ -54,11 +63,14 @@ const BEFORE_REGISTRATION: readonly string[] = ['DRAFT', 'PUBLISHED'];
 function visibleTabs(c: Competition): Tab[] {
   const can = (a: string): boolean => c.allowedActions.includes(a);
   return TABS.filter((tab) => {
+    if (tab === 'general' || tab === 'brackets') return c.viewer.staff;
+    if (tab === 'overview' || tab === 'regulation') return !c.viewer.staff;
     if (tab === 'staff') return can('competition.view');
     if (tab === 'entries') return can('registration.view');
     if (tab === 'admission') return can('admission.view') && !BEFORE_REGISTRATION.includes(c.status);
     if (tab === 'checkin') return can('checkin.view') && !BEFORE_REGISTRATION.includes(c.status);
-    if (tab === 'weighin') return can('weighin.view') && !BEFORE_REGISTRATION.includes(c.status);
+    if (tab === 'weighin')
+      return can('weighin.view') && (c.viewer.staff || !BEFORE_REGISTRATION.includes(c.status));
     if (tab === 'medical') return can('medical.view') && !BEFORE_REGISTRATION.includes(c.status);
     if (tab === 'draws') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
     if (tab === 'schedule') return can('competition.view') && !BEFORE_DRAW.includes(c.status);
@@ -96,14 +108,16 @@ export function CompetitionPage({ id }: { id: string }) {
         // «Набор судей» перенесён в «Персонал» (правки 07.11.2026, п. 16): старые ссылки ведут туда.
         const rawTab = params.get('tab');
         const requested = (rawTab === 'recruitment' ? 'staff' : rawTab) as Tab | null;
-        const tab: Tab = requested && tabs.includes(requested) ? requested : 'overview';
-        // Стадия (правки 05.11.2026): у организатора и администратора сначала — вкладки текущей стадии, остальные
-        // — по кнопке «Все разделы».
-        const stage = stageOfCompetition(c.status);
-        const focus = stage && c.viewer.staff ? STAGE_TABS[stage].filter((x) => tabs.includes(x as Tab)) : [];
-        const focused = focus.length > 1 && !allTabs && (focus.includes(tab) || tab === 'overview');
-        const shown: Tab[] = focused ? (focus as Tab[]) : tabs;
-        const hiddenCount = tabs.length - shown.length;
+        // Персонал турнира (правки 09.11.2026): пять основных вкладок, остальные разделы — по кнопке «Ещё».
+        const staff = c.viewer.staff;
+        const home: Tab = staff ? 'general' : 'overview';
+        const mapped =
+          staff && (requested === 'overview' || requested === 'regulation') ? 'general' : requested;
+        const tab: Tab = mapped && tabs.includes(mapped) ? mapped : home;
+        const main = staff ? tabs.filter((x) => STAFF_MAIN.includes(x)) : tabs;
+        const extra = staff ? tabs.filter((x) => !STAFF_MAIN.includes(x)) : [];
+        const showExtra = allTabs || extra.includes(tab);
+        const shown: Tab[] = showExtra ? [...main, ...extra] : main;
         return (
           <>
             <div className="print:hidden">
@@ -144,46 +158,65 @@ export function CompetitionPage({ id }: { id: string }) {
                       tab === x
                         ? 'border-blue-700 text-blue-800'
                         : 'border-transparent text-slate-600 hover:text-slate-900',
+                      STAFF_MAIN.includes(x) || !staff ? '' : 'text-xs font-normal',
                     )}
-                    onClick={() => router.replace({ pathname, query: x === 'overview' ? {} : { tab: x } })}
+                    onClick={() => router.replace({ pathname, query: x === home ? {} : { tab: x } })}
                   >
                     {t(`tabs.${x}`)}
-                    {!focused && focus.includes(x) && x !== 'overview' ? (
-                      <span
-                        className="h-1.5 w-1.5 rounded-full bg-blue-600"
-                        aria-label={t('tabs.stageFocus')}
-                      />
-                    ) : null}
                   </button>
                 ))}
-                {focus.length > 1 && (hiddenCount > 0 || allTabs) ? (
+                {extra.length > 0 && !extra.includes(tab) ? (
                   <button
                     type="button"
                     className="min-h-11 whitespace-nowrap px-3 text-sm text-blue-700 hover:underline"
-                    aria-expanded={!focused}
-                    onClick={() => {
-                      if (focused) {
-                        setAllTabs(true);
-                        return;
-                      }
-                      setAllTabs(false);
-                      if (!focus.includes(tab)) router.replace({ pathname, query: {} });
-                    }}
+                    aria-expanded={showExtra}
+                    onClick={() => setAllTabs(!allTabs)}
                   >
-                    {focused ? t('tabs.showAll', { count: hiddenCount }) : t('tabs.showStage')}
+                    {showExtra ? t('tabs.less') : t('tabs.more', { count: extra.length })}
                   </button>
                 ) : null}
               </nav>
             </div>
+            {tab === 'general' ? <GeneralTab competition={c} /> : null}
+            {tab === 'brackets' ? <BracketsTab competition={c} /> : null}
             {tab === 'overview' ? <OverviewTab competition={c} /> : null}
             {tab === 'regulation' ? <RegulationTab competition={c} /> : null}
             {tab === 'categories' ? <CategoriesTab competition={c} /> : null}
-            {tab === 'staff' ? <StaffTab competition={c} /> : null}
-            {tab === 'applications' ? <ApplicationsTab competition={c} /> : null}
+            {tab === 'staff' ? (
+              <div className="space-y-6">
+                {staff ? <MatsStaffCard competition={c} /> : null}
+                <StaffTab competition={c} />
+              </div>
+            ) : null}
+            {tab === 'applications' ? (
+              staff ? (
+                <CommissionTab competition={c} />
+              ) : (
+                <ApplicationsTab competition={c} />
+              )
+            ) : null}
             {tab === 'entries' ? <EntriesTab competition={c} /> : null}
             {tab === 'admission' ? <AdmissionTab competition={c} /> : null}
             {tab === 'checkin' ? <CheckInTab competition={c} /> : null}
-            {tab === 'weighin' ? <WeighInTab competition={c} /> : null}
+            {tab === 'weighin' ? (
+              staff ? (
+                <div className="space-y-6">
+                  <QuickWeighInCard competition={c} />
+                  {BEFORE_REGISTRATION.includes(c.status) ? null : (
+                    <details className="rounded-lg border border-slate-200 p-3">
+                      <summary className="cursor-pointer text-sm font-medium text-blue-700">
+                        {t('tabs.advancedWeighIn')}
+                      </summary>
+                      <div className="mt-4">
+                        <WeighInTab competition={c} />
+                      </div>
+                    </details>
+                  )}
+                </div>
+              ) : (
+                <WeighInTab competition={c} />
+              )
+            ) : null}
             {tab === 'medical' ? <MedicalTab competition={c} /> : null}
             {tab === 'draws' ? <DrawsTab competition={c} /> : null}
             {tab === 'schedule' ? <ScheduleTab competition={c} /> : null}

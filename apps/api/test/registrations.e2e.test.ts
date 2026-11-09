@@ -12,6 +12,7 @@ import {
   type TestApp,
 } from './helpers/app';
 import { competitionStaff, givePerson, publishConsentTemplates, send } from './helpers/phase3';
+import { satisfyAdmission } from './helpers/phase5';
 import {
   categoryTemplate,
   clubAthlete,
@@ -646,6 +647,8 @@ describe('entries after submission', () => {
       { to: 'SUBMITTED' },
       await appVersion(w.coachA, app.id),
     ).expect(200);
+    // С документами: без них участие сняли бы при закрытии регистрации (правки 09.11.2026).
+    await satisfyAdmission(t, w.competitionId, [e2.body.data.id]);
 
     const c = await w.organizer.agent.get(`/api/v1/competitions/${w.competitionId}`).expect(200);
     await send(

@@ -1382,6 +1382,8 @@ model Competition {
   posterTemplate          String                @default("classic") @map("poster_template")
   /// Ссылка на прямую трансляцию (VK Видео, YouTube, Rutube) для раздела «Прямая трансляция».
   liveStreamUrl           String?               @map("live_stream_url")
+  /// Сроки этапов дня соревнований (правки 09.11.2026): contracts `CompetitionDaySchedule`.
+  daySchedule             Json?                 @map("day_schedule")
   createdAt               DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt               DateTime?             @map("deleted_at") @db.Timestamptz(3)
@@ -1904,9 +1906,10 @@ model WeighInAttempt {
   competitionId   String             @map("competition_id") @db.Uuid
   entryId         String             @map("entry_id") @db.Uuid
   categoryId      String             @map("category_id") @db.Uuid
-  windowId        String             @map("window_id") @db.Uuid
-  scaleId         String             @map("scale_id") @db.Uuid
-  weightGrams     Int                @map("weight_grams")
+  /// Окно, весы и вес пусты у быстрого решения оператора (норма / недовес / перевес, правки 09.11.2026).
+  windowId        String?            @map("window_id") @db.Uuid
+  scaleId         String?            @map("scale_id") @db.Uuid
+  weightGrams     Int?               @map("weight_grams")
   measuredAt      DateTime           @map("measured_at") @db.Timestamptz(3)
   kind            WeighInAttemptKind
   result          WeighInResult
@@ -1919,8 +1922,8 @@ model WeighInAttempt {
 
   entry    Entry               @relation(fields: [entryId], references: [id], onDelete: Restrict)
   category CompetitionCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
-  window   WeighInWindow       @relation(fields: [windowId], references: [id], onDelete: Restrict)
-  scale    Scale               @relation(fields: [scaleId], references: [id], onDelete: Restrict)
+  window   WeighInWindow?      @relation(fields: [windowId], references: [id], onDelete: Restrict)
+  scale    Scale?              @relation(fields: [scaleId], references: [id], onDelete: Restrict)
   operator User?               @relation("WeighInOperator", fields: [operatorId], references: [id], onDelete: Restrict)
   records  WeighInRecord[]
 
@@ -2193,6 +2196,8 @@ model Draw {
   supersededById   String?               @map("superseded_by_id") @db.Uuid
   supersededAt     DateTime?             @map("superseded_at") @db.Timestamptz(3)
   supersedeReason  String?               @map("supersede_reason")
+  /// Ручные перестановки позиций черновика: [{a, b}] по порядку (правки 09.11.2026).
+  manualSwaps      Json                  @default("[]") @map("manual_swaps")
   updatedAt        DateTime              @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   competition    Competition          @relation(fields: [competitionId], references: [id], onDelete: Restrict)

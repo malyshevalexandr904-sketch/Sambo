@@ -6,6 +6,9 @@ import {
   ScaleInput,
   ScalePatch,
   type WeighInAttemptDto,
+  type WeighInCardDto,
+  WeighInCardsQuery,
+  WeighInDecision,
   WeighInCreate,
   type WeighInOutcomeDto,
   WeighInQuery,
@@ -23,6 +26,7 @@ import { UuidParam, ValidBody, ValidQuery } from '../../../common/validation/zod
 import { Authenticated, RequirePermission } from '../../access';
 import { WriteAuthority } from '../../venue-sync';
 import { WeighInSetupService } from '../application/weighin-setup.service';
+import { WeighInQuickService } from '../application/weighin-quick.service';
 import { WeighInService } from '../application/weighin.service';
 
 const COMP = { resolver: 'competition', param: 'id' };
@@ -107,7 +111,43 @@ export class WeighInSetupController {
 /** Взвешивание (API.md, 5.6): экран взвешивания, запись попытки, история. */
 @Controller()
 export class WeighInController {
-  constructor(private readonly weighins: WeighInService) {}
+  constructor(
+    private readonly weighins: WeighInService,
+    private readonly quick: WeighInQuickService,
+  ) {}
+
+  /** Быстрое взвешивание (правки 09.11.2026): карточки спортсмена по QR. */
+  @Get('competitions/:id/weigh-in/cards')
+  @Authenticated()
+  async cards(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @ValidQuery(WeighInCardsQuery) q: WeighInCardsQuery,
+  ): Promise<DataEnvelope<WeighInCardDto[]>> {
+    return ok(await this.quick.cards(user, id, q.qrToken));
+  }
+
+  @Get('entries/:id/weigh-in/card')
+  @Authenticated()
+  async card(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+  ): Promise<DataEnvelope<WeighInCardDto>> {
+    return ok(await this.quick.card(user, id));
+  }
+
+  /** Решение у весов: норма, недовес или перевес (снять или перевести в соседнюю категорию). */
+  @Post('entries/:id/weigh-in/decision')
+  @RequirePermission('weighin.record', ENTRY)
+  @WriteAuthority(ENTRY)
+  @HttpCode(200)
+  async decide(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @ValidBody(WeighInDecision) body: WeighInDecision,
+  ): Promise<DataEnvelope<WeighInCardDto>> {
+    return ok(await this.quick.decide(user, id, body));
+  }
 
   @Get('competitions/:id/weigh-in/settings')
   @RequirePermission('weighin.view', COMP)

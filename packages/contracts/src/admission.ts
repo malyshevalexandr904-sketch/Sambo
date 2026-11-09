@@ -213,3 +213,62 @@ export function admissionDocumentTypes(
 /** Пять документов допуска — для перечня в положении и на странице турнира (ключи `admissionDocs.*`). */
 export const ADMISSION_DOCUMENT_SLOTS = ['identity', 'insurance', 'oms', 'rank', 'medical'] as const;
 export type AdmissionDocumentSlot = (typeof ADMISSION_DOCUMENT_SLOTS)[number];
+
+// ---- Готовность документов спортсмена к турниру (правки 09.11.2026, п. 3) ----
+
+/**
+ * Итог по пяти документам допуска для заявки тренера и комиссии по допуску: OK — все проверены и действуют на дату
+ * начала турнира (зелёный); PENDING — загружены и ждут модерации (синий); EXPIRED — какой-то документ просрочен
+ * (оранжевый); MISSING — какого-то документа нет или он отклонён (красный).
+ */
+export const DOCUMENT_READINESS = ['OK', 'PENDING', 'EXPIRED', 'MISSING'] as const;
+export type DocumentReadiness = (typeof DOCUMENT_READINESS)[number];
+
+export interface ReadinessDocumentFact {
+  typeCode: string;
+  status: 'UPLOADED' | 'UNDER_REVIEW' | 'VERIFIED' | 'REJECTED' | 'EXPIRED';
+  /** YYYY-MM-DD или null (бессрочный). */
+  expirationDate: string | null;
+}
+
+export interface DocumentReadinessDto {
+  state: DocumentReadiness;
+  /** Коды типов документов по виду проблемы. */
+  missing: string[];
+  expired: string[];
+  pending: string[];
+}
+
+export function documentReadiness(
+  age: number,
+  hasRank: boolean,
+  docs: readonly ReadinessDocumentFact[],
+  onDate: string,
+): DocumentReadinessDto {
+  const { documents, insurance } = admissionDocumentTypes(age, hasRank);
+  const out: DocumentReadinessDto = { state: 'OK', missing: [], expired: [], pending: [] };
+  const valid = (d: ReadinessDocumentFact): boolean =>
+    d.expirationDate === null || d.expirationDate >= onDate;
+  for (const type of [...documents, ...insurance]) {
+    const own = docs.filter((d) => d.typeCode === type);
+    if (own.some((d) => d.status === 'VERIFIED' && valid(d))) continue;
+    if (own.some((d) => (d.status === 'UPLOADED' || d.status === 'UNDER_REVIEW') && valid(d)))
+      out.pending.push(type);
+    else if (own.some((d) => d.status === 'EXPIRED' || (d.status !== 'REJECTED' && !valid(d))))
+      out.expired.push(type);
+    else out.missing.push(type);
+  }
+  out.state =
+    out.missing.length > 0
+      ? 'MISSING'
+      : out.expired.length > 0
+        ? 'EXPIRED'
+        : out.pending.length > 0
+          ? 'PENDING'
+          : 'OK';
+  return out;
+}
+
+/** Документы, с которыми спортсмена исключают из заявки при окончании регистрации. */
+export const isReadinessBlocking = (state: DocumentReadiness): boolean =>
+  state === 'MISSING' || state === 'EXPIRED';

@@ -5,6 +5,7 @@ import type { CategoryDrawsDto, Competition } from '@sde/contracts';
 import { Alert, Badge, Button, Card, EmptyState } from '@sde/ui';
 import { useLocale, useTranslations } from 'next-intl';
 import { useSearchParams } from 'next/navigation';
+import type { ReactNode } from 'react';
 import { QueryState } from '@/components/common';
 import { CategoryStatusBadge } from '@/features/competitions/shared';
 import { usePathname, useRouter } from '@/i18n/navigation';
@@ -102,7 +103,17 @@ function CategoryPanel({
   );
 }
 
-export function DrawsTab({ competition }: { competition: Competition }) {
+export function DrawsTab({
+  competition,
+  tabKey = 'draws',
+  top,
+}: {
+  competition: Competition;
+  /** Вкладка страницы турнира, где показан список («Турнирные сетки» — brackets). */
+  tabKey?: string;
+  /** Что показать над списком категорий вместо автожеребьёвки. */
+  top?: ReactNode;
+}) {
   const t = useTranslations('draws');
   const params = useSearchParams();
   const router = useRouter();
@@ -110,7 +121,7 @@ export function DrawsTab({ competition }: { competition: Competition }) {
   const categoryId = params.get('category');
   const drawId = params.get('draw');
   const go = (query: Record<string, string>): void =>
-    router.replace({ pathname, query: { tab: 'draws', ...query } }, { scroll: false });
+    router.replace({ pathname, query: { tab: tabKey, ...query } }, { scroll: false });
   return (
     <div className="space-y-4">
       {!DRAW_PHASE.includes(competition.status) ? (
@@ -132,7 +143,11 @@ export function DrawsTab({ competition }: { competition: Competition }) {
         </>
       ) : (
         <>
-          {competition.status === 'DRAWING' ? <AutoDrawCard competition={competition} /> : null}
+          {top !== undefined ? (
+            top
+          ) : competition.status === 'DRAWING' ? (
+            <AutoDrawCard competition={competition} />
+          ) : null}
           <p className="text-sm text-slate-600">{t('hint')}</p>
           <Overview competition={competition} onOpen={(id) => go({ category: id })} />
         </>
