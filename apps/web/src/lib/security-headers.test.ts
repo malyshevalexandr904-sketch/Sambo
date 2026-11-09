@@ -17,9 +17,9 @@ describe('security headers', () => {
     expect(policy.get('camera')).toEqual(['self']);
   });
 
-  it('микрофон и геолокация запрещены всем', () => {
+  it('микрофон — только своему origin (свисток арбитра), геолокация запрещена всем', () => {
     const policy = parsePolicy(PERMISSIONS_POLICY);
-    expect(policy.get('microphone')).toEqual([]);
+    expect(policy.get('microphone')).toEqual(['self']);
     expect(policy.get('geolocation')).toEqual([]);
   });
 

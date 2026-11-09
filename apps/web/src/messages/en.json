@@ -2575,7 +2575,29 @@
     "submissionStart": "Submission",
     "submissionStop": "End of submission",
     "submissionRunning": "Submission {seconds} s",
-    "eloLabel": "Elo rating"
+    "eloLabel": "Elo rating",
+    "whistle": {
+      "on": "Whistle: on",
+      "offShort": "Whistle: off",
+      "off": "Turn on so the referee's whistle starts and stops the clock. The Time and Stop buttons keep working.",
+      "starting": "Connecting the microphone…",
+      "listening": "Listening. A whistle starts the clock, the next one stops it.",
+      "listeningDefault": "Listening (not calibrated). Calibrate so neighbouring mats interfere less.",
+      "denied": "No microphone access. Allow the microphone for this site in the browser settings.",
+      "unsupported": "This browser has no microphone access.",
+      "calibrate": "Calibrate whistle",
+      "recalibrate": "Recalibrate",
+      "calibrating": "Referee: blow the whistle 2–3 times with pauses. Heard: {count}",
+      "calibrationFailed": "No whistle heard. Move closer or blow louder and try again.",
+      "sensitivity": "Sensitivity",
+      "sensitivity_low": "low",
+      "sensitivity_medium": "medium",
+      "sensitivity_high": "high",
+      "level": "Whistle level",
+      "firedStart": "Whistle: clock started",
+      "firedStop": "Whistle: clock stopped",
+      "undo": "Undo ({seconds})"
+    }
   },
   "results": {
     "medals": {

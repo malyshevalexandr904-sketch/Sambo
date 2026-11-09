@@ -17,6 +17,7 @@ import { RefereeGesture } from '@/components/referee-gesture';
 import { useTranslations } from 'next-intl';
 import { formatClock, useRefereeLabels } from './labels';
 import type { EventInput } from './use-scoring';
+import { WhistleControl } from './whistle-control';
 
 const SIDE_STYLE: Record<Side, { box: string; bar: string; button: string; strong: string }> = {
   RED: {
@@ -325,6 +326,13 @@ export function Scoreboard({
               {t('clockStart')}
             </button>
           )
+        ) : null}
+        {canScore ? (
+          <WhistleControl
+            state={state}
+            active={canScore}
+            onClock={(e) => onEvent({ ...e, side: null, actionCode: null, value: null })}
+          />
         ) : null}
       </section>
       <SidePanel
