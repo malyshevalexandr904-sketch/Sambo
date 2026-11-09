@@ -239,7 +239,8 @@ export function DrawView({
           </Button>
         </div>
       </Card>
-      {can('draw.swap') ? <SwapCard draw={draw} onChanged={onChanged} /> : null}
+      {/* Перестановка — пока черновик можно опубликовать (правки 09.11.2026). */}
+      {can('draw.publish') ? <SwapCard draw={draw} onChanged={onChanged} /> : null}
       {isEliminationFormat(draw.format) ? (
         <Card className="print:hidden">
           <CardTitle>{t('separation.title')}</CardTitle>

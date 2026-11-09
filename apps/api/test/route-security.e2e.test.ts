@@ -169,6 +169,7 @@ describe('route security autotest', () => {
     for (const r of operational) {
       const byResolver: Record<string, string> = {
         entry: ids.entryId,
+        application: ids.applicationId,
         competitionCategory: ids.categoryId,
         draw: ids.drawId,
         match: ids.matchId,
@@ -200,9 +201,14 @@ describe('route security autotest', () => {
 });
 
 /** Турнир с категорией, заявкой, участием и черновиком жеребьёвки, право записи которого у площадочного узла. */
-async function leasedCompetition(
-  t: TestApp,
-): Promise<{ competitionId: string; categoryId: string; entryId: string; drawId: string; matchId: string }> {
+async function leasedCompetition(t: TestApp): Promise<{
+  competitionId: string;
+  categoryId: string;
+  applicationId: string;
+  entryId: string;
+  drawId: string;
+  matchId: string;
+}> {
   const competitionId = uuidv7();
   await ensureCompetition(t, competitionId);
   const categoryId = uuidv7();
@@ -273,5 +279,5 @@ async function leasedCompetition(
     where: { competitionId },
     data: { holderType: 'NODE', holderNodeId: uuidv7(), epoch: 2 },
   });
-  return { competitionId, categoryId, entryId, drawId, matchId };
+  return { competitionId, categoryId, applicationId, entryId, drawId, matchId };
 }
