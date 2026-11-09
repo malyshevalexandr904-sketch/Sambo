@@ -147,9 +147,11 @@ export interface WeighInAttemptDto {
   id: string;
   entryId: string;
   category: CategoryRef;
-  windowId: string;
-  scale: { id: string; name: string };
-  weightGrams: number;
+  /** Окно и весы; у быстрого решения (норма / недовес / перевес) без настройки окна — пусто. */
+  windowId: string | null;
+  scale: { id: string; name: string } | null;
+  /** Вес; у быстрого решения без ввода веса — пусто. */
+  weightGrams: number | null;
   measuredAt: string;
   kind: WeighInAttemptKind;
   result: WeighInResult;
@@ -190,4 +192,47 @@ export interface WeighInOutcomeDto {
 export interface WeighInSettingsDto {
   toleranceGrams: number;
   failureOutcome: WeighInFailureOutcome;
+}
+
+// ---- Быстрое взвешивание (правки 09.11.2026, п. 3) ----
+
+/** Решение оператора у весов: норма, недовес или перевес. */
+export const WEIGH_IN_VERDICTS = ['NORMAL', 'UNDER', 'OVER'] as const;
+export type WeighInVerdict = (typeof WEIGH_IN_VERDICTS)[number];
+
+/**
+ * Недовес или перевес: спортсмен не участвует (снимается) или переводится в соседнюю весовую категорию — ниже при
+ * недовесе, выше при перевесе. Вес вводить не обязательно. Прибытие отмечается тем же действием.
+ */
+export const WeighInDecision = z
+  .object({
+    verdict: z.enum(WEIGH_IN_VERDICTS),
+    action: z.enum(['WITHDRAW', 'TRANSFER']).optional(),
+    /** Категория перевода; без неё — соседняя по весу. */
+    toCategoryId: Uuid.optional(),
+    weightGrams: Grams.optional(),
+  })
+  .refine((v) => v.verdict === 'NORMAL' || !!v.action, { error: 'action_required', path: ['action'] });
+export type WeighInDecision = z.infer<typeof WeighInDecision>;
+
+export const WeighInCardsQuery = z.object({ qrToken: z.string().trim().min(10).max(2000) });
+export type WeighInCardsQuery = z.infer<typeof WeighInCardsQuery>;
+
+/** Карточка спортсмена у весов по QR: ФИО, дата рождения, документы, заявленная категория и итог. */
+export interface WeighInCardDto {
+  entryId: string;
+  entryVersion: number;
+  athleteId: string;
+  lastName: string;
+  firstName: string;
+  middleName: string | null;
+  birthDate: string;
+  organization: OrganizationRef;
+  category: CategoryRef & { weight: CategoryWeight };
+  /** Соседние весовые категории той же возрастной группы: куда перевести при недовесе и перевесе. */
+  lighter: (CategoryRef & { weight: CategoryWeight }) | null;
+  heavier: (CategoryRef & { weight: CategoryWeight }) | null;
+  documentsOk: boolean;
+  weighIn: WeighInStatus;
+  checkIn: CheckInStatus;
 }

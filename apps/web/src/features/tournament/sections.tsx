@@ -194,7 +194,7 @@ export function RegistrationSection({
         <p className="mt-3 text-sm text-slate-600">{t('whoCan')}</p>
         {canApply && viewer.data ? (
           <Link
-            href={`/competitions/${viewer.data.id}`}
+            href={`/competitions/${viewer.data.id}?apply=1`}
             className="mt-4 inline-flex min-h-11 items-center rounded-md bg-blue-700 px-5 font-medium text-white hover:bg-blue-800"
           >
             {t('apply')}

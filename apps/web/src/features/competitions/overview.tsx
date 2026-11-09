@@ -1,25 +1,17 @@
 'use client';
 // Обзор турнира: сроки во времени турнира, счётчики (дашборд организатора, первая версия), готовность к
 // публикации, переходы статуса, изменение основных данных и подача заявки клубом.
-import {
-  type ApplicationDto,
-  type Competition,
-  type DataEnvelope,
-  localDateTimeIn,
-  zonedToInstant,
-} from '@sde/contracts';
+import { type Competition, type DataEnvelope, localDateTimeIn, zonedToInstant } from '@sde/contracts';
 import { Alert, Button, Card, CardTitle, Field, Input } from '@sde/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocale, useTranslations } from 'next-intl';
 import { useState } from 'react';
 import { ReasonAction } from '@/components/common';
-import { OrganizationPicker } from '@/components/organization-picker';
-import { Link, useRouter } from '@/i18n/navigation';
-import { organizationsWith, platformHas } from '@/lib/access';
+import { Link } from '@/i18n/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useErrorMessage } from '@/lib/errors';
-import { qk, useMe } from '@/lib/queries';
-import { useAction } from '@/lib/use-action';
+import { qk } from '@/lib/queries';
+import { RosterApplyCard } from '@/features/applications/roster-apply';
 import { EditCard } from './edit-card';
 import { RatingCard } from './rating-card';
 import { MediaCard, PresentationCard, StageGuideCard } from './stage-guide';
@@ -41,7 +33,7 @@ export function OverviewTab({ competition: c }: { competition: Competition }) {
       {c.status === 'DRAFT' && can('competition.update') ? <ReadinessCard competition={c} /> : null}
       <InfoCard competition={c} />
       <RatingCard competition={c} />
-      {c.registrationOpenNow ? <ApplyCard competition={c} /> : null}
+      {c.registrationOpenNow ? <RosterApplyCard competition={c} /> : null}
       {can('competition.update') && MEDIA.includes(c.status) ? <MediaCard competition={c} /> : null}
       {can('competition.update') && c.status !== 'CANCELLED' ? <PresentationCard competition={c} /> : null}
       {can('competition.update') ? <EditCard competition={c} /> : null}
@@ -49,7 +41,7 @@ export function OverviewTab({ competition: c }: { competition: Competition }) {
   );
 }
 
-function InfoCard({ competition: c }: { competition: Competition }) {
+export function InfoCard({ competition: c }: { competition: Competition }) {
   const t = useTranslations('competitions');
   const locale = useLocale();
   const rows: [string, string][] = [
@@ -106,7 +98,7 @@ function InfoCard({ competition: c }: { competition: Competition }) {
   );
 }
 
-function ReadinessCard({ competition: c }: { competition: Competition }) {
+export function ReadinessCard({ competition: c }: { competition: Competition }) {
   const t = useTranslations('competitions.readiness');
   const items: { ok: boolean; label: string; required: boolean }[] = [
     { ok: c.counters.categories > 0, label: t('categories'), required: true },
@@ -141,7 +133,7 @@ function ReadinessCard({ competition: c }: { competition: Competition }) {
 /** Переходы с обязательной причиной: откаты и отмена (ARCHITECTURE.md, 16.1). */
 const REASON_REQUIRED = new Set(['CANCELLED']);
 
-function TransitionsCard({ competition: c }: { competition: Competition }) {
+export function TransitionsCard({ competition: c }: { competition: Competition }) {
   const t = useTranslations('competitions');
   const errorMessage = useErrorMessage();
   const failedText = useFailedText();
@@ -250,62 +242,6 @@ function TransitionsCard({ competition: c }: { competition: Competition }) {
           );
         })}
       </div>
-    </Card>
-  );
-}
-
-function ApplyCard({ competition: c }: { competition: Competition }) {
-  const t = useTranslations('competitions');
-  const router = useRouter();
-  const { data: me } = useMe();
-  const [org, setOrg] = useState('');
-  const action = useAction();
-  const available =
-    platformHas(me, 'registration.create') || organizationsWith(me, 'registration.create').length > 0;
-  if (!available) return null;
-  const selected = org;
-  return (
-    <Card>
-      <CardTitle>{t('applyTitle')}</CardTitle>
-      <p className="mb-3 text-sm text-slate-600">{t('applyHint')}</p>
-      {action.error ? (
-        <Alert tone="danger" className="mb-3">
-          {action.error}
-        </Alert>
-      ) : null}
-      <div className="flex flex-wrap items-end gap-3">
-        <OrganizationPicker
-          id="apply-org"
-          label={t('applyOrganization')}
-          permission="registration.create"
-          value={selected}
-          onChange={setOrg}
-          className="min-w-64 flex-1"
-        />
-        <Button
-          loading={action.busy}
-          disabled={!selected}
-          onClick={() =>
-            void action.run(async () => {
-              const res = await api<DataEnvelope<ApplicationDto>>(`/competitions/${c.id}/applications`, {
-                method: 'POST',
-                body: { organizationId: selected },
-              });
-              router.push(`/applications/${res.data.id}`);
-            })
-          }
-        >
-          {t('applyCreate')}
-        </Button>
-      </div>
-      <p className="mt-3 text-sm">
-        <Link
-          href={{ pathname: '/applications', query: { competitionId: c.id } }}
-          className="text-blue-700 hover:underline"
-        >
-          {t('myApplicationsHere')}
-        </Link>
-      </p>
     </Card>
   );
 }

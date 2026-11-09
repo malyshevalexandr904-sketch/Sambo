@@ -152,6 +152,7 @@ export const AUDIT_ACTIONS = [
   'draw.created',
   'draw.published',
   'draw.superseded',
+  'draw.slots_swapped',
   'bracket.advanced',
   'bracket.group_places_decided',
   'mat.created',

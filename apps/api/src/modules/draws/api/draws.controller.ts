@@ -7,6 +7,7 @@ import {
   type DrawDto,
   type DrawOverviewRow,
   DrawSupersede,
+  DrawSwap,
   type DrawVerifyDto,
 } from '@sde/contracts';
 import { CurrentUser } from '../../../common/context/current-user';
@@ -100,6 +101,20 @@ export class DrawsController {
     @ValidBody(DrawSupersede) body: DrawSupersede,
   ): Promise<DataEnvelope<DrawDto>> {
     return ok(await this.draws.supersede(user, id, version, body.reason));
+  }
+
+  /** Ручная правка черновика (правки 09.11.2026): поменять местами две позиции. */
+  @Post('draws/:id/swap')
+  @RequirePermission('draw.create', DRAW)
+  @WriteAuthority(DRAW)
+  @HttpCode(200)
+  async swap(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @IfMatchVersion() version: number,
+    @ValidBody(DrawSwap) body: DrawSwap,
+  ): Promise<DataEnvelope<DrawDto>> {
+    return ok(await this.draws.swap(user, id, version, body));
   }
 
   @Post('draws/:id/verify')

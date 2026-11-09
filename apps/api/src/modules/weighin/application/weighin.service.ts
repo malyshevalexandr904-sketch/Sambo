@@ -299,7 +299,7 @@ export class WeighInService {
     );
     const result: WeighInOutcomeDto = { attempt: toAttemptDto(attempt), record, admission };
     const facts = await this.competitionFacts(null, attempt.competitionId);
-    if (record.status === 'FAILED' && facts.outcome === 'TRANSFER')
+    if (record.status === 'FAILED' && facts.outcome === 'TRANSFER' && attempt.weightGrams !== null)
       result.suggestedCategories = await this.suggestions(
         ctx.entry.categoryId,
         attempt.weightGrams,

@@ -105,13 +105,21 @@ export default async function HomePage({ params }: { params: Promise<{ locale: s
             </div>
             <LegalLinks className="mt-8" tone="onDark" />
           </div>
+          {/* Правки 09.11.2026, п. 1: «О платформе» — заметная кнопка с пульсирующей обводкой и подписью, а не мелкая
+              надпись. Стрелка внизу по-прежнему «плывёт», при «уменьшить движение» всё неподвижно. */}
           <a
             href="#about"
-            className="mx-auto inline-flex min-h-11 flex-col items-center text-sm font-medium text-white/75 hover:text-white"
+            className="about-cta group mx-auto mt-2 inline-flex min-h-14 items-center gap-3 rounded-full border-2 border-white/60 bg-white/15 py-2 pl-6 pr-3 text-white shadow-lg shadow-black/30 backdrop-blur-md transition hover:border-white hover:bg-white/25"
           >
-            {t('aboutLink')}
-            <span aria-hidden="true" className="animate-float text-lg">
-              ↓
+            <span className="flex flex-col text-left leading-tight">
+              <span className="text-lg font-bold sm:text-xl">{t('aboutLink')}</span>
+              <span className="text-xs text-white/80 sm:text-sm">{t('aboutLinkHint')}</span>
+            </span>
+            <span
+              aria-hidden="true"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-600 text-xl font-bold transition group-hover:bg-red-500"
+            >
+              <span className="animate-float">↓</span>
             </span>
           </a>
         </div>

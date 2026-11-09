@@ -14,7 +14,8 @@ export interface AttemptFact {
   kind: WeighInAttemptKind;
   result: WeighInResult;
   measuredAt: Date;
-  weightGrams: number;
+  /** Пусто у быстрого решения оператора без ввода веса. */
+  weightGrams: number | null;
   categoryId: string;
   toleranceGrams: number;
 }
@@ -49,8 +50,9 @@ export function deriveWeighIn(attempts: readonly AttemptFact[], ctx: DerivationC
   const official = sorted.filter((a) => a.kind !== 'CONTROL');
   const last = official[official.length - 1];
   if (!last) return { status: 'EXPECTED', lastAttemptId, decisive: null };
+  // После перевода итог пересчитывается по границам новой категории; без веса (решение оператора) — как решили.
   const result =
-    last.categoryId === ctx.categoryId
+    last.categoryId === ctx.categoryId || last.weightGrams === null
       ? last.result
       : weighInResult(last.weightGrams, ctx.limits, last.toleranceGrams);
   const decisive = { attempt: last, result };

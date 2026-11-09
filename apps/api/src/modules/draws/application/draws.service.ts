@@ -3,7 +3,7 @@
 // Блокировки: право записи → турнир FOR SHARE → категория FOR UPDATE → версия жеребьёвки FOR UPDATE.
 import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { type DrawCreate, type DrawDto, isDrawFormat, ratedFormatPlan } from '@sde/contracts';
+import { type DrawCreate, type DrawDto, type DrawSwap, isDrawFormat, ratedFormatPlan } from '@sde/contracts';
 import { type Draw, type Prisma, type Tx, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
 import { DomainError, versionConflict } from '../../../common/errors/domain-error';
@@ -17,6 +17,7 @@ import { OutboxService } from '../../outbox';
 import { canonicalDrawInput, type DrawInput, drawInputHash, seedingIssues } from '../domain/draw-input';
 import { inDrawPhase, MIN_DRAW_PARTICIPANTS } from '../domain/draw-rules';
 import { computeDrawLayout, type DrawLayout } from '../domain/layout';
+import { applySwaps, parseSwaps } from '../domain/manual-swaps';
 import { isValidRandomSeed } from '../domain/prng';
 import { DrawQueriesService } from './draw-queries';
 import {
@@ -272,6 +273,53 @@ export class DrawsService {
       });
       await this.workflow.systemTransition(tx, locked, 'DRAWN');
       await this.recordPublished(tx, draw, viaPlatform);
+    });
+    return this.queries.get(user, drawId);
+  }
+
+  /**
+   * Ручная правка черновика (правки 09.11.2026, п. 3): поменять местами две позиции последнего черновика до
+   * публикации. Вход жеребьёвки не меняется — меняется расстановка; перестановка пишется в версию и в аудит.
+   */
+  async swap(user: AuthUser, drawId: string, version: number, req: DrawSwap): Promise<DrawDto> {
+    const summary = await this.queries.requireDraw(drawId);
+    const { viaPlatform } = await this.access(user, summary.competitionId, 'draw.create');
+    await this.db.tx(async (tx) => {
+      const locked = await this.workflow.lockForCommand(tx, summary.categoryId);
+      if (!inDrawPhase(locked.competitionStatus)) throw blocked('competition_status');
+      const draw = await this.lockDraw(tx, drawId, version);
+      if (draw.status !== 'DRAFT')
+        throw new DomainError('INVALID_TRANSITION', { from: draw.status, to: 'DRAFT', allowed: [] });
+      if (locked.category.status !== 'READY_FOR_DRAW')
+        throw new DomainError('CATEGORY_NOT_READY_FOR_DRAW', { status: locked.category.status });
+      const last = await tx.draw.aggregate({
+        where: { categoryId: draw.categoryId },
+        _max: { number: true },
+      });
+      if (draw.number !== last._max.number) throw blocked('newer_draft_exists');
+      const slots = await tx.drawSlot.findMany({ where: { drawId }, orderBy: { position: 'asc' } });
+      const positions = new Set(slots.map((s) => s.position));
+      if (!positions.has(req.a)) throw invalid('a', 'not_found');
+      if (!positions.has(req.b)) throw invalid('b', 'not_found');
+      const next = applySwaps(slots, [req]);
+      for (const s of next.filter((x) => x.position === req.a || x.position === req.b))
+        await tx.drawSlot.update({
+          where: { id: s.id },
+          data: { entryId: s.entryId, seedNumber: s.seedNumber },
+        });
+      const swaps = [...parseSwaps(draw.manualSwaps), req];
+      await tx.draw.update({
+        where: { id: drawId },
+        data: { manualSwaps: swaps, version: { increment: 1 } },
+      });
+      await this.audit.record(tx, {
+        action: 'draw.slots_swapped',
+        entityType: 'Draw',
+        entityId: drawId,
+        competitionId: draw.competitionId,
+        after: { a: req.a, b: req.b, swaps: swaps.length },
+        platformIntervention: viaPlatform,
+      });
     });
     return this.queries.get(user, drawId);
   }

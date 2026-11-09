@@ -58,6 +58,9 @@ export function drawActions(
     ctx.categoryStatus === 'READY_FOR_DRAW'
   )
     actions.push('draw.publish');
+  // Ручная правка черновика (правки 09.11.2026): перестановка позиций — до публикации, в последнем черновике.
+  if (ctx.status === 'DRAFT' && ctx.canPublish && ctx.latest && ctx.categoryStatus === 'READY_FOR_DRAW')
+    actions.push('draw.swap');
   if (ctx.status === 'PUBLISHED' && ctx.canRepublish && ctx.categoryStatus === 'DRAWN')
     actions.push('draw.supersede');
   return actions;

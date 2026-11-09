@@ -16,7 +16,13 @@ export class EntryWithdrawalService {
   ) {}
 
   /** Участие снимается (порядок блокировок — заявка, затем участие); уже снятое — ничего не делает. */
-  async withdrawBySystem(tx: Tx, entryId: string, userId: string, reason: string): Promise<boolean> {
+  async withdrawBySystem(
+    tx: Tx,
+    entryId: string,
+    userId: string,
+    reason: string,
+    trigger = 'withdrawn_by_doctor',
+  ): Promise<boolean> {
     const current = await tx.entry.findUniqueOrThrow({
       where: { id: entryId },
       select: { applicationId: true },
@@ -42,7 +48,7 @@ export class EntryWithdrawalService {
       competitionId: entry.competitionId,
       organizationId: application.organizationId,
       before: { status: entry.status },
-      after: { status: 'WITHDRAWN', trigger: 'withdrawn_by_doctor' },
+      after: { status: 'WITHDRAWN', trigger },
       reason,
     });
     await this.outbox.enqueue(tx, {

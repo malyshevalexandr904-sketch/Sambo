@@ -1,5 +1,11 @@
 import { Controller, Delete, Get, HttpCode, Patch, Post, Res } from '@nestjs/common';
 import {
+  ApplicationCommissionRequest,
+  type ApplicationDocumentsRow,
+  EntriesBulkCreate,
+  type EntriesBulkResult,
+  RosterQuery,
+  type RosterDto,
   ApplicationCreate,
   type ApplicationDto,
   ApplicationPatch,
@@ -32,6 +38,7 @@ import { EligibilityService } from '../application/eligibility.service';
 import { EntriesService } from '../application/entries.service';
 import { EntryDecisionsService } from '../application/entry-decisions.service';
 import { EntriesExportService } from '../application/export.service';
+import { RosterService } from '../application/roster.service';
 
 const COMP = { resolver: 'competition', param: 'id' };
 const ENTRY = { resolver: 'entry', param: 'id' };
@@ -47,7 +54,19 @@ export class CompetitionRegistrationsController {
     private readonly entries: EntriesService,
     private readonly eligibility: EligibilityService,
     private readonly exporter: EntriesExportService,
+    private readonly roster: RosterService,
   ) {}
+
+  /** Спортсмены организации для заявки списком: категории и документы (правки 09.11.2026). */
+  @Get('roster')
+  @Authenticated()
+  async rosterList(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @ValidQuery(RosterQuery) q: RosterQuery,
+  ): Promise<DataEnvelope<RosterDto>> {
+    return ok(await this.roster.roster(user, id, q.organizationId));
+  }
 
   @Get('eligible-categories')
   @Authenticated()
@@ -111,7 +130,43 @@ export class ApplicationsController {
   constructor(
     private readonly applications: ApplicationsService,
     private readonly entries: EntriesService,
+    private readonly roster: RosterService,
   ) {}
+
+  /** Несколько спортсменов в заявку (правки 09.11.2026). */
+  @Post(':id/entries/bulk')
+  @Authenticated()
+  @HttpCode(200)
+  async addBulk(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @ValidBody(EntriesBulkCreate) body: EntriesBulkCreate,
+  ): Promise<DataEnvelope<EntriesBulkResult>> {
+    return ok(await this.roster.addBulk(user, id, body));
+  }
+
+  /** Готовность документов участников — для комиссии по допуску. */
+  @Get(':id/documents-readiness')
+  @Authenticated()
+  async documentsReadiness(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+  ): Promise<DataEnvelope<ApplicationDocumentsRow[]>> {
+    return ok(await this.roster.applicationDocuments(user, id));
+  }
+
+  /** Комиссия по допуску: одобрить заявку целиком или отказать с причиной. */
+  @Post(':id/commission')
+  @Authenticated()
+  @WriteAuthority({ resolver: 'application', param: 'id' })
+  @HttpCode(204)
+  async commission(
+    @CurrentUser() user: AuthUser,
+    @UuidParam('id') id: string,
+    @ValidBody(ApplicationCommissionRequest) body: ApplicationCommissionRequest,
+  ): Promise<void> {
+    await this.roster.commission(user, id, body);
+  }
 
   private send(res: Response, app: ApplicationDto): DataEnvelope<ApplicationDto> {
     res.setHeader('ETag', etag(app.version));

@@ -42,13 +42,14 @@ export class CompetitionStagesService {
     await this.db.tx(async (tx) => {
       const before = await tx.competition.findUniqueOrThrow({
         where: { id },
-        select: { posterTemplate: true, liveStreamUrl: true },
+        select: { posterTemplate: true, liveStreamUrl: true, daySchedule: true },
       });
       await tx.competition.update({
         where: { id },
         data: {
           ...(input.posterTemplate !== undefined ? { posterTemplate: input.posterTemplate } : {}),
           ...(input.liveStreamUrl !== undefined ? { liveStreamUrl: input.liveStreamUrl } : {}),
+          ...(input.daySchedule !== undefined ? { daySchedule: input.daySchedule } : {}),
           version: { increment: 1 },
           updatedById: user.id,
         },

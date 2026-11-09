@@ -2,7 +2,7 @@
 // посетитель публичной страницы, какие разделы открыты на публичной странице и шаблоны афиши.
 import { z } from 'zod';
 import { Uuid } from './common.js';
-import type { CompetitionStatus } from './competitions.js';
+import { CompetitionDaySchedule, type CompetitionStatus } from './competitions.js';
 
 /**
  * Стадии по порядку: «Черновик» и «На согласовании» — у заявки на проведение (и у турнира, пока организатор его
@@ -90,6 +90,8 @@ const HttpsUrl = z
 export const CompetitionPresentationUpdate = z.object({
   posterTemplate: z.enum(POSTER_TEMPLATES).optional(),
   liveStreamUrl: HttpsUrl.nullable().optional(),
+  /** Сроки этапов дня соревнований (правки 09.11.2026). */
+  daySchedule: CompetitionDaySchedule.optional(),
 });
 export type CompetitionPresentationUpdate = z.infer<typeof CompetitionPresentationUpdate>;
 

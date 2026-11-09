@@ -1,6 +1,7 @@
 // Обслуживание БД и хранилища (DATABASE.md, 5, 8, 9): партиции журналов, сроки хранения служебных данных.
 import { DeleteObjectCommand, type S3Client } from '@aws-sdk/client-s3';
-import { type PrismaClient, uuidv7 } from '@sde/db';
+import { documentReadiness, fullYearsOn, isReadinessBlocking } from '@sde/contracts';
+import { type Prisma, type PrismaClient, uuidv7 } from '@sde/db';
 import { snapshotRanks } from '@sde/rating';
 import type { Env, Logger } from '@sde/server-kit';
 
@@ -177,7 +178,7 @@ export class Maintenance {
         registrationEndsAt: { lte: now },
         writeLease: { holderType: 'CLOUD' },
       },
-      select: { id: true, organizerOrganizationId: true },
+      select: { id: true, organizerOrganizationId: true, startDate: true },
       take: 100,
     });
     let closed = 0;
@@ -193,6 +194,7 @@ export class Maintenance {
           where: { competitionId: c.id, status: 'REGISTRATION' },
           data: { status: 'CLOSED', version: { increment: 1 } },
         });
+        await removeEntriesWithoutDocuments(tx, c.id, c.startDate.toISOString().slice(0, 10), now);
         await tx.auditLog.create({
           data: {
             id: uuidv7(),
@@ -310,4 +312,99 @@ export class Maintenance {
     if (written > 0) this.logger.info({ count: written }, 'Rating ranks snapshot');
     return written;
   }
+}
+
+/** Причина исключения — та же, что в API (registrations/application/roster.service.ts). */
+const DOCUMENTS_NOT_READY_REASON =
+  'Документы не приведены в порядок до окончания регистрации: нет документа или истёк срок действия';
+
+/**
+ * Правки 09.11.2026, п. 3: при окончании регистрации спортсмены поданных заявок, у которых документа допуска нет
+ * или истёк срок действия, исключаются из заявки (участие отклоняется с причиной). Загруженные и ждущие модерации
+ * остаются. Тот же расчёт — в API при закрытии регистрации вручную (RosterService.removeNotReady).
+ */
+export async function removeEntriesWithoutDocuments(
+  tx: Prisma.TransactionClient,
+  competitionId: string,
+  startDate: string,
+  now: Date,
+): Promise<number> {
+  const entries = await tx.entry.findMany({
+    where: {
+      competitionId,
+      status: { in: ['PENDING', 'APPROVED'] },
+      application: { status: { notIn: ['DRAFT', 'CANCELLED'] } },
+    },
+    select: { id: true, athleteId: true, application: { select: { organizationId: true } } },
+  });
+  if (entries.length === 0) return 0;
+  const ids = [...new Set(entries.map((e) => e.athleteId))];
+  const [athletes, docs] = await Promise.all([
+    tx.athleteProfile.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        person: { select: { birthDate: true } },
+        ranks: { where: { revokedAt: null }, select: { id: true }, take: 1 },
+      },
+    }),
+    tx.document.findMany({
+      where: { deletedAt: null, athleteId: { in: ids }, OR: [{ competitionId: null }, { competitionId }] },
+      select: { athleteId: true, typeCode: true, status: true, expirationDate: true },
+    }),
+  ]);
+  const blocking = new Set(
+    athletes
+      .filter((a) => {
+        const own = docs
+          .filter((d) => d.athleteId === a.id)
+          .map((d) => ({
+            typeCode: d.typeCode,
+            status: d.status,
+            expirationDate: d.expirationDate?.toISOString().slice(0, 10) ?? null,
+          }));
+        const age = fullYearsOn(a.person.birthDate.toISOString().slice(0, 10), startDate);
+        return isReadinessBlocking(documentReadiness(age, a.ranks.length > 0, own, startDate).state);
+      })
+      .map((a) => a.id),
+  );
+  const removed = entries.filter((e) => blocking.has(e.athleteId));
+  if (removed.length === 0) return 0;
+  await tx.entry.updateMany({
+    where: { id: { in: removed.map((e) => e.id) } },
+    data: {
+      status: 'REJECTED',
+      decidedAt: now,
+      decisionReason: DOCUMENTS_NOT_READY_REASON,
+      version: { increment: 1 },
+    },
+  });
+  for (const e of removed) {
+    await tx.auditLog.create({
+      data: {
+        id: uuidv7(),
+        actorType: 'SYSTEM',
+        action: 'entry.decided',
+        entityType: 'Entry',
+        entityId: e.id,
+        competitionId,
+        organizationId: e.application.organizationId,
+        after: { status: 'REJECTED', trigger: 'registration_closed_documents' },
+        reason: DOCUMENTS_NOT_READY_REASON,
+        traceId: 'maintenance:closeRegistrations',
+      },
+    });
+    await tx.outboxEvent.create({
+      data: {
+        id: uuidv7(),
+        type: 'registration.entry_decided',
+        aggregateType: 'Entry',
+        aggregateId: e.id,
+        competitionId,
+        traceId: 'maintenance:closeRegistrations',
+        payload: { entryId: e.id, decision: 'REJECTED' },
+      },
+    });
+  }
+  return removed.length;
 }

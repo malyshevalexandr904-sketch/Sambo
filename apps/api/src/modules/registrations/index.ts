@@ -2,3 +2,5 @@ export { RegistrationsModule } from './registrations.module';
 export { RegistrationAccessService } from './application/registration-access.service';
 export { ActiveMatchService, type EntryReadiness } from './application/active-match.service';
 export { EntryWithdrawalService } from './application/entry-withdrawal.service';
+export { EntryDecisionsService } from './application/entry-decisions.service';
+export { readinessOf, RosterService } from './application/roster.service';

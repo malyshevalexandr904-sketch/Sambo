@@ -137,7 +137,9 @@ function WeighRow({
         {row.checkIn.status !== 'ARRIVED' ? <CheckInBadge status={row.checkIn.status} /> : null}
       </div>
       <p className="text-xs text-slate-600">
-        {last ? t('lastWeight', { weight: gramsToKg(last.weightGrams, lang) }) : null}
+        {last && last.weightGrams !== null
+          ? t('lastWeight', { weight: gramsToKg(last.weightGrams, lang) })
+          : null}
         {!last && row.declaredWeightGrams !== null
           ? t('declared', { weight: gramsToKg(row.declaredWeightGrams, lang) })
           : null}
@@ -222,7 +224,8 @@ function WeighRow({
           <p className="text-sm">
             {t('recorded', {
               kind: t(`kinds.${outcome.attempt.kind}`),
-              weight: gramsToKg(outcome.attempt.weightGrams, lang),
+              weight:
+                outcome.attempt.weightGrams !== null ? gramsToKg(outcome.attempt.weightGrams, lang) : '—',
               result: t(`results.${outcome.attempt.result}`),
             })}
           </p>

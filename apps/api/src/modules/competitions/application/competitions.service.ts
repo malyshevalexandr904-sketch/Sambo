@@ -10,6 +10,7 @@ import {
   type CompetitionSummary,
   type CompetitionTransitionRequest,
   type Page,
+  parseDaySchedule,
 } from '@sde/contracts';
 import { type Tx, uuidv7 } from '@sde/db';
 import type { AuthUser } from '../../../common/context/request-context';
@@ -151,6 +152,7 @@ export class CompetitionsService {
       writeAuthority: await this.leases.authority(row.id),
       posterTemplate: row.posterTemplate,
       liveStreamUrl: row.liveStreamUrl,
+      daySchedule: parseDaySchedule(row.daySchedule),
       followed:
         (await this.db.follow.count({
           where: { userId: user.id, targetType: 'COMPETITION', targetId: row.id },
